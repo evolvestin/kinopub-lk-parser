@@ -1,7 +1,3 @@
-Of course, here is an updated and improved README file based on the provided source code. It accurately reflects the script's functionality, environment variables, and modern best practices for a Docker-based application on Ubuntu.
-
-***
-
 # Gmail to Telegram Code Forwarder
 
 A simple, efficient, and containerized service that monitors a Gmail inbox for new emails from a specific sender, extracts a verification code using a regular expression, and forwards it to a designated Telegram chat.
