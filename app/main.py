@@ -175,6 +175,11 @@ def run_idle_loop(mail):
             responses = mail.idle(timeout=IDLE_TIMEOUT)
             logging.debug('Received response from IDLE: %s', responses)
 
+            status, _ = mail.noop()
+            if status != 'OK':
+                logging.warning('NOOP command failed. Connection might be stale.')
+                break
+
         except (imaplib2.IMAP4.error, socket.error, OSError) as e:
             logging.warning('Connection lost in IDLE mode. Reconnecting. Error: %s', e)
             break
