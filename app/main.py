@@ -18,7 +18,7 @@ ALLOWED_SENDER = os.getenv('ALLOWED_SENDER')
 IMAP_HOST = 'imap.gmail.com'
 IMAP_FOLDER = 'INBOX'
 REGEX_CODE = r'\d{6}'
-MARK_AS_SEEN = False
+MARK_AS_SEEN = True
 HEARTBEAT_FILE = os.getenv('HEARTBEAT_FILE', '/tmp/kinopub-parser_heartbeat')
 
 REQUEST_TIMEOUT = 10
