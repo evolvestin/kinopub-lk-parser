@@ -1,0 +1,12 @@
+services:
+  kinopub-parser:
+    build: .
+    container_name: kinopub-parser
+    restart: unless-stopped
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "python", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
