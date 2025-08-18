@@ -23,7 +23,7 @@ HEARTBEAT_FILE = os.getenv('HEARTBEAT_FILE', '/tmp/kinopub-parser_heartbeat')
 
 REQUEST_TIMEOUT = 10
 IMAP_TIMEOUT = 30
-IDLE_TIMEOUT = 24 * 60
+IDLE_TIMEOUT = 25
 MAX_RETRIES = 5
 RECONNECT_DELAY = 15
 
@@ -106,11 +106,41 @@ def imap_connection():
                 pass
 
 
+def get_message_body(email_msg) -> str:
+    """Returns the message body: first text/plain, otherwise text/html (as is)."""
+    if email_msg.is_multipart():
+        plain_body = None
+        html_body = None
+        for part in email_msg.walk():
+            ctype = part.get_content_type()
+            if ctype in ('text/plain', 'text/html'):
+                try:
+                    payload = part.get_payload(decode=True)
+                    if isinstance(payload, (bytes, bytearray)):
+                        text = payload.decode(part.get_content_charset() or 'utf-8', errors='ignore')
+                    else:
+                        text = str(payload)
+                except (UnicodeDecodeError, AttributeError):
+                    text = ''
+                if ctype == 'text/plain' and plain_body is None and text:
+                    plain_body = text
+                elif ctype == 'text/html' and html_body is None and text:
+                    html_body = text
+        return plain_body if plain_body else (html_body or '')
+    else:
+        try:
+            payload = email_msg.get_payload(decode=True)
+            if isinstance(payload, (bytes, bytearray)):
+                return payload.decode(email_msg.get_content_charset() or 'utf-8', errors='ignore')
+            return str(payload)
+        except (UnicodeDecodeError, AttributeError):
+            return ''
+
+
 def process_emails(mail):
     """Searches and processes all unread emails."""
     try:
-        search_criteria = f'(UNSEEN FROM "{ALLOWED_SENDER}")'
-        status, data = mail.search(None, search_criteria)
+        status, data = mail.uid('SEARCH', None, 'UNSEEN', 'FROM', f'"{ALLOWED_SENDER}"')
         if status != 'OK':
             logging.error('Failed to search for unseen emails from %s.', ALLOWED_SENDER)
             return
@@ -123,31 +153,21 @@ def process_emails(mail):
         for uid in unseen_uids:
             if shutdown_flag:
                 break
-            _, msg_data = mail.fetch(uid, '(RFC822)')
+            _, msg_data = mail.uid('FETCH', uid, '(RFC822)')
             if not msg_data or not msg_data[0] or not isinstance(msg_data[0], tuple):
                 continue
 
             email_msg = email.message_from_bytes(msg_data[0][1])
-            sender = email.utils.parseaddr(email_msg.get('From'))[1] or 'Unknown Sender'
+            sender = (email.utils.parseaddr(email_msg.get('From'))[1] or 'Unknown Sender').lower()
 
-            if sender != ALLOWED_SENDER:
+            if sender != (ALLOWED_SENDER or '').lower():
                 logging.warning("Found a message not from the allowed sender, skipping. Sender: %s", sender)
                 continue
 
-            body = ''
-            if email_msg.is_multipart():
-                for part in email_msg.walk():
-                    if part.get_content_type() == 'text/plain':
-                        try:
-                            body = part.get_payload(decode=True).decode(errors='ignore')
-                            break
-                        except (UnicodeDecodeError, AttributeError):
-                            continue
-            else:
-                try:
-                    body = email_msg.get_payload(decode=True).decode(errors='ignore')
-                except (UnicodeDecodeError, AttributeError):
-                    body = ''
+            body = get_message_body(email_msg)
+            if not body:
+                logging.warning('Empty body extracted (uid=%s). Will not mark as seen.', uid)
+                continue
 
             code_match = re.search(REGEX_CODE, body)
             if code_match:
@@ -155,8 +175,10 @@ def process_emails(mail):
                 logging.info('Found code %s in email from %s', code, sender)
                 send_to_telegram(code)
 
-            if MARK_AS_SEEN:
-                mail.store(uid, '+FLAGS', '\\Seen')
+                if MARK_AS_SEEN:
+                    mail.store(uid, '+FLAGS', '\\Seen')
+            else:
+                logging.info('No 6-digit code found in message (uid=%s). Leaving UNSEEN for retry.', uid)
     except (imaplib2.IMAP4.error, socket.error, OSError) as e:
         logging.error('Error processing emails: %s', e)
         raise
@@ -174,12 +196,6 @@ def run_idle_loop(mail):
             logging.debug('Entering IDLE mode. Waiting for updates for %d seconds...', IDLE_TIMEOUT)
             responses = mail.idle(timeout=IDLE_TIMEOUT)
             logging.debug('Received response from IDLE: %s', responses)
-
-            status, _ = mail.noop()
-            if status != 'OK':
-                logging.warning('NOOP command failed. Connection might be stale.')
-                break
-
         except (imaplib2.IMAP4.error, socket.error, OSError) as e:
             logging.warning('Connection lost in IDLE mode. Reconnecting. Error: %s', e)
             break
