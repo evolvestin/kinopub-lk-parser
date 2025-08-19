@@ -107,7 +107,7 @@ def imap_connection():
 
 
 def get_message_body(email_msg) -> str:
-    """Returns the message body: first text/plain, otherwise text/html (as is)."""
+    """Returns the message body: prefers text/html if available, otherwise text/plain."""
     if email_msg.is_multipart():
         plain_body = None
         html_body = None
@@ -126,7 +126,7 @@ def get_message_body(email_msg) -> str:
                     plain_body = text
                 elif ctype == 'text/html' and html_body is None and text:
                     html_body = text
-        return plain_body if plain_body else (html_body or '')
+        return html_body if html_body else (plain_body or '')
     else:
         try:
             payload = email_msg.get_payload(decode=True)
@@ -153,8 +153,12 @@ def process_emails(mail):
         for uid in unseen_uids:
             if shutdown_flag:
                 break
-            _, msg_data = mail.uid('FETCH', uid, '(RFC822)')
+            status, msg_data = mail.uid('FETCH', uid, '(RFC822)')
+            if status != 'OK':
+                logging.warning('Failed to fetch message uid=%s: %s', uid, msg_data)
+                continue
             if not msg_data or not msg_data[0] or not isinstance(msg_data[0], tuple):
+                logging.warning('Invalid fetch data for uid=%s, skipping.', uid)
                 continue
 
             email_msg = email.message_from_bytes(msg_data[0][1])
