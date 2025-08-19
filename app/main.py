@@ -1,235 +1,87 @@
-import imaplib2
-import email.utils
-import re
-import time
-import requests
 import logging
-import os
 import signal
 import socket
-from contextlib import contextmanager
+import time
+import threading
+import imaplib2
 
-GMAIL_EMAIL = os.getenv('GMAIL_EMAIL')
-GMAIL_PASSWORD = os.getenv('GMAIL_PASSWORD')
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-CHAT_ID = os.getenv('CHAT_ID')
-ALLOWED_SENDER = os.getenv('ALLOWED_SENDER')
+import config
+import database
+import telegram_bot
+import email_processor
 
-IMAP_HOST = 'imap.gmail.com'
-IMAP_FOLDER = 'INBOX'
-REGEX_CODE = r'\d{6}'
-MARK_AS_SEEN = True
-HEARTBEAT_FILE = os.getenv('HEARTBEAT_FILE', '/tmp/kinopub-parser_heartbeat')
-
-REQUEST_TIMEOUT = 10
-IMAP_TIMEOUT = 30
-IDLE_TIMEOUT = 25
-MAX_RETRIES = 5
-RECONNECT_DELAY = 15
-
-logging.basicConfig(
-    level=os.getenv('LOG_LEVEL', 'INFO').upper(),
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-)
-
-shutdown_flag = False
+shutdown_flag = threading.Event()
 
 
 def _handle_signal(signum, _):
-    global shutdown_flag
     logging.warning('Received signal %s, shutting down gracefully...', signum)
-    shutdown_flag = True
-
-
-for sig in (signal.SIGINT, signal.SIGTERM):
-    signal.signal(sig, _handle_signal)
-
-
-def validate_config():
-    """Validates the presence of all required environment variables."""
-    missing = [key for key in ('GMAIL_EMAIL', 'GMAIL_PASSWORD', 'BOT_TOKEN', 'CHAT_ID', 'ALLOWED_SENDER') if
-               not globals()[key]]
-    if missing:
-        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+    shutdown_flag.set()
 
 
 def heartbeat():
     """Updates the heartbeat file for healthcheck."""
     try:
-        with open(HEARTBEAT_FILE, 'w') as f:
+        with open(config.HEARTBEAT_FILE, 'w') as f:
             f.write(str(int(time.time())))
     except IOError as e:
         logging.warning('Failed to update heartbeat: %s', e)
 
 
-def send_to_telegram(message: str) -> None:
-    """Sends a message to Telegram with retries."""
-    if not BOT_TOKEN or not CHAT_ID:
-        logging.error('BOT_TOKEN or CHAT_ID is not set.')
-        return
-    url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
-    payload = {'chat_id': CHAT_ID, 'text': message}
-    for attempt in range(MAX_RETRIES):
+def expire_codes_periodically():
+    """Periodically checks for and expires old codes."""
+    while not shutdown_flag.wait(config.EXPIRATION_CHECK_INTERVAL_SECONDS):
         try:
-            response = requests.post(url, data=payload, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
-            logging.info('Sent to Telegram: %s', message)
-            return
-        except requests.RequestException as e:
-            logging.error('Telegram send error (attempt %d/%d): %s', attempt + 1, MAX_RETRIES, e)
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(2 ** attempt)
-    logging.error('Failed to send to Telegram after %d retries.', MAX_RETRIES)
-
-
-@contextmanager
-def imap_connection():
-    """Context manager for IMAP connection using imaplib2."""
-    mail = None
-    try:
-        mail = imaplib2.IMAP4_SSL(IMAP_HOST, timeout=IMAP_TIMEOUT)
-        mail.login(GMAIL_EMAIL, GMAIL_PASSWORD)
-        mail.select(IMAP_FOLDER, readonly=not MARK_AS_SEEN)
-        logging.info('IMAP connection established, folder %s selected.', IMAP_FOLDER)
-        yield mail
-    except (imaplib2.IMAP4.error, socket.error, OSError) as e:
-        logging.error('IMAP connection error: %s', e)
-        raise
-    finally:
-        if mail:
-            try:
-                mail.close()
-                mail.logout()
-                logging.info('IMAP connection closed.')
-            except (imaplib2.IMAP4.error, socket.error, OSError):
-                pass
-
-
-def get_message_body(email_msg) -> str:
-    """Returns the message body: prefers text/html if available, otherwise text/plain."""
-    if email_msg.is_multipart():
-        plain_body = None
-        html_body = None
-        for part in email_msg.walk():
-            ctype = part.get_content_type()
-            if ctype in ('text/plain', 'text/html'):
-                try:
-                    payload = part.get_payload(decode=True)
-                    if isinstance(payload, (bytes, bytearray)):
-                        text = payload.decode(part.get_content_charset() or 'utf-8', errors='ignore')
-                    else:
-                        text = str(payload)
-                except (UnicodeDecodeError, AttributeError):
-                    text = ''
-                if ctype == 'text/plain' and plain_body is None and text:
-                    plain_body = text
-                elif ctype == 'text/html' and html_body is None and text:
-                    html_body = text
-        return html_body if html_body else (plain_body or '')
-    else:
-        try:
-            payload = email_msg.get_payload(decode=True)
-            if isinstance(payload, (bytes, bytearray)):
-                return payload.decode(email_msg.get_content_charset() or 'utf-8', errors='ignore')
-            return str(payload)
-        except (UnicodeDecodeError, AttributeError):
-            return ''
-
-
-def process_emails(mail):
-    """Searches and processes all unread emails."""
-    try:
-        status, data = mail.uid('SEARCH', None, 'UNSEEN', 'FROM', f'"{ALLOWED_SENDER}"')
-        if status != 'OK':
-            logging.error('Failed to search for unseen emails from %s.', ALLOWED_SENDER)
-            return
-        unseen_uids = data[0].split()
-        if not unseen_uids:
-            logging.debug('No new messages from %s.', ALLOWED_SENDER)
-            return
-
-        logging.info('Found %d unseen message(s) from %s.', len(unseen_uids), ALLOWED_SENDER)
-        for uid in unseen_uids:
-            if shutdown_flag:
-                break
-
-            status, flags_data = mail.uid('FETCH', uid, '(FLAGS)')
-            if status != 'OK' or not flags_data or flags_data[0] is None:
-                logging.warning('Message uid=%s seems to have disappeared before fetching body. Skipping.', uid)
-                continue
-
-            status, msg_data = mail.uid('FETCH', uid, '(RFC822)')
-            if status != 'OK':
-                logging.warning('Invalid fetch data for uid=%s, skipping. Server response: %s', uid, msg_data)
-                continue
-
-            if not msg_data or not msg_data[0] or not isinstance(msg_data[0], tuple):
-                logging.warning('Invalid fetch data for uid=%s, skipping. Server response: %s', uid, msg_data)
-                continue
-
-            email_msg = email.message_from_bytes(msg_data[0][1])
-            sender = (email.utils.parseaddr(email_msg.get('From'))[1] or 'Unknown Sender').lower()
-
-            if sender != (ALLOWED_SENDER or '').lower():
-                logging.warning("Found a message not from the allowed sender, skipping. Sender: %s", sender)
-                continue
-
-            body = get_message_body(email_msg)
-            if not body:
-                logging.warning('Empty body extracted (uid=%s). Will not mark as seen.', uid)
-                continue
-
-            code_match = re.search(REGEX_CODE, body)
-            if code_match:
-                code = code_match.group(0)
-                logging.info('Found code %s in email from %s', code, sender)
-                send_to_telegram(code)
-
-                if MARK_AS_SEEN:
-                    mail.store(uid, '+FLAGS', '\\Seen')
-            else:
-                logging.info('No 6-digit code found in message (uid=%s). Leaving UNSEEN for retry.', uid)
-    except (imaplib2.IMAP4.error, socket.error, OSError) as e:
-        logging.error('Error processing emails: %s', e)
-        raise
+            logging.debug('Running periodic check for expired codes...')
+            expired_codes = database.get_expired_codes()
+            if expired_codes:
+                logging.info('Found %d expired codes to process.', len(expired_codes))
+                for code_id, message_id in expired_codes:
+                    telegram_bot.edit_message_to_expired(message_id)
+                    database.delete_code(code_id)
+        except Exception as e:
+            logging.error('Error in expiration thread: %s', e)
 
 
 def run_idle_loop(mail):
-    """Main loop for operating in IDLE mode using imaplib2."""
-    while not shutdown_flag:
+    """Main loop for operating in IDLE mode."""
+    while not shutdown_flag.is_set():
         heartbeat()
         try:
-            process_emails(mail)
-            if shutdown_flag:
+            email_processor.process_emails(mail, shutdown_flag)
+            if shutdown_flag.is_set():
                 break
 
-            logging.debug('Entering IDLE mode. Waiting for updates for %d seconds...', IDLE_TIMEOUT)
-            responses = mail.idle(timeout=IDLE_TIMEOUT)
-            logging.debug('Received response from IDLE: %s', responses)
+            logging.debug('Entering IDLE mode. Waiting for updates for %d seconds...', config.IDLE_TIMEOUT)
+            mail.idle(timeout=config.IDLE_TIMEOUT)
         except (imaplib2.IMAP4.error, socket.error, OSError) as e:
             logging.warning('Connection lost in IDLE mode. Reconnecting. Error: %s', e)
             break
 
 
 def main_loop():
-    """Main loop managing the connection."""
+    """Main loop managing the connection and threads."""
     logging.info('Starting bot...')
-    validate_config()
+    config.validate_config()
+    database.init_db()
 
-    while not shutdown_flag:
+    expiration_thread = threading.Thread(target=expire_codes_periodically, daemon=True)
+    expiration_thread.start()
+
+    while not shutdown_flag.is_set():
         try:
-            with imap_connection() as mail:
+            with email_processor.imap_connection() as mail:
                 run_idle_loop(mail)
         except (imaplib2.IMAP4.error, socket.error, OSError) as e:
             logging.error('A critical error occurred in the main loop: %s', e)
 
-        if not shutdown_flag:
-            logging.info('Will attempt to reconnect in %d seconds...', RECONNECT_DELAY)
-            time.sleep(RECONNECT_DELAY)
+        if not shutdown_flag.is_set():
+            logging.info('Will attempt to reconnect in %d seconds...', config.RECONNECT_DELAY)
+            shutdown_flag.wait(config.RECONNECT_DELAY)
 
     logging.info('Bot stopped.')
 
 
 if __name__ == '__main__':
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(sig, _handle_signal)
     main_loop()

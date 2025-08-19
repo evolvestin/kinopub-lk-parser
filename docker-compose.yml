@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    volumes:
+      - ./data:/data
     healthcheck:
       test: ["CMD", "python", "/app/healthcheck.py"]
       interval: 30s

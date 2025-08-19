@@ -6,7 +6,9 @@ RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-COPY app/ /app/
+RUN mkdir /data && chown app:app /data
+
+COPY --chown=app:app app/ /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
 RUN chmod +x /app/main.py /app/healthcheck.py
