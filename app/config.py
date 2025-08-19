@@ -1,6 +1,7 @@
 import os
 import logging
 
+
 GMAIL_EMAIL = os.getenv('GMAIL_EMAIL')
 GMAIL_PASSWORD = os.getenv('GMAIL_PASSWORD')
 ALLOWED_SENDER = os.getenv('ALLOWED_SENDER')
@@ -14,7 +15,7 @@ CHAT_ID = os.getenv('CHAT_ID')
 REGEX_CODE = r'\d{6}'
 CODE_LIFETIME_MINUTES = 15
 HEARTBEAT_FILE = '/tmp/kinopub-parser_heartbeat'
-DB_PATH = '/data/codes.db'
+
 
 REQUEST_TIMEOUT = 10
 IMAP_TIMEOUT = 30
@@ -22,6 +23,11 @@ IDLE_TIMEOUT = 25
 MAX_RETRIES = 5
 RECONNECT_DELAY = 15
 EXPIRATION_CHECK_INTERVAL_SECONDS = 10
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+data_dir = os.path.join(project_root, 'data')
+os.makedirs(data_dir, exist_ok=True)
+DB_PATH = os.path.join(data_dir, 'codes.db')
 
 
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
