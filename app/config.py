@@ -6,7 +6,7 @@ GMAIL_PASSWORD = os.getenv('GMAIL_PASSWORD')
 ALLOWED_SENDER = os.getenv('ALLOWED_SENDER')
 IMAP_HOST = 'imap.gmail.com'
 IMAP_FOLDER = 'INBOX'
-MARK_AS_SEEN = False
+MARK_AS_SEEN = True
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
