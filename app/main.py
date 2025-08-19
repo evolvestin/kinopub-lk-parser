@@ -153,12 +153,19 @@ def process_emails(mail):
         for uid in unseen_uids:
             if shutdown_flag:
                 break
+
+            status, flags_data = mail.uid('FETCH', uid, '(FLAGS)')
+            if status != 'OK' or not flags_data or flags_data[0] is None:
+                logging.warning('Message uid=%s seems to have disappeared before fetching body. Skipping.', uid)
+                continue
+
             status, msg_data = mail.uid('FETCH', uid, '(RFC822)')
             if status != 'OK':
-                logging.warning('Failed to fetch message uid=%s: %s', uid, msg_data)
+                logging.warning('Invalid fetch data for uid=%s, skipping. Server response: %s', uid, msg_data)
                 continue
+
             if not msg_data or not msg_data[0] or not isinstance(msg_data[0], tuple):
-                logging.warning('Invalid fetch data for uid=%s, skipping.', uid)
+                logging.warning('Invalid fetch data for uid=%s, skipping. Server response: %s', uid, msg_data)
                 continue
 
             email_msg = email.message_from_bytes(msg_data[0][1])
