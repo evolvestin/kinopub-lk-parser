@@ -5,10 +5,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    volumes:
-      - ./data:/data
+    ports:
+      - "8012:8000"
     healthcheck:
-      test: ["CMD", "python", "/app/healthcheck.py"]
+      test: ["CMD", "python", "/app/manage.py", "healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3
