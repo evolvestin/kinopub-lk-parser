@@ -2,14 +2,8 @@ from datetime import timedelta
 from django.db.models import Sum, Subquery, OuterRef, Case, When, Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from unfold.components import (
-    Container,
-    List,
-    ListItem,
-    Value,
-    Chart,
-    Card,
-)
+from unfold.components import Chart, Card
+from unfold.widgets import List, ListItem
 
 from app.models import ViewHistory, ShowDuration
 
@@ -63,15 +57,19 @@ def dashboard_callback(request, context):
         view_count=Count('id')
     ).order_by('-view_count')[:5]
 
-    top_series_list_items = [
-        ListItem(title=f"{series['show__title']} ({series['episode_count']})")
-        for series in top_series_qs
-    ] if top_series_qs else [ListItem(title="Недостаточно данных.")]
+    top_series_list = List(
+        children=[
+            ListItem(title=f"{series['show__title']} ({series['episode_count']})")
+            for series in top_series_qs
+        ] if top_series_qs else [ListItem(title="Недостаточно данных.")]
+    )
 
-    top_movies_list_items = [
-        ListItem(title=f"{movie['show__title']} ({movie['view_count']})")
-        for movie in top_movies_qs
-    ] if top_movies_qs else [ListItem(title="Недостаточно данных.")]
+    top_movies_list = List(
+        children=[
+            ListItem(title=f"{movie['show__title']} ({movie['view_count']})")
+            for movie in top_movies_qs
+        ] if top_movies_qs else [ListItem(title="Недостаточно данных.")]
+    )
 
     twelve_months_ago = timezone.now().date() - timedelta(days=365)
     views_per_month = ViewHistory.objects.filter(
@@ -85,62 +83,30 @@ def dashboard_callback(request, context):
     chart_labels = [d['month'].strftime('%b %Y') for d in views_per_month]
     chart_data = [d['c'] for d in views_per_month]
 
+    stats_list = List(
+        children=[
+            ListItem(title=f"Общее время просмотра: {duration_str}"),
+            ListItem(title=f"Просмотрено эпизодов: {total_episodes}"),
+            ListItem(title=f"Просмотрено фильмов: {total_movies}"),
+            ListItem(title=f"Просмотрено сериалов: {watched_series_count}"),
+        ]
+    )
+
     components = [
-        Container(
-            fluid=True,
-            children=[
-                Container(
-                    children=[
-                        Value(
-                            title="Общее время просмотра",
-                            value=duration_str,
-                        ),
-                        Value(
-                            title="Просмотрено эпизодов",
-                            value=total_episodes,
-                        ),
-                        Value(
-                            title="Просмотрено фильмов",
-                            value=total_movies,
-                        ),
-                        Value(
-                            title="Просмотрено сериалов",
-                            value=watched_series_count,
-                        )
-                    ],
-                ),
-                Container(
-                    children=[
-                        Card(
-                            title="Топ-5 сериалов (по эпизодам)",
-                            children=[List(children=top_series_list_items)],
-                            props={"class": "w-full"},
-                        ),
-                        Card(
-                            title="Топ-5 фильмов (по просмотрам)",
-                            children=[List(children=top_movies_list_items)],
-                            props={"class": "w-full"},
-                        ),
-                    ],
-                ),
-                Container(
-                    children=[
-                        Chart(
-                            title="Активность просмотров",
-                            data={
-                                "labels": chart_labels,
-                                "datasets": [
-                                    {
-                                        "label": "Просмотры по месяцам (за последний год)",
-                                        "data": chart_data,
-                                    }
-                                ],
-                            },
-                        )
-                    ],
-                    props={"class": "mt-4"},
-                )
-            ]
+        Card(title="Статистика", children=[stats_list]),
+        Card(title="Топ-5 сериалов (по эпизодам)", children=[top_series_list]),
+        Card(title="Топ-5 фильмов (по просмотрам)", children=[top_movies_list]),
+        Chart(
+            title="Активность просмотров",
+            data={
+                "labels": chart_labels,
+                "datasets": [
+                    {
+                        "label": "Просмотры по месяцам (за последний год)",
+                        "data": chart_data,
+                    }
+                ],
+            },
         )
     ]
 

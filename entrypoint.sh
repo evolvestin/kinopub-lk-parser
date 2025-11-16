@@ -31,8 +31,4 @@ else:
     print(f"Superuser '{username}' already exists.")
 END
 
-echo "Starting background services (parser, etc.)..."
-python manage.py runservices &
-
-echo "Starting Django development server on 0.0.0.0:8000..."
-exec python manage.py runserver 0.0.0.0:8000 --insecure
+exec "$@"  # Выполняем команду, переданную из docker-compose (runserver или runservices)

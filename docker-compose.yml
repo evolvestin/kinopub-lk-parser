@@ -1,14 +1,68 @@
 services:
-  kinopub-parser:
+  web:
     build: .
-    container_name: kinopub-parser
+    container_name: kinopub-parser-web
     restart: unless-stopped
-    env_file:
-      - .env
+    env_file: .env
     ports:
       - "8012:8000"
+    volumes:
+      - .:/app:delegated
+    command: python manage.py runserver 0.0.0.0:8000 --insecure
     healthcheck:
-      test: ["CMD", "python", "/app/manage.py", "healthcheck"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/admin/login/"]
       interval: 30s
       timeout: 10s
       retries: 3
+    depends_on:
+      - redis
+
+  email-listener:
+    build: .
+    container_name: kinopub-parser-email-listener
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - .:/app:delegated
+    command: python manage.py runemail_listener
+    depends_on:
+      - web
+
+  celery-worker:
+    build: .
+    container_name: kinopub-parser-celery-worker
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - .:/app:delegated
+    command: celery -A kinopub_parser worker -l info
+    healthcheck:
+      test: ["CMD", "celery", "-A", "kinopub_parser", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - web
+      - redis
+
+  celery-beat:
+    build: .
+    container_name: kinopub-parser-celery-beat
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - .:/app:delegated
+    command: celery -A kinopub_parser beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    depends_on:
+      - web
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: kinopub-parser-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
