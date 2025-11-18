@@ -24,7 +24,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python manage.py collectstatic --noinput
 
 RUN chmod +x /app/manage.py
-RUN chmod +x /app/entrypoint.sh
 
 USER app
 
@@ -35,5 +34,3 @@ ENV PATH=/home/app/bin:$PATH \
     DJANGO_SETTINGS_MODULE=kinopub_parser.settings
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD python /app/manage.py healthcheck
-
-ENTRYPOINT ["/app/entrypoint.sh"]

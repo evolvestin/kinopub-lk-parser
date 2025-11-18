@@ -1,10 +1,12 @@
-import os
 import logging
+import os
+import sys
 from pathlib import Path
-from dotenv import load_dotenv
-from django.core.exceptions import ImproperlyConfigured
 
-# --- Paths ---
+from celery.schedules import crontab
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 if os.path.isdir('/data'):
@@ -15,13 +17,11 @@ os.makedirs(data_dir, exist_ok=True)
 
 COOKIES_FILE_PATH = data_dir / 'cookies.json'
 
-# --- Google Drive Backup Config ---
 GOOGLE_DRIVE_CREDENTIALS_JSON = os.getenv('GOOGLE_DRIVE_CREDENTIALS_JSON')
 GOOGLE_DRIVE_FOLDER_ID = '1mpco3I0v22hTklleYJkZZh0VNlhol9L3'
 DB_BACKUP_FILENAME = os.getenv('DB_BACKUP_FILENAME', 'data.db')
 COOKIES_BACKUP_FILENAME = os.getenv('COOKIES_BACKUP_FILENAME', 'cookies.json')
 
-# --- Django Core Settings ---
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-for-dev')
 DEBUG = False
 ALLOWED_HOSTS = ['*']
@@ -32,7 +32,6 @@ USE_I18N = True
 FORMAT_MODULE_PATH = ['kinopub_parser.formats']
 LANGUAGE_CODE = 'en'
 
-# Application definition
 INSTALLED_APPS = [
     'unfold',
     'unfold.contrib.filters',
@@ -43,7 +42,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django_celery_beat',
     'app',
 ]
 
@@ -76,29 +74,41 @@ TEMPLATES = [
 ]
 
 DB_PATH = data_dir / DB_BACKUP_FILENAME
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': DB_PATH,
+if 'runparserlocal' in sys.argv:
+    logging.info('"runparserlocal" command detected. Configuring for local SQLite database.')
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': DB_PATH,
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('POSTGRES_DB'),
+            'USER': os.getenv('POSTGRES_USER'),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
+            'HOST': os.getenv('POSTGRES_HOST', 'db'),
+            'PORT': os.getenv('POSTGRES_PORT', '5432'),
+        }
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-X_FRAME_OPTIONS = "SAMEORIGIN"
-SILENCED_SYSTEM_CHECKS = ["security.W019"]
+X_FRAME_OPTIONS = 'SAMEORIGIN'
+SILENCED_SYSTEM_CHECKS = ['security.W019']
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# --- Celery Configuration ---
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ALWAYS_EAGER = False
 
-# --- Email Processor & Telegram Bot Config ---
 GMAIL_EMAIL = os.getenv('GMAIL_EMAIL')
 GMAIL_PASSWORD = os.getenv('GMAIL_PASSWORD')
 ALLOWED_SENDER = os.getenv('ALLOWED_SENDER')
@@ -128,17 +138,16 @@ LOG_RETENTION_DAYS = 90
 LOG_DELETION_INTERVAL_HOURS = 24
 
 # --- Full Catalog Scan Config ---
-FULL_SCAN_PAGE_DELAY_SECONDS = 60
+FULL_SCAN_PAGE_DELAY_SECONDS = 10
 FULL_SCAN_RESUME_WINDOW_HOURS = 24
 
 # --- Unfold ---
 UNFOLD = {
-    "SITE_TITLE": "KinoPub Parser",
-    "SITE_HEADER": "KinoPub Parser",
-    "SITE_BRAND": "KinoPub Parser",
-    "WELCOME_SIGN": "Добро пожаловать в панель управления",
-    "DASHBOARD_CALLBACK": "app.dashboard.dashboard_callback",
-    "THEME": "dark",
+    'SITE_TITLE': 'KinoPub Parser',
+    'SITE_HEADER': 'KinoPub Parser',
+    'SITE_BRAND': 'KinoPub Parser',
+    'WELCOME_SIGN': 'Добро пожаловать в панель управления',
+    'THEME': 'dark',
 }
 
 # --- Logging ---
@@ -166,6 +175,42 @@ LOGGING = {
         'handlers': ['console', 'database'],
         'level': LOG_LEVEL,
     },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'database'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'celery': {
+            'handlers': ['console', 'database'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'app': {
+            'handlers': ['console', 'database'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+    },
+}
+
+CELERY_BEAT_SCHEDULE = {
+    'run_history_parser': {
+        'task': 'app.tasks.run_history_parser_task',
+        'schedule': 3600 * HISTORY_PARSER_INTERVAL_HOURS,
+    },
+    'run_full_scan': {
+        'task': 'app.tasks.run_full_scan_task',
+        'schedule': crontab(minute=0, hour=0, day_of_month=1, month_of_year='1,4,7,10'),
+    },
+    'expire_codes': {
+        'task': 'app.tasks.expire_codes_task',
+        'schedule': 20,  # every 20s
+    },
+    'delete_old_logs': {
+        'task': 'app.tasks.delete_old_logs_task',
+        'schedule': 86400,  # every 24 hours
+    },
 }
 
 
@@ -184,7 +229,7 @@ REQUIRED_SETTINGS = (
 missing_settings = [key for key in REQUIRED_SETTINGS if not globals().get(key)]
 if missing_settings:
     raise ImproperlyConfigured(
-        f"Missing required environment variables: {', '.join(missing_settings)}"
+        f'Missing required environment variables: {", ".join(missing_settings)}'
     )
 
 logging.info('Configuration validated successfully.')

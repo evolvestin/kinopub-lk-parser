@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["I", "Q"]
+fixable = ["I", "Q001", "Q002"]
+
+[tool.ruff.format]
+quote-style = "single"

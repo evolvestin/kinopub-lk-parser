@@ -5,17 +5,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
             name='Code',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
                 ('code', models.CharField(max_length=255)),
                 ('telegram_message_id', models.IntegerField()),
                 ('received_at', models.DateTimeField()),
@@ -39,30 +45,62 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ShowDuration',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
                 ('season_number', models.IntegerField(null=True)),
                 ('episode_number', models.IntegerField(null=True)),
                 ('duration_seconds', models.IntegerField()),
-                ('show', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='app.show')),
+                (
+                    'show',
+                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='app.show'),
+                ),
             ],
             options={
                 'db_table': 'show_durations',
-                'indexes': [models.Index(fields=['show', 'season_number', 'episode_number'], name='idx_duration')],
+                'indexes': [
+                    models.Index(
+                        fields=['show', 'season_number', 'episode_number'],
+                        name='idx_duration',
+                    )
+                ],
                 'unique_together': {('show', 'season_number', 'episode_number')},
             },
         ),
         migrations.CreateModel(
             name='ViewHistory',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
                 ('view_date', models.DateField()),
                 ('season_number', models.IntegerField(default=0)),
                 ('episode_number', models.IntegerField(default=0)),
-                ('show', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='app.show')),
+                (
+                    'show',
+                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='app.show'),
+                ),
             ],
             options={
                 'db_table': 'view_history',
-                'indexes': [models.Index(fields=['show', 'view_date', 'season_number', 'episode_number'], name='idx_view')],
+                'indexes': [
+                    models.Index(
+                        fields=['show', 'view_date', 'season_number', 'episode_number'],
+                        name='idx_view',
+                    )
+                ],
                 'unique_together': {('show', 'view_date', 'season_number', 'episode_number')},
             },
         ),

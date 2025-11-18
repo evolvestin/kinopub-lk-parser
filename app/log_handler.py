@@ -19,7 +19,7 @@ class DatabaseLogHandler(logging.Handler):
             self.log_entry_model.objects.create(
                 level=record.levelname,
                 module=record.module,
-                message=record.getMessage()
+                message=record.getMessage(),
             )
         except Exception:
-            pass
+            self.handleError(record)

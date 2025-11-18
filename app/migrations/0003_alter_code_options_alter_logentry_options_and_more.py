@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0002_logentry'),
     ]
@@ -17,7 +16,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterModelOptions(
             name='logentry',
-            options={'ordering': ['-timestamp'], 'verbose_name': 'Log entry', 'verbose_name_plural': 'Log entries'},
+            options={
+                'ordering': ['-timestamp'],
+                'verbose_name': 'Log entry',
+                'verbose_name_plural': 'Log entries',
+            },
         ),
         migrations.AlterModelOptions(
             name='show',
@@ -25,11 +28,17 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterModelOptions(
             name='showduration',
-            options={'verbose_name': 'Show duration', 'verbose_name_plural': 'Show durations'},
+            options={
+                'verbose_name': 'Show duration',
+                'verbose_name_plural': 'Show durations',
+            },
         ),
         migrations.AlterModelOptions(
             name='viewhistory',
-            options={'verbose_name': 'View history record', 'verbose_name_plural': 'View history records'},
+            options={
+                'verbose_name': 'View history record',
+                'verbose_name_plural': 'View history records',
+            },
         ),
         migrations.AddField(
             model_name='code',

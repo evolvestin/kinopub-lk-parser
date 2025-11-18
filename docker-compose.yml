@@ -8,61 +8,83 @@ services:
       - "8012:8000"
     volumes:
       - .:/app:delegated
-    command: python manage.py runserver 0.0.0.0:8000 --insecure
+      - data:/data
+    command: >
+      sh -c "
+        python manage.py migrate --noinput &&
+        python manage.py createsuperuserifneeded &&
+        echo 'Restoring from backup on start...' &&
+        python manage.py restorebackup &&
+        python manage.py runserver 0.0.0.0:8000 --insecure
+      "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/admin/login/"]
       interval: 30s
       timeout: 10s
       retries: 3
     depends_on:
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - kinopub-net
 
-  email-listener:
-    build: .
-    container_name: kinopub-parser-email-listener
+  db:
+    image: postgres:16-alpine
+    container_name: kinopub-parser-db
     restart: unless-stopped
     env_file: .env
     volumes:
-      - .:/app:delegated
-    command: python manage.py runemail_listener
-    depends_on:
-      - web
-
-  celery-worker:
-    build: .
-    container_name: kinopub-parser-celery-worker
-    restart: unless-stopped
-    env_file: .env
-    volumes:
-      - .:/app:delegated
-    command: celery -A kinopub_parser worker -l info
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "celery", "-A", "kinopub_parser", "inspect", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    depends_on:
-      - web
-      - redis
-
-  celery-beat:
-    build: .
-    container_name: kinopub-parser-celery-beat
-    restart: unless-stopped
-    env_file: .env
-    volumes:
-      - .:/app:delegated
-    command: celery -A kinopub_parser beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    depends_on:
-      - web
-      - redis
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kinopub-net
 
   redis:
     image: redis:7-alpine
     container_name: kinopub-parser-redis
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    networks:
+      - kinopub-net
+
+  celery:
+    build: .
+    container_name: kinopub-parser-celery
+    command: celery -A kinopub_parser worker -l INFO
+    env_file: .env
+    volumes:
+      - .:/app:delegated
+      - data:/data
+    depends_on:
+      - redis
+      - db
+    networks:
+      - kinopub-net
+
+  celery-beat:
+    build: .
+    container_name: kinopub-parser-celery-beat
+    command: celery -A kinopub_parser beat -l INFO
+    env_file: .env
+    volumes:
+      - .:/app:delegated
+    depends_on:
+      - redis
+      - db
+    networks:
+      - kinopub-net
+
+volumes:
+  data:
+    name: kinopub_parser_data
+  pgdata:
+    name: kinopub_parser_pgdata
+
+networks:
+  kinopub-net:
+    driver: bridge

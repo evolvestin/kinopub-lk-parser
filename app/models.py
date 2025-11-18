@@ -2,13 +2,13 @@ from django.db import models
 
 
 class BaseModel(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         abstract = True
-        verbose_name = "Base model"
-        verbose_name_plural = "Base models"
+        verbose_name = 'Base model'
+        verbose_name_plural = 'Base models'
 
 
 class Code(BaseModel):
@@ -17,8 +17,8 @@ class Code(BaseModel):
     received_at = models.DateTimeField()
 
     class Meta:
-        verbose_name = "Code"
-        verbose_name_plural = "Codes"
+        verbose_name = 'Code'
+        verbose_name_plural = 'Codes'
 
 
 class Country(BaseModel):
@@ -28,8 +28,8 @@ class Country(BaseModel):
         return self.name
 
     class Meta:
-        verbose_name = "Country"
-        verbose_name_plural = "Countries"
+        verbose_name = 'Country'
+        verbose_name_plural = 'Countries'
 
 
 class Genre(BaseModel):
@@ -39,8 +39,8 @@ class Genre(BaseModel):
         return self.name
 
     class Meta:
-        verbose_name = "Genre"
-        verbose_name_plural = "Genres"
+        verbose_name = 'Genre'
+        verbose_name_plural = 'Genres'
 
 
 class Person(BaseModel):
@@ -50,8 +50,8 @@ class Person(BaseModel):
         return self.name
 
     class Meta:
-        verbose_name = "Person"
-        verbose_name_plural = "Persons"
+        verbose_name = 'Person'
+        verbose_name_plural = 'Persons'
 
 
 class Show(BaseModel):
@@ -77,8 +77,8 @@ class Show(BaseModel):
         return self.title or self.original_title or f'Show {self.id}'
 
     class Meta:
-        verbose_name = "Show"
-        verbose_name_plural = "Shows"
+        verbose_name = 'Show'
+        verbose_name_plural = 'Shows'
 
 
 class ViewHistory(BaseModel):
@@ -91,12 +91,12 @@ class ViewHistory(BaseModel):
         indexes = [
             models.Index(
                 fields=['show', 'view_date', 'season_number', 'episode_number'],
-                name='idx_view'
+                name='idx_view',
             ),
         ]
         unique_together = [['show', 'view_date', 'season_number', 'episode_number']]
-        verbose_name = "View history record"
-        verbose_name_plural = "View history records"
+        verbose_name = 'View history record'
+        verbose_name_plural = 'View history records'
 
 
 class ShowDuration(BaseModel):
@@ -107,26 +107,22 @@ class ShowDuration(BaseModel):
 
     class Meta:
         indexes = [
-            models.Index(
-                fields=['show', 'season_number', 'episode_number'],
-                name='idx_duration'
-            ),
+            models.Index(fields=['show', 'season_number', 'episode_number'], name='idx_duration'),
         ]
         unique_together = [['show', 'season_number', 'episode_number']]
-        verbose_name = "Show duration"
-        verbose_name_plural = "Show durations"
+        verbose_name = 'Show duration'
+        verbose_name_plural = 'Show durations'
 
 
 class LogEntry(BaseModel):
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
     level = models.CharField(max_length=10)
     module = models.CharField(max_length=100)
     message = models.TextField()
 
     def __str__(self):
-        return f'[{self.timestamp.strftime("%Y-%m-%d %H:%M:%S")}] [{self.level}] {self.module}: {self.message}'
+        return f'[{self.created_at.strftime("%Y-%m-%d %H:%M:%S")}] [{self.level}] {self.module}: {self.message}'
 
     class Meta:
-        ordering = ['-timestamp']
-        verbose_name = "Log entry"
-        verbose_name_plural = "Log entries"
+        ordering = ['-created_at']
+        verbose_name = 'Log entry'
+        verbose_name_plural = 'Log entries'

@@ -1,17 +1,40 @@
 from django.contrib import admin
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Q, Sum
 from django.urls import reverse
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin
-from app.models import Code, Show, ViewHistory, ShowDuration, LogEntry, Country, Genre, Person
+
+from app.models import (
+    Code,
+    Country,
+    Genre,
+    LogEntry,
+    Person,
+    Show,
+    ShowDuration,
+    ViewHistory,
+)
+from kinopub_parser.admin import admin_site
 
 
-@admin.register(Code)
+@admin.register(Code, site=admin_site)
 class CodeAdmin(ModelAdmin):
-    list_display = ('code', 'telegram_message_id', 'received_at', 'created_at', 'updated_at')
+    list_display = (
+        'code',
+        'telegram_message_id',
+        'received_at',
+        'created_at',
+        'updated_at',
+    )
     list_filter = ('received_at',)
     search_fields = ('code',)
-    readonly_fields = ('code', 'telegram_message_id', 'received_at', 'created_at', 'updated_at')
+    readonly_fields = (
+        'code',
+        'telegram_message_id',
+        'received_at',
+        'created_at',
+        'updated_at',
+    )
 
     def has_add_permission(self, request):
         return False
@@ -26,31 +49,66 @@ class CodeAdmin(ModelAdmin):
 class ShowDurationInline(admin.TabularInline):
     model = ShowDuration
     extra = 0
-    readonly_fields = ('season_number', 'episode_number', 'duration_seconds', 'created_at', 'updated_at')
+    readonly_fields = (
+        'season_number',
+        'episode_number',
+        'duration_seconds',
+        'created_at',
+        'updated_at',
+    )
     can_delete = False
 
 
 class ViewHistoryInline(admin.TabularInline):
     model = ViewHistory
     extra = 0
-    readonly_fields = ('view_date', 'season_number', 'episode_number', 'created_at', 'updated_at')
+    readonly_fields = (
+        'view_date',
+        'season_number',
+        'episode_number',
+        'created_at',
+        'updated_at',
+    )
     can_delete = False
 
 
-@admin.register(Show)
+@admin.register(Show, site=admin_site)
 class ShowAdmin(ModelAdmin):
-    list_display = ('title', 'original_title', 'type', 'year', 'view_count', 'total_duration_hours', 'created_at', 'updated_at')
+    list_display = (
+        'title',
+        'original_title',
+        'type',
+        'year',
+        'view_count',
+        'total_duration_hours',
+        'created_at',
+        'updated_at',
+    )
     list_filter = ('type', 'year', 'genres', 'countries')
     search_fields = ('title', 'original_title')
     inlines = [ShowDurationInline, ViewHistoryInline]
-    readonly_fields = ('id', 'title', 'original_title', 'type', 'year', 'kinopoisk_url', 'kinopoisk_rating', 'kinopoisk_votes', 'imdb_url', 'imdb_rating', 'imdb_votes', 'created_at', 'updated_at')
+    readonly_fields = (
+        'id',
+        'title',
+        'original_title',
+        'type',
+        'year',
+        'kinopoisk_url',
+        'kinopoisk_rating',
+        'kinopoisk_votes',
+        'imdb_url',
+        'imdb_rating',
+        'imdb_votes',
+        'created_at',
+        'updated_at',
+    )
     filter_horizontal = ('countries', 'genres', 'directors', 'actors')
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         queryset = queryset.annotate(
             _view_count=Count('viewhistory'),
-            _total_duration=Sum('showduration__duration_seconds')
+            _total_duration=Sum('showduration__duration_seconds'),
         )
         return queryset
 
@@ -65,29 +123,57 @@ class ShowAdmin(ModelAdmin):
         return 0
 
 
-@admin.register(ViewHistory)
+@admin.register(ViewHistory, site=admin_site)
 class ViewHistoryAdmin(ModelAdmin):
-    list_display = ('show', 'view_date', 'season_number', 'episode_number', 'created_at', 'updated_at')
+    list_display = (
+        'show',
+        'view_date',
+        'season_number',
+        'episode_number',
+        'created_at',
+        'updated_at',
+    )
     list_filter = ('view_date',)
     search_fields = ('show__title', 'show__original_title')
     autocomplete_fields = ('show',)
-    readonly_fields = ('show', 'view_date', 'season_number', 'episode_number', 'created_at', 'updated_at')
+    readonly_fields = (
+        'show',
+        'view_date',
+        'season_number',
+        'episode_number',
+        'created_at',
+        'updated_at',
+    )
 
 
-@admin.register(ShowDuration)
+@admin.register(ShowDuration, site=admin_site)
 class ShowDurationAdmin(ModelAdmin):
-    list_display = ('show', 'season_number', 'episode_number', 'duration_seconds', 'created_at', 'updated_at')
+    list_display = (
+        'show',
+        'season_number',
+        'episode_number',
+        'duration_seconds',
+        'created_at',
+        'updated_at',
+    )
     search_fields = ('show__title', 'show__original_title')
     autocomplete_fields = ('show',)
-    readonly_fields = ('show', 'season_number', 'episode_number', 'duration_seconds', 'created_at', 'updated_at')
+    readonly_fields = (
+        'show',
+        'season_number',
+        'episode_number',
+        'duration_seconds',
+        'created_at',
+        'updated_at',
+    )
 
 
-@admin.register(LogEntry)
+@admin.register(LogEntry, site=admin_site)
 class LogEntryAdmin(ModelAdmin):
-    list_display = ('timestamp', 'colored_level', 'module', 'message', 'updated_at')
-    list_filter = ('level', 'module', 'timestamp')
+    list_display = ('colored_level', 'module', 'message', 'created_at', 'updated_at')
+    list_filter = ('level', 'module', 'created_at')
     search_fields = ('module', 'message')
-    readonly_fields = ('timestamp', 'level', 'module', 'message', 'created_at', 'updated_at')
+    readonly_fields = ('level', 'module', 'message', 'created_at', 'updated_at')
 
     @admin.display(description='Level', ordering='level')
     def colored_level(self, obj):
@@ -100,9 +186,7 @@ class LogEntryAdmin(ModelAdmin):
         }
         color = colors.get(obj.level, 'black')
         return format_html(
-            '<span style="color: {}; font_weight: bold;">{}</span>',
-            color,
-            obj.level
+            '<span style="color: {}; font_weight: bold;">{}</span>', color, obj.level
         )
 
     def has_add_permission(self, request):
@@ -117,8 +201,8 @@ class LogEntryAdmin(ModelAdmin):
 
 class ShowCountryInline(admin.TabularInline):
     model = Show.countries.through
-    verbose_name = "Show"
-    verbose_name_plural = "Shows from this country"
+    verbose_name = 'Show'
+    verbose_name_plural = 'Shows from this country'
     extra = 0
     autocomplete_fields = ('show',)
     can_delete = False
@@ -132,8 +216,8 @@ class ShowCountryInline(admin.TabularInline):
 
 class ShowGenreInline(admin.TabularInline):
     model = Show.genres.through
-    verbose_name = "Show"
-    verbose_name_plural = "Shows in this genre"
+    verbose_name = 'Show'
+    verbose_name_plural = 'Shows in this genre'
     extra = 0
     autocomplete_fields = ('show',)
     can_delete = False
@@ -147,8 +231,8 @@ class ShowGenreInline(admin.TabularInline):
 
 class ShowDirectorInline(admin.TabularInline):
     model = Show.directors.through
-    verbose_name = "Directed Show"
-    verbose_name_plural = "Directed Shows"
+    verbose_name = 'Directed Show'
+    verbose_name_plural = 'Directed Shows'
     extra = 0
     autocomplete_fields = ('show',)
     can_delete = False
@@ -162,8 +246,8 @@ class ShowDirectorInline(admin.TabularInline):
 
 class ShowActorInline(admin.TabularInline):
     model = Show.actors.through
-    verbose_name = "Acted In Show"
-    verbose_name_plural = "Acted In Shows"
+    verbose_name = 'Acted In Show'
+    verbose_name_plural = 'Acted In Shows'
     extra = 0
     autocomplete_fields = ('show',)
     can_delete = False
@@ -181,127 +265,152 @@ class BaseNameAdmin(ModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
 
 
-@admin.register(Country)
+@admin.register(Country, site=admin_site)
 class CountryAdmin(BaseNameAdmin):
     inlines = [ShowCountryInline]
     readonly_fields = BaseNameAdmin.readonly_fields + ('related_actors',)
 
     fieldsets = (
         (None, {'fields': ('name',)}),
-        ('Related Actors (Top 20 with most roles)', {
-            'fields': ('related_actors',),
-            'classes': ('collapse',),
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',),
-        }),
+        (
+            'Related Actors (Top 20 with most roles)',
+            {
+                'fields': ('related_actors',),
+                'classes': ('collapse',),
+            },
+        ),
+        (
+            'Dates',
+            {
+                'fields': ('created_at', 'updated_at'),
+                'classes': ('collapse',),
+            },
+        ),
     )
 
     @admin.display(description='Actors')
     def related_actors(self, obj):
-        actors = Person.objects.filter(
-            acted_in_shows__countries=obj
-        ).distinct().annotate(
-            show_count=Count('acted_in_shows', filter=Q(acted_in_shows__countries=obj))
-        ).order_by('-show_count')[:20]
+        actors = (
+            Person.objects.filter(acted_in_shows__countries=obj)
+            .distinct()
+            .annotate(show_count=Count('acted_in_shows', filter=Q(acted_in_shows__countries=obj)))
+            .order_by('-show_count')[:20]
+        )
 
         if not actors:
-            return "No related actors found."
+            return 'No related actors found.'
 
-        html = "<ul>"
+        html = '<ul>'
         for actor in actors:
-            link = reverse("admin:app_person_change", args=[actor.id])
+            link = reverse('admin:app_person_change', args=[actor.id])
             html += f'<li><a href="{link}">{actor.name}</a> ({actor.show_count} shows)</li>'
-        html += "</ul>"
+        html += '</ul>'
         return format_html(html)
 
 
-@admin.register(Genre)
+@admin.register(Genre, site=admin_site)
 class GenreAdmin(BaseNameAdmin):
     inlines = [ShowGenreInline]
     readonly_fields = BaseNameAdmin.readonly_fields + ('related_actors',)
 
     fieldsets = (
         (None, {'fields': ('name',)}),
-        ('Related Actors (Top 20 with most roles)', {
-            'fields': ('related_actors',),
-            'classes': ('collapse',),
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',),
-        }),
+        (
+            'Related Actors (Top 20 with most roles)',
+            {
+                'fields': ('related_actors',),
+                'classes': ('collapse',),
+            },
+        ),
+        (
+            'Timestamps',
+            {
+                'fields': ('created_at', 'updated_at'),
+                'classes': ('collapse',),
+            },
+        ),
     )
 
     @admin.display(description='Actors')
     def related_actors(self, obj):
-        actors = Person.objects.filter(
-            acted_in_shows__genres=obj
-        ).distinct().annotate(
-            show_count=Count('acted_in_shows', filter=Q(acted_in_shows__genres=obj))
-        ).order_by('-show_count')[:20]
+        actors = (
+            Person.objects.filter(acted_in_shows__genres=obj)
+            .distinct()
+            .annotate(show_count=Count('acted_in_shows', filter=Q(acted_in_shows__genres=obj)))
+            .order_by('-show_count')[:20]
+        )
 
         if not actors:
-            return "No related actors found."
+            return 'No related actors found.'
 
-        html = "<ul>"
+        html = '<ul>'
         for actor in actors:
-            link = reverse("admin:app_person_change", args=[actor.id])
+            link = reverse('admin:app_person_change', args=[actor.id])
             html += f'<li><a href="{link}">{actor.name}</a> ({actor.show_count} shows)</li>'
-        html += "</ul>"
+        html += '</ul>'
         return format_html(html)
 
 
-@admin.register(Person)
+@admin.register(Person, site=admin_site)
 class PersonAdmin(BaseNameAdmin):
     inlines = [ShowDirectorInline, ShowActorInline]
-    readonly_fields = BaseNameAdmin.readonly_fields + ('related_genres', 'related_countries')
+    readonly_fields = BaseNameAdmin.readonly_fields + (
+        'related_genres',
+        'related_countries',
+    )
 
     fieldsets = (
         (None, {'fields': ('name',)}),
-        ('Related Information (Top 20)', {
-            'fields': ('related_genres', 'related_countries'),
-            'classes': ('collapse',),
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',),
-        }),
+        (
+            'Related Information (Top 20)',
+            {
+                'fields': ('related_genres', 'related_countries'),
+                'classes': ('collapse',),
+            },
+        ),
+        (
+            'Timestamps',
+            {
+                'fields': ('created_at', 'updated_at'),
+                'classes': ('collapse',),
+            },
+        ),
     )
 
     @admin.display(description='Genres')
     def related_genres(self, obj):
-        genres = Genre.objects.filter(
-            Q(show__actors=obj) | Q(show__directors=obj)
-        ).distinct().annotate(
-            show_count=Count('show', filter=Q(show__actors=obj) | Q(show__directors=obj))
-        ).order_by('-show_count')[:20]
+        genres = (
+            Genre.objects.filter(Q(show__actors=obj) | Q(show__directors=obj))
+            .distinct()
+            .annotate(show_count=Count('show', filter=Q(show__actors=obj) | Q(show__directors=obj)))
+            .order_by('-show_count')[:20]
+        )
 
         if not genres:
-            return "No related genres found."
+            return 'No related genres found.'
 
-        html = "<ul>"
+        html = '<ul>'
         for genre in genres:
-            link = reverse("admin:app_genre_change", args=[genre.id])
+            link = reverse('admin:app_genre_change', args=[genre.id])
             html += f'<li><a href="{link}">{genre.name}</a> ({genre.show_count} shows)</li>'
-        html += "</ul>"
+        html += '</ul>'
         return format_html(html)
 
     @admin.display(description='Countries')
     def related_countries(self, obj):
-        countries = Country.objects.filter(
-            Q(show__actors=obj) | Q(show__directors=obj)
-        ).distinct().annotate(
-            show_count=Count('show', filter=Q(show__actors=obj) | Q(show__directors=obj))
-        ).order_by('-show_count')[:20]
+        countries = (
+            Country.objects.filter(Q(show__actors=obj) | Q(show__directors=obj))
+            .distinct()
+            .annotate(show_count=Count('show', filter=Q(show__actors=obj) | Q(show__directors=obj)))
+            .order_by('-show_count')[:20]
+        )
 
         if not countries:
-            return "No related countries found."
+            return 'No related countries found.'
 
-        html = "<ul>"
+        html = '<ul>'
         for country in countries:
-            link = reverse("admin:app_country_change", args=[country.id])
+            link = reverse('admin:app_country_change', args=[country.id])
             html += f'<li><a href="{link}">{country.name}</a> ({country.show_count} shows)</li>'
-        html += "</ul>"
+        html += '</ul>'
         return format_html(html)

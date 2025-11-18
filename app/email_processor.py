@@ -1,12 +1,12 @@
 import email
 import email.utils
-import re
 import logging
+import re
 import socket
-import imaplib2
 from contextlib import contextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
+import imaplib2
 from django.conf import settings
 
 from app import telegram_bot
@@ -77,7 +77,11 @@ def process_emails(mail, shutdown_flag):
             logging.debug('No new messages from %s.', settings.ALLOWED_SENDER)
             return
 
-        logging.info('Found %d unseen message(s) from %s.', len(unseen_uids), settings.ALLOWED_SENDER)
+        logging.info(
+            'Found %d unseen message(s) from %s.',
+            len(unseen_uids),
+            settings.ALLOWED_SENDER,
+        )
         for uid in unseen_uids:
             if shutdown_flag.is_set():
                 break
@@ -112,7 +116,11 @@ def process_emails(mail, shutdown_flag):
 
                 message_id = telegram_bot.send_message(code)
                 if message_id:
-                    Code.objects.create(code=code, telegram_message_id=message_id, received_at=received_at_dt)
+                    Code.objects.create(
+                        code=code,
+                        telegram_message_id=message_id,
+                        received_at=received_at_dt,
+                    )
                     logging.info('Code %s (msg_id: %d) added to the database.', code, message_id)
                     BackupManager().schedule_backup()
                     if settings.MARK_AS_SEEN:

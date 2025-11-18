@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KinoPub Parser - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #111827;
+            color: #f9fafb;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <nav class="bg-gray-800 border-b border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-white">KinoPub Parser</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/admin/" class="text-gray-300 hover:text-white">Dashboard</a>
+                    <a href="/admin/app/" class="text-gray-300 hover:text-white">App</a>
+                    <a href="/admin/logout/" class="text-gray-300 hover:text-white">Выход</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold text-gray-100 mb-4">Статистика</h3>
+                    <ul class="space-y-3 text-gray-300">
+                        <li class="flex justify-between">
+                            <span>Общее время просмотра:</span>
+                            <span class="font-medium">{{ stats.duration }}</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span>Просмотрено эпизодов:</span>
+                            <span class="font-medium">{{ stats.episodes }}</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span>Просмотрено фильмов:</span>
+                            <span class="font-medium">{{ stats.movies }}</span>
+                        </li>
+                        <li class="flex justify-between">
+                            <span>Просмотрено сериалов:</span>
+                            <span class="font-medium">{{ stats.series }}</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold text-gray-100 mb-4">Топ-5 сериалов</h3>
+                    <ul class="space-y-2 text-gray-300">
+                        {% for series in top_series %}
+                            <li class="flex justify-between">
+                                <span class="truncate mr-2">{{ series.show__title }}</span>
+                                <span class="font-medium whitespace-nowrap">({{ series.episode_count }})</span>
+                            </li>
+                        {% empty %}
+                            <li class="text-gray-400">Недостаточно данных</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold text-gray-100 mb-4">Топ-5 фильмов</h3>
+                    <ul class="space-y-2 text-gray-300">
+                        {% for movie in top_movies %}
+                            <li class="flex justify-between">
+                                <span class="truncate mr-2">{{ movie.show__title }}</span>
+                                <span class="font-medium whitespace-nowrap">({{ movie.view_count }})</span>
+                            </li>
+                        {% empty %}
+                            <li class="text-gray-400">Недостаточно данных</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
+                    <h3 class="text-lg font-semibold text-gray-100 mb-4">Активность просмотров</h3>
+                    <canvas id="viewsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        const ctx = document.getElementById('viewsChart');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {{ chart_labels|safe }},
+                datasets: [{
+                    label: 'Просмотры по месяцам',
+                    data: {{ chart_data|safe }},
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#e5e7eb'
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#9ca3af'
+                        },
+                        grid: {
+                            color: '#374151'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#9ca3af'
+                        },
+                        grid: {
+                            color: '#374151'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

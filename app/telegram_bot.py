@@ -1,7 +1,7 @@
-import requests
 import logging
 import time
 
+import requests
 from django.conf import settings
 
 
@@ -19,15 +19,20 @@ def send_message(message: str) -> int | None:
             data = response.json()
             if data.get('ok'):
                 message_id = data['result']['message_id']
-                logging.info('Sent to Telegram: \'%s\' (msg_id: %d)', message, message_id)
+                logging.info("Sent to Telegram: '%s' (msg_id: %d)", message, message_id)
                 return message_id
             else:
                 logging.error('Telegram API error: %s', data.get('description'))
 
         except requests.RequestException as e:
-            logging.error('Telegram send error (attempt %d/%d): %s', attempt + 1, settings.MAX_RETRIES, e)
+            logging.error(
+                'Telegram send error (attempt %d/%d): %s',
+                attempt + 1,
+                settings.MAX_RETRIES,
+                e,
+            )
             if attempt < settings.MAX_RETRIES - 1:
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
 
     logging.error('Failed to send to Telegram after %d retries.', settings.MAX_RETRIES)
     return None
@@ -43,7 +48,7 @@ def edit_message_to_expired(message_id: int):
         'chat_id': settings.CHAT_ID,
         'message_id': message_id,
         'text': '_Expired_',
-        'parse_mode': 'Markdown'
+        'parse_mode': 'Markdown',
     }
     try:
         response = requests.post(url, data=payload, timeout=settings.REQUEST_TIMEOUT)

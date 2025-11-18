@@ -6,7 +6,6 @@ PyDrive2==1.21.3
 selenium>=4.15
 undetected-chromedriver>=3.5
 python-dotenv>=1.0
-django-unfold==0.71.0
-celery==5.4.0
-redis==5.0.7
-django-celery-beat==2.8.1
+celery==5.5.3
+redis==7.0.1
+psycopg[binary,pq]==3.2.12

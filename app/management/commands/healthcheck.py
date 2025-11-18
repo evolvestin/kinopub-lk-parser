@@ -1,9 +1,10 @@
+import logging
 import os
 import sys
 import time
 
-from django.core.management.base import BaseCommand
 from django.conf import settings
+from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
@@ -18,11 +19,13 @@ class Command(BaseCommand):
             if age <= threshold:
                 sys.exit(0)
             else:
-                self.stdout.write(f'Heartbeat stale: {age:.1f}s > {threshold}s (file: {heartbeat_file})')
+                logging.error(
+                    f'Heartbeat stale: {age:.1f}s > {threshold}s (file: {heartbeat_file})'
+                )
                 sys.exit(1)
         except FileNotFoundError:
-            self.stdout.write(f'Heartbeat not found (file: {heartbeat_file})')
+            logging.error(f'Heartbeat not found (file: {heartbeat_file})')
             sys.exit(1)
         except Exception as e:
-            self.stdout.write(f'Healthcheck error: {e}')
+            logging.error(f'Healthcheck error: {e}')
             sys.exit(1)

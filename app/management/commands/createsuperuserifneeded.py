@@ -1,0 +1,28 @@
+import logging
+import os
+
+from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
+
+from app.gdrive_backup import BackupManager
+
+
+class Command(BaseCommand):
+    help = "Creates a superuser if it doesn't exist, using environment variables."
+
+    def handle(self, *args, **options):
+        User = get_user_model()
+        username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
+
+        if not User.objects.filter(username=username).exists():
+            logging.info(f"Superuser '{username}' not found, creating...")
+            email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@example.com')
+            password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
+            if password:
+                User.objects.create_superuser(username, email, password)
+                logging.info(f"Superuser '{username}' created.")
+                BackupManager().schedule_backup()
+            else:
+                logging.warning('DJANGO_SUPERUSER_PASSWORD not set, skipping superuser creation.')
+        else:
+            logging.info(f"Superuser '{username}' already exists.")
