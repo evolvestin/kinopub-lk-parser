@@ -15,7 +15,7 @@ else:
     data_dir = BASE_DIR / 'data'
 os.makedirs(data_dir, exist_ok=True)
 
-COOKIES_FILE_PATH_MAIN = data_dir / 'cookies.json'
+COOKIES_FILE_PATH_MAIN = data_dir / 'cookies_main.json'
 COOKIES_FILE_PATH_AUX = data_dir / 'cookies_aux.json'
 
 GOOGLE_DRIVE_CREDENTIALS_JSON = os.getenv('GOOGLE_DRIVE_CREDENTIALS_JSON')
@@ -24,6 +24,7 @@ DB_BACKUP_FILENAME = os.getenv('DB_BACKUP_FILENAME', 'data.json')
 COOKIES_BACKUP_FILENAME_MAIN = os.getenv('COOKIES_BACKUP_FILENAME_MAIN', 'cookies_main.json')
 COOKIES_BACKUP_FILENAME_AUX = os.getenv('COOKIES_BACKUP_FILENAME_AUX', 'cookies_aux.json')
 
+LOCAL_RUN = False
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-for-dev')
 DEBUG = False
 ALLOWED_HOSTS = ['*']
@@ -74,6 +75,7 @@ TEMPLATES = [
 
 DB_PATH = data_dir / DB_BACKUP_FILENAME
 if 'runparserlocal' in sys.argv:
+    LOCAL_RUN = True
     logging.info('"runparserlocal" command detected. Configuring for local SQLite database.')
     DATABASES = {
         'default': {

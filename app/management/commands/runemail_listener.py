@@ -19,6 +19,8 @@ def _handle_signal(signum, _):
 
 
 def _update_heartbeat():
+    if settings.LOCAL_RUN:
+        return
     try:
         with open(settings.HEARTBEAT_FILE, 'a'):
             os.utime(settings.HEARTBEAT_FILE, None)

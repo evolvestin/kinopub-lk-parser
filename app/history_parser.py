@@ -160,8 +160,11 @@ def save_cookies(driver, file_path):
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(cookies, f, ensure_ascii=False, indent=2)
     logging.info('Cookies successfully saved to %s', file_path)
-    celery_app.send_task('app.tasks.backup_cookies')
-    logging.info('Cookies backup scheduled via Celery.')
+    if not settings.LOCAL_RUN:
+        celery_app.send_task('app.tasks.backup_cookies')
+        logging.info('Cookies backup scheduled via Celery.')
+    else:
+        logging.info('Local run detected, skipping Celery cookies backup task.')
 
 
 def do_login(driver, login, password, cookie_path, base_url):
@@ -235,12 +238,16 @@ def do_login(driver, login, password, cookie_path, base_url):
 
         logging.info('Authorization successful.')
         save_cookies(driver, cookie_path)
+        return True
 
     except TimeoutException:
-        logging.error('Failed to log in within the allotted time. Please restart the script.')
-        raise RuntimeError('Failed to authorize.')
+        logging.error(
+            'Failed to log in within the allotted time. The page might be inaccessible or changed.'
+        )
+        return False
     except Exception as e:
-        raise RuntimeError(f'An error occurred during login: {e}')
+        logging.error(f'An unexpected error occurred during login: {e}')
+        return False
 
 
 def initialize_driver_session(headless=True, session_type='main'):
@@ -300,13 +307,18 @@ def initialize_driver_session(headless=True, session_type='main'):
                     logging.error(f'Failed to delete stale cookie file: {e}')
             logging.warning('Session is invalid or expired. Attempting to log in...')
             driver.get(f'{target_url}user/login')
-            do_login(driver, login, password, cookie_path, target_url)
-            return driver
+            if do_login(driver, login, password, cookie_path, target_url):
+                return driver
+            else:
+                logging.error('Login process failed. Unable to establish a session.')
+                if driver:
+                    driver.quit()
+                return None
     except Exception as e:
         logging.error('An unexpected error occurred during session initialization: %s', e)
         if driver:
             driver.quit()
-        raise
+        return None
 
 
 def get_movie_duration_and_save(driver, show_id):
@@ -624,11 +636,18 @@ def get_total_pages(driver):
         return 1
 
 
-def run_parser_session(headless=True):
+def run_parser_session(headless=True, driver_instance=None):
     logging.info('--- Starting Kinopub History Parser Session ---')
-    driver = None
+    driver = driver_instance
+    manage_driver = False
     try:
-        driver = initialize_driver_session(headless=headless)
+        if driver is None:
+            driver = initialize_driver_session(headless=headless)
+            manage_driver = True
+
+        if driver is None:
+            logging.error('Failed to initialize or use provided driver. Aborting parser run.')
+            return
 
         episodes_added = _run_parser_for_mode(driver, 'episodes')
         movies_added = _run_parser_for_mode(driver, 'movies')
@@ -646,7 +665,6 @@ def run_parser_session(headless=True):
     except Exception as e:
         logging.error('An unexpected error occurred in the parser session: %s', e)
     finally:
-        if driver:
-            logging.info('Closing Selenium driver for the session.')
-            driver.quit()
-            driver.quit = lambda: None
+        logging.info('Closing Selenium driver for the session.')
+        driver.quit()
+        driver.quit = lambda: None

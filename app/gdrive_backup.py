@@ -30,6 +30,9 @@ class BackupManager:
             self._initialized = True
 
     def schedule_backup(self):
+        if settings.LOCAL_RUN:
+            logging.info('Local run detected, skipping Celery backup task scheduling.')
+            return
         celery_app.send_task('app.tasks.backup_database')
         logging.info('Database backup scheduled via Celery.')
 
@@ -97,6 +100,32 @@ class BackupManager:
             return False
 
     def perform_backup(self):
+        from django.db.models import Max
+        from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
+
+        last_ts_file = os.path.join('/data', 'last_db_backup_ts')
+        last_backup_ts = 0.0
+        if os.path.exists(last_ts_file):
+            try:
+                with open(last_ts_file, 'r') as f:
+                    last_backup_ts = float(f.read().strip())
+            except ValueError:
+                pass
+
+        check_models = [Code, Country, Genre, Person, Show, ShowDuration, ViewHistory]
+        max_updated_at = None
+
+        for model in check_models:
+            res = model.objects.aggregate(max_ts=Max('updated_at'))
+            ts = res.get('max_ts')
+            if ts:
+                if max_updated_at is None or ts > max_updated_at:
+                    max_updated_at = ts
+
+        if max_updated_at and max_updated_at.timestamp() <= last_backup_ts:
+            logging.info('Database has not changed since last backup. Skipping.')
+            return
+
         logging.info('Starting backup process (JSON format)...')
         drive = self._get_drive_service()
         if not drive:
@@ -112,7 +141,6 @@ class BackupManager:
                     'dumpdata',
                     'app',
                     stdout=f,
-                    indent=2,
                     use_natural_foreign_keys=True,
                     use_natural_primary_keys=True,
                 )
@@ -121,6 +149,9 @@ class BackupManager:
                 file_size = os.path.getsize(backup_file_path)
                 logging.info(f'Backup file created successfully, size: {file_size} bytes')
                 self._upload_file(drive, backup_file_path, settings.DB_BACKUP_FILENAME)
+                if max_updated_at:
+                    with open(last_ts_file, 'w') as f:
+                        f.write(str(max_updated_at.timestamp()))
             else:
                 logging.error(f'Backup file {backup_file_path} was not found after creation.')
 

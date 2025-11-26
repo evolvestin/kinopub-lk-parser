@@ -49,6 +49,12 @@ class Command(BaseCommand):
             # Using 'aux' session type for aggressive detail updating
             driver = initialize_driver_session(session_type='aux')
 
+            if driver is None:
+                self.stderr.write(
+                    self.style.ERROR('Could not initialize Selenium driver. Aborting.')
+                )
+                return
+
             # Determine base URL dynamically from the driver's current location or settings
             base_url = settings.SITE_AUX_URL
 
