@@ -2,7 +2,6 @@ from django.contrib import admin
 from django.db.models import Count, Q, Sum
 from django.urls import reverse
 from django.utils.html import format_html
-from unfold.admin import ModelAdmin
 
 from app.models import (
     Code,
@@ -18,7 +17,7 @@ from kinopub_parser.admin import admin_site
 
 
 @admin.register(Code, site=admin_site)
-class CodeAdmin(ModelAdmin):
+class CodeAdmin(admin.ModelAdmin):
     list_display = (
         'code',
         'telegram_message_id',
@@ -73,7 +72,7 @@ class ViewHistoryInline(admin.TabularInline):
 
 
 @admin.register(Show, site=admin_site)
-class ShowAdmin(ModelAdmin):
+class ShowAdmin(admin.ModelAdmin):
     list_display = (
         'title',
         'original_title',
@@ -124,7 +123,7 @@ class ShowAdmin(ModelAdmin):
 
 
 @admin.register(ViewHistory, site=admin_site)
-class ViewHistoryAdmin(ModelAdmin):
+class ViewHistoryAdmin(admin.ModelAdmin):
     list_display = (
         'show',
         'view_date',
@@ -147,7 +146,7 @@ class ViewHistoryAdmin(ModelAdmin):
 
 
 @admin.register(ShowDuration, site=admin_site)
-class ShowDurationAdmin(ModelAdmin):
+class ShowDurationAdmin(admin.ModelAdmin):
     list_display = (
         'show',
         'season_number',
@@ -169,7 +168,7 @@ class ShowDurationAdmin(ModelAdmin):
 
 
 @admin.register(LogEntry, site=admin_site)
-class LogEntryAdmin(ModelAdmin):
+class LogEntryAdmin(admin.ModelAdmin):
     list_display = ('colored_level', 'module', 'message', 'created_at', 'updated_at')
     list_filter = ('level', 'module', 'created_at')
     search_fields = ('module', 'message')
@@ -259,7 +258,7 @@ class ShowActorInline(admin.TabularInline):
         return False
 
 
-class BaseNameAdmin(ModelAdmin):
+class BaseNameAdmin(admin.ModelAdmin):
     list_display = ('name', 'created_at', 'updated_at')
     search_fields = ('name',)
     readonly_fields = ('created_at', 'updated_at')

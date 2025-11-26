@@ -15,12 +15,14 @@ else:
     data_dir = BASE_DIR / 'data'
 os.makedirs(data_dir, exist_ok=True)
 
-COOKIES_FILE_PATH = data_dir / 'cookies.json'
+COOKIES_FILE_PATH_MAIN = data_dir / 'cookies.json'
+COOKIES_FILE_PATH_AUX = data_dir / 'cookies_aux.json'
 
 GOOGLE_DRIVE_CREDENTIALS_JSON = os.getenv('GOOGLE_DRIVE_CREDENTIALS_JSON')
 GOOGLE_DRIVE_FOLDER_ID = '1mpco3I0v22hTklleYJkZZh0VNlhol9L3'
-DB_BACKUP_FILENAME = os.getenv('DB_BACKUP_FILENAME', 'data.db')
-COOKIES_BACKUP_FILENAME = os.getenv('COOKIES_BACKUP_FILENAME', 'cookies.json')
+DB_BACKUP_FILENAME = os.getenv('DB_BACKUP_FILENAME', 'data.json')
+COOKIES_BACKUP_FILENAME_MAIN = os.getenv('COOKIES_BACKUP_FILENAME_MAIN', 'cookies_main.json')
+COOKIES_BACKUP_FILENAME_AUX = os.getenv('COOKIES_BACKUP_FILENAME_AUX', 'cookies_aux.json')
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-for-dev')
 DEBUG = False
@@ -33,9 +35,6 @@ FORMAT_MODULE_PATH = ['kinopub_parser.formats']
 LANGUAGE_CODE = 'en'
 
 INSTALLED_APPS = [
-    'unfold',
-    'unfold.contrib.filters',
-    'unfold.contrib.forms',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -79,7 +78,7 @@ if 'runparserlocal' in sys.argv:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': DB_PATH,
+            'NAME': data_dir / 'local.sqlite3',
         }
     }
 else:
@@ -118,10 +117,15 @@ MARK_AS_SEEN = True
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 
-# --- History Parser Config ---
+# --- History Parser Config (Main Account) ---
 KINOPUB_LOGIN = os.getenv('KINOPUB_LOGIN')
 KINOPUB_PASSWORD = os.getenv('KINOPUB_PASSWORD')
-SITE_URL = 'https://y52x.ddm.ovh/'
+SITE_URL = os.getenv('SITE_URL')
+
+# --- Auxiliary Account Config (For aggressive tasks) ---
+KINOPUB_AUX_LOGIN = os.getenv('KINOPUB_AUX_LOGIN')
+KINOPUB_AUX_PASSWORD = os.getenv('KINOPUB_AUX_PASSWORD')
+SITE_AUX_URL = os.getenv('SITE_AUX_URL')
 HISTORY_PARSER_INTERVAL_HOURS = int(os.getenv('HISTORY_PARSER_INTERVAL_HOURS', 6))
 
 # --- App Core Config ---
@@ -138,17 +142,8 @@ LOG_RETENTION_DAYS = 90
 LOG_DELETION_INTERVAL_HOURS = 24
 
 # --- Full Catalog Scan Config ---
-FULL_SCAN_PAGE_DELAY_SECONDS = 10
+FULL_SCAN_PAGE_DELAY_SECONDS = 0
 FULL_SCAN_RESUME_WINDOW_HOURS = 24
-
-# --- Unfold ---
-UNFOLD = {
-    'SITE_TITLE': 'KinoPub Parser',
-    'SITE_HEADER': 'KinoPub Parser',
-    'SITE_BRAND': 'KinoPub Parser',
-    'WELCOME_SIGN': 'Добро пожаловать в панель управления',
-    'THEME': 'dark',
-}
 
 # --- Logging ---
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()

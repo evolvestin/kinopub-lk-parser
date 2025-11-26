@@ -1,4 +1,5 @@
 import logging
+import os
 import signal
 import socket
 import threading
@@ -17,6 +18,14 @@ def _handle_signal(signum, _):
     shutdown_flag.set()
 
 
+def _update_heartbeat():
+    try:
+        with open(settings.HEARTBEAT_FILE, 'a'):
+            os.utime(settings.HEARTBEAT_FILE, None)
+    except Exception as e:
+        logging.warning('Could not update heartbeat file: %s', e)
+
+
 def run_idle_loop(mail, current_shutdown_flag):
     while not current_shutdown_flag.is_set():
         try:
@@ -27,6 +36,7 @@ def run_idle_loop(mail, current_shutdown_flag):
                 'Entering IDLE mode. Waiting for updates for %d seconds...',
                 settings.IDLE_TIMEOUT,
             )
+            _update_heartbeat()
             mail.idle(timeout=settings.IDLE_TIMEOUT)
         except (imaplib2.IMAP4.error, socket.error, OSError) as e:
             logging.warning('Connection lost in IDLE mode. Reconnecting. Error: %s', e)
@@ -36,6 +46,7 @@ def run_idle_loop(mail, current_shutdown_flag):
 def run_email_listener(current_shutdown_flag):
     """The main loop for the email listener, including connection and reconnect logic."""
     while not current_shutdown_flag.is_set():
+        _update_heartbeat()
         try:
             with email_processor.imap_connection() as mail:
                 run_idle_loop(mail, current_shutdown_flag)
@@ -55,5 +66,6 @@ class Command(BaseCommand):
             signal.signal(sig, _handle_signal)
 
         logging.info('Starting email listener...')
+        _update_heartbeat()
         run_email_listener(shutdown_flag)
         logging.info('Email listener stopped.')

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import random
 import re
 import shutil
 import time
@@ -10,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 import undetected_chromedriver as uc
 from django.conf import settings
 from django.db.models import Max
+from kinopub_parser import celery_app
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
@@ -109,17 +111,31 @@ def update_show_details(driver, show_id):
         raise
 
 
-def setup_driver(headless=True):
+def setup_driver(headless=True, profile_key='main', randomize=False):
     options = uc.ChromeOptions()
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--window-size=1280,900')
+
+    if randomize:
+        width = random.randint(1024, 1920)
+        height = random.randint(768, 1080)
+        options.add_argument(f'--window-size={width},{height}')
+    else:
+        options.add_argument('--window-size=1280,900')
+
+    options.page_load_strategy = 'eager'
+    options.add_experimental_option(
+        'prefs',
+        {
+            'profile.managed_default_content_settings.images': 2,
+        },
+    )
 
     if headless:
         options.add_argument('--headless=new')
         options.add_argument('--disable-gpu')
 
-        user_data_dir = os.path.join('/data', 'uc_browser_data')
+        user_data_dir = os.path.join('/data', f'uc_browser_data_{profile_key}')
         if os.path.exists(user_data_dir):
             try:
                 shutil.rmtree(user_data_dir)
@@ -139,15 +155,17 @@ def setup_driver(headless=True):
     return driver
 
 
-def save_cookies(driver):
+def save_cookies(driver, file_path):
     cookies = driver.get_cookies()
-    with open(settings.COOKIES_FILE_PATH, 'w', encoding='utf-8') as f:
+    with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(cookies, f, ensure_ascii=False, indent=2)
-    logging.info('Cookies successfully saved to %s', settings.COOKIES_FILE_PATH)
+    logging.info('Cookies successfully saved to %s', file_path)
+    celery_app.send_task('app.tasks.backup_cookies')
+    logging.info('Cookies backup scheduled via Celery.')
 
 
-def do_login(driver):
-    login_url = f'{settings.SITE_URL}user/login'
+def do_login(driver, login, password, cookie_path, base_url):
+    login_url = f'{base_url}user/login'
     try:
         wait = WebDriverWait(driver, 30)
         login_input = wait.until(
@@ -163,9 +181,9 @@ def do_login(driver):
         )
 
         login_input.clear()
-        login_input.send_keys(settings.KINOPUB_LOGIN)
+        login_input.send_keys(login)
         password_input.clear()
-        password_input.send_keys(settings.KINOPUB_PASSWORD)
+        password_input.send_keys(password)
         time.sleep(1)
         submit_btn.click()
 
@@ -216,7 +234,7 @@ def do_login(driver):
             raise TimeoutException('Timeout expired while waiting for 2FA code.')
 
         logging.info('Authorization successful.')
-        save_cookies(driver)
+        save_cookies(driver, cookie_path)
 
     except TimeoutException:
         logging.error('Failed to log in within the allotted time. Please restart the script.')
@@ -225,22 +243,36 @@ def do_login(driver):
         raise RuntimeError(f'An error occurred during login: {e}')
 
 
-def initialize_driver_session(headless=True):
-    logging.info('Initializing Selenium driver session...')
-    driver = setup_driver(headless=headless)
+def initialize_driver_session(headless=True, session_type='main'):
+    logging.info(f'Initializing Selenium driver session (Type: {session_type})...')
+
+    if session_type == 'aux':
+        target_url = settings.SITE_AUX_URL
+        login = settings.KINOPUB_AUX_LOGIN
+        password = settings.KINOPUB_AUX_PASSWORD
+        cookie_path = settings.COOKIES_FILE_PATH_AUX
+        randomize = True
+    else:
+        target_url = settings.SITE_URL
+        login = settings.KINOPUB_LOGIN
+        password = settings.KINOPUB_PASSWORD
+        cookie_path = settings.COOKIES_FILE_PATH_MAIN
+        randomize = False
+
+    driver = setup_driver(headless=headless, profile_key=session_type, randomize=randomize)
 
     try:
-        driver.get(settings.SITE_URL)
-        if os.path.exists(settings.COOKIES_FILE_PATH):
+        driver.get(target_url)
+        if os.path.exists(cookie_path):
             try:
-                with open(settings.COOKIES_FILE_PATH, 'r', encoding='utf-8') as f:
+                with open(cookie_path, 'r', encoding='utf-8') as f:
                     cookies = json.load(f)
                 for cookie in cookies:
                     if 'expiry' in cookie and cookie['expiry']:
                         cookie['expiry'] = int(cookie['expiry'])
                     driver.add_cookie(cookie)
                 logging.info('Cookies loaded. Refreshing page to validate session...')
-                driver.get(settings.SITE_URL)
+                driver.get(target_url)
                 time.sleep(2)
             except Exception as e:
                 logging.warning(
@@ -258,9 +290,17 @@ def initialize_driver_session(headless=True):
             logging.info('Session is valid.')
             return driver
         except TimeoutException:
+            if os.path.exists(cookie_path):
+                logging.warning(
+                    'Loaded cookies did not result in a valid session. Deleting cookie file.'
+                )
+                try:
+                    os.remove(cookie_path)
+                except OSError as e:
+                    logging.error(f'Failed to delete stale cookie file: {e}')
             logging.warning('Session is invalid or expired. Attempting to log in...')
-            driver.get(f'{settings.SITE_URL}user/login')
-            do_login(driver)
+            driver.get(f'{target_url}user/login')
+            do_login(driver, login, password, cookie_path, target_url)
             return driver
     except Exception as e:
         logging.error('An unexpected error occurred during session initialization: %s', e)
@@ -298,6 +338,8 @@ def get_movie_duration_and_save(driver, show_id):
                 defaults={'duration_seconds': duration_sec},
             )
             logging.info('Cached duration for movie id%d: %d seconds.', show_id, duration_sec)
+        else:
+            logging.warning('Could not find playlist JSON for movie %s', movie_url)
     except Exception as e:
         logging.error('Error getting duration for movie id%d: %s', show_id, e)
 
@@ -517,6 +559,17 @@ def _run_parser_for_mode(driver, mode):
 
     logging.info('Navigating to history page: %s', history_url)
     driver.get(history_url)
+
+    try:
+        body_text = driver.find_element(By.TAG_NAME, 'body').text
+        if 'Для доступа к этой странице нужен PRO-аккаунт' in body_text:
+            logging.error(
+                'Failed to access history page: PRO account is required. Aborting scan for mode "%s".',
+                mode,
+            )
+            return 0
+    except Exception:
+        pass
 
     total_pages = get_total_pages(driver)
     logging.info("Found %d pages to parse for mode '%s'.", total_pages, mode)

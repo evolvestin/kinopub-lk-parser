@@ -3,9 +3,15 @@ import time
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from selenium.webdriver.common.by import By
 
 from app.gdrive_backup import BackupManager
-from app.history_parser import initialize_driver_session, update_show_details
+from app.history_parser import (
+    get_movie_duration_and_save,
+    get_season_durations_and_save,
+    initialize_driver_session,
+    update_show_details,
+)
 from app.models import Show
 
 
@@ -40,14 +46,18 @@ class Command(BaseCommand):
         driver = None
         updated_count = 0
         try:
-            driver = initialize_driver_session()
+            # Using 'aux' session type for aggressive detail updating
+            driver = initialize_driver_session(session_type='aux')
+
+            # Determine base URL dynamically from the driver's current location or settings
+            base_url = settings.SITE_AUX_URL
 
             for i, show_id in enumerate(show_ids_to_update):
                 logging.info(
                     f'Processing show {i + 1}/{len(show_ids_to_update)} (ID: {show_id})...'
                 )
                 try:
-                    show_url = f'{settings.SITE_URL}item/view/{show_id}'
+                    show_url = f'{base_url}item/view/{show_id}'
                     driver.get(show_url)
                     time.sleep(1)
 
@@ -55,7 +65,6 @@ class Command(BaseCommand):
 
                     logging.info(f'Successfully updated details for show ID {show_id}.')
                     updated_count += 1
-                    time.sleep(2)
                 except Exception as e:
                     logging.error(f'Failed to update show ID {show_id}: {e}')
                     continue

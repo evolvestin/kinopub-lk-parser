@@ -64,16 +64,14 @@ class BackupManager:
     def _upload_file(self, drive, local_path, remote_name):
         try:
             file_id = self._get_file_id(drive, remote_name)
-            g_file = (
-                drive.CreateFile({'id': file_id})
-                if file_id
-                else drive.CreateFile(
-                    {
-                        'title': remote_name,
-                        'parents': [{'id': settings.GOOGLE_DRIVE_FOLDER_ID}],
-                    }
+            if not file_id:
+                logging.error(
+                    'File "%s" not found on Google Drive and creation is not supported. Upload aborted.',
+                    remote_name,
                 )
-            )
+                return
+
+            g_file = drive.CreateFile({'id': file_id})
             g_file.SetContentFile(local_path)
             g_file.Upload()
             self._cached_file_ids[remote_name] = g_file['id']
@@ -99,139 +97,57 @@ class BackupManager:
             return False
 
     def perform_backup(self):
-        original_handlers = logging.root.handlers[:]
-        console_handler = next(
-            (h for h in original_handlers if isinstance(h, logging.StreamHandler)), None
-        )
+        logging.info('Starting backup process (JSON format)...')
+        drive = self._get_drive_service()
+        if not drive:
+            logging.error('Could not get Google Drive service. Backup aborted.')
+            return
+
+        backup_file_path = os.path.join('/data', f'backup_{int(time.time())}.json')
 
         try:
-            if console_handler:
-                logging.root.handlers = [console_handler]
-
-            logging.info('Starting backup process...')
-            drive = self._get_drive_service()
-            if not drive:
-                logging.error('Could not get Google Drive service. Backup aborted.')
-                return
-
-            backup_db_path = os.path.join('/data', f'backup_{int(time.time())}.db')
-
-            logging.info(f'Creating temporary SQLite backup at {backup_db_path}')
-
-            connections.databases['backup_sqlite'] = {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': backup_db_path,
-                'TIME_ZONE': settings.TIME_ZONE,
-                'CONN_HEALTH_CHECKS': False,
-                'CONN_MAX_AGE': 0,
-                'OPTIONS': {},
-                'AUTOCOMMIT': True,
-                'ATOMIC_REQUESTS': False,
-            }
-
-            call_command('migrate', database='backup_sqlite', verbosity=0, interactive=False)
-
-            connections['backup_sqlite'].ensure_connection()
-
-            models_to_backup = [
-                m for m in apps.get_models() if m._meta.app_label == 'app' and not m._meta.proxy
-            ]
-
-            for model in models_to_backup:
-                table_name = model._meta.db_table
-                sys.stdout.write(f'Backing up table: {table_name}\n')
-                sys.stdout.flush()
-
-                created_at_field = next(
-                    (f for f in model._meta.fields if f.name == 'created_at'), None
+            logging.info(f'Dumping database to {backup_file_path}...')
+            with open(backup_file_path, 'w', encoding='utf-8') as f:
+                call_command(
+                    'dumpdata',
+                    'app',
+                    stdout=f,
+                    indent=2,
+                    use_natural_foreign_keys=True,
+                    use_natural_primary_keys=True,
                 )
-                updated_at_field = next(
-                    (f for f in model._meta.fields if f.name == 'updated_at'), None
-                )
-                original_auto_now_add = created_at_field.auto_now_add if created_at_field else None
-                original_auto_now = updated_at_field.auto_now if updated_at_field else None
 
-                try:
-                    if created_at_field:
-                        created_at_field.auto_now_add = False
-                    if updated_at_field:
-                        updated_at_field.auto_now = False
-
-                    queryset = model.objects.using('default').all()
-                    total_count = queryset.count()
-                    sys.stdout.write(f'Found {total_count} records to backup for {table_name}\n')
-                    sys.stdout.flush()
-
-                    if total_count > 0:
-                        batch_size = 2000
-                        for offset in range(0, total_count, batch_size):
-                            batch = list(queryset[offset : offset + batch_size])
-                            if batch:
-                                model.objects.using('backup_sqlite').bulk_create(
-                                    batch, batch_size=batch_size, ignore_conflicts=True
-                                )
-                        sys.stdout.write(
-                            f'Successfully backed up {total_count} records for {table_name}\n'
-                        )
-                        sys.stdout.flush()
-                finally:
-                    if created_at_field and original_auto_now_add is not None:
-                        created_at_field.auto_now_add = original_auto_now_add
-                    if updated_at_field and original_auto_now is not None:
-                        updated_at_field.auto_now = original_auto_now
-
-            for model in models_to_backup:
-                for field in model._meta.many_to_many:
-                    m2m_model = field.remote_field.through
-                    if not m2m_model._meta.auto_created:
-                        continue
-                    table_name = m2m_model._meta.db_table
-                    sys.stdout.write(f'Backing up M2M table: {table_name}\n')
-                    sys.stdout.flush()
-
-                    queryset = m2m_model.objects.using('default').all()
-                    total_count = queryset.count()
-
-                    if total_count > 0:
-                        batch_size = 5000
-                        for offset in range(0, total_count, batch_size):
-                            batch = list(queryset[offset : offset + batch_size])
-                            if batch:
-                                m2m_model.objects.using('backup_sqlite').bulk_create(
-                                    batch, batch_size=batch_size, ignore_conflicts=True
-                                )
-                        sys.stdout.write(
-                            f'Successfully backed up {total_count} M2M records for {table_name}\n'
-                        )
-                        sys.stdout.flush()
-
-            connections['backup_sqlite'].close()
-            del connections.databases['backup_sqlite']
-
-            file_size = os.path.getsize(backup_db_path)
-            logging.info(f'Backup database created successfully, size: {file_size} bytes')
-
-            self._upload_file(drive, backup_db_path, settings.DB_BACKUP_FILENAME)
-
-            if os.path.exists(settings.COOKIES_FILE_PATH):
-                self._upload_file(
-                    drive,
-                    settings.COOKIES_FILE_PATH,
-                    settings.COOKIES_BACKUP_FILENAME,
-                )
+            if os.path.exists(backup_file_path):
+                file_size = os.path.getsize(backup_file_path)
+                logging.info(f'Backup file created successfully, size: {file_size} bytes')
+                self._upload_file(drive, backup_file_path, settings.DB_BACKUP_FILENAME)
+            else:
+                logging.error(f'Backup file {backup_file_path} was not found after creation.')
 
         except Exception as e:
             logging.error(f'An error occurred during backup process: {e}', exc_info=True)
         finally:
-            logging.root.handlers = original_handlers
+            if backup_file_path and os.path.exists(backup_file_path):
+                os.remove(backup_file_path)
+                logging.info(f'Removed temporary backup file: {backup_file_path}')
 
-            if 'backup_sqlite' in connections.databases:
-                if connections['backup_sqlite'].connection:
-                    connections['backup_sqlite'].close()
-                del connections.databases['backup_sqlite']
-            if 'backup_db_path' in locals() and os.path.exists(backup_db_path):
-                os.remove(backup_db_path)
-                logging.info(f'Removed temporary backup file: {backup_db_path}')
+    def perform_cookies_backup(self):
+        logging.info('Starting cookies backup process...')
+        drive = self._get_drive_service()
+        if not drive:
+            logging.error('Could not get Google Drive service. Cookies backup aborted.')
+            return
+
+        cookie_files = [
+            (settings.COOKIES_FILE_PATH_MAIN, settings.COOKIES_BACKUP_FILENAME_MAIN),
+            (settings.COOKIES_FILE_PATH_AUX, settings.COOKIES_BACKUP_FILENAME_AUX),
+        ]
+
+        for local_path, remote_name in cookie_files:
+            if os.path.exists(local_path):
+                self._upload_file(drive, local_path, remote_name)
+            else:
+                logging.warning(f'Cookies file {local_path} not found locally. Skipping.')
 
     def restore_from_backup(self):
         logging.info('Attempting to download files from Google Drive for restore...')
@@ -250,5 +166,11 @@ class BackupManager:
             )
             return None
 
-        self._download_file(drive, settings.COOKIES_BACKUP_FILENAME, settings.COOKIES_FILE_PATH)
+        self._download_file(
+            drive, settings.COOKIES_BACKUP_FILENAME_MAIN, settings.COOKIES_FILE_PATH_MAIN
+        )
+        self._download_file(
+            drive, settings.COOKIES_BACKUP_FILENAME_AUX, settings.COOKIES_FILE_PATH_AUX
+        )
+
         return db_backup_path

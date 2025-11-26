@@ -56,6 +56,7 @@ services:
     build: .
     container_name: kinopub-parser-celery
     command: celery -A kinopub_parser worker -l INFO
+    restart: unless-stopped
     env_file: .env
     volumes:
       - .:/app:delegated
@@ -65,17 +66,43 @@ services:
       - db
     networks:
       - kinopub-net
+    healthcheck:
+      test: [ "CMD-SHELL", "celery -A kinopub_parser inspect ping -d celery@$HOSTNAME" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   celery-beat:
+      build: .
+      container_name: kinopub-parser-celery-beat
+      command: celery -A kinopub_parser beat -l INFO
+      restart: unless-stopped
+      env_file: .env
+      volumes:
+        - .:/app:delegated
+      depends_on:
+        - redis
+        - db
+      networks:
+        - kinopub-net
+      healthcheck:
+        test: [ "CMD-SHELL", "pgrep -f 'celery' || exit 1" ]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+
+  email-listener:
     build: .
-    container_name: kinopub-parser-celery-beat
-    command: celery -A kinopub_parser beat -l INFO
+    container_name: kinopub-parser-email-listener
+    command: python manage.py runemail_listener
+    restart: unless-stopped
     env_file: .env
     volumes:
       - .:/app:delegated
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
     networks:
       - kinopub-net
 

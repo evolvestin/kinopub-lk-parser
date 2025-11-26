@@ -70,3 +70,16 @@ def backup_database():
             lock.release()
     else:
         logging.debug('Backup already in progress. Skipping.')
+
+
+@shared_task
+def backup_cookies():
+    redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
+    lock = redis_client.lock('cookies_backup_lock', timeout=60)
+    if lock.acquire(blocking=False):
+        try:
+            BackupManager().perform_cookies_backup()
+        finally:
+            lock.release()
+    else:
+        logging.debug('Cookies backup already in progress. Skipping.')

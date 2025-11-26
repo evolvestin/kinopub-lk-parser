@@ -86,6 +86,10 @@ def parse_and_save_catalog_page(driver, mode):
     if not shows_on_page:
         return 0
 
+    page_ids = [item['id'] for item in shows_on_page]
+    existing_ids = set(Show.objects.filter(id__in=page_ids).values_list('id', flat=True))
+    new_count = len(page_ids) - len(existing_ids)
+
     shows_to_upsert = [Show(**data) for data in shows_on_page]
 
     update_fields = [
@@ -98,14 +102,14 @@ def parse_and_save_catalog_page(driver, mode):
         'imdb_rating',
     ]
 
-    created_shows = Show.objects.bulk_create(
+    Show.objects.bulk_create(
         shows_to_upsert,
         update_conflicts=True,
         unique_fields=['id'],
         update_fields=update_fields,
     )
 
-    return len(created_shows)
+    return new_count
 
 
 def run_full_scan_session(headless=True):
@@ -139,7 +143,15 @@ def run_full_scan_session(headless=True):
             )
 
     try:
-        driver = initialize_driver_session(headless=headless)
+        # Using 'aux' session type for aggressive scanning
+        driver = initialize_driver_session(headless=headless, session_type='aux')
+        current_base_url = driver.current_url.rstrip(
+            '/'
+        )  # Get the base URL from the authenticated session
+        if current_base_url.endswith('/user/login'):
+            # If we just logged in, we might be at / or /user/login, ensure we have the root
+            current_base_url = settings.SITE_AUX_URL.rstrip('/')
+
         backup_manager = BackupManager()
 
         mode_found = not bool(start_mode)
@@ -151,7 +163,7 @@ def run_full_scan_session(headless=True):
                 continue
 
             try:
-                base_url = f'{settings.SITE_URL}{mode}'
+                base_url = f'{current_base_url}/{mode}'
                 driver.get(base_url)
                 total_pages = get_total_pages(driver)
                 logging.info("Found %d pages for mode '%s'.", total_pages, mode)
@@ -165,9 +177,9 @@ def run_full_scan_session(headless=True):
                     driver.get(page_url)
                     added_count = parse_and_save_catalog_page(driver, mode)
                     logging.info('Saved %d show records from page %d.', added_count, page)
-                    if added_count > 0:
-                        backup_manager.schedule_backup()
                     time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
+
+                backup_manager.schedule_backup()
 
             except Exception as e:
                 logging.error(

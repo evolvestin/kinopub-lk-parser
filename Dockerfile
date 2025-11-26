@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
     tzdata \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system app && adduser --disabled-password --ingroup app --gecos "" app

@@ -1,3 +1,4 @@
+# app/management/commands/runparserlocal.py
 import logging
 import os
 import sys
@@ -18,22 +19,25 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         logging.info('--- Starting local history parser script ---')
         email_thread = None
-        backup_db_path = None
+        backup_file_path = None
 
         try:
             logging.info('Attempting to restore database from Google Drive backup for local run...')
-            backup_db_path = BackupManager().restore_from_backup()
+            backup_file_path = BackupManager().restore_from_backup()
 
-            if not backup_db_path or not os.path.exists(backup_db_path):
-                self.stdout.write(
-                    self.style.WARNING(
-                        'No backup file found or downloaded. Local parser requires a database backup. Aborting.'
-                    )
-                )
-                sys.exit(1)
-
-            logging.info('Database configuration is set to local SQLite. Running migrations...')
+            logging.info('Running migrations for local database...')
             call_command('migrate', interactive=False, verbosity=1)
+
+            if backup_file_path and os.path.exists(backup_file_path):
+                logging.info(f'Loading data from backup: {backup_file_path}')
+                try:
+                    call_command('loaddata', backup_file_path)
+                except Exception as e:
+                    logging.error(f'Failed to load backup data: {e}')
+            else:
+                self.stdout.write(
+                    self.style.WARNING('No backup file found. Starting with empty DB.')
+                )
 
             logging.info('Starting email listener in the background for 2FA codes...')
             email_thread = threading.Thread(
@@ -49,14 +53,14 @@ class Command(BaseCommand):
             history_parser.run_parser_session(headless=False)
 
         except Exception as e:
-            logging.error('A critical error occurred during local execution: %s', e, exc_info=True)
+            logging.error('A critical error occurred during local execution: {e}', exc_info=True)
             sys.exit(1)
         finally:
             if email_thread:
                 logging.info('Stopping email listener thread...')
                 shutdown_flag.set()
                 email_thread.join(timeout=5)
-            if backup_db_path and os.path.exists(backup_db_path):
-                logging.info(f'Removing temporary backup file: {backup_db_path}')
-                os.remove(backup_db_path)
+            if backup_file_path and os.path.exists(backup_file_path):
+                logging.info(f'Removing temporary backup file: {backup_file_path}')
+                os.remove(backup_file_path)
         logging.info('--- Local history parser script finished successfully ---')
