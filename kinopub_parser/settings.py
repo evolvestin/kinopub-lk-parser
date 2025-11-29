@@ -29,6 +29,11 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-for-de
 DEBUG = False
 ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8012',
+    'http://127.0.0.1:8012',
+]
+
 TIME_ZONE = 'UTC'
 USE_TZ = True
 USE_I18N = True
@@ -101,11 +106,12 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 SILENCED_SYSTEM_CHECKS = ['security.W019']
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = data_dir / 'staticfiles'
 
-STATICFILES_DIRS = [
-    BASE_DIR / 'kinopub_parser' / 'static',
-]
+STATICFILES_DIRS = []
+static_src = BASE_DIR / 'kinopub_parser' / 'static'
+if static_src.exists():
+    STATICFILES_DIRS.append(static_src)
 
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'

@@ -31,6 +31,9 @@ class Command(BaseCommand):
                     field.auto_now_add = False
 
         try:
+            logging.info('Flushing existing data before restore...')
+            call_command('flush', interactive=False, reset_sequences=True)
+
             logging.info('Loading data from JSON backup...')
             call_command('loaddata', backup_file_path)
             logging.info('Restore process completed successfully.')

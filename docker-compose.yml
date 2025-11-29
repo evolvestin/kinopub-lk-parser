@@ -77,11 +77,12 @@ services:
   celery-beat:
       build: .
       container_name: kinopub-parser-celery-beat
-      command: celery -A kinopub_parser beat -l INFO
+      command: celery -A kinopub_parser beat -l INFO --schedule=/data/celerybeat-schedule
       restart: unless-stopped
       env_file: .env
       volumes:
         - .:/app:delegated
+        - data:/data
       depends_on:
         - redis
         - db

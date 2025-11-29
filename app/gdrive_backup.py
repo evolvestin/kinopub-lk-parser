@@ -198,7 +198,7 @@ class BackupManager:
             logging.error('Could not get Google Drive service. Restore aborted.')
             return None
 
-        data_dir = os.path.join(settings.BASE_DIR, 'data')
+        data_dir = str(settings.COOKIES_FILE_PATH_MAIN.parent)
         os.makedirs(data_dir, exist_ok=True)
         db_backup_path = os.path.join(data_dir, settings.DB_BACKUP_FILENAME)
 

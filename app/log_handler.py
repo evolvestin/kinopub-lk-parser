@@ -1,6 +1,7 @@
 import logging
 
 from django.apps import apps
+from django.utils import timezone
 
 
 class DatabaseLogHandler(logging.Handler):
@@ -16,10 +17,13 @@ class DatabaseLogHandler(logging.Handler):
 
     def emit(self, record):
         try:
+            now = timezone.now()
             self.log_entry_model.objects.create(
                 level=record.levelname,
                 module=record.module,
                 message=record.getMessage(),
+                created_at=now,
+                updated_at=now,
             )
         except Exception:
             self.handleError(record)
