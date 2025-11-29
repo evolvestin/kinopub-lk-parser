@@ -54,6 +54,36 @@ class Person(BaseModel):
         verbose_name_plural = 'Persons'
 
 
+class ViewUser(BaseModel):
+    telegram_id = models.BigIntegerField(unique=True, null=True, blank=True)
+    username = models.CharField(max_length=255, null=True, blank=True)
+    name = models.CharField(max_length=255, default='')
+    language = models.CharField(max_length=10, default='en')
+
+    def __str__(self):
+        if self.name:
+            return self.name
+        if self.username:
+            return self.username
+        return str(self.telegram_id)
+
+    class Meta:
+        verbose_name = 'View User'
+        verbose_name_plural = 'View Users'
+
+
+class ViewUserGroup(BaseModel):
+    name = models.CharField(max_length=255, unique=True)
+    users = models.ManyToManyField(ViewUser, related_name='groups', blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = 'View User Group'
+        verbose_name_plural = 'View User Groups'
+
+
 class Show(BaseModel):
     id = models.IntegerField(primary_key=True)
     title = models.CharField(max_length=255)
@@ -86,6 +116,7 @@ class ViewHistory(BaseModel):
     view_date = models.DateField()
     season_number = models.IntegerField(default=0)
     episode_number = models.IntegerField(default=0)
+    users = models.ManyToManyField(ViewUser, related_name='history', blank=True)
 
     class Meta:
         indexes = [
@@ -126,3 +157,22 @@ class LogEntry(BaseModel):
         ordering = ['-created_at']
         verbose_name = 'Log entry'
         verbose_name_plural = 'Log entries'
+
+
+class UserRating(BaseModel):
+    RATING_CHOICES = [(float(i) / 2, str(float(i) / 2)) for i in range(21)]
+
+    user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='ratings')
+    show = models.ForeignKey(Show, on_delete=models.CASCADE, related_name='ratings')
+    rating = models.FloatField(choices=RATING_CHOICES)
+
+    class Meta:
+        verbose_name = 'User Rating'
+        verbose_name_plural = 'User Ratings'
+        unique_together = ('user', 'show')
+        indexes = [
+            models.Index(fields=['user', 'show']),
+        ]
+
+    def __str__(self):
+        return f'{self.user.name}: {self.show.title} - {self.rating}'

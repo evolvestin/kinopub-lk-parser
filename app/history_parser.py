@@ -22,6 +22,16 @@ from app.gdrive_backup import BackupManager
 from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
 
 
+def close_driver(driver):
+    if driver:
+        logging.info('Closing Selenium driver.')
+        try:
+            driver.quit()
+        except Exception:
+            pass
+        driver.quit = lambda: None
+
+
 def _extract_int_from_string(text):
     if not text:
         return None
@@ -102,9 +112,10 @@ def update_show_details(driver, show_id):
 
         show.save()
 
-    except (NoSuchElementException, Show.DoesNotExist):
-        logging.warning(
-            f'Could not fetch extended details for show id={show_id}. Info table may be missing.'
+    except (NoSuchElementException, Show.DoesNotExist) as e:
+        logging.error(
+            f'Could not fetch extended details for show id={show_id}. Info table may be missing.',
+            exc_info=e,
         )
     except Exception as e:
         logging.error(f'An error occurred while updating show details for id={show_id}: {e}')
@@ -116,18 +127,25 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
 
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    options.add_argument('--disable-infobars')
+    options.add_argument('--lang=ru-RU,ru')
+    options.add_argument(
+        '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+
     if randomize:
         width = random.randint(1024, 1920)
         height = random.randint(768, 1080)
         options.add_argument(f'--window-size={width},{height}')
     else:
-        options.add_argument('--window-size=1280,900')
+        options.add_argument('--window-size=1920,1080')
 
     options.page_load_strategy = 'eager'
     options.add_experimental_option(
         'prefs',
         {
             'profile.managed_default_content_settings.images': 2,
+            'intl.accept_languages': 'ru-RU,ru,en-US,en',
         },
     )
 
@@ -169,6 +187,12 @@ def save_cookies(driver, file_path):
 
 def do_login(driver, login, password, cookie_path, base_url):
     login_url = f'{base_url}user/login'
+
+    title = driver.title
+    page_source = driver.page_source
+    if 'Один момент' in title or 'Just a moment' in title or 'challenges.cloudflare.com' in page_source:
+        logging.warning('Обнаружена защита Cloudflare на странице входа.')
+
     try:
         wait = WebDriverWait(driver, 30)
         login_input = wait.until(
@@ -241,9 +265,12 @@ def do_login(driver, login, password, cookie_path, base_url):
         return True
 
     except TimeoutException:
-        logging.error(
-            'Failed to log in within the allotted time. The page might be inaccessible or changed.'
-        )
+        if 'Один момент' in driver.title or 'Just a moment' in driver.title:
+            logging.error('Не удалось пройти проверку Cloudflare.')
+        else:
+            logging.error(
+                'Failed to log in within the allotted time. The page might be inaccessible or changed.'
+            )
         return False
     except Exception as e:
         logging.error(f'An unexpected error occurred during login: {e}')
@@ -311,13 +338,11 @@ def initialize_driver_session(headless=True, session_type='main'):
                 return driver
             else:
                 logging.error('Login process failed. Unable to establish a session.')
-                if driver:
-                    driver.quit()
+                close_driver(driver)
                 return None
     except Exception as e:
         logging.error('An unexpected error occurred during session initialization: %s', e)
-        if driver:
-            driver.quit()
+        close_driver(driver)
         return None
 
 
@@ -558,7 +583,49 @@ def get_latest_view_date_orm(mode: str):
         return None
 
 
-def _run_parser_for_mode(driver, mode):
+def open_url_safe(driver, url, headless=True, session_type='main'):
+    driver.get(url)
+    try:
+        title = driver.title
+        page_source = driver.page_source
+
+        is_cloudflare = (
+                'Один момент' in title
+                or 'Just a moment' in title
+                or '/cdn-cgi/challenge-platform/' in page_source
+                or 'challenges.cloudflare.com' in page_source
+        )
+
+        if is_cloudflare:
+            logging.warning(f'Обнаружена защита Cloudflare на {url}. Перезапуск сессии...')
+            close_driver(driver)
+            time.sleep(10)
+
+            new_driver = initialize_driver_session(headless=headless, session_type=session_type)
+            if not new_driver:
+                raise Exception('Не удалось перезапустить драйвер после обнаружения защиты.')
+
+            new_driver.get(url)
+
+            new_title = new_driver.title
+            new_source = new_driver.page_source
+
+            if (
+                    'Один момент' in new_title
+                    or 'Just a moment' in new_title
+                    or '/cdn-cgi/challenge-platform/' in new_source
+            ):
+                close_driver(new_driver)
+                raise Exception('Защита Cloudflare срабатывает повторно после перезапуска.')
+
+            return new_driver
+    except Exception as e:
+        logging.error(f'Ошибка при проверке Cloudflare: {e}')
+        raise
+    return driver
+
+
+def _run_parser_for_mode(driver, mode, headless=True, session_type='main'):
     if mode == 'episodes':
         history_url = f'{settings.SITE_URL}history/index/{settings.KINOPUB_LOGIN}/episodes'
         logging.info('Parsing mode: TV Show EPISODES')
@@ -567,10 +634,10 @@ def _run_parser_for_mode(driver, mode):
         logging.info('Parsing mode: MOVIES')
     else:
         logging.error("Invalid parsing mode '%s'. Aborting.", mode)
-        return 0
+        return 0, driver
 
     logging.info('Navigating to history page: %s', history_url)
-    driver.get(history_url)
+    driver = open_url_safe(driver, history_url, headless, session_type)
 
     try:
         body_text = driver.find_element(By.TAG_NAME, 'body').text
@@ -579,7 +646,7 @@ def _run_parser_for_mode(driver, mode):
                 'Failed to access history page: PRO account is required. Aborting scan for mode "%s".',
                 mode,
             )
-            return 0
+            return 0, driver
     except Exception:
         pass
 
@@ -593,7 +660,7 @@ def _run_parser_for_mode(driver, mode):
         try:
             page_url = f'{history_url}?page={page}&per-page=50'
             if driver.current_url != page_url:
-                driver.get(page_url)
+                driver = open_url_safe(driver, page_url, headless, session_type)
                 time.sleep(1)
 
             logging.info('Parsing page %d/%d...', page, total_pages)
@@ -622,7 +689,7 @@ def _run_parser_for_mode(driver, mode):
             continue
 
     logging.info("--- Finished parsing for '%s'. Added %d records. ---", mode, total_views_added)
-    return total_views_added
+    return total_views_added, driver
 
 
 def get_total_pages(driver):
@@ -639,18 +706,16 @@ def get_total_pages(driver):
 def run_parser_session(headless=True, driver_instance=None):
     logging.info('--- Starting Kinopub History Parser Session ---')
     driver = driver_instance
-    manage_driver = False
     try:
         if driver is None:
             driver = initialize_driver_session(headless=headless)
-            manage_driver = True
 
         if driver is None:
             logging.error('Failed to initialize or use provided driver. Aborting parser run.')
             return
 
-        episodes_added = _run_parser_for_mode(driver, 'episodes')
-        movies_added = _run_parser_for_mode(driver, 'movies')
+        episodes_added, driver = _run_parser_for_mode(driver, 'episodes', headless=headless)
+        movies_added, driver = _run_parser_for_mode(driver, 'movies', headless=headless)
 
         total_views_added = episodes_added + movies_added
         if total_views_added > 0:
@@ -665,6 +730,51 @@ def run_parser_session(headless=True, driver_instance=None):
     except Exception as e:
         logging.error('An unexpected error occurred in the parser session: %s', e)
     finally:
-        logging.info('Closing Selenium driver for the session.')
-        driver.quit()
-        driver.quit = lambda: None
+        close_driver(driver)
+
+
+def process_show_durations(driver, show):
+    """
+    Determines if the show is a movie or series and fetches durations accordingly.
+    For series, it parses the available seasons from the page.
+    """
+    movie_types = ['Movie', 'Concert', 'Documentary Movie']
+
+    if show.type in movie_types:
+        get_movie_duration_and_save(driver, show.id)
+    else:
+        # Logic for Series, DocuSeries, TV Show, etc.
+        try:
+            # Navigate to the show page to find season links
+            show_url = f'{settings.SITE_URL}item/view/{show.id}'
+            driver.get(show_url)
+
+            # Wait for basic load
+            wait = WebDriverWait(driver, 10)
+            wait.until(expected_conditions.presence_of_element_located((By.CSS_SELECTOR, 'h1, h3')))
+
+            seasons = set()
+            # New layout: Seasons are links like /item/view/ID/s1e1 inside a div
+            # We look for all links containing the show ID and /s followed by a digit
+            links = driver.find_elements(By.CSS_SELECTOR, f'a[href*="/item/view/{show.id}/s"]')
+
+            for link in links:
+                href = link.get_attribute('href')
+                if not href:
+                    continue
+                # Extract season number from pattern .../s(\d+)e1
+                match = re.search(r'/s(\d+)e1', href)
+                if match:
+                    seasons.add(int(match.group(1)))
+
+            # Fallback: if no tabs are found, it might be a single season show
+            if not seasons:
+                seasons.add(1)
+
+            logging.info(f'Found seasons {seasons} for show {show.id}')
+
+            for season in sorted(list(seasons)):
+                get_season_durations_and_save(driver, show.id, season)
+
+        except Exception as e:
+            logging.error(f'Error processing seasons for show {show.id}: {e}')

@@ -11,6 +11,8 @@ from django.db import connections
 from oauth2client.service_account import ServiceAccountCredentials
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
+from django.db.models import Max
+from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory, ViewUser, ViewUserGroup
 
 from kinopub_parser import celery_app
 
@@ -100,10 +102,9 @@ class BackupManager:
             return False
 
     def perform_backup(self):
-        from django.db.models import Max
-        from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
+        data_dir = str(settings.COOKIES_FILE_PATH_MAIN.parent)
 
-        last_ts_file = os.path.join('/data', 'last_db_backup_ts')
+        last_ts_file = os.path.join(data_dir, 'last_db_backup_ts')
         last_backup_ts = 0.0
         if os.path.exists(last_ts_file):
             try:
@@ -112,7 +113,17 @@ class BackupManager:
             except ValueError:
                 pass
 
-        check_models = [Code, Country, Genre, Person, Show, ShowDuration, ViewHistory]
+        check_models = [
+            Code,
+            Country,
+            Genre,
+            Person,
+            Show,
+            ShowDuration,
+            ViewHistory,
+            ViewUser,
+            ViewUserGroup,
+        ]
         max_updated_at = None
 
         for model in check_models:
@@ -132,7 +143,7 @@ class BackupManager:
             logging.error('Could not get Google Drive service. Backup aborted.')
             return
 
-        backup_file_path = os.path.join('/data', f'backup_{int(time.time())}.json')
+        backup_file_path = os.path.join(data_dir, f'backup_{int(time.time())}.json')
 
         try:
             logging.info(f'Dumping database to {backup_file_path}...')

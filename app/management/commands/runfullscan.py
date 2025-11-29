@@ -12,6 +12,7 @@ from app.constants import SHOW_TYPE_MAPPING
 from app.gdrive_backup import BackupManager
 from app.history_parser import get_total_pages, initialize_driver_session
 from app.models import LogEntry, Show
+from app.history_parser import close_driver, get_total_pages, initialize_driver_session
 
 
 def parse_and_save_catalog_page(driver, mode):
@@ -143,13 +144,11 @@ def run_full_scan_session(headless=True):
             )
 
     try:
-        # Using 'aux' session type for aggressive scanning
         driver = initialize_driver_session(headless=headless, session_type='aux')
         current_base_url = driver.current_url.rstrip(
             '/'
-        )  # Get the base URL from the authenticated session
+        )
         if current_base_url.endswith('/user/login'):
-            # If we just logged in, we might be at / or /user/login, ensure we have the root
             current_base_url = settings.SITE_AUX_URL.rstrip('/')
 
         backup_manager = BackupManager()
@@ -202,10 +201,7 @@ def run_full_scan_session(headless=True):
             exc_info=True,
         )
     finally:
-        if driver:
-            logging.info('Closing Selenium driver for the session.')
-            driver.quit()
-            driver.quit = lambda: None
+        close_driver(driver)
 
 
 class Command(BaseCommand):

@@ -11,7 +11,10 @@ from app.models import (
     Person,
     Show,
     ShowDuration,
+    UserRating,
     ViewHistory,
+    ViewUser,
+    ViewUserGroup,
 )
 from kinopub_parser.admin import admin_site
 
@@ -71,6 +74,12 @@ class ViewHistoryInline(admin.TabularInline):
     can_delete = False
 
 
+class UserRatingInline(admin.TabularInline):
+    model = UserRating
+    extra = 1
+    autocomplete_fields = ('user',)
+
+
 @admin.register(Show, site=admin_site)
 class ShowAdmin(admin.ModelAdmin):
     list_display = (
@@ -80,12 +89,13 @@ class ShowAdmin(admin.ModelAdmin):
         'year',
         'view_count',
         'total_duration_hours',
+        'get_avg_rating',
         'created_at',
         'updated_at',
     )
-    list_filter = ('type', 'year', 'genres', 'countries')
+    list_filter = ('type', 'year')
     search_fields = ('title', 'original_title')
-    inlines = [ShowDurationInline, ViewHistoryInline]
+    inlines = [ShowDurationInline, ViewHistoryInline, UserRatingInline]
     readonly_fields = (
         'id',
         'title',
@@ -101,7 +111,9 @@ class ShowAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
     )
-    filter_horizontal = ('countries', 'genres', 'directors', 'actors')
+    # Оптимизация: переносим большие списки в autocomplete, оставляем только небольшие в filter_horizontal
+    autocomplete_fields = ('directors', 'actors')
+    filter_horizontal = ('countries', 'genres')
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -121,6 +133,35 @@ class ShowAdmin(admin.ModelAdmin):
             return round(obj._total_duration / 3600, 1)
         return 0
 
+    @admin.display(description='Avg Rating')
+    def get_avg_rating(self, obj):
+        ratings = obj.ratings.all()
+        if not ratings:
+            return '-'
+        avg = sum(r.rating for r in ratings) / len(ratings)
+        return round(avg, 2)
+
+
+@admin.register(ViewUser, site=admin_site)
+class ViewUserAdmin(admin.ModelAdmin):
+    list_display = (
+        'name',
+        'username',
+        'telegram_id',
+        'language',
+        'created_at',
+        'updated_at',
+    )
+    search_fields = ('name', 'username', 'telegram_id')
+    list_filter = ('language',)
+
+
+@admin.register(ViewUserGroup, site=admin_site)
+class ViewUserGroupAdmin(admin.ModelAdmin):
+    list_display = ('name', 'created_at', 'updated_at')
+    search_fields = ('name',)
+    filter_horizontal = ('users',)
+
 
 @admin.register(ViewHistory, site=admin_site)
 class ViewHistoryAdmin(admin.ModelAdmin):
@@ -129,20 +170,22 @@ class ViewHistoryAdmin(admin.ModelAdmin):
         'view_date',
         'season_number',
         'episode_number',
+        'get_users',
         'created_at',
         'updated_at',
     )
-    list_filter = ('view_date',)
+    list_filter = ('view_date', 'users')
     search_fields = ('show__title', 'show__original_title')
     autocomplete_fields = ('show',)
+    filter_horizontal = ('users',)
     readonly_fields = (
-        'show',
-        'view_date',
-        'season_number',
-        'episode_number',
         'created_at',
         'updated_at',
     )
+
+    @admin.display(description='Users')
+    def get_users(self, obj):
+        return ", ".join([u.name or u.username or str(u.telegram_id) for u in obj.users.all()])
 
 
 @admin.register(ShowDuration, site=admin_site)
@@ -267,14 +310,14 @@ class BaseNameAdmin(admin.ModelAdmin):
 @admin.register(Country, site=admin_site)
 class CountryAdmin(BaseNameAdmin):
     inlines = [ShowCountryInline]
-    readonly_fields = BaseNameAdmin.readonly_fields + ('related_actors',)
+    readonly_fields = BaseNameAdmin.readonly_fields + ('related_actors', 'user_stats')
 
     fieldsets = (
         (None, {'fields': ('name',)}),
         (
-            'Related Actors (Top 20 with most roles)',
+            'Statistics',
             {
-                'fields': ('related_actors',),
+                'fields': ('user_stats', 'related_actors'),
                 'classes': ('collapse',),
             },
         ),
@@ -286,6 +329,28 @@ class CountryAdmin(BaseNameAdmin):
             },
         ),
     )
+
+    @admin.display(description='User Stats (Shows watched)')
+    def user_stats(self, obj):
+        # Считаем количество уникальных шоу этой страны, которые посмотрел каждый пользователь
+        stats = (
+            ViewUser.objects.filter(history__show__countries=obj)
+            .distinct()
+            .annotate(
+                shows_count=Count('history__show', distinct=True, filter=Q(history__show__countries=obj))
+            )
+            .order_by('-shows_count')
+        )
+
+        if not stats:
+            return 'No views yet.'
+
+        html = '<ul>'
+        for user in stats:
+            user_label = user.name or user.username or str(user.telegram_id)
+            html += f'<li><strong>{user_label}</strong>: {user.shows_count} shows</li>'
+        html += '</ul>'
+        return format_html(html)
 
     @admin.display(description='Actors')
     def related_actors(self, obj):
@@ -310,14 +375,14 @@ class CountryAdmin(BaseNameAdmin):
 @admin.register(Genre, site=admin_site)
 class GenreAdmin(BaseNameAdmin):
     inlines = [ShowGenreInline]
-    readonly_fields = BaseNameAdmin.readonly_fields + ('related_actors',)
+    readonly_fields = BaseNameAdmin.readonly_fields + ('related_actors', 'user_stats')
 
     fieldsets = (
         (None, {'fields': ('name',)}),
         (
-            'Related Actors (Top 20 with most roles)',
+            'Statistics',
             {
-                'fields': ('related_actors',),
+                'fields': ('user_stats', 'related_actors'),
                 'classes': ('collapse',),
             },
         ),
@@ -329,6 +394,27 @@ class GenreAdmin(BaseNameAdmin):
             },
         ),
     )
+
+    @admin.display(description='User Stats (Shows watched)')
+    def user_stats(self, obj):
+        stats = (
+            ViewUser.objects.filter(history__show__genres=obj)
+            .distinct()
+            .annotate(
+                shows_count=Count('history__show', distinct=True, filter=Q(history__show__genres=obj))
+            )
+            .order_by('-shows_count')
+        )
+
+        if not stats:
+            return 'No views yet.'
+
+        html = '<ul>'
+        for user in stats:
+            user_label = user.name or user.username or str(user.telegram_id)
+            html += f'<li><strong>{user_label}</strong>: {user.shows_count} shows</li>'
+        html += '</ul>'
+        return format_html(html)
 
     @admin.display(description='Actors')
     def related_actors(self, obj):
@@ -353,17 +439,19 @@ class GenreAdmin(BaseNameAdmin):
 @admin.register(Person, site=admin_site)
 class PersonAdmin(BaseNameAdmin):
     inlines = [ShowDirectorInline, ShowActorInline]
+    search_fields = ('name',)
     readonly_fields = BaseNameAdmin.readonly_fields + (
         'related_genres',
         'related_countries',
+        'user_stats',
     )
 
     fieldsets = (
         (None, {'fields': ('name',)}),
         (
-            'Related Information (Top 20)',
+            'Statistics',
             {
-                'fields': ('related_genres', 'related_countries'),
+                'fields': ('user_stats', 'related_genres', 'related_countries'),
                 'classes': ('collapse',),
             },
         ),
@@ -375,6 +463,32 @@ class PersonAdmin(BaseNameAdmin):
             },
         ),
     )
+
+    @admin.display(description='User Stats (Shows watched with this person)')
+    def user_stats(self, obj):
+        # Пользователи, смотревшие фильмы/сериалы с этим актером или режиссером
+        stats = (
+            ViewUser.objects.filter(Q(history__show__actors=obj) | Q(history__show__directors=obj))
+            .distinct()
+            .annotate(
+                shows_count=Count(
+                    'history__show',
+                    distinct=True,
+                    filter=Q(history__show__actors=obj) | Q(history__show__directors=obj)
+                )
+            )
+            .order_by('-shows_count')
+        )
+
+        if not stats:
+            return 'No views yet.'
+
+        html = '<ul>'
+        for user in stats:
+            user_label = user.name or user.username or str(user.telegram_id)
+            html += f'<li><strong>{user_label}</strong>: {user.shows_count} shows</li>'
+        html += '</ul>'
+        return format_html(html)
 
     @admin.display(description='Genres')
     def related_genres(self, obj):

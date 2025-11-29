@@ -1,23 +1,17 @@
 import logging
-import time
-
-from django.conf import settings
 from django.core.management.base import BaseCommand
-from selenium.webdriver.common.by import By
-
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
     close_driver,
-    get_movie_duration_and_save,
-    get_season_durations_and_save,
     initialize_driver_session,
-    update_show_details,
+    process_show_durations,
 )
+import time
 from app.models import Show
 
 
 class Command(BaseCommand):
-    help = 'Fetches and updates details (year, ratings, etc.) for shows that are missing this information.'
+    help = 'Fetches and updates durations for shows that are missing duration data.'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -30,15 +24,18 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR('Limit must be a positive integer.'))
             return
 
-        self.stdout.write(f'Searching for up to {limit} shows with missing year information...')
+        self.stdout.write(f'Searching for up to {limit} shows with missing duration information...')
 
         show_ids_to_update = list(
-            Show.objects.filter(year__isnull=True).order_by('?').values_list('id', flat=True)[:limit]
+            Show.objects.filter(showduration__isnull=True)
+            .order_by('?')
+            .values_list('id', flat=True)
+            .distinct()[:limit]
         )
 
         if not show_ids_to_update:
             self.stdout.write(
-                self.style.SUCCESS('No shows with missing year found. Nothing to do.')
+                self.style.SUCCESS('No shows with missing durations found. Nothing to do.')
             )
             return
 
@@ -47,44 +44,42 @@ class Command(BaseCommand):
         driver = None
         updated_count = 0
         try:
-            driver = initialize_driver_session(session_type='aux')
+            driver = initialize_driver_session(session_type='main')
 
             if driver is None:
                 self.stderr.write(
-                    self.style.ERROR('Could not initialize Selenium driver. Aborting.')
+                    self.style.ERROR('Could not initialize Selenium driver (main account). Aborting.')
                 )
                 return
-
-            base_url = settings.SITE_AUX_URL
 
             for i, show_id in enumerate(show_ids_to_update):
                 logging.info(
                     f'Processing show {i + 1}/{len(show_ids_to_update)} (ID: {show_id})...'
                 )
                 try:
-                    show_url = f'{base_url}item/view/{show_id}'
-                    driver.get(show_url)
-                    time.sleep(1)
+                    show = Show.objects.get(id=show_id)
+                    process_show_durations(driver, show)
 
-                    update_show_details(driver, show_id)
-
-                    logging.info(f'Successfully updated details for show ID {show_id}.')
+                    logging.info(f'Finished processing durations for show ID {show_id}.')
                     updated_count += 1
+                except Show.DoesNotExist:
+                    logging.warning(f'Show ID {show_id} not found in DB during processing.')
                 except Exception as e:
-                    logging.error(f'Failed to update show ID {show_id}: {e}')
+                    logging.error(f'Failed to update durations for show ID {show_id}: {e}')
                     continue
+                time.sleep(60)
 
             if updated_count > 0:
                 self.stdout.write(
-                    self.style.SUCCESS(f'Finished updating {updated_count} show details.')
+                    self.style.SUCCESS(f'Finished processing durations for {updated_count} shows.')
                 )
                 BackupManager().schedule_backup()
             else:
-                self.stdout.write(self.style.SUCCESS('Finished updating show details.'))
+                self.stdout.write(self.style.SUCCESS('Finished processing. No durations added.'))
 
         except Exception as e:
             logging.error(
-                'A critical error occurred during the update process: %s',
+                'A critical error occurred during the duration update process: %s',
                 e,
                 exc_info=True,
             )
