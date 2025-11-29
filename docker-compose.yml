@@ -15,7 +15,7 @@ services:
         python manage.py createsuperuserifneeded &&
         echo 'Restoring from backup on start...' &&
         python manage.py restorebackup &&
-        python manage.py runserver 0.0.0.0:8000 --insecure
+        gunicorn kinopub_parser.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
       "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/admin/login/"]

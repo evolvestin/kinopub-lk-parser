@@ -9,3 +9,5 @@ python-dotenv>=1.0
 celery==5.5.3
 redis==7.0.1
 psycopg[binary,pq]==3.2.12
+gunicorn==23.0.0
+whitenoise==6.11.0
