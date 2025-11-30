@@ -10,9 +10,8 @@ from selenium.webdriver.common.by import By
 
 from app.constants import SHOW_TYPE_MAPPING
 from app.gdrive_backup import BackupManager
-from app.history_parser import get_total_pages, initialize_driver_session
-from app.models import LogEntry, Show
 from app.history_parser import close_driver, get_total_pages, initialize_driver_session
+from app.models import LogEntry, Show
 
 
 def parse_and_save_catalog_page(driver, mode):
@@ -145,9 +144,7 @@ def run_full_scan_session(headless=True):
 
     try:
         driver = initialize_driver_session(headless=headless, session_type='aux')
-        current_base_url = driver.current_url.rstrip(
-            '/'
-        )
+        current_base_url = driver.current_url.rstrip('/')
         if current_base_url.endswith('/user/login'):
             current_base_url = settings.SITE_AUX_URL.rstrip('/')
 

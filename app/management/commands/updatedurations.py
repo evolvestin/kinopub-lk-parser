@@ -1,12 +1,14 @@
 import logging
+import time
+
 from django.core.management.base import BaseCommand
+
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
     close_driver,
     initialize_driver_session,
     process_show_durations,
 )
-import time
 from app.models import Show
 
 
@@ -48,7 +50,9 @@ class Command(BaseCommand):
 
             if driver is None:
                 self.stderr.write(
-                    self.style.ERROR('Could not initialize Selenium driver (main account). Aborting.')
+                    self.style.ERROR(
+                        'Could not initialize Selenium driver (main account). Aborting.'
+                    )
                 )
                 return
 

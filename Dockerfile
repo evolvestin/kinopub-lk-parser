@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     chromium-driver \
     tzdata \
     procps \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --system app && adduser --disabled-password --ingroup app --gecos "" app

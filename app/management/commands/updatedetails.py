@@ -23,22 +23,35 @@ class Command(BaseCommand):
         parser.add_argument(
             'limit', type=int, help='The maximum number of shows to process in one run.'
         )
+        parser.add_argument(
+            '--type',
+            type=str,
+            dest='type',
+            help='Filter shows by type (e.g. Series, Movie).',
+        )
 
     def handle(self, *args, **options):
         limit = options['limit']
+        show_type = options.get('type')
+
         if limit <= 0:
             self.stdout.write(self.style.ERROR('Limit must be a positive integer.'))
             return
 
-        self.stdout.write(f'Searching for up to {limit} shows with missing year information...')
+        msg = f'Searching for up to {limit} shows with missing year information'
+        if show_type:
+            msg += f' (type: {show_type})'
+        self.stdout.write(f'{msg}...')
 
-        show_ids_to_update = list(
-            Show.objects.filter(year__isnull=True).order_by('?').values_list('id', flat=True)[:limit]
-        )
+        queryset = Show.objects.filter(year__isnull=True)
+        if show_type:
+            queryset = queryset.filter(type=show_type)
+
+        show_ids_to_update = list(queryset.order_by('?').values_list('id', flat=True)[:limit])
 
         if not show_ids_to_update:
             self.stdout.write(
-                self.style.SUCCESS('No shows with missing year found. Nothing to do.')
+                self.style.SUCCESS('No shows found matching criteria. Nothing to do.')
             )
             return
 

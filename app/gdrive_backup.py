@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import subprocess
 import sys
 import time
 
@@ -8,12 +9,22 @@ from django.apps import apps
 from django.conf import settings
 from django.core.management import call_command
 from django.db import connections
+from django.db.models import Max
 from oauth2client.service_account import ServiceAccountCredentials
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
-from django.db.models import Max
-from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory, ViewUser, ViewUserGroup
 
+from app.models import (
+    Code,
+    Country,
+    Genre,
+    Person,
+    Show,
+    ShowDuration,
+    ViewHistory,
+    ViewUser,
+    ViewUserGroup,
+)
 from kinopub_parser import celery_app
 
 
@@ -137,24 +148,38 @@ class BackupManager:
             logging.info('Database has not changed since last backup. Skipping.')
             return
 
-        logging.info('Starting backup process (JSON format)...')
+        logging.info('Starting backup process (pg_dump binary format)...')
         drive = self._get_drive_service()
         if not drive:
             logging.error('Could not get Google Drive service. Backup aborted.')
             return
 
-        backup_file_path = os.path.join(data_dir, f'backup_{int(time.time())}.json')
+        backup_file_path = os.path.join(data_dir, f'backup_{int(time.time())}.dump')
 
         try:
+            db_conf = settings.DATABASES['default']
+            env = os.environ.copy()
+            env['PGPASSWORD'] = db_conf['PASSWORD']
+
+            cmd = [
+                'pg_dump',
+                '-h',
+                db_conf['HOST'],
+                '-p',
+                str(db_conf['PORT']),
+                '-U',
+                db_conf['USER'],
+                '-F',
+                'c',
+                '-b',
+                '-v',
+                '-f',
+                backup_file_path,
+                db_conf['NAME'],
+            ]
+
             logging.info(f'Dumping database to {backup_file_path}...')
-            with open(backup_file_path, 'w', encoding='utf-8') as f:
-                call_command(
-                    'dumpdata',
-                    'app',
-                    stdout=f,
-                    use_natural_foreign_keys=True,
-                    use_natural_primary_keys=True,
-                )
+            subprocess.run(cmd, env=env, check=True)
 
             if os.path.exists(backup_file_path):
                 file_size = os.path.getsize(backup_file_path)
@@ -166,6 +191,8 @@ class BackupManager:
             else:
                 logging.error(f'Backup file {backup_file_path} was not found after creation.')
 
+        except subprocess.CalledProcessError as e:
+            logging.error(f'pg_dump failed: {e}')
         except Exception as e:
             logging.error(f'An error occurred during backup process: {e}', exc_info=True)
         finally:

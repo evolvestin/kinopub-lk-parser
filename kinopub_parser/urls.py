@@ -11,7 +11,9 @@ admin.sites.site = admin_site
 
 urlpatterns = [
     path('admin/', admin_site.urls),
-    path('favicon.ico', RedirectView.as_view(url=settings.STATIC_URL + 'favicon.ico', permanent=True)),
+    path(
+        'favicon.ico', RedirectView.as_view(url=settings.STATIC_URL + 'favicon.ico', permanent=True)
+    ),
 ]
 
 if not settings.DEBUG:

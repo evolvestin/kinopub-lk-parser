@@ -1,15 +1,15 @@
 import logging
 import os
+import subprocess
 
-from django.apps import apps
-from django.core.management import call_command
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from app.gdrive_backup import BackupManager
 
 
 class Command(BaseCommand):
-    help = 'Restores data from a Google Drive backup using loaddata (JSON).'
+    help = 'Restores data from a Google Drive backup using pg_restore (binary format).'
 
     def handle(self, *args, **options):
         logging.info('Starting restore from backup process...')
@@ -22,32 +22,40 @@ class Command(BaseCommand):
 
         logging.info(f'Using backup file at {backup_file_path}')
 
-        patched_fields = []
-        for model in apps.get_app_config('app').get_models():
-            for field in model._meta.local_fields:
-                if getattr(field, 'auto_now', False) or getattr(field, 'auto_now_add', False):
-                    patched_fields.append((field, field.auto_now, field.auto_now_add))
-                    field.auto_now = False
-                    field.auto_now_add = False
-
         try:
-            logging.info('Flushing existing data before restore...')
-            call_command('flush', interactive=False, reset_sequences=True)
+            db_conf = settings.DATABASES['default']
+            env = os.environ.copy()
+            env['PGPASSWORD'] = db_conf['PASSWORD']
 
-            logging.info('Loading data from JSON backup...')
-            call_command('loaddata', backup_file_path)
+            cmd = [
+                'pg_restore',
+                '-h',
+                db_conf['HOST'],
+                '-p',
+                str(db_conf['PORT']),
+                '-U',
+                db_conf['USER'],
+                '-d',
+                db_conf['NAME'],
+                '-c',
+                '--no-owner',
+                '-v',
+                backup_file_path,
+            ]
+
+            logging.info('Restoring database using pg_restore...')
+            subprocess.run(cmd, env=env, check=True)
+
             logging.info('Restore process completed successfully.')
             manager.schedule_backup()
 
+        except subprocess.CalledProcessError as e:
+            logging.error(f'pg_restore failed: {e}')
         except Exception as e:
             logging.error(
                 f'A critical error occurred during backup restoration: {e}', exc_info=True
             )
         finally:
-            for field, auto_now, auto_now_add in patched_fields:
-                field.auto_now = auto_now
-                field.auto_now_add = auto_now_add
-
             if os.path.exists(backup_file_path):
                 os.remove(backup_file_path)
                 logging.info(f'Removed temporary backup file: {backup_file_path}')

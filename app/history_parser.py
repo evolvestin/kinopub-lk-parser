@@ -11,15 +11,15 @@ from datetime import datetime, timedelta, timezone
 import undetected_chromedriver as uc
 from django.conf import settings
 from django.db.models import Max
-from kinopub_parser import celery_app
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
-from app.constants import MONTHS_MAP, SHOW_TYPE_MAPPING
+from app.constants import MONTHS_MAP, SHOW_STATUS_MAPPING, SHOW_TYPE_MAPPING
 from app.gdrive_backup import BackupManager
 from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
+from kinopub_parser import celery_app
 
 
 def close_driver(driver):
@@ -70,6 +70,11 @@ def update_show_details(driver, show_id):
                     show.type = SHOW_TYPE_MAPPING.get(type_key, type_key.capitalize())
             except NoSuchElementException:
                 logging.error(f'Could not find type link for show id={show_id}')
+
+        status_data = get_row_data('Статус')
+        if status_data:
+            raw_status = status_data.text.strip()
+            show.status = SHOW_STATUS_MAPPING.get(raw_status, raw_status)
 
         rating_data = get_row_data('Рейтинг')
         if rating_data:
@@ -131,7 +136,8 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
     options.add_argument('--disable-infobars')
     options.add_argument('--lang=ru-RU,ru')
     options.add_argument(
-        '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+        '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    )
 
     if randomize:
         width = random.randint(1024, 1920)
@@ -190,7 +196,11 @@ def do_login(driver, login, password, cookie_path, base_url):
 
     title = driver.title
     page_source = driver.page_source
-    if 'Один момент' in title or 'Just a moment' in title or 'challenges.cloudflare.com' in page_source:
+    if (
+        'Один момент' in title
+        or 'Just a moment' in title
+        or 'challenges.cloudflare.com' in page_source
+    ):
         logging.warning('Обнаружена защита Cloudflare на странице входа.')
 
     try:
@@ -590,10 +600,10 @@ def open_url_safe(driver, url, headless=True, session_type='main'):
         page_source = driver.page_source
 
         is_cloudflare = (
-                'Один момент' in title
-                or 'Just a moment' in title
-                or '/cdn-cgi/challenge-platform/' in page_source
-                or 'challenges.cloudflare.com' in page_source
+            'Один момент' in title
+            or 'Just a moment' in title
+            or '/cdn-cgi/challenge-platform/' in page_source
+            or 'challenges.cloudflare.com' in page_source
         )
 
         if is_cloudflare:
@@ -611,9 +621,9 @@ def open_url_safe(driver, url, headless=True, session_type='main'):
             new_source = new_driver.page_source
 
             if (
-                    'Один момент' in new_title
-                    or 'Just a moment' in new_title
-                    or '/cdn-cgi/challenge-platform/' in new_source
+                'Один момент' in new_title
+                or 'Just a moment' in new_title
+                or '/cdn-cgi/challenge-platform/' in new_source
             ):
                 close_driver(new_driver)
                 raise Exception('Защита Cloudflare срабатывает повторно после перезапуска.')

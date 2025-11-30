@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0005_alter_logentry_options_remove_logentry_timestamp_and_more'),
     ]
@@ -13,7 +12,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ViewUser',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name='ID'
+                    ),
+                ),
                 ('created_at', models.DateTimeField(auto_now_add=True, db_index=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('telegram_id', models.BigIntegerField(blank=True, null=True, unique=True)),
@@ -34,11 +38,19 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='ViewUserGroup',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name='ID'
+                    ),
+                ),
                 ('created_at', models.DateTimeField(auto_now_add=True, db_index=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('name', models.CharField(max_length=255, unique=True)),
-                ('users', models.ManyToManyField(blank=True, related_name='groups', to='app.viewuser')),
+                (
+                    'users',
+                    models.ManyToManyField(blank=True, related_name='groups', to='app.viewuser'),
+                ),
             ],
             options={
                 'verbose_name': 'View User Group',

@@ -5,6 +5,7 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["I", "Q"]
 fixable = ["I", "Q001", "Q002"]
+ignore = ["Q000"]
 
 [tool.ruff.format]
 quote-style = "single"

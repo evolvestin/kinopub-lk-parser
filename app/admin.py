@@ -86,6 +86,7 @@ class ShowAdmin(admin.ModelAdmin):
         'title',
         'original_title',
         'type',
+        'status',
         'year',
         'view_count',
         'total_duration_hours',
@@ -93,7 +94,7 @@ class ShowAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
     )
-    list_filter = ('type', 'year')
+    list_filter = ('type', 'status', 'year')
     search_fields = ('title', 'original_title')
     inlines = [ShowDurationInline, ViewHistoryInline, UserRatingInline]
     readonly_fields = (
@@ -101,6 +102,7 @@ class ShowAdmin(admin.ModelAdmin):
         'title',
         'original_title',
         'type',
+        'status',
         'year',
         'kinopoisk_url',
         'kinopoisk_rating',
@@ -111,7 +113,6 @@ class ShowAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
     )
-    # Оптимизация: переносим большие списки в autocomplete, оставляем только небольшие в filter_horizontal
     autocomplete_fields = ('directors', 'actors')
     filter_horizontal = ('countries', 'genres')
 
@@ -185,7 +186,7 @@ class ViewHistoryAdmin(admin.ModelAdmin):
 
     @admin.display(description='Users')
     def get_users(self, obj):
-        return ", ".join([u.name or u.username or str(u.telegram_id) for u in obj.users.all()])
+        return ', '.join([u.name or u.username or str(u.telegram_id) for u in obj.users.all()])
 
 
 @admin.register(ShowDuration, site=admin_site)
@@ -337,7 +338,9 @@ class CountryAdmin(BaseNameAdmin):
             ViewUser.objects.filter(history__show__countries=obj)
             .distinct()
             .annotate(
-                shows_count=Count('history__show', distinct=True, filter=Q(history__show__countries=obj))
+                shows_count=Count(
+                    'history__show', distinct=True, filter=Q(history__show__countries=obj)
+                )
             )
             .order_by('-shows_count')
         )
@@ -401,7 +404,9 @@ class GenreAdmin(BaseNameAdmin):
             ViewUser.objects.filter(history__show__genres=obj)
             .distinct()
             .annotate(
-                shows_count=Count('history__show', distinct=True, filter=Q(history__show__genres=obj))
+                shows_count=Count(
+                    'history__show', distinct=True, filter=Q(history__show__genres=obj)
+                )
             )
             .order_by('-shows_count')
         )
@@ -474,7 +479,7 @@ class PersonAdmin(BaseNameAdmin):
                 shows_count=Count(
                     'history__show',
                     distinct=True,
-                    filter=Q(history__show__actors=obj) | Q(history__show__directors=obj)
+                    filter=Q(history__show__actors=obj) | Q(history__show__directors=obj),
                 )
             )
             .order_by('-shows_count')

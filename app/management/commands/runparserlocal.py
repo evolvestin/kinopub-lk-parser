@@ -8,13 +8,11 @@ from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 
-from app import history_parser
+from app import history_parser, telegram_bot
 from app.gdrive_backup import BackupManager
 from app.history_parser import update_show_details
 from app.management.commands.runemail_listener import run_email_listener, shutdown_flag
-from app.models import Show
-from app import telegram_bot
-from app.models import Code
+from app.models import Code, Show
 
 
 class Command(BaseCommand):
@@ -33,7 +31,9 @@ class Command(BaseCommand):
         self.stdout.write(f'Searching for up to {limit} shows with missing year information...')
 
         show_ids_to_update = list(
-            Show.objects.filter(year__isnull=True).order_by('?').values_list('id', flat=True)[:limit]
+            Show.objects.filter(year__isnull=True)
+            .order_by('?')
+            .values_list('id', flat=True)[:limit]
         )
 
         if not show_ids_to_update:

@@ -1,6 +1,6 @@
 from django.contrib import admin
-from django.urls import path
 from django.shortcuts import render
+from django.urls import path
 
 from app.dashboard import dashboard_callback
 

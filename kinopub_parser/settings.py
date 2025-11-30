@@ -32,6 +32,7 @@ ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8012',
     'http://127.0.0.1:8012',
+    'https://kinopub.webredirect.org',
 ]
 
 TIME_ZONE = 'UTC'

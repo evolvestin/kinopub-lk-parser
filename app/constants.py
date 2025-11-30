@@ -34,3 +34,7 @@ SHOW_TYPE_MAPPING = {
     'tvshow': 'TV Show',
     'sport': 'Sports Program',
 }
+
+SHOW_STATUS_MAPPING = {
+    'окончен': 'Finished',
+}

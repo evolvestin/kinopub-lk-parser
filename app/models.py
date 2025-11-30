@@ -90,6 +90,7 @@ class Show(BaseModel):
     original_title = models.CharField(max_length=255)
     type = models.CharField(max_length=50, default='Series')
     year = models.IntegerField(null=True, blank=True)
+    status = models.CharField(max_length=50, null=True, blank=True)
     kinopoisk_url = models.URLField(max_length=255, null=True, blank=True)
     kinopoisk_rating = models.FloatField(null=True, blank=True)
     kinopoisk_votes = models.IntegerField(null=True, blank=True)
