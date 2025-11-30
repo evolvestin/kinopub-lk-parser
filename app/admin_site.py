@@ -13,6 +13,7 @@ from argparse import _StoreTrueAction, _StoreFalseAction
 from app.dashboard import dashboard_callback
 from app.models import TaskRun, LogEntry
 from app.tasks import run_admin_command
+from app.constants import SHOW_TYPE_MAPPING
 
 class CustomAdminSite(admin.AdminSite):
     def get_urls(self):
@@ -48,7 +49,7 @@ class CustomAdminSite(admin.AdminSite):
         return render(request, 'admin/index.html', context)
 
     def _get_app_commands_details(self):
-        """Инспектирует команды приложения app и возвращает их структуру аргументов."""
+        """Инспектирует команды приложения app и возвращает их структуру аргументов."""       
         commands_dict = {}
         sys_commands = get_commands()
         
@@ -58,11 +59,16 @@ class CustomAdminSite(admin.AdminSite):
             '--no-color', '--force-color', '--skip-checks', '--version', '-h', '--help'
         }
 
-        # Фильтруем только наши кастомные команды из приложения 'app'
-        # Или можно явно перечислить разрешенные команды, если нужно строже
+        # Команды, которые нужно исключить из списка
+        hidden_commands = [
+            'healthcheck',
+            'runemail_listener',
+            'runparserlocal',
+        ]
+
         target_commands = [
             name for name, app in sys_commands.items() 
-            if app == 'app' and name not in ['createsuperuserifneeded']
+            if app == 'app' and name not in hidden_commands
         ]
 
         for name in target_commands:
@@ -92,7 +98,6 @@ class CustomAdminSite(admin.AdminSite):
                         arg_info['name'] = action.dest
                     else:
                         arg_info['is_positional'] = False
-                        # Берем длинное имя флага, если есть (напр --account), иначе короткое
                         long_opt = next((o for o in action.option_strings if o.startswith('--')), action.option_strings[0])
                         arg_info['name'] = long_opt
                         
@@ -100,6 +105,11 @@ class CustomAdminSite(admin.AdminSite):
                             arg_info['type'] = 'checkbox'
                         elif action.type == int:
                             arg_info['type'] = 'number'
+
+                        if name == 'updatedetails' and action.dest == 'type':
+                            arg_info['type'] = 'select'
+                            unique_types = sorted(list(set(SHOW_TYPE_MAPPING.values())))
+                            arg_info['choices'] = [{'value': t, 'label': t} for t in unique_types]
 
                     args_details.append(arg_info)
 

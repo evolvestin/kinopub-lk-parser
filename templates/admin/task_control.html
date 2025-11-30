@@ -140,6 +140,7 @@
         const descEl = document.getElementById('cmdDescription');
         const argsContainer = document.getElementById('dynamicArgsContainer');
         const submitBtn = document.getElementById('submitBtn');
+        let isFirstLogLoad = true; // Флаг для начального скролла логов
 
         function renderArguments(cmdName) {
             argsContainer.innerHTML = '';
@@ -169,7 +170,6 @@
                 
                 let labelText = arg.name;
                 if (!arg.is_positional) {
-                    // It's a flag/option
                     labelText = `${arg.name} (опционально)`;
                 } else {
                     labelText += " (обязательно)";
@@ -178,33 +178,67 @@
                 if (arg.help) {
                     labelText += ` - <span class="text-gray-500 text-xs font-normal">${arg.help}</span>`;
                 }
-                label.innerHTML = labelText;
-                wrapper.appendChild(label);
-
-                const input = document.createElement('input');
-                // Уникальное имя поля: arg_{dest_name}
-                input.name = `arg_${arg.dest}`; 
-                input.className = "bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full";
                 
+                // Если чекбокс, лейбл формируется иначе внутри блока if
+                if (arg.type !== 'checkbox') {
+                    label.innerHTML = labelText;
+                    wrapper.appendChild(label);
+                }
+
+                let input;
+
                 if (arg.type === 'checkbox') {
+                    input = document.createElement('input');
                     input.type = 'checkbox';
+                    input.name = `arg_${arg.dest}`;
                     input.className = "w-5 h-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600 ring-offset-gray-800";
-                    // label logic for checkbox usually places input inside or next to label, adjusting here:
+                    
                     label.className = "flex items-center space-x-2 text-sm font-medium text-gray-300 cursor-pointer";
-                    wrapper.innerHTML = ''; // clear wrapper to restructure for checkbox
+                    label.innerHTML = labelText; // Reset text for checkbox layout
+                    wrapper.innerHTML = '';
                     wrapper.appendChild(label);
                     label.prepend(input);
+                
+                } else if (arg.type === 'select') {
+                    input = document.createElement('select');
+                    input.name = `arg_${arg.dest}`;
+                    input.className = "bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full";
+                    
+                    // Добавляем пустую опцию, если поле не обязательное или просто как дефолт
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = "";
+                    defaultOption.text = "-- Выберите --";
+                    input.appendChild(defaultOption);
+
+                    if (arg.choices) {
+                        arg.choices.forEach(choice => {
+                            const opt = document.createElement('option');
+                            opt.value = choice.value;
+                            opt.text = choice.label;
+                            if (arg.default === choice.value) opt.selected = true;
+                            input.appendChild(opt);
+                        });
+                    }
+                    wrapper.appendChild(input);
+
                 } else if (arg.type === 'number') {
+                    input = document.createElement('input');
+                    input.name = `arg_${arg.dest}`;
+                    input.className = "bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full";
                     input.type = 'number';
                     if(arg.default !== '') input.value = arg.default;
-                    if(arg.required) input.required = true;
                     wrapper.appendChild(input);
+
                 } else {
+                    input = document.createElement('input');
+                    input.name = `arg_${arg.dest}`;
+                    input.className = "bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full";
                     input.type = 'text';
                     if(arg.default !== '') input.value = arg.default;
-                    if(arg.required) input.required = true;
                     wrapper.appendChild(input);
                 }
+
+                if(arg.required && arg.type !== 'checkbox') input.required = true;
 
                 argsContainer.appendChild(wrapper);
             });
@@ -212,12 +246,10 @@
 
         if(select) {
             select.addEventListener('change', (e) => renderArguments(e.target.value));
-            // Init if preselected (browser refresh)
+            // Init if preselected
             if(select.value) renderArguments(select.value);
         }
 
-        // --- Live Data Updating Logic (Same as before) ---
-        
         function formatDuration(seconds) {
             seconds = Math.floor(seconds);
             if (seconds <= 0) return "Запущено";
@@ -253,6 +285,7 @@
                 if (!response.ok) return;
                 const data = await response.json();
 
+                // Обновление расписания
                 const schedBody = document.getElementById('scheduleTableBody');
                 if (data.schedule.length === 0) {
                     schedBody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-center">Нет запланированных задач</td></tr>`;
@@ -268,6 +301,7 @@
                     `).join('');
                 }
 
+                // Обновление истории
                 const tasksBody = document.getElementById('tasksTableBody');
                 if (data.history.length === 0) {
                     tasksBody.innerHTML = `<tr><td colspan="4" class="px-4 py-2 text-center">История пуста</td></tr>`;
@@ -284,7 +318,9 @@
                     `).join('');
                 }
 
+                // Обновление логов
                 const logsContainer = document.getElementById('logsContainer');
+                // Проверяем, находится ли скролл внизу ПЕРЕД обновлением контента
                 const isScrolledToBottom = logsContainer.scrollHeight - logsContainer.scrollTop - logsContainer.clientHeight < 50;
                 
                 if (data.logs.length === 0) {
@@ -297,7 +333,12 @@
                             <span class="break-words text-gray-300">[${log.module}] ${log.message}</span>
                         </div>
                     `).join('');
-                    if (isScrolledToBottom) logsContainer.scrollTop = logsContainer.scrollHeight;
+                    
+                    // Скроллим вниз, если это первая загрузка ИЛИ пользователь уже был внизу
+                    if (isFirstLogLoad || isScrolledToBottom) {
+                        logsContainer.scrollTop = logsContainer.scrollHeight;
+                        isFirstLogLoad = false;
+                    }
                 }
             } catch (e) { console.error("Update failed", e); }
         }
