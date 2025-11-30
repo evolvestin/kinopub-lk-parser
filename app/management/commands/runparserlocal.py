@@ -55,6 +55,10 @@ class Command(BaseCommand):
                 logging.info(f'Successfully updated details for show ID {show_id}.')
                 updated_count += 1
             except Exception as e:
+                err_str = str(e).lower()
+                if 'connection refused' in err_str or 'max retries exceeded' in err_str or 'invalid session' in err_str:
+                    logging.error('Selenium driver is dead. Aborting task loop.')
+                    break
                 logging.error(f'Failed to update show ID {show_id}: {e}')
                 continue
 

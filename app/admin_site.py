@@ -132,14 +132,17 @@ class CustomAdminSite(admin.AdminSite):
             if 'stop_task_id' in request.POST:
                 try:
                     task_to_stop = TaskRun.objects.get(id=request.POST.get('stop_task_id'), status='RUNNING')
+                    
+                    # Пытаемся отправить сигнал в Celery, если есть ID
                     if task_to_stop.celery_task_id:
-                        # Отправляем SIGINT для корректного закрытия ресурсов (try...finally в коде)
                         celery_app.control.revoke(task_to_stop.celery_task_id, terminate=True, signal='SIGINT')
-                        task_to_stop.status = 'STOPPED'
-                        task_to_stop.save()
-                        messages.warning(request, f'Задача {task_to_stop.command} останавливается...')
-                    else:
-                        messages.error(request, 'Не удалось найти ID процесса Celery.')
+                    
+                    # В любом случае меняем статус в БД, чтобы убрать зависшую задачу из интерфейса
+                    task_to_stop.status = 'STOPPED'
+                    task_to_stop.output = (task_to_stop.output or '') + '\n[System] Задача остановлена вручную (или сброшен статус после перезагрузки).'
+                    task_to_stop.save()
+                    messages.warning(request, f'Задача {task_to_stop.command} переведена в статус Остановлено.')
+
                 except TaskRun.DoesNotExist:
                     messages.error(request, 'Задача не найдена или уже завершена.')
                 return redirect('admin:task_control')
@@ -153,8 +156,8 @@ class CustomAdminSite(admin.AdminSite):
                 for old_task in running_tasks:
                     if old_task.celery_task_id:
                         celery_app.control.revoke(old_task.celery_task_id, terminate=True, signal='SIGINT')
-                        old_task.status = 'STOPPED'
-                        old_task.save()
+                    old_task.status = 'STOPPED'
+                    old_task.save()
                 
                 if running_tasks.exists():
                     messages.warning(request, f"Предыдущие активные задачи '{command_name}' были принудительно остановлены.")

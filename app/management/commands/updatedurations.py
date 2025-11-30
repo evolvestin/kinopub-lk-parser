@@ -61,6 +61,12 @@ class Command(BaseCommand):
                     f'Processing show {i + 1}/{len(show_ids_to_update)} (ID: {show_id})...'
                 )
                 try:
+                    # Проверяем, жив ли драйвер, так как process_show_durations "глотает" ошибки соединения
+                    try:
+                        _ = driver.current_url
+                    except Exception as e:
+                        raise Exception(f"Driver unresponsive: {e}")
+
                     show = Show.objects.get(id=show_id)
                     process_show_durations(driver, show)
 
@@ -69,6 +75,12 @@ class Command(BaseCommand):
                 except Show.DoesNotExist:
                     logging.warning(f'Show ID {show_id} not found in DB during processing.')
                 except Exception as e:
+                    # Если драйвер упал или соединение разорвано — прерываем цикл
+                    err_str = str(e).lower()
+                    if 'driver unresponsive' in err_str or 'connection refused' in err_str or 'max retries exceeded' in err_str:
+                        logging.error('Selenium driver is dead. Aborting task loop.')
+                        break
+                    
                     logging.error(f'Failed to update durations for show ID {show_id}: {e}')
                     continue
                 time.sleep(60)

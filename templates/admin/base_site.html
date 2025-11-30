@@ -1,0 +1,282 @@
+{% extends "admin/base.html" %}
+
+{% block title %}KinoPub Parser Admin{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">KinoPub Parser</a></h1>
+{% endblock %}
+
+{% block extrastyle %}
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<style>
+    /* ==========================================================================
+       СТИЛИ ПРИМЕНЯЮТСЯ ТОЛЬКО ДЛЯ ТЕМНОЙ ТЕМЫ (html[data-theme="dark"])
+       Светлая тема останется стандартной Django.
+       ========================================================================== */
+
+    html[data-theme="dark"] {
+        /* Палитра на основе скриншота KinoPub */
+        --body-bg: #14181f;         /* Очень темный фон (основной) */
+        --primary: #1b1f26;         /* Фон панелей и хедера */
+        --secondary: #232830;       /* Второстепенные элементы */
+        
+        --primary-fg: #e5e7eb;      /* Основной текст (светло-серый) */
+        --body-fg: #9ca3af;         /* Второстепенный текст */
+        
+        --accent: #2ecc71;          /* Акцентный зеленый (как на кнопках) */
+        --accent-red: #e74c3c;      /* Акцентный красный */
+        
+        --link-fg: #60a5fa;         /* Цвет ссылок */
+        --link-hover-color: #93c5fd;
+        
+        --border-color: #2d333b;    /* Цвет границ */
+        --hairline-color: #2d333b;
+        
+        /* Переопределение переменных Django Admin */
+        --header-bg: var(--primary);
+        --header-color: var(--primary-fg);
+        --darkened-bg: #0d1116;
+        
+        --button-bg: var(--accent);
+        --button-hover-bg: #27ae60;
+        --default-button-bg: #374151;
+        --default-button-hover-bg: #4b5563;
+        
+        --object-tools-bg: var(--secondary);
+        --object-tools-hover-bg: #374151;
+    }
+
+    /* Глобальные стили (ТОЛЬКО DARK) */
+    html[data-theme="dark"] body {
+        background-color: var(--body-bg) !important;
+        color: var(--body-fg) !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    /* Хедер */
+    html[data-theme="dark"] #header {
+        background-color: var(--primary) !important;
+        border-bottom: 1px solid var(--border-color);
+    }
+    html[data-theme="dark"] #branding h1 {
+        color: var(--primary-fg) !important;
+    }
+    
+    /* Ссылки */
+    html[data-theme="dark"] a:link, 
+    html[data-theme="dark"] a:visited {
+        color: var(--link-fg);
+    }
+    html[data-theme="dark"] a:hover {
+        color: var(--link-hover-color);
+    }
+
+    /* Контейнеры и модули (карточки) */
+    html[data-theme="dark"] .dashboard .module, 
+    html[data-theme="dark"] #content-main .module, 
+    html[data-theme="dark"] .object-tools a, 
+    html[data-theme="dark"] .form-row, 
+    html[data-theme="dark"] .changelist-form,
+    html[data-theme="dark"] #changelist .results,
+    html[data-theme="dark"] .login #content-main,
+    html[data-theme="dark"] .login #container {
+        background-color: var(--primary) !important;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    /* Заголовки модулей */
+    html[data-theme="dark"] .module caption, 
+    html[data-theme="dark"] .module h2 {
+        background-color: var(--secondary) !important;
+        color: var(--primary-fg) !important;
+    }
+
+    /* Таблицы */
+    html[data-theme="dark"] table thead th {
+        background-color: var(--secondary) !important;
+        color: var(--primary-fg) !important;
+        border-bottom: 1px solid var(--border-color) !important;
+    }
+    html[data-theme="dark"] table tbody tr {
+        background-color: var(--primary) !important;
+    }
+    html[data-theme="dark"] table tbody tr.row1, 
+    html[data-theme="dark"] table tbody tr.row2 {
+        background-color: var(--primary) !important;
+        border-bottom: 1px solid var(--border-color);
+    }
+    html[data-theme="dark"] table tbody tr:hover {
+        background-color: var(--secondary) !important;
+    }
+    html[data-theme="dark"] table tbody td {
+        border-bottom: 1px solid var(--border-color) !important;
+        color: var(--body-fg) !important;
+    }
+
+    /* Кнопки действий (Save, etc) */
+    html[data-theme="dark"] .submit-row input[type=submit] {
+        background-color: var(--accent) !important;
+        color: white !important;
+        border: none;
+        text-transform: uppercase;
+        font-weight: bold;
+    }
+    html[data-theme="dark"] .submit-row input[type=submit].deletelink {
+        background-color: var(--accent-red) !important;
+    }
+
+    /* Хлебные крошки */
+    html[data-theme="dark"] div.breadcrumbs {
+        background-color: var(--primary) !important;
+        color: var(--body-fg);
+        border-bottom: 1px solid var(--border-color);
+    }
+    html[data-theme="dark"] div.breadcrumbs a {
+        color: var(--link-fg) !important;
+    }
+
+    /* --- ЗАМЕНА ИКОНОК НА MATERIAL ICONS (ТОЛЬКО В DARK MODE) --- */
+    /* В светлой теме останутся стандартные SVG иконки Django */
+
+    /* Сброс стандартных иконок Django */
+    html[data-theme="dark"] a.addlink, 
+    html[data-theme="dark"] a.changelink, 
+    html[data-theme="dark"] a.deletelink, 
+    html[data-theme="dark"] a.historylink, 
+    html[data-theme="dark"] a.viewlink, 
+    html[data-theme="dark"] .model-group .addlink, 
+    html[data-theme="dark"] .model-group .changelink, 
+    html[data-theme="dark"] .model-group .viewlink,
+    html[data-theme="dark"] ul.messagelist li {
+        background-image: none !important;
+        padding-left: 0 !important;
+        display: inline-flex !important;
+        align-items: center;
+        gap: 5px;
+        text-decoration: none;
+    }
+
+    /* Общие стили для псевдо-элементов иконок */
+    html[data-theme="dark"] a.addlink::before, 
+    html[data-theme="dark"] a.changelink::before, 
+    html[data-theme="dark"] a.deletelink::before, 
+    html[data-theme="dark"] a.historylink::before, 
+    html[data-theme="dark"] a.viewlink::before,
+    html[data-theme="dark"] ul.messagelist li::before {
+        font-family: 'Material Icons';
+        font-weight: normal;
+        font-style: normal;
+        font-size: 18px;
+        line-height: 1;
+        display: inline-block;
+        text-transform: none;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* Mapping (назначение иконок) */
+
+    /* Добавить (+) */
+    html[data-theme="dark"] a.addlink::before {
+        content: "add_circle";
+        color: var(--accent); 
+    }
+
+    /* Изменить (карандаш) */
+    html[data-theme="dark"] a.changelink::before {
+        content: "edit";
+        color: #f39c12; 
+    }
+
+    /* Просмотр (глаз) */
+    html[data-theme="dark"] a.viewlink::before {
+        content: "visibility";
+        color: var(--link-fg);
+    }
+
+    /* Удалить (мусорка) */
+    html[data-theme="dark"] a.deletelink::before {
+        content: "delete";
+        color: var(--accent-red);
+    }
+
+    /* История (часы) */
+    html[data-theme="dark"] a.historylink::before {
+        content: "history";
+        color: var(--body-fg);
+    }
+    
+    /* Иконки сообщений */
+    html[data-theme="dark"] ul.messagelist li.success::before {
+        content: "check_circle";
+        color: var(--accent);
+        margin-right: 8px;
+    }
+    html[data-theme="dark"] ul.messagelist li.warning::before {
+        content: "warning";
+        color: #f39c12;
+        margin-right: 8px;
+    }
+    html[data-theme="dark"] ul.messagelist li.error::before {
+        content: "error";
+        color: var(--accent-red);
+        margin-right: 8px;
+    }
+    
+    /* Сообщения */
+    html[data-theme="dark"] ul.messagelist li {
+        background-color: var(--primary) !important;
+        border: 1px solid var(--border-color);
+        color: var(--primary-fg);
+        border-radius: 4px;
+        padding: 10px 15px;
+        margin-bottom: 5px;
+    }
+
+    /* Поиск */
+    html[data-theme="dark"] #toolbar #searchbar {
+        background-color: var(--secondary) !important;
+        color: white !important;
+        border: 1px solid var(--border-color);
+        padding: 5px;
+        border-radius: 4px;
+    }
+    html[data-theme="dark"] #toolbar input[type=submit] {
+        background-color: var(--primary) !important;
+        border: 1px solid var(--border-color);
+        color: var(--primary-fg);
+        cursor: pointer;
+    }
+</style>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. При начальной загрузке: если стоит тема 'auto' или не задана, принудительно ставим 'dark'
+        if (document.documentElement.dataset.theme === 'auto' || !document.documentElement.dataset.theme) {
+            document.documentElement.dataset.theme = 'dark';
+            try { localStorage.setItem('theme', 'dark'); } catch(e){}
+        }
+
+        // 2. Наблюдаем за изменением темы. Если она станет 'auto', меняем на 'light'.
+        // Таким образом из цикла (Light -> Dark -> Auto) мы выкидываем Auto.
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === "attributes" && mutation.attributeName === "data-theme") {
+                    const currentTheme = document.documentElement.dataset.theme;
+                    if (currentTheme === 'auto') {
+                        // Если Django переключил на Auto (это происходит при клике на Dark),
+                        // мы сразу переключаем на Light.
+                        document.documentElement.dataset.theme = 'light';
+                        try { localStorage.setItem('theme', 'light'); } catch(e){}
+                    }
+                }
+            });
+        });
+
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['data-theme']
+        });
+    });
+</script>
+{% endblock %}
