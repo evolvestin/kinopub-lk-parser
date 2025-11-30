@@ -64,6 +64,7 @@ class CustomAdminSite(admin.AdminSite):
             'healthcheck',
             'runemail_listener',
             'runparserlocal',
+            'createsuperuserifneeded',
         ]
 
         target_commands = [
@@ -123,13 +124,42 @@ class CustomAdminSite(admin.AdminSite):
         return commands_dict
 
     def task_control_view(self, request):
+        from kinopub_parser import celery_app  # Импорт здесь во избежание циклической зависимости
         commands_info = self._get_app_commands_details()
         
         if request.method == 'POST' and not request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            # Обработка остановки задачи
+            if 'stop_task_id' in request.POST:
+                try:
+                    task_to_stop = TaskRun.objects.get(id=request.POST.get('stop_task_id'), status='RUNNING')
+                    if task_to_stop.celery_task_id:
+                        # Отправляем SIGINT для корректного закрытия ресурсов (try...finally в коде)
+                        celery_app.control.revoke(task_to_stop.celery_task_id, terminate=True, signal='SIGINT')
+                        task_to_stop.status = 'STOPPED'
+                        task_to_stop.save()
+                        messages.warning(request, f'Задача {task_to_stop.command} останавливается...')
+                    else:
+                        messages.error(request, 'Не удалось найти ID процесса Celery.')
+                except TaskRun.DoesNotExist:
+                    messages.error(request, 'Задача не найдена или уже завершена.')
+                return redirect('admin:task_control')
+
+            # Обработка запуска новой задачи
             command_name = request.POST.get('command')
             
             if command_name and command_name in commands_info:
-                # Собираем строку аргументов из POST данных
+                # 1. Проверяем, есть ли уже запущенная задача этого типа
+                running_tasks = TaskRun.objects.filter(command=command_name, status='RUNNING')
+                for old_task in running_tasks:
+                    if old_task.celery_task_id:
+                        celery_app.control.revoke(old_task.celery_task_id, terminate=True, signal='SIGINT')
+                        old_task.status = 'STOPPED'
+                        old_task.save()
+                
+                if running_tasks.exists():
+                    messages.warning(request, f"Предыдущие активные задачи '{command_name}' были принудительно остановлены.")
+
+                # 2. Сбор аргументов
                 cmd_config = commands_info[command_name]
                 args_list = []
 
@@ -143,11 +173,9 @@ class CustomAdminSite(admin.AdminSite):
                     else:
                         # Опциональные аргументы (флаги)
                         if arg['type'] == 'checkbox':
-                            # Если чекбокс отмечен, добавляем флаг
                             if value == 'on':
                                 args_list.append(arg['name'])
                         elif value:
-                             # --account main
                             args_list.append(f"{arg['name']} {value}")
 
                 arguments_str = " ".join(args_list)
@@ -212,6 +240,7 @@ class CustomAdminSite(admin.AdminSite):
                 ],
                 'history': [
                     {
+                        'id': t.id,
                         'created_at': t.created_at.strftime('%d.%m.%Y %H:%M:%S'),
                         'command': t.command,
                         'arguments': t.arguments or "-",

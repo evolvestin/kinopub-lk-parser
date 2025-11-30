@@ -185,6 +185,7 @@ class TaskRun(BaseModel):
         ('RUNNING', 'Выполняется'),
         ('SUCCESS', 'Успешно'),
         ('FAILURE', 'Ошибка'),
+        ('STOPPED', 'Остановлено'),
     ]
 
     command = models.CharField(max_length=255)
@@ -192,6 +193,7 @@ class TaskRun(BaseModel):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='QUEUED')
     output = models.TextField(blank=True, null=True)
     error_message = models.TextField(blank=True, null=True)
+    celery_task_id = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         ordering = ['-created_at']

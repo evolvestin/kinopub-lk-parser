@@ -94,11 +94,12 @@ def backup_cookies():
         logging.debug('Cookies backup already in progress. Skipping.')
 
 
-@shared_task
-def run_admin_command(task_run_id):
+@shared_task(bind=True)
+def run_admin_command(self, task_run_id):
     try:
         task_run = TaskRun.objects.get(id=task_run_id)
         task_run.status = 'RUNNING'
+        task_run.celery_task_id = self.request.id
         task_run.save()
 
         cmd_args = shlex.split(task_run.arguments) if task_run.arguments else []
@@ -112,6 +113,10 @@ def run_admin_command(task_run_id):
             
             task_run.output = out_buffer.getvalue() + "\n" + err_buffer.getvalue()
             task_run.status = 'SUCCESS'
+        except KeyboardInterrupt:
+            # Обработка остановки задачи (SIGINT)
+            task_run.output = out_buffer.getvalue() + "\nProcess interrupted by user."
+            task_run.status = 'STOPPED'
         except Exception as e:
             task_run.output = out_buffer.getvalue()
             task_run.error_message = str(e)
