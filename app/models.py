@@ -177,3 +177,26 @@ class UserRating(BaseModel):
 
     def __str__(self):
         return f'{self.user.name}: {self.show.title} - {self.rating}'
+
+
+class TaskRun(BaseModel):
+    STATUS_CHOICES = [
+        ('QUEUED', 'В очереди'),
+        ('RUNNING', 'Выполняется'),
+        ('SUCCESS', 'Успешно'),
+        ('FAILURE', 'Ошибка'),
+    ]
+
+    command = models.CharField(max_length=255)
+    arguments = models.CharField(max_length=255, blank=True, null=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='QUEUED')
+    output = models.TextField(blank=True, null=True)
+    error_message = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Task Run'
+        verbose_name_plural = 'Task Runs'
+
+    def __str__(self):
+        return f"{self.command} ({self.status})"

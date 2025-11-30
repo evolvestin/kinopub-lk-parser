@@ -9,6 +9,15 @@ from redis import Redis
 from app import history_parser, telegram_bot
 from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry
+import io
+import shlex
+from contextlib import redirect_stdout, redirect_stderr
+
+from celery import shared_task
+from django.core.management import call_command
+from django.utils import timezone
+
+from app.models import TaskRun
 
 
 @shared_task
@@ -33,7 +42,7 @@ def run_full_scan_task():
 def expire_codes_task():
     logging.debug('Running periodic check for expired codes...')
     try:
-        expiration_threshold = datetime.now(timezone.utc) - timedelta(
+        expiration_threshold = timezone.now() - timedelta(
             minutes=settings.CODE_LIFETIME_MINUTES
         )
         expired_codes = Code.objects.filter(received_at__lt=expiration_threshold)
@@ -51,7 +60,7 @@ def expire_codes_task():
 def delete_old_logs_task():
     logging.info('Running periodic check for old log entries...')
     try:
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=settings.LOG_RETENTION_DAYS)
+        cutoff_date = timezone.now() - timedelta(days=settings.LOG_RETENTION_DAYS)
         deleted_count, _ = LogEntry.objects.filter(created_at__lt=cutoff_date).delete()
         if deleted_count > 0:
             logging.info('Deleted %d old log entries.', deleted_count)
@@ -83,3 +92,33 @@ def backup_cookies():
             lock.release()
     else:
         logging.debug('Cookies backup already in progress. Skipping.')
+
+
+@shared_task
+def run_admin_command(task_run_id):
+    try:
+        task_run = TaskRun.objects.get(id=task_run_id)
+        task_run.status = 'RUNNING'
+        task_run.save()
+
+        cmd_args = shlex.split(task_run.arguments) if task_run.arguments else []
+        
+        out_buffer = io.StringIO()
+        err_buffer = io.StringIO()
+
+        try:
+            with redirect_stdout(out_buffer), redirect_stderr(err_buffer):
+                call_command(task_run.command, *cmd_args)
+            
+            task_run.output = out_buffer.getvalue() + "\n" + err_buffer.getvalue()
+            task_run.status = 'SUCCESS'
+        except Exception as e:
+            task_run.output = out_buffer.getvalue()
+            task_run.error_message = str(e)
+            task_run.status = 'FAILURE'
+        
+        task_run.updated_at = timezone.now()
+        task_run.save()
+
+    except TaskRun.DoesNotExist:
+        pass

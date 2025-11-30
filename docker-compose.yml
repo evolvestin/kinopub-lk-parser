@@ -1,4 +1,12 @@
 services:
+  # Service for setting permissions on the data folder before launching the application
+  init:
+    image: busybox
+    container_name: kinopub-parser-init
+    command: sh -c "mkdir -p /data && chown -R 1000:1000 /data"
+    volumes:
+      - ./data:/data
+
   web:
     build: .
     container_name: kinopub-parser-web
@@ -8,13 +16,19 @@ services:
       - "8012:8000"
     volumes:
       - .:/app:delegated
-      - data:/data
+      - ./data:/data
     command: >
       sh -c "
         python manage.py collectstatic --noinput &&
         python manage.py migrate --noinput &&
         python manage.py createsuperuserifneeded &&
-        gunicorn kinopub_parser.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
+        if [ \"$DJANGO_DEBUG\" = \"true\" ] || [ \"$DJANGO_DEBUG\" = \"True\" ]; then
+          echo \"Starting Django Development Server...\" &&
+          python manage.py runserver 0.0.0.0:8000;
+        else
+          echo \"Starting Gunicorn...\" &&
+          gunicorn kinopub_parser.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60;
+        fi
       "
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/admin/login/"]
@@ -22,6 +36,8 @@ services:
       timeout: 10s
       retries: 3
     depends_on:
+      init:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
@@ -59,14 +75,18 @@ services:
     env_file: .env
     volumes:
       - .:/app:delegated
-      - data:/data
+      - ./data:/data
     depends_on:
-      - redis
-      - db
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
     networks:
       - kinopub-net
     healthcheck:
-      test: [ "CMD-SHELL", "celery -A kinopub_parser inspect ping -d celery@$HOSTNAME" ]
+      test: [ "CMD-SHELL", "pgrep -f 'celery worker' || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -80,10 +100,14 @@ services:
       env_file: .env
       volumes:
         - .:/app:delegated
-        - data:/data
+        - ./data:/data
       depends_on:
-        - redis
-        - db
+        init:
+          condition: service_completed_successfully
+        redis:
+          condition: service_started
+        db:
+          condition: service_healthy
       networks:
         - kinopub-net
       healthcheck:
@@ -107,8 +131,6 @@ services:
       - kinopub-net
 
 volumes:
-  data:
-    name: kinopub_parser_data
   pgdata:
     name: kinopub_parser_pgdata
 

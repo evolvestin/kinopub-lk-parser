@@ -3,6 +3,9 @@ from django.db.models import Count, Q, Sum
 from django.urls import reverse
 from django.utils.html import format_html
 
+# Импортируем нашу кастомную админку
+from app.admin_site import admin_site
+
 from app.models import (
     Code,
     Country,
@@ -16,7 +19,12 @@ from app.models import (
     ViewUser,
     ViewUserGroup,
 )
-from kinopub_parser.admin import admin_site
+from django.contrib.auth.admin import GroupAdmin, UserAdmin
+from django.contrib.auth.models import Group, User
+
+
+admin_site.register(Group, GroupAdmin)
+admin_site.register(User, UserAdmin)
 
 
 @admin.register(Code, site=admin_site)

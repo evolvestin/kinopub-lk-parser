@@ -6,9 +6,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     procps \
     postgresql-client \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system app && adduser --disabled-password --ingroup app --gecos "" app
+RUN addgroup --gid 1000 app && adduser --uid 1000 --ingroup app --disabled-password --gecos "" app
 
 RUN mkdir -p /home/app/bin && \
     cp /usr/bin/chromedriver /home/app/bin/chromedriver && \
