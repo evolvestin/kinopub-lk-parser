@@ -165,6 +165,10 @@ def run_full_scan_session(headless=True, target_type=None):
             if target_type and mode != target_type:
                 continue
 
+            if not target_type and mode == 'serial':
+                logging.info("Skipping 'serial' mode by default. Use --type=serial to force scan.")
+                continue
+
             if not mode_found and mode == start_mode:
                 mode_found = True
             if not mode_found:

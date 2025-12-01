@@ -1,17 +1,19 @@
 import logging
 import time
+
 from django.conf import settings
 from django.core.management.base import BaseCommand
+
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
-    initialize_driver_session,
     close_driver,
-    get_total_pages,
-    parse_new_episodes_list,
-    update_show_details,
-    process_show_durations,
     get_season_durations_and_save,
+    get_total_pages,
+    initialize_driver_session,
     open_url_safe,
+    parse_new_episodes_list,
+    process_show_durations,
+    update_show_details,
 )
 from app.models import Show, ShowDuration
 

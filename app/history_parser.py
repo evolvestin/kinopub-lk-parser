@@ -62,9 +62,8 @@ def update_show_details(driver, show_id):
             try:
                 link = year_data.find_element(By.TAG_NAME, 'a')
                 href = link.get_attribute('href')
-                type_match = re.search(
-                    r'/(movie|serial|concert|documovie|docuserial|tvshow|sport)', href
-                )
+                types_pattern = '|'.join(SHOW_TYPE_MAPPING.keys())
+                type_match = re.search(f'/({types_pattern})', href)
                 if type_match:
                     type_key = type_match.group(1)
                     show.type = SHOW_TYPE_MAPPING.get(type_key, type_key.capitalize())

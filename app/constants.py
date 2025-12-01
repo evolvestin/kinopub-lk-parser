@@ -33,6 +33,7 @@ SHOW_TYPE_MAPPING = {
     'docuserial': 'Documentary Series',
     'tvshow': 'TV Show',
     'sport': 'Sports Program',
+    '3d': '3D Movie',
 }
 
 SHOW_STATUS_MAPPING = {
