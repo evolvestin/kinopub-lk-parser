@@ -26,18 +26,27 @@ class Command(BaseCommand):
             default='main',
             help='The account to use: "main" for history parsing, "aux" for details update (limit 5).',
         )
-
-    def _run_details_update_task(self, driver, limit, account_type):
-        self.stdout.write(f'Searching for up to {limit} shows with missing year information...')
-
-        show_ids_to_update = list(
-            Show.objects.filter(year__isnull=True)
-            .order_by('?')
-            .values_list('id', flat=True)[:limit]
+        parser.add_argument(
+            '--type',
+            type=str,
+            dest='type',
+            help='Filter shows by type (e.g. Series, Movie). Only used with --account=aux.',
         )
 
+    def _run_details_update_task(self, driver, limit, account_type, show_type=None):
+        msg = f'Searching for up to {limit} shows with missing year information'
+        if show_type:
+            msg += f' (type: {show_type})'
+        self.stdout.write(f'{msg}...')
+
+        queryset = Show.objects.filter(year__isnull=True)
+        if show_type:
+            queryset = queryset.filter(type=show_type)
+
+        show_ids_to_update = list(queryset.order_by('?').values_list('id', flat=True)[:limit])
+
         if not show_ids_to_update:
-            self.stdout.write(self.style.SUCCESS('No shows with missing year found.'))
+            self.stdout.write(self.style.SUCCESS('No shows found matching criteria.'))
             return driver
 
         self.stdout.write(f'Found {len(show_ids_to_update)} shows to update.')
@@ -90,6 +99,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         account = options['account']
+        show_type = options.get('type')
 
         if account == 'main':
             task = 'history'
@@ -148,7 +158,9 @@ class Command(BaseCommand):
                 history_parser.run_parser_session(headless=headless, driver_instance=driver)
             elif task == 'details':
                 logging.info('--- Starting details update session in local mode ---')
-                driver = self._run_details_update_task(driver, limit=5, account_type=account)
+                driver = self._run_details_update_task(
+                    driver, limit=5, account_type=account, show_type=show_type
+                )
 
             logging.info('Checking for active 2FA codes to expire...')
             active_codes = Code.objects.all()

@@ -54,7 +54,11 @@ def delete_old_logs_task():
     logging.info('Running periodic check for old log entries...')
     try:
         cutoff_date = timezone.now() - timedelta(days=settings.LOG_RETENTION_DAYS)
-        deleted_count, _ = LogEntry.objects.filter(created_at__lt=cutoff_date).delete()
+        deleted_count, _ = (
+            LogEntry.objects.filter(created_at__lt=cutoff_date)
+            .exclude(message__contains='New Episodes Parser Finished')
+            .delete()
+        )
         if deleted_count > 0:
             logging.info('Deleted %d old log entries.', deleted_count)
     except Exception as e:
@@ -120,3 +124,12 @@ def run_admin_command(self, task_run_id):
 
     except TaskRun.DoesNotExist:
         pass
+
+
+@shared_task
+def run_new_episodes_task():
+    logging.info('Starting daily new episodes parser task.')
+    try:
+        call_command('runnewepisodes')
+    except Exception as e:
+        logging.error('Celery task: new episodes run failed: %s', e, exc_info=True)

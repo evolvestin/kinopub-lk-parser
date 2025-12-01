@@ -59,7 +59,6 @@ class CustomAdminSite(admin.AdminSite):
         commands_dict = {}
         sys_commands = get_commands()
 
-        # Стандартные аргументы Django, которые мы хотим скрыть из UI
         ignored_args = {
             '-v',
             '--verbosity',
@@ -74,7 +73,6 @@ class CustomAdminSite(admin.AdminSite):
             '--help',
         }
 
-        # Команды, которые нужно исключить из списка
         hidden_commands = [
             'healthcheck',
             'runemail_listener',
@@ -91,12 +89,10 @@ class CustomAdminSite(admin.AdminSite):
         for name in target_commands:
             try:
                 cmd_class = load_command_class('app', name)
-                # Создаем парсер, чтобы извлечь аргументы
                 parser = cmd_class.create_parser('manage.py', name)
 
                 args_details = []
                 for action in parser._actions:
-                    # Пропускаем стандартные аргументы
                     is_ignored = any(opt in ignored_args for opt in action.option_strings)
                     if is_ignored:
                         continue
@@ -106,10 +102,9 @@ class CustomAdminSite(admin.AdminSite):
                         'help': action.help,
                         'required': action.required,
                         'default': action.default if action.default is not None else '',
-                        'type': 'text',  # default
+                        'type': 'text',
                     }
 
-                    # Определяем позиционный это аргумент или опциональный (флаг)
                     if not action.option_strings:
                         arg_info['is_positional'] = True
                         arg_info['name'] = action.dest
@@ -126,7 +121,7 @@ class CustomAdminSite(admin.AdminSite):
                         elif action.type == int:
                             arg_info['type'] = 'number'
 
-                        if name == 'updatedetails' and action.dest == 'type':
+                        if action.dest == 'type':
                             arg_info['type'] = 'select'
                             unique_types = sorted(list(set(SHOW_TYPE_MAPPING.values())))
                             arg_info['choices'] = [{'value': t, 'label': t} for t in unique_types]

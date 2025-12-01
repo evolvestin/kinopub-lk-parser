@@ -791,3 +791,79 @@ def process_show_durations(driver, show):
 
         except Exception as e:
             logging.error(f'Error processing seasons for show {show.id}: {e}')
+
+
+def parse_new_episodes_list(driver):
+    """
+    Parses the /media/new-serial-episodes page table.
+    Returns a list of dictionaries with basic episode info.
+    """
+    episodes = []
+    try:
+        rows = driver.find_elements(By.CSS_SELECTOR, 'table.table tbody tr')
+        logging.debug(f'Found {len(rows)} rows on new episodes page.')
+
+        for row in rows:
+            try:
+                # Extract URL from onclick attribute or first link
+                onclick_val = row.get_attribute('onclick')
+                href = None
+
+                if onclick_val and 'document.location' in onclick_val:
+                    # Extract URL from: document.location = '/path/...'
+                    match = re.search(r"['\"]([^'\"]+)['\"]", onclick_val)
+                    if match:
+                        href = match.group(1)
+
+                if not href:
+                    # Fallback to link inside row
+                    try:
+                        link_el = row.find_element(By.TAG_NAME, 'a')
+                        href = link_el.get_attribute('href')
+                    except NoSuchElementException:
+                        continue
+
+                # Parse ID, Season, Episode from URL: /item/view/104191/s2e3/Daddy-Issues
+                # Regex must handle: /item/view/<id>/s<S>e<E>...
+                url_match = re.search(r'/item/view/(\d+)/s(\d+)e(\d+)', href)
+                if not url_match:
+                    continue
+
+                show_id = int(url_match.group(1))
+                season_num = int(url_match.group(2))
+                episode_num = int(url_match.group(3))
+
+                # Parse Titles
+                try:
+                    title_cell = row.find_element(By.CSS_SELECTOR, 'td:nth-child(2)')
+                    title_el = title_cell.find_element(By.TAG_NAME, 'b')
+                    title = title_el.text.strip()
+
+                    # Original title is often in the same cell text, separated by <br> or just text node
+                    full_text = title_cell.text
+                    original_title = full_text.replace(title, '').strip()
+                    if not original_title:
+                        original_title = title
+                except NoSuchElementException:
+                    title = f'Show {show_id}'
+                    original_title = title
+
+                episodes.append(
+                    {
+                        'show_id': show_id,
+                        'title': title,
+                        'original_title': original_title,
+                        'season': season_num,
+                        'episode': episode_num,
+                        'href': href,
+                    }
+                )
+
+            except Exception as e:
+                logging.error(f'Error parsing row in new episodes list: {e}')
+                continue
+
+    except NoSuchElementException:
+        logging.warning('Table not found on new episodes page.')
+
+    return episodes

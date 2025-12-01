@@ -112,7 +112,7 @@ def parse_and_save_catalog_page(driver, mode):
     return new_count
 
 
-def run_full_scan_session(headless=True):
+def run_full_scan_session(headless=True, target_type=None):
     logging.info('--- Starting Full Catalog Scan Session ---')
     driver = None
 
@@ -134,20 +134,37 @@ def run_full_scan_session(headless=True):
     if last_log:
         match = re.search(r"Processing '(\w+)' page (\d+)", last_log.message)
         if match:
-            start_mode = match.group(1)
-            start_page = int(match.group(2)) + 1
-            logging.info(
-                'Resuming scan from %s, page %d based on recent logs.',
-                start_mode,
-                start_page,
-            )
+            found_mode = match.group(1)
+            found_page = int(match.group(2))
+
+            if target_type:
+                if found_mode == target_type:
+                    start_mode = found_mode
+                    start_page = found_page + 1
+                    logging.info(
+                        'Resuming scan for specific type %s from page %d.',
+                        start_mode,
+                        start_page,
+                    )
+            else:
+                start_mode = found_mode
+                start_page = found_page + 1
+                logging.info(
+                    'Resuming scan from %s, page %d based on recent logs.',
+                    start_mode,
+                    start_page,
+                )
 
     try:
         driver = initialize_driver_session(headless=headless, session_type='aux')
         backup_manager = BackupManager()
 
         mode_found = not bool(start_mode)
+
         for mode in SHOW_TYPE_MAPPING:
+            if target_type and mode != target_type:
+                continue
+
             if not mode_found and mode == start_mode:
                 mode_found = True
             if not mode_found:
@@ -224,7 +241,6 @@ def run_full_scan_session(headless=True):
                     e,
                     exc_info=True,
                 )
-                # Бросаем исключение, чтобы остановить процесс и пометить как FAILURE
                 raise CommandError(f'Scan failed for mode {mode}: {e}')
 
         logging.info('--- Full catalog scan session finished successfully. ---')
@@ -245,5 +261,18 @@ def run_full_scan_session(headless=True):
 class Command(BaseCommand):
     help = 'Runs a full scan of the site catalog to populate the Show database.'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--type',
+            type=str,
+            dest='type',
+            help='Filter shows by type (e.g. serial, movie).',
+        )
+
     def handle(self, *args, **options):
-        run_full_scan_session()
+        target_type = options.get('type')
+        if target_type and target_type not in SHOW_TYPE_MAPPING:
+            raise CommandError(
+                f'Invalid type: {target_type}. Choices: {", ".join(SHOW_TYPE_MAPPING.keys())}'
+            )
+        run_full_scan_session(target_type=target_type)

@@ -37,4 +37,5 @@ SHOW_TYPE_MAPPING = {
 
 SHOW_STATUS_MAPPING = {
     'окончен': 'Finished',
+    'в эфире': 'Ongoing',
 }

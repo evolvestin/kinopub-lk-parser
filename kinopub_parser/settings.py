@@ -208,6 +208,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.tasks.run_history_parser_task',
         'schedule': 3600 * HISTORY_PARSER_INTERVAL_HOURS,
     },
+    'run_new_episodes': {
+        'task': 'app.tasks.run_new_episodes_task',
+        'schedule': crontab(minute=0, hour=4),  # Запуск в 04:00 UTC ежедневно
+    },
     'run_full_scan': {
         'task': 'app.tasks.run_full_scan_task',
         'schedule': crontab(minute=0, hour=0, day_of_month=1, month_of_year='1,4,7,10'),

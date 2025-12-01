@@ -1,7 +1,10 @@
 import logging
 import time
+from datetime import datetime
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q
+from django.utils import timezone
 
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
@@ -9,7 +12,7 @@ from app.history_parser import (
     initialize_driver_session,
     process_show_durations,
 )
-from app.models import Show
+from app.models import LogEntry, Show
 
 
 class Command(BaseCommand):
@@ -19,24 +22,66 @@ class Command(BaseCommand):
         parser.add_argument(
             'limit', type=int, help='The maximum number of shows to process in one run.'
         )
+        parser.add_argument(
+            '--type',
+            type=str,
+            dest='type',
+            help='Filter shows by type (e.g. Series, Movie).',
+        )
 
     def handle(self, *args, **options):
         limit = options['limit']
-        if limit <= 0:
-            raise CommandError('Limit must be a positive integer.')
+        show_type = options.get('type')
 
-        self.stdout.write(f'Searching for up to {limit} shows with missing duration information...')
+        show_ids_to_update = []
+        is_series_mode = show_type in ['Series', 'serial']
 
-        show_ids_to_update = list(
-            Show.objects.filter(showduration__isnull=True)
-            .order_by('?')
-            .values_list('id', flat=True)
-            .distinct()[:limit]
-        )
+        if is_series_mode:
+            self.stdout.write('Series mode detected. Limit ignored. Fetching unfinished series...')
+
+            first_anchor_log = (
+                LogEntry.objects.filter(message__contains='New Episodes Parser Finished')
+                .order_by('created_at')
+                .first()
+            )
+
+            anchor_date = (
+                first_anchor_log.created_at
+                if first_anchor_log
+                else datetime.min.replace(tzinfo=timezone.utc)
+            )
+
+            unfinished_shows = Show.objects.filter(type='Series').exclude(status='Finished')
+
+            for show in unfinished_shows:
+                success_msg = f'Finished processing durations for show ID {show.id}.'
+                already_updated = LogEntry.objects.filter(
+                    message__contains=success_msg, created_at__gte=anchor_date
+                ).exists()
+
+                if not already_updated:
+                    show_ids_to_update.append(show.id)
+
+        else:
+            if limit <= 0:
+                raise CommandError('Limit must be a positive integer.')
+
+            msg = f'Searching for up to {limit} shows with missing duration information'
+            if show_type:
+                msg += f' (type: {show_type})'
+            self.stdout.write(f'{msg}...')
+
+            queryset = Show.objects.filter(showduration__isnull=True)
+            if show_type:
+                queryset = queryset.filter(type=show_type)
+
+            show_ids_to_update = list(
+                queryset.order_by('?').values_list('id', flat=True).distinct()[:limit]
+            )
 
         if not show_ids_to_update:
             self.stdout.write(
-                self.style.SUCCESS('No shows with missing durations found. Nothing to do.')
+                self.style.SUCCESS('No shows found matching criteria. Nothing to do.')
             )
             return
 
@@ -51,7 +96,6 @@ class Command(BaseCommand):
                     logging.info('Restarting Selenium driver session...')
                     driver = initialize_driver_session(session_type='main')
                     if driver is None:
-                        # Если драйвер не удалось поднять - это критическая ошибка
                         raise CommandError('Could not restart Selenium driver. Aborting.')
 
                 logging.info(
@@ -84,6 +128,7 @@ class Command(BaseCommand):
 
                     logging.error(f'Failed to update durations for show ID {show_id}: {e}')
                     continue
+
                 time.sleep(60)
 
             if updated_count > 0:
@@ -96,15 +141,11 @@ class Command(BaseCommand):
 
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING('Process interrupted by user.'))
-            # Не вызываем CommandError здесь, если хотим статус STOPPED (нужна поддержка в tasks.py),
-            # но по умолчанию tasks.py ловит это отдельно.
 
         except CommandError:
-            # Если мы сами вызвали CommandError выше, пробрасываем его дальше
             raise
 
         except Exception as e:
-            # Любая другая непредвиденная ошибка должна помечать таск как FAILURE
             logging.error(
                 'A critical error occurred during the duration update process: %s',
                 e,
