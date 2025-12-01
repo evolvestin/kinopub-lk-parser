@@ -1,23 +1,18 @@
+import io
 import logging
+import shlex
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 
 from celery import shared_task
 from django.conf import settings
 from django.core.management import call_command
+from django.utils import timezone
 from redis import Redis
 
 from app import history_parser, telegram_bot
 from app.gdrive_backup import BackupManager
-from app.models import Code, LogEntry
-import io
-import shlex
-from contextlib import redirect_stdout, redirect_stderr
-
-from celery import shared_task
-from django.core.management import call_command
-from django.utils import timezone
-
-from app.models import TaskRun
+from app.models import Code, LogEntry, TaskRun
 
 
 @shared_task
@@ -42,9 +37,7 @@ def run_full_scan_task():
 def expire_codes_task():
     logging.debug('Running periodic check for expired codes...')
     try:
-        expiration_threshold = timezone.now() - timedelta(
-            minutes=settings.CODE_LIFETIME_MINUTES
-        )
+        expiration_threshold = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
         expired_codes = Code.objects.filter(received_at__lt=expiration_threshold)
         if expired_codes.exists():
             logging.info('Found %d expired codes to process.', expired_codes.count())
@@ -103,25 +96,25 @@ def run_admin_command(self, task_run_id):
         task_run.save()
 
         cmd_args = shlex.split(task_run.arguments) if task_run.arguments else []
-        
+
         out_buffer = io.StringIO()
         err_buffer = io.StringIO()
 
         try:
             with redirect_stdout(out_buffer), redirect_stderr(err_buffer):
                 call_command(task_run.command, *cmd_args)
-            
-            task_run.output = out_buffer.getvalue() + "\n" + err_buffer.getvalue()
+
+            task_run.output = out_buffer.getvalue() + '\n' + err_buffer.getvalue()
             task_run.status = 'SUCCESS'
         except KeyboardInterrupt:
             # Обработка остановки задачи (SIGINT)
-            task_run.output = out_buffer.getvalue() + "\nProcess interrupted by user."
+            task_run.output = out_buffer.getvalue() + '\nProcess interrupted by user.'
             task_run.status = 'STOPPED'
         except Exception as e:
             task_run.output = out_buffer.getvalue()
             task_run.error_message = str(e)
             task_run.status = 'FAILURE'
-        
+
         task_run.updated_at = timezone.now()
         task_run.save()
 

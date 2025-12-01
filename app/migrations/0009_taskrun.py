@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0008_show_status'),
     ]
@@ -13,12 +12,29 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='TaskRun',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name='ID'
+                    ),
+                ),
                 ('created_at', models.DateTimeField(auto_now_add=True, db_index=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('command', models.CharField(max_length=255)),
                 ('arguments', models.CharField(blank=True, max_length=255, null=True)),
-                ('status', models.CharField(choices=[('QUEUED', 'В очереди'), ('RUNNING', 'Выполняется'), ('SUCCESS', 'Успешно'), ('FAILURE', 'Ошибка')], default='QUEUED', max_length=20)),
+                (
+                    'status',
+                    models.CharField(
+                        choices=[
+                            ('QUEUED', 'В очереди'),
+                            ('RUNNING', 'Выполняется'),
+                            ('SUCCESS', 'Успешно'),
+                            ('FAILURE', 'Ошибка'),
+                        ],
+                        default='QUEUED',
+                        max_length=20,
+                    ),
+                ),
                 ('output', models.TextField(blank=True, null=True)),
                 ('error_message', models.TextField(blank=True, null=True)),
             ],

@@ -2,7 +2,7 @@ import logging
 import time
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from selenium.webdriver.common.by import By
 
 from app.gdrive_backup import BackupManager
@@ -35,8 +35,7 @@ class Command(BaseCommand):
         show_type = options.get('type')
 
         if limit <= 0:
-            self.stdout.write(self.style.ERROR('Limit must be a positive integer.'))
-            return
+            raise CommandError('Limit must be a positive integer.')
 
         msg = f'Searching for up to {limit} shows with missing year information'
         if show_type:
@@ -57,24 +56,27 @@ class Command(BaseCommand):
 
         self.stdout.write(f'Found {len(show_ids_to_update)} shows to update.')
 
-        driver = None
+        driver = initialize_driver_session(session_type='aux')
         updated_count = 0
+        base_url = settings.SITE_AUX_URL
+
         try:
-            driver = initialize_driver_session(session_type='aux')
-
-            if driver is None:
-                self.stderr.write(
-                    self.style.ERROR('Could not initialize Selenium driver. Aborting.')
-                )
-                return
-
-            base_url = settings.SITE_AUX_URL
-
             for i, show_id in enumerate(show_ids_to_update):
+                if driver is None:
+                    logging.info('Restarting Selenium driver session...')
+                    driver = initialize_driver_session(session_type='aux')
+                    if driver is None:
+                        raise CommandError('Could not restart Selenium driver. Aborting.')
+
                 logging.info(
                     f'Processing show {i + 1}/{len(show_ids_to_update)} (ID: {show_id})...'
                 )
                 try:
+                    try:
+                        _ = driver.current_url
+                    except Exception as e:
+                        raise Exception(f'Driver unresponsive: {e}')
+
                     show_url = f'{base_url}item/view/{show_id}'
                     driver.get(show_url)
                     time.sleep(1)
@@ -85,9 +87,16 @@ class Command(BaseCommand):
                     updated_count += 1
                 except Exception as e:
                     err_str = str(e).lower()
-                    if 'connection refused' in err_str or 'max retries exceeded' in err_str or 'invalid session' in err_str:
-                        logging.error('Selenium driver is dead. Aborting task loop.')
-                        break
+                    if (
+                        'driver unresponsive' in err_str
+                        or 'connection refused' in err_str
+                        or 'max retries exceeded' in err_str
+                        or 'invalid session' in err_str
+                    ):
+                        logging.error('Selenium driver is dead. Restarting session...')
+                        close_driver(driver)
+                        driver = None
+                        continue
 
                     logging.error(f'Failed to update show ID {show_id}: {e}')
                     continue
@@ -100,12 +109,14 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.SUCCESS('Finished updating show details.'))
 
+        except CommandError:
+            raise
         except Exception as e:
             logging.error(
                 'A critical error occurred during the update process: %s',
                 e,
                 exc_info=True,
             )
-            self.stderr.write(self.style.ERROR('A critical error occurred. Check the logs.'))
+            raise CommandError(f'A critical error occurred: {e}')
         finally:
             close_driver(driver)

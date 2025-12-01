@@ -38,7 +38,7 @@ class Command(BaseCommand):
 
         if not show_ids_to_update:
             self.stdout.write(self.style.SUCCESS('No shows with missing year found.'))
-            return
+            return driver
 
         self.stdout.write(f'Found {len(show_ids_to_update)} shows to update.')
 
@@ -46,8 +46,24 @@ class Command(BaseCommand):
         base_url = settings.SITE_AUX_URL if account_type == 'aux' else settings.SITE_URL
 
         for i, show_id in enumerate(show_ids_to_update):
+            if driver is None:
+                logging.info('Restarting Selenium driver session...')
+                driver = history_parser.initialize_driver_session(
+                    headless=False, session_type=account_type
+                )
+                if driver is None:
+                    self.stderr.write(
+                        self.style.ERROR('Could not restart Selenium driver. Aborting.')
+                    )
+                    break
+
             logging.info(f'Processing show {i + 1}/{len(show_ids_to_update)} (ID: {show_id})...')
             try:
+                try:
+                    _ = driver.current_url
+                except Exception as e:
+                    raise Exception(f'Driver unresponsive: {e}')
+
                 show_url = f'{base_url}item/view/{show_id}'
                 driver.get(show_url)
                 time.sleep(1)
@@ -56,13 +72,21 @@ class Command(BaseCommand):
                 updated_count += 1
             except Exception as e:
                 err_str = str(e).lower()
-                if 'connection refused' in err_str or 'max retries exceeded' in err_str or 'invalid session' in err_str:
-                    logging.error('Selenium driver is dead. Aborting task loop.')
-                    break
+                if (
+                    'driver unresponsive' in err_str
+                    or 'connection refused' in err_str
+                    or 'max retries exceeded' in err_str
+                    or 'invalid session' in err_str
+                ):
+                    logging.error('Selenium driver is dead. Restarting session...')
+                    history_parser.close_driver(driver)
+                    driver = None
+                    continue
                 logging.error(f'Failed to update show ID {show_id}: {e}')
                 continue
 
         self.stdout.write(self.style.SUCCESS(f'Finished updating {updated_count} show details.'))
+        return driver
 
     def handle(self, *args, **options):
         account = options['account']
@@ -124,7 +148,7 @@ class Command(BaseCommand):
                 history_parser.run_parser_session(headless=headless, driver_instance=driver)
             elif task == 'details':
                 logging.info('--- Starting details update session in local mode ---')
-                self._run_details_update_task(driver, limit=5, account_type=account)
+                driver = self._run_details_update_task(driver, limit=5, account_type=account)
 
             logging.info('Checking for active 2FA codes to expire...')
             active_codes = Code.objects.all()

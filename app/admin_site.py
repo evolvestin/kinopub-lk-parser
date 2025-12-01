@@ -1,19 +1,20 @@
 import json
-from django.contrib import admin
-from django.conf import settings
-from django.shortcuts import render, redirect
-from django.urls import path, reverse
-from django.contrib import messages
-from django.utils import timezone
+from argparse import _StoreFalseAction, _StoreTrueAction
 from datetime import timedelta
+
+from django.conf import settings
+from django.contrib import admin, messages
 from django.core.management import get_commands, load_command_class
 from django.http import JsonResponse
-from argparse import _StoreTrueAction, _StoreFalseAction
+from django.shortcuts import redirect, render
+from django.urls import path, reverse
+from django.utils import timezone
 
-from app.dashboard import dashboard_callback
-from app.models import TaskRun, LogEntry
-from app.tasks import run_admin_command
 from app.constants import SHOW_TYPE_MAPPING
+from app.dashboard import dashboard_callback
+from app.models import LogEntry, TaskRun
+from app.tasks import run_admin_command
+
 
 class CustomAdminSite(admin.AdminSite):
     def get_urls(self):
@@ -27,17 +28,22 @@ class CustomAdminSite(admin.AdminSite):
     def custom_index(self, request, extra_context=None):
         app_list = self.get_app_list(request)
 
-        app_list.insert(0, {
-            'name': 'System',
-            'app_label': 'system',
-            'models': [{
-                'name': 'Task Control',
-                'object_name': 'task_control',
-                'admin_url': reverse('admin:task_control'),
-                'add_url': None,
-                'view_only': True,
-            }],
-        })
+        app_list.insert(
+            0,
+            {
+                'name': 'System',
+                'app_label': 'system',
+                'models': [
+                    {
+                        'name': 'Task Control',
+                        'object_name': 'task_control',
+                        'admin_url': reverse('admin:task_control'),
+                        'add_url': None,
+                        'view_only': True,
+                    }
+                ],
+            },
+        )
 
         context = {
             **self.each_context(request),
@@ -49,14 +55,23 @@ class CustomAdminSite(admin.AdminSite):
         return render(request, 'admin/index.html', context)
 
     def _get_app_commands_details(self):
-        """Инспектирует команды приложения app и возвращает их структуру аргументов."""       
+        """Инспектирует команды приложения app и возвращает их структуру аргументов."""
         commands_dict = {}
         sys_commands = get_commands()
-        
+
         # Стандартные аргументы Django, которые мы хотим скрыть из UI
         ignored_args = {
-            '-v', '--verbosity', '--settings', '--pythonpath', '--traceback', 
-            '--no-color', '--force-color', '--skip-checks', '--version', '-h', '--help'
+            '-v',
+            '--verbosity',
+            '--settings',
+            '--pythonpath',
+            '--traceback',
+            '--no-color',
+            '--force-color',
+            '--skip-checks',
+            '--version',
+            '-h',
+            '--help',
         }
 
         # Команды, которые нужно исключить из списка
@@ -68,7 +83,8 @@ class CustomAdminSite(admin.AdminSite):
         ]
 
         target_commands = [
-            name for name, app in sys_commands.items() 
+            name
+            for name, app in sys_commands.items()
             if app == 'app' and name not in hidden_commands
         ]
 
@@ -77,20 +93,20 @@ class CustomAdminSite(admin.AdminSite):
                 cmd_class = load_command_class('app', name)
                 # Создаем парсер, чтобы извлечь аргументы
                 parser = cmd_class.create_parser('manage.py', name)
-                
+
                 args_details = []
                 for action in parser._actions:
                     # Пропускаем стандартные аргументы
                     is_ignored = any(opt in ignored_args for opt in action.option_strings)
                     if is_ignored:
                         continue
-                        
+
                     arg_info = {
                         'dest': action.dest,
                         'help': action.help,
                         'required': action.required,
                         'default': action.default if action.default is not None else '',
-                        'type': 'text' # default
+                        'type': 'text',  # default
                     }
 
                     # Определяем позиционный это аргумент или опциональный (флаг)
@@ -99,9 +115,12 @@ class CustomAdminSite(admin.AdminSite):
                         arg_info['name'] = action.dest
                     else:
                         arg_info['is_positional'] = False
-                        long_opt = next((o for o in action.option_strings if o.startswith('--')), action.option_strings[0])
+                        long_opt = next(
+                            (o for o in action.option_strings if o.startswith('--')),
+                            action.option_strings[0],
+                        )
                         arg_info['name'] = long_opt
-                        
+
                         if isinstance(action, (_StoreTrueAction, _StoreFalseAction)):
                             arg_info['type'] = 'checkbox'
                         elif action.type == int:
@@ -115,33 +134,46 @@ class CustomAdminSite(admin.AdminSite):
                     args_details.append(arg_info)
 
                 commands_dict[name] = {
-                    'help': cmd_class.help or "Описание отсутствует",
-                    'args': args_details
+                    'help': cmd_class.help or 'Описание отсутствует',
+                    'args': args_details,
                 }
             except Exception:
                 continue
-                
+
         return commands_dict
 
     def task_control_view(self, request):
         from kinopub_parser import celery_app  # Импорт здесь во избежание циклической зависимости
+
         commands_info = self._get_app_commands_details()
-        
-        if request.method == 'POST' and not request.headers.get('x-requested-with') == 'XMLHttpRequest':
+
+        if (
+            request.method == 'POST'
+            and not request.headers.get('x-requested-with') == 'XMLHttpRequest'
+        ):
             # Обработка остановки задачи
             if 'stop_task_id' in request.POST:
                 try:
-                    task_to_stop = TaskRun.objects.get(id=request.POST.get('stop_task_id'), status='RUNNING')
-                    
+                    task_to_stop = TaskRun.objects.get(
+                        id=request.POST.get('stop_task_id'), status='RUNNING'
+                    )
+
                     # Пытаемся отправить сигнал в Celery, если есть ID
                     if task_to_stop.celery_task_id:
-                        celery_app.control.revoke(task_to_stop.celery_task_id, terminate=True, signal='SIGINT')
-                    
+                        celery_app.control.revoke(
+                            task_to_stop.celery_task_id, terminate=True, signal='SIGINT'
+                        )
+
                     # В любом случае меняем статус в БД, чтобы убрать зависшую задачу из интерфейса
                     task_to_stop.status = 'STOPPED'
-                    task_to_stop.output = (task_to_stop.output or '') + '\n[System] Задача остановлена вручную (или сброшен статус после перезагрузки).'
+                    task_to_stop.output = (
+                        (task_to_stop.output or '')
+                        + '\n[System] Задача остановлена вручную (или сброшен статус после перезагрузки).'
+                    )
                     task_to_stop.save()
-                    messages.warning(request, f'Задача {task_to_stop.command} переведена в статус Остановлено.')
+                    messages.warning(
+                        request, f'Задача {task_to_stop.command} переведена в статус Остановлено.'
+                    )
 
                 except TaskRun.DoesNotExist:
                     messages.error(request, 'Задача не найдена или уже завершена.')
@@ -149,25 +181,30 @@ class CustomAdminSite(admin.AdminSite):
 
             # Обработка запуска новой задачи
             command_name = request.POST.get('command')
-            
+
             if command_name and command_name in commands_info:
                 # 1. Проверяем, есть ли уже запущенная задача этого типа
                 running_tasks = TaskRun.objects.filter(command=command_name, status='RUNNING')
                 for old_task in running_tasks:
                     if old_task.celery_task_id:
-                        celery_app.control.revoke(old_task.celery_task_id, terminate=True, signal='SIGINT')
+                        celery_app.control.revoke(
+                            old_task.celery_task_id, terminate=True, signal='SIGINT'
+                        )
                     old_task.status = 'STOPPED'
                     old_task.save()
-                
+
                 if running_tasks.exists():
-                    messages.warning(request, f"Предыдущие активные задачи '{command_name}' были принудительно остановлены.")
+                    messages.warning(
+                        request,
+                        f"Предыдущие активные задачи '{command_name}' были принудительно остановлены.",
+                    )
 
                 # 2. Сбор аргументов
                 cmd_config = commands_info[command_name]
                 args_list = []
 
                 for arg in cmd_config['args']:
-                    form_key = f"arg_{arg['dest']}"
+                    form_key = f'arg_{arg["dest"]}'
                     value = request.POST.get(form_key)
 
                     if arg['is_positional']:
@@ -179,14 +216,11 @@ class CustomAdminSite(admin.AdminSite):
                             if value == 'on':
                                 args_list.append(arg['name'])
                         elif value:
-                            args_list.append(f"{arg['name']} {value}")
+                            args_list.append(f'{arg["name"]} {value}')
 
-                arguments_str = " ".join(args_list)
+                arguments_str = ' '.join(args_list)
 
-                TaskRun.objects.create(
-                    command=command_name,
-                    arguments=arguments_str
-                )
+                TaskRun.objects.create(command=command_name, arguments=arguments_str)
                 last_run = TaskRun.objects.order_by('-id').first()
                 if last_run:
                     run_admin_command.delay(last_run.id)
@@ -200,27 +234,33 @@ class CustomAdminSite(admin.AdminSite):
         if hasattr(settings, 'CELERY_BEAT_SCHEDULE'):
             for name, config in settings.CELERY_BEAT_SCHEDULE.items():
                 schedule_obj = config.get('schedule')
-                next_run_dt = now 
+                next_run_dt = now
                 try:
                     if isinstance(schedule_obj, (int, float)):
                         interval = float(schedule_obj)
-                        next_run_dt = now + timedelta(seconds=interval - (now.timestamp() % interval))
+                        next_run_dt = now + timedelta(
+                            seconds=interval - (now.timestamp() % interval)
+                        )
                     elif isinstance(schedule_obj, timedelta):
                         interval = schedule_obj.total_seconds()
-                        next_run_dt = now + timedelta(seconds=interval - (now.timestamp() % interval))
+                        next_run_dt = now + timedelta(
+                            seconds=interval - (now.timestamp() % interval)
+                        )
                     elif hasattr(schedule_obj, 'is_due'):
                         is_due, next_seconds = schedule_obj.is_due(now)
                         next_run_dt = now + timedelta(seconds=next_seconds)
                 except Exception:
                     pass
-                
+
                 seconds_left = (next_run_dt - now).total_seconds()
-                scheduled_tasks.append({
-                    'name': name,
-                    'next_run_dt': next_run_dt,
-                    'seconds_left': seconds_left,
-                    'next_run_display': next_run_dt.strftime('%Y-%m-%d %H:%M:%S')
-                })
+                scheduled_tasks.append(
+                    {
+                        'name': name,
+                        'next_run_dt': next_run_dt,
+                        'seconds_left': seconds_left,
+                        'next_run_display': next_run_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                    }
+                )
 
         scheduled_tasks.sort(key=lambda x: x['seconds_left'])
 
@@ -228,42 +268,55 @@ class CustomAdminSite(admin.AdminSite):
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             recent_tasks = TaskRun.objects.all()[:10]
             logs_qs = LogEntry.objects.all()[:30]
-            logs_data = [{
-                'created_at': l.created_at.strftime('%H:%M:%S'),
-                'level': l.level,
-                'module': l.module,
-                'message': l.message
-            } for l in logs_qs]
+            logs_data = [
+                {
+                    'created_at': l.created_at.strftime('%H:%M:%S'),
+                    'level': l.level,
+                    'module': l.module,
+                    'message': l.message,
+                }
+                for l in logs_qs
+            ]
             logs_data.reverse()
 
-            return JsonResponse({
-                'schedule': [
-                    {'name': t['name'], 'next_run_display': t['next_run_display'], 'seconds_left': t['seconds_left']} 
-                    for t in scheduled_tasks
-                ],
-                'history': [
-                    {
-                        'id': t.id,
-                        'created_at': t.created_at.strftime('%d.%m.%Y %H:%M:%S'),
-                        'command': t.command,
-                        'arguments': t.arguments or "-",
-                        'status': t.status,
-                        'status_display': t.get_status_display()
-                    } for t in recent_tasks
-                ],
-                'logs': logs_data
-            })
+            return JsonResponse(
+                {
+                    'schedule': [
+                        {
+                            'name': t['name'],
+                            'next_run_display': t['next_run_display'],
+                            'seconds_left': t['seconds_left'],
+                        }
+                        for t in scheduled_tasks
+                    ],
+                    'history': [
+                        {
+                            'id': t.id,
+                            'created_at': t.created_at.strftime('%d.%m.%Y %H:%M:%S'),
+                            'command': t.command,
+                            'arguments': t.arguments or '-',
+                            'status': t.status,
+                            'status_display': t.get_status_display(),
+                        }
+                        for t in recent_tasks
+                    ],
+                    'logs': logs_data,
+                }
+            )
 
         recent_tasks = TaskRun.objects.all()[:10]
-        
+
         context = self.each_context(request)
-        context.update({
-            'commands_json': json.dumps(commands_info), # Передаем структуру команд в JS
-            'available_commands_list': commands_info.keys(),
-            'recent_tasks': recent_tasks,
-            'scheduled_tasks': scheduled_tasks,
-            'title': 'Управление задачами'
-        })
+        context.update(
+            {
+                'commands_json': json.dumps(commands_info),  # Передаем структуру команд в JS
+                'available_commands_list': commands_info.keys(),
+                'recent_tasks': recent_tasks,
+                'scheduled_tasks': scheduled_tasks,
+                'title': 'Управление задачами',
+            }
+        )
         return render(request, 'admin/task_control.html', context)
+
 
 admin_site = CustomAdminSite(name='admin')

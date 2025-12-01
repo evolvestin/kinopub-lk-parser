@@ -763,6 +763,9 @@ def process_show_durations(driver, show):
             wait = WebDriverWait(driver, 10)
             wait.until(expected_conditions.presence_of_element_located((By.CSS_SELECTOR, 'h1, h3')))
 
+            # Обновляем детали (год, жанры, статус) сразу на главной странице сериала
+            update_show_details(driver, show.id)
+
             seasons = set()
             # New layout: Seasons are links like /item/view/ID/s1e1 inside a div
             # We look for all links containing the show ID and /s followed by a digit

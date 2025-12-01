@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0009_taskrun'),
     ]
@@ -18,6 +17,16 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='taskrun',
             name='status',
-            field=models.CharField(choices=[('QUEUED', 'В очереди'), ('RUNNING', 'Выполняется'), ('SUCCESS', 'Успешно'), ('FAILURE', 'Ошибка'), ('STOPPED', 'Остановлено')], default='QUEUED', max_length=20),
+            field=models.CharField(
+                choices=[
+                    ('QUEUED', 'В очереди'),
+                    ('RUNNING', 'Выполняется'),
+                    ('SUCCESS', 'Успешно'),
+                    ('FAILURE', 'Ошибка'),
+                    ('STOPPED', 'Остановлено'),
+                ],
+                default='QUEUED',
+                max_length=20,
+            ),
         ),
     ]

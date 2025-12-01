@@ -1,7 +1,7 @@
 import logging
 import time
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
@@ -23,8 +23,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         limit = options['limit']
         if limit <= 0:
-            self.stdout.write(self.style.ERROR('Limit must be a positive integer.'))
-            return
+            raise CommandError('Limit must be a positive integer.')
 
         self.stdout.write(f'Searching for up to {limit} shows with missing duration information...')
 
@@ -43,29 +42,26 @@ class Command(BaseCommand):
 
         self.stdout.write(f'Found {len(show_ids_to_update)} shows to update.')
 
-        driver = None
+        driver = initialize_driver_session(session_type='main')
         updated_count = 0
+
         try:
-            driver = initialize_driver_session(session_type='main')
-
-            if driver is None:
-                self.stderr.write(
-                    self.style.ERROR(
-                        'Could not initialize Selenium driver (main account). Aborting.'
-                    )
-                )
-                return
-
             for i, show_id in enumerate(show_ids_to_update):
+                if driver is None:
+                    logging.info('Restarting Selenium driver session...')
+                    driver = initialize_driver_session(session_type='main')
+                    if driver is None:
+                        # Если драйвер не удалось поднять - это критическая ошибка
+                        raise CommandError('Could not restart Selenium driver. Aborting.')
+
                 logging.info(
                     f'Processing show {i + 1}/{len(show_ids_to_update)} (ID: {show_id})...'
                 )
                 try:
-                    # Проверяем, жив ли драйвер, так как process_show_durations "глотает" ошибки соединения
                     try:
                         _ = driver.current_url
                     except Exception as e:
-                        raise Exception(f"Driver unresponsive: {e}")
+                        raise Exception(f'Driver unresponsive: {e}')
 
                     show = Show.objects.get(id=show_id)
                     process_show_durations(driver, show)
@@ -75,12 +71,17 @@ class Command(BaseCommand):
                 except Show.DoesNotExist:
                     logging.warning(f'Show ID {show_id} not found in DB during processing.')
                 except Exception as e:
-                    # Если драйвер упал или соединение разорвано — прерываем цикл
                     err_str = str(e).lower()
-                    if 'driver unresponsive' in err_str or 'connection refused' in err_str or 'max retries exceeded' in err_str:
-                        logging.error('Selenium driver is dead. Aborting task loop.')
-                        break
-                    
+                    if (
+                        'driver unresponsive' in err_str
+                        or 'connection refused' in err_str
+                        or 'max retries exceeded' in err_str
+                    ):
+                        logging.error('Selenium driver is dead. Restarting session...')
+                        close_driver(driver)
+                        driver = None
+                        continue
+
                     logging.error(f'Failed to update durations for show ID {show_id}: {e}')
                     continue
                 time.sleep(60)
@@ -93,12 +94,23 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.SUCCESS('Finished processing. No durations added.'))
 
+        except KeyboardInterrupt:
+            self.stdout.write(self.style.WARNING('Process interrupted by user.'))
+            # Не вызываем CommandError здесь, если хотим статус STOPPED (нужна поддержка в tasks.py),
+            # но по умолчанию tasks.py ловит это отдельно.
+
+        except CommandError:
+            # Если мы сами вызвали CommandError выше, пробрасываем его дальше
+            raise
+
         except Exception as e:
+            # Любая другая непредвиденная ошибка должна помечать таск как FAILURE
             logging.error(
                 'A critical error occurred during the duration update process: %s',
                 e,
                 exc_info=True,
             )
-            self.stderr.write(self.style.ERROR('A critical error occurred. Check the logs.'))
+            raise CommandError(f'A critical error occurred: {e}')
+
         finally:
             close_driver(driver)

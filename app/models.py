@@ -201,4 +201,4 @@ class TaskRun(BaseModel):
         verbose_name_plural = 'Task Runs'
 
     def __str__(self):
-        return f"{self.command} ({self.status})"
+        return f'{self.command} ({self.status})'

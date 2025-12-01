@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 
@@ -144,10 +144,6 @@ def run_full_scan_session(headless=True):
 
     try:
         driver = initialize_driver_session(headless=headless, session_type='aux')
-        current_base_url = driver.current_url.rstrip('/')
-        if current_base_url.endswith('/user/login'):
-            current_base_url = settings.SITE_AUX_URL.rstrip('/')
-
         backup_manager = BackupManager()
 
         mode_found = not bool(start_mode)
@@ -158,8 +154,22 @@ def run_full_scan_session(headless=True):
                 logging.info("Skipping mode '%s' to resume.", mode)
                 continue
 
+            if driver and driver.current_url:
+                current_base_url = driver.current_url.rstrip('/')
+                if current_base_url.endswith('/user/login'):
+                    current_base_url = settings.SITE_AUX_URL.rstrip('/')
+            else:
+                current_base_url = settings.SITE_AUX_URL.rstrip('/')
+
+            base_url = f'{current_base_url}/{mode}'
+
             try:
-                base_url = f'{current_base_url}/{mode}'
+                if driver is None:
+                    driver = initialize_driver_session(headless=headless, session_type='aux')
+                    if not driver:
+                        logging.error(f'Could not initialize driver for mode {mode}. Skipping.')
+                        continue
+
                 driver.get(base_url)
                 total_pages = get_total_pages(driver)
                 logging.info("Found %d pages for mode '%s'.", total_pages, mode)
@@ -168,15 +178,45 @@ def run_full_scan_session(headless=True):
                 start_page = 1
 
                 for page in range(current_page, total_pages + 1):
+                    if driver is None:
+                        logging.info('Restarting Selenium driver...')
+                        driver = initialize_driver_session(headless=headless, session_type='aux')
+                        if not driver:
+                            raise CommandError('Failed to restart driver. Aborting scan.')
+
                     logging.info("Processing '%s' page %d of %d...", mode, page, total_pages)
                     page_url = f'{base_url}?page={page}&per-page=50'
-                    driver.get(page_url)
-                    added_count = parse_and_save_catalog_page(driver, mode)
-                    logging.info('Saved %d show records from page %d.', added_count, page)
-                    time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
+
+                    try:
+                        try:
+                            _ = driver.current_url
+                        except Exception as e:
+                            raise Exception(f'Driver unresponsive: {e}')
+
+                        driver.get(page_url)
+                        added_count = parse_and_save_catalog_page(driver, mode)
+                        logging.info('Saved %d show records from page %d.', added_count, page)
+                        time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
+                    except Exception as e:
+                        err_str = str(e).lower()
+                        if (
+                            'driver unresponsive' in err_str
+                            or 'connection refused' in err_str
+                            or 'max retries exceeded' in err_str
+                            or 'invalid session' in err_str
+                        ):
+                            logging.error('Selenium driver is dead. Restarting session...')
+                            close_driver(driver)
+                            driver = None
+                            continue
+                        else:
+                            logging.error(f'Error processing page {page} in mode {mode}: {e}')
+                            continue
 
                 backup_manager.schedule_backup()
 
+            except CommandError:
+                raise
             except Exception as e:
                 logging.error(
                     "A critical error occurred while processing mode '%s': %s",
@@ -184,19 +224,20 @@ def run_full_scan_session(headless=True):
                     e,
                     exc_info=True,
                 )
-                logging.info(
-                    'Aborting scan. The process can be restarted and will resume automatically.'
-                )
-                break
+                # Бросаем исключение, чтобы остановить процесс и пометить как FAILURE
+                raise CommandError(f'Scan failed for mode {mode}: {e}')
 
         logging.info('--- Full catalog scan session finished successfully. ---')
 
+    except CommandError:
+        raise
     except Exception as e:
         logging.error(
             'An unexpected error occurred in the full scan session: %s',
             e,
             exc_info=True,
         )
+        raise CommandError(f'Full scan session failed: {e}')
     finally:
         close_driver(driver)
 
