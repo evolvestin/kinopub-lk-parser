@@ -129,6 +129,9 @@ IMAP_HOST = 'imap.gmail.com'
 IMAP_FOLDER = 'INBOX'
 MARK_AS_SEEN = True
 
+# --- Environment Config ---
+ENVIRONMENT = os.getenv('ENVIRONMENT')
+
 # --- Bot Integration Config ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
@@ -206,27 +209,33 @@ LOGGING = {
 }
 
 CELERY_BEAT_SCHEDULE = {
-    'run_history_parser': {
-        'task': 'app.tasks.run_history_parser_task',
-        'schedule': 3600 * HISTORY_PARSER_INTERVAL_HOURS,
-    },
-    'run_new_episodes': {
-        'task': 'app.tasks.run_new_episodes_task',
-        'schedule': crontab(minute=0, hour=4),  # Запуск в 04:00 UTC ежедневно
-    },
-    'run_full_scan': {
-        'task': 'app.tasks.run_full_scan_task',
-        'schedule': crontab(minute=0, hour=0, day_of_month=1, month_of_year='1,4,7,10'),
-    },
     'expire_codes': {
         'task': 'app.tasks.expire_codes_task',
         'schedule': 20,  # every 20s
     },
     'delete_old_logs': {
         'task': 'app.tasks.delete_old_logs_task',
-        'schedule': 86400,  # every 24 hours
+        'schedule': crontab(minute=0, hour=0),  # every 24 hours
     },
 }
+
+if ENVIRONMENT == 'PROD':
+    CELERY_BEAT_SCHEDULE.update(
+        {
+            'run_history_parser': {
+                'task': 'app.tasks.run_history_parser_task',
+                'schedule': 3600 * HISTORY_PARSER_INTERVAL_HOURS,
+            },
+            'run_new_episodes': {
+                'task': 'app.tasks.run_new_episodes_task',
+                'schedule': crontab(minute=0, hour=4),  # every 24 hours
+            },
+            'run_full_scan': {
+                'task': 'app.tasks.run_full_scan_task',
+                'schedule': crontab(minute=0, hour=0, day_of_month=1, month_of_year='1,4,7,10'),
+            },
+        }
+    )
 
 
 # --- Config Validation ---

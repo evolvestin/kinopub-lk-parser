@@ -184,7 +184,12 @@ class BackupManager:
             if os.path.exists(backup_file_path):
                 file_size = os.path.getsize(backup_file_path)
                 logging.info(f'Backup file created successfully, size: {file_size} bytes')
-                self._upload_file(drive, backup_file_path, settings.DB_BACKUP_FILENAME)
+                
+                if settings.ENVIRONMENT == 'DEV':
+                    logging.info('Dev environment detected. Skipping upload to Google Drive.')
+                else:
+                    self._upload_file(drive, backup_file_path, settings.DB_BACKUP_FILENAME)
+                
                 if max_updated_at:
                     with open(last_ts_file, 'w') as f:
                         f.write(str(max_updated_at.timestamp()))
