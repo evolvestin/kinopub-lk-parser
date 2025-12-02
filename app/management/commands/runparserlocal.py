@@ -8,11 +8,12 @@ from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 
-from app import history_parser, telegram_bot
+from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.history_parser import update_show_details
 from app.management.commands.runemail_listener import run_email_listener, shutdown_flag
 from app.models import Code, Show
+from app.telegram_bot import TelegramSender
 
 
 class Command(BaseCommand):
@@ -166,7 +167,7 @@ class Command(BaseCommand):
             active_codes = Code.objects.all()
             if active_codes.exists():
                 for code in active_codes:
-                    telegram_bot.edit_message_to_expired(code.telegram_message_id)
+                    TelegramSender().edit_message_to_expired(code.telegram_message_id)
                     code.delete()
                 logging.info('Expired and deleted active codes.')
 

@@ -9,9 +9,9 @@ from datetime import datetime, timedelta, timezone
 import imaplib2
 from django.conf import settings
 
-from app import telegram_bot
 from app.gdrive_backup import BackupManager
 from app.models import Code
+from app.telegram_bot import TelegramSender
 
 
 @contextmanager
@@ -114,7 +114,7 @@ def process_emails(mail, shutdown_flag):
                 code = code_match.group(0)
                 logging.info('Found code %s in email (uid=%s)', code, uid)
 
-                message_id = telegram_bot.send_message(code)
+                message_id = TelegramSender().send_message(code)
                 if message_id:
                     Code.objects.create(
                         code=code,

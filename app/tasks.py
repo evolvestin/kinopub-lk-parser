@@ -10,9 +10,10 @@ from django.core.management import call_command
 from django.utils import timezone
 from redis import Redis
 
-from app import history_parser, telegram_bot
+from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, TaskRun
+from app.telegram_bot import TelegramSender
 
 
 @shared_task
@@ -42,7 +43,8 @@ def expire_codes_task():
         if expired_codes.exists():
             logging.info('Found %d expired codes to process.', expired_codes.count())
             for code in expired_codes:
-                telegram_bot.edit_message_to_expired(code.telegram_message_id)
+                TelegramSender().edit_message_to_expired(code.telegram_message_id)
+                code.telegram_message_id
                 code.delete()
             BackupManager().schedule_backup()
     except Exception as e:

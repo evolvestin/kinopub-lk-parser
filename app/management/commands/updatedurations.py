@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from datetime import datetime
 
@@ -53,14 +54,14 @@ class Command(BaseCommand):
 
             for show in Show.objects.filter(type='Series'):
                 already_updated = LogEntry.objects.filter(
-                    message__contains=f'Finished processing durations for show ID {show.id}.', 
-                    created_at__gte=anchor_date
+                    message__contains=f'Finished processing durations for show ID {show.id}.',
+                    created_at__gte=anchor_date,
                 ).exists()
 
                 has_errors = LogEntry.objects.filter(
                     message__contains=f'show id{show.id}',
                     level='ERROR',
-                    created_at__gte=anchor_date
+                    created_at__gte=anchor_date,
                 ).exists()
 
                 if not already_updated or has_errors:
@@ -75,13 +76,36 @@ class Command(BaseCommand):
                 msg += f' (type: {show_type})'
             self.stdout.write(f'{msg}...')
 
-            queryset = Show.objects.filter(showduration__isnull=True)
-            if show_type:
-                queryset = queryset.filter(type=show_type)
+            # 1. Находим шоу с ошибками (без отсечки по дате, глобально)
+            error_ids = set()
+            error_logs = LogEntry.objects.filter(level='ERROR', message__contains='show id')
+            for log in error_logs:
+                match = re.search(r'show id(\d+)', log.message)
+                if match:
+                    error_ids.add(int(match.group(1)))
 
-            show_ids_to_update = list(
-                queryset.order_by('?').values_list('id', flat=True).distinct()[:limit]
+            base_qs = Show.objects.all()
+            if show_type:
+                base_qs = base_qs.filter(type=show_type)
+
+            # Приоритет отдаем тем, кто с ошибками
+            priority_ids = list(
+                base_qs.filter(id__in=error_ids).values_list('id', flat=True)[:limit]
             )
+
+            # Добираем рандомными, у которых нет длительности
+            remaining_limit = limit - len(priority_ids)
+            random_ids = []
+            if remaining_limit > 0:
+                random_ids = list(
+                    base_qs.filter(showduration__isnull=True)
+                    .exclude(id__in=priority_ids)
+                    .order_by('?')
+                    .values_list('id', flat=True)
+                    .distinct()[:remaining_limit]
+                )
+
+            show_ids_to_update = priority_ids + random_ids
 
         if not show_ids_to_update:
             self.stdout.write(
@@ -115,6 +139,12 @@ class Command(BaseCommand):
                     process_show_durations(driver, show)
 
                     logging.info(f'Finished processing durations for show ID {show_id}.')
+
+                    # Удаляем логи ошибок после успешной обработки
+                    LogEntry.objects.filter(
+                        message__contains=f'show ID {show_id}', level='ERROR'
+                    ).delete()
+
                     updated_count += 1
                 except Show.DoesNotExist:
                     logging.warning(f'Show ID {show_id} not found in DB during processing.')
