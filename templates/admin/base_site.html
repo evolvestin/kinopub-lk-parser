@@ -116,15 +116,42 @@
     }
 
     /* Кнопки действий (Save, etc) */
-    html[data-theme="dark"] .submit-row input[type=submit] {
+    html[data-theme="dark"] .submit-row input[type=submit],
+    html[data-theme="dark"] #content .submit-row a.deletelink {
         background-color: var(--accent) !important;
         color: white !important;
         border: none;
         text-transform: uppercase;
         font-weight: bold;
+        padding: 10px 20px !important;
+        border-radius: 4px;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        vertical-align: middle;
+        line-height: normal;
+        cursor: pointer;
+        min-height: 35px;
+        box-sizing: border-box;
     }
-    html[data-theme="dark"] .submit-row input[type=submit].deletelink {
+
+    html[data-theme="dark"] .submit-row input[type=submit]:hover {
+        background-color: var(--button-hover-bg) !important;
+    }
+
+    /* Специфика для кнопки удаления */
+    html[data-theme="dark"] #content .submit-row a.deletelink {
         background-color: var(--accent-red) !important;
+        gap: 8px;
+    }
+
+    /* Принудительно красим иконку в белый */
+    html[data-theme="dark"] #content .submit-row a.deletelink::before {
+        color: white !important;
+    }
+
+    html[data-theme="dark"] #content .submit-row a.deletelink:hover {
+        background-color: #c0392b !important;
     }
 
     /* Хлебные крошки */
@@ -151,11 +178,23 @@
     html[data-theme="dark"] .model-group .viewlink,
     html[data-theme="dark"] ul.messagelist li {
         background-image: none !important;
-        padding-left: 0 !important;
         display: inline-flex !important;
         align-items: center;
-        gap: 5px;
+        gap: 6px;
         text-decoration: none;
+        width: fit-content;
+        line-height: 1.2;
+        border-radius: 3px;
+        vertical-align: middle;
+    }
+
+    html[data-theme="dark"] #content a.addlink, 
+    html[data-theme="dark"] #content a.changelink, 
+    html[data-theme="dark"] #content a.deletelink, 
+    html[data-theme="dark"] #content a.historylink, 
+    html[data-theme="dark"] #content a.viewlink,
+    html[data-theme="dark"] ul.messagelist li {
+        padding: 4px 8px !important;
     }
 
     /* Общие стили для псевдо-элементов иконок */
@@ -173,6 +212,7 @@
         display: inline-block;
         text-transform: none;
         -webkit-font-smoothing: antialiased;
+        flex-shrink: 0; /* Запрещаем иконке сжиматься, если места мало */
     }
 
     /* Mapping (назначение иконок) */
@@ -248,6 +288,128 @@
         color: var(--primary-fg);
         cursor: pointer;
     }
+    /* --- Иконки для RelatedWidgetWrapper ( ForeignKey, ManyToMany, Autocomplete ) --- */
+    /* Эти ссылки содержат <img>, который нужно скрыть и заменить на ::before псевдоэлемент */
+
+    /* Скрываем стандартные картинки */
+    html[data-theme="dark"] .related-widget-wrapper-link img {
+        display: none !important;
+    }
+    
+    /* Настраиваем контейнер ссылки, чтобы иконка была по центру */
+    html[data-theme="dark"] .related-widget-wrapper-link {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 24px; 
+        height: 24px;
+        text-decoration: none;
+        vertical-align: middle;
+    }
+    
+    /* Общие стили для иконки Material */
+    html[data-theme="dark"] .related-widget-wrapper-link::before {
+        font-family: 'Material Icons';
+        font-weight: normal;
+        font-style: normal;
+        font-size: 20px;
+        line-height: 1;
+        display: inline-block;
+        text-transform: none;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* Назначение конкретных иконок */
+    html[data-theme="dark"] .related-widget-wrapper-link.add-related::before {
+        content: "add_circle";
+        color: var(--accent);
+    }
+    html[data-theme="dark"] .related-widget-wrapper-link.change-related::before {
+        content: "edit";
+        color: #f39c12;
+    }
+    html[data-theme="dark"] .related-widget-wrapper-link.view-related::before {
+        content: "visibility";
+        color: var(--link-fg);
+    }
+    html[data-theme="dark"] .related-widget-wrapper-link.delete-related::before {
+        content: "delete";
+        color: var(--accent-red);
+    }
+    /* Пагинация (исправление цветов) */
+    html[data-theme="dark"] .paginator {
+        border-top: 1px solid var(--border-color) !important;
+        border-bottom: 1px solid var(--border-color) !important;
+        background-color: var(--primary) !important;
+        color: var(--body-fg) !important;
+    }
+
+    html[data-theme="dark"] .paginator a:link, 
+    html[data-theme="dark"] .paginator a:visited {
+        background-color: var(--secondary);
+        color: var(--primary-fg) !important;
+        padding: 4px 10px;
+        margin: 0 2px;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+        text-decoration: none;
+        font-weight: normal;
+    }
+
+    html[data-theme="dark"] .paginator a:hover {
+        background-color: var(--default-button-hover-bg);
+        color: white !important;
+        border-color: var(--default-button-hover-bg);
+    }
+
+    html[data-theme="dark"] .paginator span.this-page {
+        background-color: var(--accent);
+        color: white !important;
+        padding: 4px 10px;
+        margin: 0 2px;
+        border-radius: 4px;
+        border: 1px solid var(--accent);
+        font-weight: bold;
+    }
+    html[data-theme="dark"] .paginator span.this-page {
+        background-color: var(--accent);
+        color: white !important;
+        padding: 4px 10px;
+        margin: 0 2px;
+        border-radius: 4px;
+        border: 1px solid var(--accent);
+        font-weight: bold;
+    }
+
+    /* --- Иконки выбора даты и времени (Date/Time Shortcuts) --- */
+    /* Скрываем стандартную картинку Django и настраиваем контейнер */
+    html[data-theme="dark"] .datetimeshortcuts .date-icon,
+    html[data-theme="dark"] .datetimeshortcuts .clock-icon {
+        background-image: none !important;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+
+    /* Иконка календаря */
+    html[data-theme="dark"] .datetimeshortcuts .date-icon::before {
+        font-family: 'Material Icons';
+        content: "event";
+        font-size: 20px;
+        color: var(--link-fg);
+    }
+
+    /* Иконка часов */
+    html[data-theme="dark"] .datetimeshortcuts .clock-icon::before {
+        font-family: 'Material Icons';
+        content: "schedule";
+        font-size: 20px;
+        color: var(--link-fg);
+    }
 </style>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
@@ -257,8 +419,44 @@
             try { localStorage.setItem('theme', 'dark'); } catch(e){}
         }
 
-        // 2. Наблюдаем за изменением темы. Если она станет 'auto', меняем на 'light'.
-        // Таким образом из цикла (Light -> Dark -> Auto) мы выкидываем Auto.
+        // 2. Глобальная замена иконок Boolean (img) на Material Icons (span)
+        // Ищет стандартные Django картинки icon-yes.svg и icon-no.svg и заменяет их на текстовые иконки
+        document.querySelectorAll('img[src*="icon-yes.svg"], img[src*="icon-no.svg"]').forEach(function(img) {
+            const isYes = img.src.includes('icon-yes.svg');
+            const span = document.createElement('span');
+            
+            // Базовые стили для Material Icons (на случай, если класс .material-icons не подключен глобально)
+            span.style.fontFamily = 'Material Icons';
+            span.style.fontWeight = 'normal';
+            span.style.fontStyle = 'normal';
+            span.style.fontSize = '20px'; // Размер как у остальных иконок в теме
+            span.style.lineHeight = '1';
+            span.style.verticalAlign = 'middle';
+            span.style.display = 'inline-block';
+            span.style.textTransform = 'none';
+            span.style.letterSpacing = 'normal';
+            span.style.wordWrap = 'normal';
+            span.style.whiteSpace = 'nowrap';
+            span.style.direction = 'ltr';
+            
+            // Настройка иконки и цвета (используем CSS-переменные темы с фоллбэком)
+            if (isYes) {
+                span.textContent = 'check_circle';
+                span.style.color = 'var(--accent, #2ecc71)';
+            } else {
+                span.textContent = 'cancel';
+                span.style.color = 'var(--accent-red, #e74c3c)';
+            }
+            
+            // Сохраняем title/alt для всплывающей подсказки
+            if (img.alt) span.title = img.alt;
+
+            if (img.parentNode) {
+                img.parentNode.replaceChild(span, img);
+            }
+        });
+
+        // 3. Наблюдаем за изменением темы. Если она станет 'auto', меняем на 'light'.
         const observer = new MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
                 if (mutation.type === "attributes" && mutation.attributeName === "data-theme") {

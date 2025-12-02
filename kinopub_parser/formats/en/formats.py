@@ -1,4 +1,4 @@
-DATE_FORMAT = 'd/m/Y'
+DATE_FORMAT = 'Y-m-d'
 DATETIME_FORMAT = f'{DATE_FORMAT} H:i:s'
 TIME_FORMAT = 'H:i:s'
 

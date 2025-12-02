@@ -10,7 +10,7 @@ from django.shortcuts import redirect, render
 from django.urls import path, reverse
 from django.utils import timezone
 
-from app.constants import SHOW_TYPE_MAPPING
+from app.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING
 from app.dashboard import dashboard_callback
 from app.models import LogEntry, TaskRun
 from app.tasks import run_admin_command
@@ -244,6 +244,11 @@ class CustomAdminSite(admin.AdminSite):
                     elif hasattr(schedule_obj, 'is_due'):
                         is_due, next_seconds = schedule_obj.is_due(now)
                         next_run_dt = now + timedelta(seconds=next_seconds)
+
+                    if next_run_dt.microsecond >= 500000:
+                        next_run_dt += timedelta(seconds=1)
+                    next_run_dt = next_run_dt.replace(microsecond=0)
+
                 except Exception:
                     pass
 
@@ -253,7 +258,7 @@ class CustomAdminSite(admin.AdminSite):
                         'name': name,
                         'next_run_dt': next_run_dt,
                         'seconds_left': seconds_left,
-                        'next_run_display': next_run_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                        'next_run_display': next_run_dt.strftime(DATETIME_FORMAT),
                     }
                 )
 
@@ -287,7 +292,7 @@ class CustomAdminSite(admin.AdminSite):
                     'history': [
                         {
                             'id': t.id,
-                            'created_at': t.created_at.strftime('%d.%m.%Y %H:%M:%S'),
+                            'created_at': t.created_at.strftime(DATETIME_FORMAT),
                             'command': t.command,
                             'arguments': t.arguments or '-',
                             'status': t.status,

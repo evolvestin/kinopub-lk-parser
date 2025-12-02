@@ -16,7 +16,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
-from app.constants import MONTHS_MAP, SHOW_STATUS_MAPPING, SHOW_TYPE_MAPPING
+from app.constants import DATE_FORMAT, MONTHS_MAP, SHOW_STATUS_MAPPING, SHOW_TYPE_MAPPING
 from app.gdrive_backup import BackupManager
 from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
 from kinopub_parser import celery_app
@@ -443,7 +443,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
     stop_parsing = False
     latest_date_in_db = None
     if latest_db_date:
-        latest_date_in_db = datetime.strptime(latest_db_date, '%Y-%m-%d').date()
+        latest_date_in_db = datetime.strptime(latest_db_date, DATE_FORMAT).date()
 
     views_on_page = []
     item_blocks = driver.find_elements(By.CSS_SELECTOR, '.item-list .col-md-3')
@@ -453,7 +453,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
             year = date_header.find_element(By.TAG_NAME, 'small').text.strip()
             match = re.match(r'(\d{1,2})\s+([А-Яа-яA-Za-z]+)', date_header.text)
             formatted_date = f'{year}-{MONTHS_MAP[match.group(2)]}-{match.group(1).zfill(2)}'
-            current_date_from_site = datetime.strptime(formatted_date, '%Y-%m-%d').date()
+            current_date_from_site = datetime.strptime(formatted_date, DATE_FORMAT).date()
 
             if latest_date_in_db and current_date_from_site < latest_date_in_db:
                 if not stop_parsing:
@@ -584,7 +584,7 @@ def get_latest_view_date_orm(mode: str):
 
     result = qs.aggregate(max_date=Max('view_date'))
     if result and result['max_date']:
-        max_date_str = result['max_date'].strftime('%Y-%m-%d')
+        max_date_str = result['max_date'].strftime(DATE_FORMAT)
         logging.info("Latest view date for '%s' in DB: %s", mode, max_date_str)
         return max_date_str
     else:

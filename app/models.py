@@ -1,5 +1,7 @@
 from django.db import models
 
+from app.constants import DATETIME_FORMAT
+
 
 class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -152,7 +154,10 @@ class LogEntry(BaseModel):
     message = models.TextField()
 
     def __str__(self):
-        return f'[{self.created_at.strftime("%Y-%m-%d %H:%M:%S")}] [{self.level}] {self.module}: {self.message}'
+        return (
+            f'[{self.created_at.strftime(DATETIME_FORMAT)}]'
+            f' [{self.level}] {self.module}: {self.message}'
+        )
 
     class Meta:
         ordering = ['-created_at']

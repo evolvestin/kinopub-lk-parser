@@ -1,3 +1,6 @@
+DATE_FORMAT = '%Y-%m-%d'
+DATETIME_FORMAT = f'{DATE_FORMAT} %H:%M:%S'
+
 MONTHS_MAP = {
     'Январь': '01',
     'January': '01',

@@ -58,13 +58,21 @@ class ShowDurationInline(admin.TabularInline):
     model = ShowDuration
     extra = 0
     readonly_fields = (
-        'season_number',
-        'episode_number',
+        'get_season',
+        'get_episode',
         'duration_seconds',
         'created_at',
         'updated_at',
     )
     can_delete = False
+
+    @admin.display(description='Season')
+    def get_season(self, obj):
+        return obj.season_number if obj.season_number and obj.season_number > 0 else '-'
+
+    @admin.display(description='Episode')
+    def get_episode(self, obj):
+        return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
 
 
 class ViewHistoryInline(admin.TabularInline):
@@ -72,12 +80,20 @@ class ViewHistoryInline(admin.TabularInline):
     extra = 0
     readonly_fields = (
         'view_date',
-        'season_number',
-        'episode_number',
+        'get_season',
+        'get_episode',
         'created_at',
         'updated_at',
     )
     can_delete = False
+
+    @admin.display(description='Season')
+    def get_season(self, obj):
+        return obj.season_number if obj.season_number and obj.season_number > 0 else '-'
+
+    @admin.display(description='Episode')
+    def get_episode(self, obj):
+        return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
 
 
 class UserRatingInline(admin.TabularInline):
@@ -134,11 +150,17 @@ class ShowAdmin(admin.ModelAdmin):
     def view_count(self, obj):
         return obj._view_count
 
-    @admin.display(description='Duration (h)')
+    @admin.display(description='Duration')
     def total_duration_hours(self, obj):
         if obj and obj._total_duration:
-            return round(obj._total_duration / 3600, 1)
-        return 0
+            total_minutes = int(obj._total_duration // 60)
+            hours = total_minutes // 60
+            minutes = total_minutes % 60
+
+            if hours > 0:
+                return f'{hours}ч {minutes}м'
+            return f'{minutes}м'
+        return '-'
 
     @admin.display(description='Avg Rating')
     def get_avg_rating(self, obj):
@@ -175,8 +197,8 @@ class ViewHistoryAdmin(admin.ModelAdmin):
     list_display = (
         'show',
         'view_date',
-        'season_number',
-        'episode_number',
+        'get_season',
+        'get_episode',
         'get_users',
         'created_at',
         'updated_at',
@@ -190,17 +212,29 @@ class ViewHistoryAdmin(admin.ModelAdmin):
         'updated_at',
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.order_by('-view_date', '-season_number', '-episode_number')
+
     @admin.display(description='Users')
     def get_users(self, obj):
         return ', '.join([u.name or u.username or str(u.telegram_id) for u in obj.users.all()])
+
+    @admin.display(description='Season', ordering='season_number')
+    def get_season(self, obj):
+        return obj.season_number if obj.season_number and obj.season_number > 0 else '-'
+
+    @admin.display(description='Episode', ordering='episode_number')
+    def get_episode(self, obj):
+        return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
 
 
 @admin.register(ShowDuration, site=admin_site)
 class ShowDurationAdmin(admin.ModelAdmin):
     list_display = (
         'show',
-        'season_number',
-        'episode_number',
+        'get_season',
+        'get_episode',
         'duration_seconds',
         'created_at',
         'updated_at',
@@ -215,6 +249,18 @@ class ShowDurationAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.order_by('show__title', '-season_number', '-episode_number')
+
+    @admin.display(description='Season', ordering='season_number')
+    def get_season(self, obj):
+        return obj.season_number if obj.season_number and obj.season_number > 0 else '-'
+
+    @admin.display(description='Episode', ordering='episode_number')
+    def get_episode(self, obj):
+        return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
 
 
 @admin.register(LogEntry, site=admin_site)
