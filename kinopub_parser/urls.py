@@ -12,6 +12,8 @@ urlpatterns = [
     path(
         'favicon.ico', RedirectView.as_view(url=settings.STATIC_URL + 'favicon.ico', permanent=True)
     ),
+    path('api/bot/check/<int:telegram_id>/', views.check_bot_user),
+    path('api/bot/register/', views.register_bot_user),
 ]
 
 if not settings.DEBUG:

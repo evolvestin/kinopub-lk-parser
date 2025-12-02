@@ -128,6 +128,8 @@ ALLOWED_SENDER = os.getenv('ALLOWED_SENDER')
 IMAP_HOST = 'imap.gmail.com'
 IMAP_FOLDER = 'INBOX'
 MARK_AS_SEEN = True
+
+# --- Bot Integration Config ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
 

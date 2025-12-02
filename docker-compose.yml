@@ -129,6 +129,20 @@ services:
         condition: service_healthy
     networks:
       - kinopub-net
+  
+  telegram-bot:
+    build:
+      context: ./telegram_bot
+    container_name: kinopub-parser-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - BACKEND_URL=http://web:8000
+    depends_on:
+      web:
+        condition: service_started
+    networks:
+      - kinopub-net
 
 volumes:
   pgdata:

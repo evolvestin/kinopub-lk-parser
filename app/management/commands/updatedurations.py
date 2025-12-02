@@ -37,7 +37,7 @@ class Command(BaseCommand):
         is_series_mode = show_type in ['Series', 'serial']
 
         if is_series_mode:
-            self.stdout.write('Series mode detected. Limit ignored. Fetching unfinished series...')
+            self.stdout.write('Series mode detected. Limit ignored. Fetching series...')
 
             first_anchor_log = (
                 LogEntry.objects.filter(message__contains='New Episodes Parser Finished')
@@ -51,15 +51,19 @@ class Command(BaseCommand):
                 else datetime.min.replace(tzinfo=timezone.utc)
             )
 
-            unfinished_shows = Show.objects.filter(type='Series').exclude(status='Finished')
-
-            for show in unfinished_shows:
-                success_msg = f'Finished processing durations for show ID {show.id}.'
+            for show in Show.objects.filter(type='Series'):
                 already_updated = LogEntry.objects.filter(
-                    message__contains=success_msg, created_at__gte=anchor_date
+                    message__contains=f'Finished processing durations for show ID {show.id}.', 
+                    created_at__gte=anchor_date
                 ).exists()
 
-                if not already_updated:
+                has_errors = LogEntry.objects.filter(
+                    message__contains=f'show id{show.id}',
+                    level='ERROR',
+                    created_at__gte=anchor_date
+                ).exists()
+
+                if not already_updated or has_errors:
                     show_ids_to_update.append(show.id)
 
         else:
