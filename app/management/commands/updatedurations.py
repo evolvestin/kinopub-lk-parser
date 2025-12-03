@@ -163,7 +163,7 @@ class Command(BaseCommand):
                     logging.error(f'Failed to update durations for show ID {show_id}: {e}')
                     continue
 
-                time.sleep(60)
+                time.sleep(30)
 
             if updated_count > 0:
                 self.stdout.write(

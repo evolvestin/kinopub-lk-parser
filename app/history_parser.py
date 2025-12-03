@@ -4,6 +4,7 @@ import os
 import random
 import re
 import shutil
+import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -126,6 +127,23 @@ def update_show_details(driver, show_id):
         raise
 
 
+def get_chrome_major_version():
+    """Определяет мажорную версию установленного Chromium."""
+    try:
+        executable = '/usr/bin/chromium'
+        if not os.path.exists(executable):
+            executable = 'chromium'
+
+        output = subprocess.check_output([executable, '--version'], text=True)
+        match = re.search(r'(\d+)\.', output)
+        if match:
+            return int(match.group(1))
+    except Exception as e:
+        logging.warning(f'Could not detect Chrome version automatically: {e}')
+
+    return None
+
+
 def setup_driver(headless=True, profile_key='main', randomize=False):
     options = uc.ChromeOptions()
     options.add_argument('--no-sandbox')
@@ -156,6 +174,10 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
         },
     )
 
+    # Определяем версию автоматически
+    real_version = get_chrome_major_version()
+    logging.info(f'Detected Chrome version: {real_version}')
+
     if headless:
         options.add_argument('--headless=new')
         options.add_argument('--disable-gpu')
@@ -179,9 +201,10 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
             browser_executable_path='/usr/bin/chromium',
             driver_executable_path=driver_executable_path,
             user_data_dir=user_data_dir,
+            version_main=real_version,
         )
     else:
-        driver = uc.Chrome(options=options)
+        driver = uc.Chrome(options=options, version_main=real_version)
 
     driver.set_page_load_timeout(60)
     return driver
