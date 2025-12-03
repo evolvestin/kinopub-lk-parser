@@ -135,7 +135,9 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
     options.add_argument('--disable-infobars')
     options.add_argument('--lang=ru-RU,ru')
     options.add_argument(
-        '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+        '--user-agent=Mozilla/5.0 (X11; Linux x86_64)'
+        ' AppleWebKit/537.36 (KHTML, like Gecko)'
+        ' Chrome/131.0.0.0 Safari/537.36'
     )
 
     if randomize:
@@ -166,9 +168,16 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
             except Exception as e:
                 logging.warning(f'Could not clean user data directory: {e}')
 
+        driver_executable_path = None
+        if os.path.exists('/home/app/bin/chromedriver'):
+            driver_executable_path = '/home/app/bin/chromedriver'
+        elif os.path.exists('/usr/bin/chromedriver'):
+            driver_executable_path = '/usr/bin/chromedriver'
+
         driver = uc.Chrome(
             options=options,
             browser_executable_path='/usr/bin/chromium',
+            driver_executable_path=driver_executable_path,
             user_data_dir=user_data_dir,
         )
     else:

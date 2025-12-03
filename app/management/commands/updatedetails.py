@@ -56,7 +56,7 @@ class Command(BaseCommand):
 
         self.stdout.write(f'Found {len(show_ids_to_update)} shows to update.')
 
-        driver = initialize_driver_session(session_type='aux')
+        driver = None
         updated_count = 0
         base_url = settings.SITE_AUX_URL
 
