@@ -17,6 +17,16 @@ from app.tasks import run_admin_command
 
 
 class CustomAdminSite(admin.AdminSite):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            TaskRun.objects.filter(status='RUNNING').update(
+                status='STOPPED',
+                output='[System] Процесс был прерван (обнаружен перезапуск сервера).'
+            )
+        except Exception:
+            pass
+
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
