@@ -61,3 +61,29 @@ async def set_user_role(telegram_id: int, role: str, message_id: int) -> dict:
     except Exception as e:
         logging.error(f'API Set Role Error: {e}')
         return {'success': False, 'error': str(e)}
+
+
+async def update_user_data(
+    telegram_id: int, 
+    username: str, 
+    first_name: str, 
+    language_code: str,
+    is_blocked: bool = None
+) -> bool:
+    url = f'{BACKEND_URL}/api/bot/update_user/'
+    payload = {
+        'telegram_id': telegram_id,
+        'username': username,
+        'first_name': first_name,
+        'language_code': language_code,
+    }
+    if is_blocked is not None:
+        payload['is_blocked'] = is_blocked
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=HEADERS, timeout=5) as response:
+                return response.status == 200
+    except Exception as e:
+        logging.error(f'API Update User Error: {e}')
+        return False

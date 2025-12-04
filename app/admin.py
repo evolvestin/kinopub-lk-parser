@@ -2,11 +2,14 @@ from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
 from django.db.models import Count, Q, Sum
+from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 
 # Импортируем нашу кастомную админку
 from app.admin_site import admin_site
+from app.telegram_bot import TelegramSender
+from app.views import sync_user_permissions
 from app.models import (
     Code,
     Country,
@@ -235,18 +238,53 @@ class ViewUserAdmin(admin.ModelAdmin):
         'name',
         'username',
         'role',
+        'is_bot_blocked',
         'telegram_id',
         'django_user',
         'created_at',
+        'updated_at',
     )
     search_fields = ('name', 'username', 'telegram_id')
-    list_filter = ('role', 'language')
-    readonly_fields = ('django_user', 'role_message_id')
+    list_filter = ('role', 'is_bot_blocked', 'language')
+    readonly_fields = (
+        'django_user',
+        'role_message_id',
+        'telegram_actions',
+        'created_at',
+        'updated_at',
+    )
     actions = ['resend_role_message']
+
+    @admin.display(description='Bot Blocked', boolean=True)
+    def is_bot_blocked(self, obj):
+        return obj.is_bot_blocked
+
+    @admin.display(description='Telegram Actions')
+    def telegram_actions(self, obj):
+        if not obj.id:
+            return "-"
+        return format_html(
+            '<a class="button" style="padding:4px 10px; background:#2ecc71; color:white; '
+            'text-decoration:none; border-radius:4px;" href="?_resend_telegram=1">'
+            'Отправить новое сообщение о роли</a>'
+        )
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        if '_resend_telegram' in request.GET and object_id:
+            try:
+                obj = self.get_object(request, object_id)
+                if obj:
+                    TelegramSender().send_user_role_message(obj)
+                    self.message_user(request, f"Сообщение для {obj} успешно отправлено в канал.")
+            except Exception as e:
+                self.message_user(request, f"Ошибка отправки: {e}", level='ERROR')
+            
+            return HttpResponseRedirect(request.path)
+
+        return super().change_view(request, object_id, form_url, extra_context)
 
     @admin.action(description='Resend Role Management Message to Telegram')
     def resend_role_message(self, request, queryset):
-        from app.telegram_bot import TelegramSender
         sender = TelegramSender()
         count = 0
         for user in queryset:
@@ -259,11 +297,9 @@ class ViewUserAdmin(admin.ModelAdmin):
         self.message_user(request, f"Messages resent for {count} users.")
 
     def save_model(self, request, obj, form, change):
-        """При изменении роли в админке синхронизируем права Django пользователя."""
         super().save_model(request, obj, form, change)
         if obj.django_user:
-            from app.views import _sync_user_permissions
-            _sync_user_permissions(obj.django_user, obj.role)
+            sync_user_permissions(obj.django_user, obj.role)
 
 
 @admin.register(ViewUserGroup, site=admin_site)

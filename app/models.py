@@ -3,6 +3,8 @@ from django.db import models
 from app.constants import DATETIME_FORMAT
 from django.contrib.auth.models import User
 from app.constants import UserRole
+from django.conf import settings
+from app.telegram_bot import TelegramSender
 
 
 class BaseModel(models.Model):
@@ -63,6 +65,7 @@ class ViewUser(BaseModel):
     username = models.CharField(max_length=255, null=True, blank=True)
     name = models.CharField(max_length=255, default='')
     language = models.CharField(max_length=10, default='en')
+    is_bot_blocked = models.BooleanField(default=False, verbose_name="Bot Blocked")
 
     role = models.CharField(
         max_length=20,
@@ -71,20 +74,28 @@ class ViewUser(BaseModel):
     )
     django_user = models.OneToOneField(
         User,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='view_user'
     )
     role_message_id = models.IntegerField(null=True, blank=True, help_text="ID сообщения в админ-канале для управления ролью")
 
-    def __str__(self):
-        if self.name:
-            return f"{self.name} ({self.role})"
-        if self.username:
-            return f"{self.username} ({self.role})"
-        return f"{self.telegram_id} ({self.role})"
+    def delete(self, *args, **kwargs):
+        # Удаляем связанного Django-пользователя, если удаление инициировано со стороны ViewUser
+        user = self.django_user
+        super().delete(*args, **kwargs)
+        if user:
+            user.delete()
 
+    def __str__(self):
+        blocked_mark = " [BLOCKED]" if self.is_bot_blocked else ""
+        if self.name:
+            return f"{self.name} ({self.role}){blocked_mark}"
+        if self.username:
+            return f"{self.username} ({self.role}){blocked_mark}"
+        return f"{self.telegram_id} ({self.role}){blocked_mark}"
+    
     class Meta:
         verbose_name = 'View User'
         verbose_name_plural = 'View Users'

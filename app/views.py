@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from django.conf import settings
 from django.contrib.auth.models import User, Group, Permission
@@ -10,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 from app.constants import UserRole
 from app.dashboard import dashboard_callback
 from app.models import ViewUser
+from app.telegram_bot import TelegramSender
 
 
 def index(request):
@@ -96,16 +98,13 @@ def register_bot_user(request):
             view_user.save()
 
         # 3. Синхронизация прав на основе роли
-        _sync_user_permissions(django_user, view_user.role)
+        sync_user_permissions(django_user, view_user.role)
 
         # 4. Отправляем сообщение в админ-канал для управления ролями
-        # Вызываем это асинхронно или просто здесь, так как requests достаточно быстр,
-        # но лучше обернуть в try/except чтобы не ломать регистрацию если телеграм лежит
         try:
-            from app.telegram_bot import TelegramSender
             TelegramSender().send_user_role_message(view_user)
         except Exception as e:
-            print(f"Failed to send role message: {e}")
+            logging.error(f"Failed to send role message for {telegram_id}: {e}")
 
         return JsonResponse({
             'status': 'ok',
@@ -114,6 +113,7 @@ def register_bot_user(request):
             'user_id': view_user.id
         })
     except Exception as e:
+        logging.error(f"Registration error: {e}")
         return JsonResponse({'error': str(e)}, status=400)
 
 
@@ -146,11 +146,10 @@ def set_bot_user_role(request):
         view_user.save()
 
         if view_user.django_user:
-            _sync_user_permissions(view_user.django_user, new_role)
+            sync_user_permissions(view_user.django_user, new_role)
 
         # Обновляем галочки в сообщении (бекенд сам обновляет Telegram)
         try:
-            from app.telegram_bot import TelegramSender
             TelegramSender().update_user_role_message(view_user)
         except Exception:
             pass
@@ -162,7 +161,7 @@ def set_bot_user_role(request):
         return JsonResponse({'error': str(e)}, status=400)
 
 
-def _sync_user_permissions(user, role):
+def sync_user_permissions(user, role):
     """Назначает права Django пользователю на основе роли ViewUser."""
     # Очищаем группы и индивидуальные права перед назначением новых
     user.groups.clear()
@@ -188,3 +187,66 @@ def _sync_user_permissions(user, role):
         user.is_superuser = False
 
     user.save()
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def update_bot_user(request):
+    """
+    Обновляет персональные данные пользователя (имя, username, язык) и статус блокировки.
+    Вызывается при любом взаимодействии с ботом.
+    """
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        telegram_id = data.get('telegram_id')
+        
+        # Если пользователя нет в базе (он не прошел /start), обновлять нечего
+        # Либо можно создавать "на лету", но обычно мы ждем регистрации
+        try:
+            view_user = ViewUser.objects.get(telegram_id=telegram_id)
+        except ViewUser.DoesNotExist:
+            return JsonResponse({'status': 'skipped', 'reason': 'user_not_found'})
+
+        updated_fields = []
+
+        # Обновление основных данных
+        new_username = data.get('username')
+        new_name = data.get('first_name', '')
+        new_language = data.get('language_code', 'en')
+
+        if view_user.username != new_username:
+            view_user.username = new_username
+            updated_fields.append('username')
+        
+        if view_user.name != new_name:
+            view_user.name = new_name
+            updated_fields.append('name')
+
+        if view_user.language != new_language:
+            view_user.language = new_language
+            updated_fields.append('language')
+
+        # Обновление статуса блокировки (если передан)
+        is_blocked = data.get('is_blocked')
+        if is_blocked is not None:
+            if view_user.is_bot_blocked != is_blocked:
+                view_user.is_bot_blocked = is_blocked
+                updated_fields.append('is_bot_blocked')
+
+        if updated_fields:
+            view_user.save(update_fields=updated_fields)
+            # Если изменилось имя/юзернейм, обновляем сообщение в админ-канале
+            if 'username' in updated_fields or 'name' in updated_fields:
+                try:
+                    TelegramSender().update_user_role_message(view_user)
+                except Exception:
+                    pass
+
+        return JsonResponse({'status': 'ok', 'updated': updated_fields})
+
+    except Exception as e:
+        logging.error(f"Update user error: {e}")
+        return JsonResponse({'error': str(e)}, status=400)

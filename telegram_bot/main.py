@@ -5,8 +5,10 @@ import sys
 from aiogram import Dispatcher, F, Router
 from aiogram.enums import ChatType
 from aiogram.filters import CommandStart
-from handlers import callbacks, commands
+from handlers import callbacks, commands, member
+from middlewares import UserSyncMiddleware  # Импорт мидлвари
 from services.bot_instance import BotInstance
+from api_server import start_api_server
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
@@ -17,12 +19,17 @@ def register_router() -> Router:
     """
     router = Router()
 
+    # --- Middlewares ---
+    router.message.middleware(UserSyncMiddleware())
+    router.callback_query.middleware(UserSyncMiddleware())
+
+    # --- Member Status Updates (Block/Unblock) ---
+    router.include_router(member.router)
+
     # --- Commands ---
-    # Private chat start
     router.message.register(
         commands.bot_command_start_private, CommandStart(), F.chat.type == ChatType.PRIVATE
     )
-    # Group chat start
     router.message.register(
         commands.bot_command_start_group,
         CommandStart(),
@@ -30,7 +37,6 @@ def register_router() -> Router:
     )
 
     # --- Callbacks ---
-    # Обработка кнопок смены роли (начинаются на setrole_)
     router.callback_query.register(
         callbacks.role_switch_handler,
         F.data.startswith('setrole_')
@@ -53,6 +59,9 @@ async def main():
 
     logging.info('Starting Telegram Bot...')
     await bot.delete_webhook(drop_pending_updates=True)
+    
+    # Запускаем API сервер и поллинг параллельно
+    await start_api_server(bot)
     await dispatcher.start_polling(bot)
 
 
