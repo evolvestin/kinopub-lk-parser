@@ -17,13 +17,6 @@ def register_router() -> Router:
     """
     router = Router()
 
-    # --- Callbacks ---
-    router.callback_query.register(
-        callbacks.registration_callback_handler, F.data == 'start_registration'
-    )
-    router.callback_query.register(callbacks.admin_approve_handler, F.data.startswith('approve_'))
-    router.callback_query.register(callbacks.admin_reject_handler, F.data.startswith('reject_'))
-
     # --- Commands ---
     # Private chat start
     router.message.register(
@@ -34,6 +27,13 @@ def register_router() -> Router:
         commands.bot_command_start_group,
         CommandStart(),
         F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}),
+    )
+
+    # --- Callbacks ---
+    # Обработка кнопок смены роли (начинаются на setrole_)
+    router.callback_query.register(
+        callbacks.role_switch_handler,
+        F.data.startswith('setrole_')
     )
 
     return router

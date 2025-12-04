@@ -26,8 +26,8 @@ class TelegramSender:
         self._initialized = True
 
     def _request(self, method: str, endpoint: str, payload: dict, attempt: int = 0) -> dict | None:
-        if not settings.BOT_TOKEN or not settings.CHAT_ID:
-            logger.error('BOT_TOKEN or CHAT_ID is not set in settings.')
+        if not settings.BOT_TOKEN or not settings.CODES_CHANNEL_ID:
+            logger.error('BOT_TOKEN or CODES_CHANNEL_ID is not set in settings.')
             return None
 
         url = f'{self.api_base}/{endpoint}'
@@ -82,7 +82,7 @@ class TelegramSender:
             return None
 
     def send_message(self, message: str) -> int | None:
-        payload = {'chat_id': settings.CHAT_ID, 'text': message, 'parse_mode': 'HTML'}
+        payload = {'chat_id': settings.CODES_CHANNEL_ID, 'text': message, 'parse_mode': 'HTML'}
         data = self._request('POST', 'sendMessage', payload)
 
         if data and data.get('ok'):
@@ -93,7 +93,7 @@ class TelegramSender:
 
     def edit_message_to_expired(self, message_id: int):
         payload = {
-            'chat_id': settings.CHAT_ID,
+            'chat_id': settings.CODES_CHANNEL_ID,
             'message_id': message_id,
             'text': '<i>Code expired</i>',
             'parse_mode': 'HTML',
@@ -102,3 +102,79 @@ class TelegramSender:
         # Для editMessageText используем тот же механизм _request
         self._request('POST', 'editMessageText', payload)
         logger.info(f'Edited message {message_id} to Expired status (if successful).')
+
+    def delete_message(self, chat_id, message_id):
+        if not message_id:
+            return
+        payload = {'chat_id': chat_id, 'message_id': message_id}
+        self._request('POST', 'deleteMessage', payload)
+
+    def send_user_role_message(self, view_user):
+        """Отправляет или переотправляет сообщение с управлением правами пользователя."""
+        if not settings.USER_MANAGEMENT_CHANNEL_ID:
+            logger.warning('USER_MANAGEMENT_CHANNEL_ID is not set.')
+            return
+
+        # Если есть старое сообщение, сначала чистим кнопки, затем удаляем
+        if view_user.role_message_id:
+            try:
+                # 1. Убираем клавиатуру (чтобы кнопки не работали, если удаление не пройдет)
+                self._request('POST', 'editMessageReplyMarkup', {
+                    'chat_id': settings.USER_MANAGEMENT_CHANNEL_ID,
+                    'message_id': view_user.role_message_id,
+                    'reply_markup': {'inline_keyboard': []}
+                })
+                # 2. Удаляем само сообщение
+                self.delete_message(settings.USER_MANAGEMENT_CHANNEL_ID, view_user.role_message_id)
+            except Exception as e:
+                logger.warning(f"Failed to cleanup old role message {view_user.role_message_id}: {e}")
+
+        text = (
+            f"👤 <b>User Registration / Role Management</b>\n\n"
+            f"<b>Name:</b> {view_user.name or 'N/A'}\n"
+            f"<b>Username:</b> @{view_user.username or 'N/A'}\n"
+            f"<b>ID:</b> <code>{view_user.telegram_id}</code>\n"
+            f"<b>Language:</b> {view_user.language}\n"
+            f"<b>Registered:</b> {view_user.created_at.strftime('%Y-%m-%d %H:%M')}"
+        )
+
+        keyboard = self._get_role_keyboard(view_user)
+        payload = {
+            'chat_id': settings.USER_MANAGEMENT_CHANNEL_ID,
+            'text': text,
+            'parse_mode': 'HTML',
+            'reply_markup': {'inline_keyboard': keyboard}
+        }
+
+        data = self._request('POST', 'sendMessage', payload)
+        if data and data.get('ok'):
+            new_msg_id = data['result']['message_id']
+            view_user.role_message_id = new_msg_id
+            view_user.save(update_fields=['role_message_id'])
+            logger.info(f"Role message sent for user {view_user.telegram_id} (msg_id: {new_msg_id})")
+
+    def update_user_role_message(self, view_user):
+        """Обновляет клавиатуру в существующем сообщении."""
+        if not settings.USER_MANAGEMENT_CHANNEL_ID or not view_user.role_message_id:
+            return
+
+        keyboard = self._get_role_keyboard(view_user)
+        payload = {
+            'chat_id': settings.USER_MANAGEMENT_CHANNEL_ID,
+            'message_id': view_user.role_message_id,
+            'reply_markup': {'inline_keyboard': keyboard}
+        }
+        self._request('POST', 'editMessageReplyMarkup', payload)
+
+    def _get_role_keyboard(self, view_user):
+        from app.constants import UserRole  # Импорт внутри, чтобы избежать циклов
+        buttons = []
+        for role in UserRole:
+            is_active = (role.value == view_user.role)
+            label = f"✅ {role.name}" if is_active else role.name
+            # callback_data: setrole_<user_id>_<role_value>
+            buttons.append({
+                'text': label,
+                'callback_data': f"setrole_{view_user.telegram_id}_{role.value}"
+            })
+        return [buttons]

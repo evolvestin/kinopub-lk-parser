@@ -41,3 +41,23 @@ async def register_user(
     except Exception as e:
         logging.error(f'API Registration Error: {e}')
         return False
+
+
+async def set_user_role(telegram_id: int, role: str, message_id: int) -> dict:
+    url = f'{BACKEND_URL}/api/bot/set_role/'
+    payload = {
+        'telegram_id': telegram_id,
+        'role': role,
+        'message_id': message_id
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=HEADERS, timeout=5) as response:
+                if response.status == 200:
+                    return {'success': True}
+                elif response.status == 409:
+                    return {'success': False, 'error': 'outdated'}
+                return {'success': False, 'error': 'api_error'}
+    except Exception as e:
+        logging.error(f'API Set Role Error: {e}')
+        return {'success': False, 'error': str(e)}

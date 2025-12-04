@@ -44,7 +44,10 @@ class Command(BaseCommand):
             ]
 
             logging.info('Restoring database using pg_restore...')
-            subprocess.run(cmd, env=env, check=True)
+            result = subprocess.run(cmd, env=env, check=False)
+
+            if result.returncode > 1:
+                raise subprocess.CalledProcessError(result.returncode, cmd)
 
             logging.info('Restore process completed successfully.')
             manager.schedule_backup()

@@ -2,3 +2,7 @@
 /data/
 /staticfiles/admin/
 __pycache__/
+/.idea/
+/staticfiles/
+/kinopub_parser/static/logo.png
+celerybeat-schedule

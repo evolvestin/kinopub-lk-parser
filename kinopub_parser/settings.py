@@ -134,7 +134,8 @@ ENVIRONMENT = os.getenv('ENVIRONMENT')
 
 # --- Bot Integration Config ---
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-CHAT_ID = os.getenv('CHAT_ID')
+CODES_CHANNEL_ID = os.getenv('CODES_CHANNEL_ID')
+USER_MANAGEMENT_CHANNEL_ID = os.getenv('USER_MANAGEMENT_CHANNEL_ID')
 
 # --- History Parser Config (Main Account) ---
 KINOPUB_LOGIN = os.getenv('KINOPUB_LOGIN')
@@ -243,7 +244,7 @@ REQUIRED_SETTINGS = (
     'GMAIL_EMAIL',
     'GMAIL_PASSWORD',
     'BOT_TOKEN',
-    'CHAT_ID',
+    'CODES_CHANNEL_ID',
     'ALLOWED_SENDER',
     'GOOGLE_DRIVE_CREDENTIALS_JSON',
     'KINOPUB_LOGIN',

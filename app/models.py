@@ -1,6 +1,8 @@
 from django.db import models
 
 from app.constants import DATETIME_FORMAT
+from django.contrib.auth.models import User
+from app.constants import UserRole
 
 
 class BaseModel(models.Model):
@@ -62,12 +64,26 @@ class ViewUser(BaseModel):
     name = models.CharField(max_length=255, default='')
     language = models.CharField(max_length=10, default='en')
 
+    role = models.CharField(
+        max_length=20,
+        choices=[(r.value, r.name) for r in UserRole],
+        default=UserRole.GUEST
+    )
+    django_user = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='view_user'
+    )
+    role_message_id = models.IntegerField(null=True, blank=True, help_text="ID сообщения в админ-канале для управления ролью")
+
     def __str__(self):
         if self.name:
-            return self.name
+            return f"{self.name} ({self.role})"
         if self.username:
-            return self.username
-        return str(self.telegram_id)
+            return f"{self.username} ({self.role})"
+        return f"{self.telegram_id} ({self.role})"
 
     class Meta:
         verbose_name = 'View User'

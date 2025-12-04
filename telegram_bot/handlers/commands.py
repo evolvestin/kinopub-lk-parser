@@ -12,29 +12,28 @@ ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 
 async def bot_command_start_private(message: Message, bot: Bot):
     sender = MessageSender(bot)
-    user_id = message.from_user.id
-    first_name = message.from_user.first_name
+    user = message.from_user
 
-    # Проверяем наличие пользователя (асинхронно)
-    exists = await client.check_user_exists(user_id)
+    # Автоматическая регистрация при каждом старте (обновляет данные, если юзер уже есть)
+    success = await client.register_user(
+        user.id,
+        user.username,
+        user.first_name,
+        user.language_code or 'ru'
+    )
 
-    if exists:
+    if success:
         text = (
-            f'👋 {bold(f"С возвращением, {first_name}!")}\n\n'
-            'Вы уже зарегистрированы в системе. '
-            'Я готов показывать вашу статистику и новые эпизоды.'
+            f'👋 {bold(f"Привет, {user.first_name}!")}\n\n'
+            'Вы успешно зарегистрированы в системе.\n'
+            'По умолчанию вам присвоена роль <b>Guest</b>.\n\n'
+            'Если вам нужен доступ к дашборду или админ-панели, '
+            'обратитесь к администратору для повышения прав.'
         )
-        await sender.send_message(chat_id=user_id, text=text)
     else:
-        text = (
-            f'👋 {bold(f"Привет, {first_name}!")}\n\n'
-            'Я — бот для сбора статистики по фильмам и сериалам на основе KinoPub.\n'
-            'Для доступа к функциям необходимо пройти процедуру регистрации.\n\n'
-            f'⚠️ {bold(f"Заявки обрабатываются вручную администратором (@{ADMIN_USERNAME}).")}'
-        )
-        await sender.send_message(
-            chat_id=user_id, text=text, keyboard=keyboards.get_registration_keyboard()
-        )
+        text = f'⚠️ {bold("Ошибка регистрации.")}\nПопробуйте позже или свяжитесь с администратором.'
+
+    await sender.send_message(chat_id=user.id, text=text)
 
 
 async def bot_command_start_group(message: Message, bot: Bot):

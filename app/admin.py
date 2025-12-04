@@ -3,7 +3,7 @@ from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
 from django.db.models import Count, Q, Sum
 from django.urls import reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 
 # Импортируем нашу кастомную админку
 from app.admin_site import admin_site
@@ -22,7 +22,65 @@ from app.models import (
 )
 
 admin_site.register(Group, GroupAdmin)
-admin_site.register(User, UserAdmin)
+
+
+class CustomUserAdmin(UserAdmin):
+    list_display = (
+        'username',
+        'email',
+        'first_name',
+        'last_name',
+        'is_staff',
+        'is_superuser',
+    )
+    readonly_fields = (
+        'last_login',
+        'date_joined',
+        'is_staff',
+        'is_superuser',
+        'get_groups_display',
+        'get_permissions_display',
+    )
+    fieldsets = (
+        (None, {'fields': ('username', 'password')}),
+        ('Personal info', {'fields': ('first_name', 'last_name', 'email')}),
+        (
+            'Permissions (Managed via ViewUser Role)',
+            {
+                'fields': (
+                    'is_active',
+                    'is_staff',
+                    'is_superuser',
+                    'get_groups_display',
+                    'get_permissions_display',
+                ),
+            },
+        ),
+        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+    )
+
+    @admin.display(description='Groups')
+    def get_groups_display(self, obj):
+        groups = obj.groups.all()
+        if not groups:
+            return '-'
+        return format_html(
+            '<ul>{}</ul>',
+            format_html_join('', '<li>{}</li>', ((g.name,) for g in groups))
+        )
+
+    @admin.display(description='User permissions')
+    def get_permissions_display(self, obj):
+        perms = obj.user_permissions.all()
+        if not perms:
+            return '-'
+        return format_html(
+            '<div style="max-height: 400px; overflow-y: auto;"><ul>{}</ul></div>',
+            format_html_join('', '<li>{}</li>', ((p,) for p in perms))
+        )
+
+
+admin_site.register(User, CustomUserAdmin)
 
 
 @admin.register(Code, site=admin_site)
@@ -176,13 +234,36 @@ class ViewUserAdmin(admin.ModelAdmin):
     list_display = (
         'name',
         'username',
+        'role',
         'telegram_id',
-        'language',
+        'django_user',
         'created_at',
-        'updated_at',
     )
     search_fields = ('name', 'username', 'telegram_id')
-    list_filter = ('language',)
+    list_filter = ('role', 'language')
+    readonly_fields = ('django_user', 'role_message_id')
+    actions = ['resend_role_message']
+
+    @admin.action(description='Resend Role Management Message to Telegram')
+    def resend_role_message(self, request, queryset):
+        from app.telegram_bot import TelegramSender
+        sender = TelegramSender()
+        count = 0
+        for user in queryset:
+            try:
+                sender.send_user_role_message(user)
+                count += 1
+            except Exception as e:
+                self.message_user(request, f"Error sending for {user}: {e}", level='ERROR')
+        
+        self.message_user(request, f"Messages resent for {count} users.")
+
+    def save_model(self, request, obj, form, change):
+        """При изменении роли в админке синхронизируем права Django пользователя."""
+        super().save_model(request, obj, form, change)
+        if obj.django_user:
+            from app.views import _sync_user_permissions
+            _sync_user_permissions(obj.django_user, obj.role)
 
 
 @admin.register(ViewUserGroup, site=admin_site)

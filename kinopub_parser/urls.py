@@ -14,6 +14,7 @@ urlpatterns = [
     ),
     path('api/bot/check/<int:telegram_id>/', views.check_bot_user),
     path('api/bot/register/', views.register_bot_user),
+    path('api/bot/set_role/', views.set_bot_user_role),
 ]
 
 if not settings.DEBUG:

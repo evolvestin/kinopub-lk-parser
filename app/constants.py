@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 DATE_FORMAT = '%Y-%m-%d'
 DATETIME_FORMAT = f'{DATE_FORMAT} %H:%M:%S'
 
@@ -43,3 +45,8 @@ SHOW_STATUS_MAPPING = {
     'окончен': 'Finished',
     'в эфире': 'Ongoing',
 }
+
+class UserRole(StrEnum):
+    GUEST = 'guest'
+    VIEWER = 'viewer'
+    ADMIN = 'admin'
