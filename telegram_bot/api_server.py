@@ -32,6 +32,20 @@ async def handle_send_message(request):
         logging.error(f"Failed to send message: {e}")
         return web.json_response({'ok': False, 'description': str(e)}, status=400)
 
+async def handle_delete_message(request):
+    bot: Bot = request.app['bot']
+    data = await request.json()
+
+    chat_id = data.get('chat_id')
+    message_id = data.get('message_id')
+
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        return web.json_response({'ok': True, 'result': True})
+    except TelegramAPIError as e:
+        logging.warning(f"Failed to delete message: {e}")
+        return web.json_response({'ok': False, 'description': str(e)})
+
 async def handle_edit_message(request):
     bot: Bot = request.app['bot']
     data = await request.json()
@@ -50,20 +64,32 @@ async def handle_edit_message(request):
             pass
 
     try:
-        if not text and not reply_markup:
-            await bot.delete_message(chat_id=chat_id, message_id=message_id)
-            return web.json_response({'ok': True, 'result': True})
-            
-        await bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=text,
-            parse_mode=parse_mode,
-            reply_markup=reply_markup
-        )
+        if text:
+            # Если есть текст, обновляем текст (и кнопки, если переданы)
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup
+            )
+        elif reply_markup:
+            # Если текста нет, но есть кнопки — обновляем только клавиатуру
+            await bot.edit_message_reply_markup(
+                chat_id=chat_id,
+                message_id=message_id,
+                reply_markup=reply_markup
+            )
+        else:
+            return web.json_response({'ok': False, 'description': 'No text or markup provided for edit'}, status=400)
+
         return web.json_response({'ok': True, 'result': True})
     except TelegramAPIError as e:
-        logging.warning(f"Failed to edit/delete message: {e}")
+        # Игнорируем ошибку, если сообщение не изменилось
+        if "message is not modified" in str(e):
+             return web.json_response({'ok': True, 'result': True})
+             
+        logging.warning(f"Failed to edit message: {e}")
         return web.json_response({'ok': False, 'description': str(e)})
 
 async def start_api_server(bot: Bot):
@@ -71,6 +97,7 @@ async def start_api_server(bot: Bot):
     app['bot'] = bot
     app.router.add_post('/api/send_message', handle_send_message)
     app.router.add_post('/api/edit_message', handle_edit_message)
+    app.router.add_post('/api/delete_message', handle_delete_message)
     
     runner = web.AppRunner(app)
     await runner.setup()

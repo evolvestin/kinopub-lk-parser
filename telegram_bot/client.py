@@ -68,7 +68,7 @@ async def update_user_data(
     username: str, 
     first_name: str, 
     language_code: str,
-    is_blocked: bool = None
+    is_active: bool = None
 ) -> bool:
     url = f'{BACKEND_URL}/api/bot/update_user/'
     payload = {
@@ -77,8 +77,9 @@ async def update_user_data(
         'first_name': first_name,
         'language_code': language_code,
     }
-    if is_blocked is not None:
-        payload['is_blocked'] = is_blocked
+    # Теперь передаем is_active вместо is_blocked
+    if is_active is not None:
+        payload['is_active'] = is_active
 
     try:
         async with aiohttp.ClientSession() as session:

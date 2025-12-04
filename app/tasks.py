@@ -14,6 +14,7 @@ from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, TaskRun
 from app.telegram_bot import TelegramSender
+from shared.html_helper import italic
 
 
 @shared_task
@@ -44,7 +45,6 @@ def expire_codes_task():
             logging.info('Found %d expired codes to process.', expired_codes.count())
             for code in expired_codes:
                 TelegramSender().edit_message_to_expired(code.telegram_message_id)
-                code.telegram_message_id
                 code.delete()
             BackupManager().schedule_backup()
     except Exception as e:

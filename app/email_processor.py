@@ -12,6 +12,7 @@ from django.conf import settings
 from app.gdrive_backup import BackupManager
 from app.models import Code
 from app.telegram_bot import TelegramSender
+from shared.html_helper import code
 
 
 @contextmanager
@@ -111,17 +112,18 @@ def process_emails(mail, shutdown_flag):
 
             code_match = re.search(settings.REGEX_CODE, body)
             if code_match:
-                code = code_match.group(0)
-                logging.info('Found code %s in email (uid=%s)', code, uid)
+                code_str = code_match.group(0)
+                logging.info('Found code %s in email (uid=%s)', code_str, uid)
 
-                message_id = TelegramSender().send_message(code)
+                # Отправляем код в Telegram с моноширинным форматированием для удобного копирования
+                message_id = TelegramSender().send_message(code(code_str))
                 if message_id:
                     Code.objects.create(
-                        code=code,
+                        code=code_str,
                         telegram_message_id=message_id,
                         received_at=received_at_dt,
                     )
-                    logging.info('Code %s (msg_id: %d) added to the database.', code, message_id)
+                    logging.info('Code %s (msg_id: %d) added to the database.', code_str, message_id)
                     BackupManager().schedule_backup()
                     if settings.MARK_AS_SEEN:
                         mail.uid('STORE', uid, '+FLAGS', r'(\Seen)')

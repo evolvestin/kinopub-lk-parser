@@ -5,7 +5,7 @@ from typing import Optional, Union
 
 from aiogram import Bot, types
 from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter, TelegramServerError
-from html_helper import html_secure
+from html_helper import html_secure, sub_tag
 
 
 class MessageSender:
@@ -29,7 +29,6 @@ class MessageSender:
 
         try:
             if edit_message:
-                # Логика редактирования
                 if isinstance(edit_message, (str, int)):
                     message_id = int(edit_message)
                     response = await self.bot.edit_message_text(
@@ -41,9 +40,8 @@ class MessageSender:
                         parse_mode=parse_mode,
                     )
                 elif isinstance(edit_message, types.Message):
-                    # Простая проверка на изменение текста, чтобы не спамить API
                     current_text = edit_message.text or edit_message.caption or ''
-                    clean_new_text = html_secure(re.sub('<.*?>', '', text), reverse=True).strip()
+                    clean_new_text = html_secure(sub_tag(text), reverse=True).strip()
 
                     if (
                         current_text.strip() == clean_new_text
@@ -60,7 +58,6 @@ class MessageSender:
                         parse_mode=parse_mode,
                     )
             else:
-                # Логика отправки
                 response = await self.bot.send_message(
                     chat_id=chat_id,
                     text=text,
@@ -100,7 +97,6 @@ class MessageSender:
             logging.error(f'Network error after retries: {e}')
 
         except Exception as e:
-            # Игнорируем ошибки блокировки бота пользователем, чтобы не крашить поток
             err_str = str(e).lower()
             if any(
                 x in err_str for x in ['blocked', 'user is deactivated', 'chat not found', 'kicked']

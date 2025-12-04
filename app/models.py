@@ -65,7 +65,7 @@ class ViewUser(BaseModel):
     username = models.CharField(max_length=255, null=True, blank=True)
     name = models.CharField(max_length=255, default='')
     language = models.CharField(max_length=10, default='en')
-    is_bot_blocked = models.BooleanField(default=False, verbose_name="Bot Blocked")
+    is_bot_active = models.BooleanField(default=True, verbose_name="Bot Active")
 
     role = models.CharField(
         max_length=20,
@@ -89,12 +89,12 @@ class ViewUser(BaseModel):
             user.delete()
 
     def __str__(self):
-        blocked_mark = " [BLOCKED]" if self.is_bot_blocked else ""
+        status_mark = "" if self.is_bot_active else " [BLOCKED]"
         if self.name:
-            return f"{self.name} ({self.role}){blocked_mark}"
+            return f"{self.name} ({self.role}){status_mark}"
         if self.username:
-            return f"{self.username} ({self.role}){blocked_mark}"
-        return f"{self.telegram_id} ({self.role}){blocked_mark}"
+            return f"{self.username} ({self.role}){status_mark}"
+        return f"{self.telegram_id} ({self.role}){status_mark}"
     
     class Meta:
         verbose_name = 'View User'

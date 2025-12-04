@@ -145,6 +145,8 @@ services:
     depends_on:
       web:
         condition: service_started
+    volumes:
+      - ./shared:/app/shared
     networks:
       - kinopub-net
 

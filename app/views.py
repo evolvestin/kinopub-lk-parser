@@ -67,14 +67,25 @@ def register_bot_user(request):
                 'username': username,
                 'name': first_name,
                 'language': data.get('language_code', 'ru'),
-                'role': UserRole.GUEST  # По умолчанию гость
+                'role': UserRole.GUEST,
+                'is_bot_active': True
             },
         )
 
         if not created:
-            view_user.username = username
-            view_user.name = first_name
-            view_user.save()
+            has_changes = False
+            if view_user.username != username:
+                view_user.username = username
+                has_changes = True
+            if view_user.name != first_name:
+                view_user.name = first_name
+                has_changes = True
+            if not view_user.is_bot_active:
+                view_user.is_bot_active = True
+                has_changes = True
+
+            if has_changes:
+                view_user.save()
 
         # 2. Создаем или получаем Django User
         django_user, user_created = User.objects.get_or_create(
@@ -100,11 +111,16 @@ def register_bot_user(request):
         # 3. Синхронизация прав на основе роли
         sync_user_permissions(django_user, view_user.role)
 
-        # 4. Отправляем сообщение в админ-канал для управления ролями
+        # 4. Отправляем сообщение в админ-канал
+        # Если пользователь только создан или сообщения о роли еще нет - создаем новое.
+        # Если уже есть - обновляем существующее (чтобы не спамить при нажатии /start после разблокировки).
         try:
-            TelegramSender().send_user_role_message(view_user)
+            if created or not view_user.role_message_id:
+                TelegramSender().send_user_role_message(view_user)
+            else:
+                TelegramSender().update_user_role_message(view_user)
         except Exception as e:
-            logging.error(f"Failed to send role message for {telegram_id}: {e}")
+            logging.error(f"Failed to handle role message for {telegram_id}: {e}")
 
         return JsonResponse({
             'status': 'ok',
@@ -193,7 +209,7 @@ def sync_user_permissions(user, role):
 @require_http_methods(['POST'])
 def update_bot_user(request):
     """
-    Обновляет персональные данные пользователя (имя, username, язык) и статус блокировки.
+    Обновляет персональные данные пользователя (имя, username, язык) и статус активности.
     Вызывается при любом взаимодействии с ботом.
     """
     if not _check_token(request):
@@ -203,8 +219,6 @@ def update_bot_user(request):
         data = json.loads(request.body)
         telegram_id = data.get('telegram_id')
         
-        # Если пользователя нет в базе (он не прошел /start), обновлять нечего
-        # Либо можно создавать "на лету", но обычно мы ждем регистрации
         try:
             view_user = ViewUser.objects.get(telegram_id=telegram_id)
         except ViewUser.DoesNotExist:
@@ -229,15 +243,17 @@ def update_bot_user(request):
             view_user.language = new_language
             updated_fields.append('language')
 
-        # Обновление статуса блокировки (если передан)
-        is_blocked = data.get('is_blocked')
-        if is_blocked is not None:
-            if view_user.is_bot_blocked != is_blocked:
-                view_user.is_bot_blocked = is_blocked
-                updated_fields.append('is_bot_blocked')
+        # Обновление статуса активности (если передан)
+        is_active = data.get('is_active')
+        if is_active is not None:
+            if view_user.is_bot_active != is_active:
+                view_user.is_bot_active = is_active
+                updated_fields.append('is_bot_active')
 
         if updated_fields:
-            view_user.save(update_fields=updated_fields)
+            # Используем обычный save() без update_fields, чтобы Django автоматически обновил updated_at
+            view_user.save()
+            
             # Если изменилось имя/юзернейм, обновляем сообщение в админ-канале
             if 'username' in updated_fields or 'name' in updated_fields:
                 try:

@@ -235,17 +235,18 @@ class ShowAdmin(admin.ModelAdmin):
 @admin.register(ViewUser, site=admin_site)
 class ViewUserAdmin(admin.ModelAdmin):
     list_display = (
+        'telegram_id',
         'name',
         'username',
+        'language',
         'role',
-        'is_bot_blocked',
-        'telegram_id',
+        'is_bot_active',
         'django_user',
         'created_at',
         'updated_at',
     )
     search_fields = ('name', 'username', 'telegram_id')
-    list_filter = ('role', 'is_bot_blocked', 'language')
+    list_filter = ('role', 'is_bot_active', 'language')
     readonly_fields = (
         'django_user',
         'role_message_id',
@@ -255,9 +256,9 @@ class ViewUserAdmin(admin.ModelAdmin):
     )
     actions = ['resend_role_message']
 
-    @admin.display(description='Bot Blocked', boolean=True)
-    def is_bot_blocked(self, obj):
-        return obj.is_bot_blocked
+    @admin.display(description='Bot Active', boolean=True)
+    def is_bot_active(self, obj):
+        return obj.is_bot_active
 
     @admin.display(description='Telegram Actions')
     def telegram_actions(self, obj):
@@ -369,7 +370,7 @@ class ShowDurationAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.order_by('show__title', '-season_number', '-episode_number')
+        return qs.order_by('-updated_at', '-season_number', '-episode_number')
 
     @admin.display(description='Season', ordering='season_number')
     def get_season(self, obj):

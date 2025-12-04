@@ -4,7 +4,7 @@ import client
 import keyboards
 from aiogram import Bot
 from aiogram.types import Message
-from html_helper import bold
+from html_helper import bold, html_secure
 from sender import MessageSender
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
@@ -23,7 +23,7 @@ async def bot_command_start_private(message: Message, bot: Bot):
 
     if success:
         text = (
-            f'👋 {bold(f"Привет, {user.first_name}!")}\n\n'
+            f'👋 {bold(f"Привет, {html_secure(user.first_name)}!")}\n\n'
             'Вы успешно зарегистрированы в системе.\n'
             f'По умолчанию вам присвоена роль {bold("Guest")}.\n\n'
             'Если вам нужен доступ к дашборду или админ-панели, '

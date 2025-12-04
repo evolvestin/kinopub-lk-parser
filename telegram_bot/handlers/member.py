@@ -14,20 +14,20 @@ async def on_user_status_changed(event: ChatMemberUpdated):
     new_state = event.new_chat_member.status
     user = event.from_user
     
-    is_blocked = None
+    is_active = None
     
     if new_state == ChatMemberStatus.KICKED:
         logging.info(f"User {user.id} blocked the bot.")
-        is_blocked = True
+        is_active = False
     elif new_state == ChatMemberStatus.MEMBER:
         logging.info(f"User {user.id} unblocked the bot.")
-        is_blocked = False
+        is_active = True
         
-    if is_blocked is not None:
+    if is_active is not None:
         await client.update_user_data(
             telegram_id=user.id,
             username=user.username,
             first_name=user.first_name,
             language_code=user.language_code,
-            is_blocked=is_blocked
+            is_active=is_active
         )

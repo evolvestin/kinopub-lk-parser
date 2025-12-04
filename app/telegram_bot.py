@@ -1,6 +1,7 @@
 import logging
 import requests
 from django.conf import settings
+from shared.html_helper import html_secure, bold, code, italic
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,6 @@ class TelegramSender:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(TelegramSender, cls).__new__(cls)
-            # Адрес контейнера бота внутри сети docker-compose
             cls._instance.service_url = 'http://telegram-bot:8081/api'
         return cls._instance
 
@@ -49,7 +49,7 @@ class TelegramSender:
         payload = {
             'chat_id': settings.CODES_CHANNEL_ID,
             'message_id': message_id,
-            'text': '<i>Code expired</i>',
+            'text': italic('Code expired'),
             'parse_mode': 'HTML',
         }
         self._request('edit_message', payload)
@@ -57,9 +57,9 @@ class TelegramSender:
     def delete_message(self, chat_id, message_id):
         if not message_id:
             return
-        # В нашем API edit_message без текста работает как удаление (см. api_server.py)
+        
         payload = {'chat_id': chat_id, 'message_id': message_id}
-        self._request('edit_message', payload)
+        self._request('delete_message', payload)
 
     def send_user_role_message(self, view_user):
         if not settings.USER_MANAGEMENT_CHANNEL_ID:
@@ -67,18 +67,16 @@ class TelegramSender:
             return
 
         if view_user.role_message_id:
-            # Сначала чистим клавиатуру у старого
             self.update_user_role_message(view_user, empty_keyboard=True)
-            # Затем удаляем
             self.delete_message(settings.USER_MANAGEMENT_CHANNEL_ID, view_user.role_message_id)
 
         text = (
-            f"👤 <b>User Registration / Role Management</b>\n\n"
-            f"<b>Name:</b> {html_secure(view_user.name or 'N/A')}\n"
-            f"<b>Username:</b> @{html_secure(view_user.username or 'N/A')}\n"
-            f"<b>ID:</b> <code>{view_user.telegram_id}</code>\n"
-            f"<b>Language:</b> {view_user.language}\n"
-            f"<b>Registered:</b> {view_user.created_at.strftime('%Y-%m-%d %H:%M')}"
+            f"👤 {bold('User Registration / Role Management')}\n\n"
+            f"{bold('Name:')} {html_secure(view_user.name or 'N/A')}\n"
+            f"{bold('Username:')} @{html_secure(view_user.username or 'N/A')}\n"
+            f"{bold('ID:')} {code(view_user.telegram_id)}\n"
+            f"{bold('Language:')} {view_user.language}\n"
+            f"{bold('Registered:')} {view_user.created_at.strftime('%Y-%m-%d %H:%M')}"
         )
 
         keyboard = self._get_role_keyboard(view_user)
@@ -104,12 +102,12 @@ class TelegramSender:
         keyboard = [] if empty_keyboard else self._get_role_keyboard(view_user)
         
         text = (
-            f"👤 <b>User Registration / Role Management</b>\n\n"
-            f"<b>Name:</b> {html_secure(view_user.name or 'N/A')}\n"
-            f"<b>Username:</b> @{html_secure(view_user.username or 'N/A')}\n"
-            f"<b>ID:</b> <code>{view_user.telegram_id}</code>\n"
-            f"<b>Language:</b> {view_user.language}\n"
-            f"<b>Registered:</b> {view_user.created_at.strftime('%Y-%m-%d %H:%M')}"
+            f"👤 {bold('User Registration / Role Management')}\n\n"
+            f"{bold('Name:')} {html_secure(view_user.name or 'N/A')}\n"
+            f"{bold('Username:')} @{html_secure(view_user.username or 'N/A')}\n"
+            f"{bold('ID:')} {code(view_user.telegram_id)}\n"
+            f"{bold('Language:')} {view_user.language}\n"
+            f"{bold('Registered:')} {view_user.created_at.strftime('%Y-%m-%d %H:%M')}"
         )
 
         payload = {
