@@ -1,18 +1,18 @@
 import json
 import logging
 import uuid
+
 from django.conf import settings
-from django.contrib.auth.models import User, Group, Permission
-from django.http import JsonResponse
+from django.contrib.auth.models import Group, Permission, User
 from django.db.models import Q
-from app.models import Show
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from app.constants import UserRole
 from app.dashboard import dashboard_callback
-from app.models import ViewUser
+from app.models import Show, ViewUser
 from app.telegram_bot import TelegramSender
 
 
@@ -60,7 +60,7 @@ def register_bot_user(request):
                 host = origin.replace('https://', '').replace('http://', '').split('/')[0]
                 break
 
-        email = f"{login_username}@{host}"
+        email = f'{login_username}@{host}'
 
         # 1. Создаем или обновляем ViewUser
         view_user, created = ViewUser.objects.get_or_create(
@@ -70,7 +70,7 @@ def register_bot_user(request):
                 'name': first_name,
                 'language': data.get('language_code', 'ru'),
                 'role': UserRole.GUEST,
-                'is_bot_active': True
+                'is_bot_active': True,
             },
         )
 
@@ -96,8 +96,8 @@ def register_bot_user(request):
                 'email': email,
                 'is_staff': False,
                 'is_superuser': False,
-                'first_name': first_name[:30]  # Ограничение Django
-            }
+                'first_name': first_name[:30],  # Ограничение Django
+            },
         )
 
         if user_created:
@@ -122,16 +122,13 @@ def register_bot_user(request):
             else:
                 TelegramSender().update_user_role_message(view_user)
         except Exception as e:
-            logging.error(f"Failed to handle role message for {telegram_id}: {e}")
+            logging.error(f'Failed to handle role message for {telegram_id}: {e}')
 
-        return JsonResponse({
-            'status': 'ok',
-            'created': created,
-            'role': view_user.role,
-            'user_id': view_user.id
-        })
+        return JsonResponse(
+            {'status': 'ok', 'created': created, 'role': view_user.role, 'user_id': view_user.id}
+        )
     except Exception as e:
-        logging.error(f"Registration error: {e}")
+        logging.error(f'Registration error: {e}')
         return JsonResponse({'error': str(e)}, status=400)
 
 
@@ -152,10 +149,10 @@ def set_bot_user_role(request):
         # Проверка актуальности сообщения (защита от нажатий на старые кнопки)
         if view_user.role_message_id and message_id:
             if int(view_user.role_message_id) != int(message_id):
-                return JsonResponse({
-                    'status': 'error', 
-                    'message': 'Message outdated. Please refresh or resend.'
-                }, status=409)
+                return JsonResponse(
+                    {'status': 'error', 'message': 'Message outdated. Please refresh or resend.'},
+                    status=409,
+                )
 
         if new_role not in [r.value for r in UserRole]:
             return JsonResponse({'error': 'Invalid role'}, status=400)
@@ -194,8 +191,7 @@ def sync_user_permissions(user, role):
 
         # Получаем права на просмотр (view_) для всех моделей приложения app
         permissions = Permission.objects.filter(
-            content_type__app_label='app',
-            codename__startswith='view_'
+            content_type__app_label='app', codename__startswith='view_'
         )
         # Назначаем права напрямую, чтобы они отображались в окне "User permissions"
         user.user_permissions.set(permissions)
@@ -220,7 +216,7 @@ def update_bot_user(request):
     try:
         data = json.loads(request.body)
         telegram_id = data.get('telegram_id')
-        
+
         try:
             view_user = ViewUser.objects.get(telegram_id=telegram_id)
         except ViewUser.DoesNotExist:
@@ -236,7 +232,7 @@ def update_bot_user(request):
         if view_user.username != new_username:
             view_user.username = new_username
             updated_fields.append('username')
-        
+
         if view_user.name != new_name:
             view_user.name = new_name
             updated_fields.append('name')
@@ -255,7 +251,7 @@ def update_bot_user(request):
         if updated_fields:
             # Используем обычный save() без update_fields, чтобы Django автоматически обновил updated_at
             view_user.save()
-            
+
             # Если изменилось имя/юзернейм, обновляем сообщение в админ-канале
             if 'username' in updated_fields or 'name' in updated_fields:
                 try:
@@ -266,7 +262,7 @@ def update_bot_user(request):
         return JsonResponse({'status': 'ok', 'updated': updated_fields})
 
     except Exception as e:
-        logging.error(f"Update user error: {e}")
+        logging.error(f'Update user error: {e}')
         return JsonResponse({'error': str(e)}, status=400)
 
 
@@ -287,14 +283,16 @@ def bot_search_shows(request):
 
     results = []
     for show in shows:
-        results.append({
-            'id': show.id,
-            'title': show.title,
-            'original_title': show.original_title,
-            'year': show.year,
-            'type': show.type,
-        })
-    
+        results.append(
+            {
+                'id': show.id,
+                'title': show.title,
+                'original_title': show.original_title,
+                'year': show.year,
+                'type': show.type,
+            }
+        )
+
     return JsonResponse({'results': results})
 
 
@@ -306,7 +304,7 @@ def bot_get_show_details(request, show_id):
 
     try:
         show = Show.objects.prefetch_related('countries', 'genres').get(id=show_id)
-        
+
         data = {
             'id': show.id,
             'title': show.title,
@@ -324,4 +322,3 @@ def bot_get_show_details(request, show_id):
         return JsonResponse(data)
     except Show.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
-

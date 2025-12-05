@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0013_alter_viewuser_options_alter_viewuser_django_user'),
     ]

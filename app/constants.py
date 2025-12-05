@@ -46,6 +46,7 @@ SHOW_STATUS_MAPPING = {
     'в эфире': 'Ongoing',
 }
 
+
 class UserRole(StrEnum):
     GUEST = 'guest'
     VIEWER = 'viewer'

@@ -1,5 +1,7 @@
 from django.core.management.base import BaseCommand
+
 from app.models import Country
+
 
 class Command(BaseCommand):
     help = 'Populates countries with ISO codes and Emoji flags'
@@ -108,8 +110,10 @@ class Command(BaseCommand):
                 updated_count += 1
             except Country.DoesNotExist:
                 not_found.append(name)
-        
+
         self.stdout.write(self.style.SUCCESS(f'Updated {updated_count} countries.'))
-        
+
         if not_found:
-            self.stdout.write(self.style.WARNING(f'Countries not found in DB: {", ".join(not_found)}'))
+            self.stdout.write(
+                self.style.WARNING(f'Countries not found in DB: {", ".join(not_found)}')
+            )

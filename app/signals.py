@@ -18,8 +18,7 @@ def delete_view_user_message(sender, instance, **kwargs):
         try:
             if settings.USER_MANAGEMENT_CHANNEL_ID:
                 TelegramSender().delete_message(
-                    settings.USER_MANAGEMENT_CHANNEL_ID,
-                    instance.role_message_id
+                    settings.USER_MANAGEMENT_CHANNEL_ID, instance.role_message_id
                 )
         except Exception:
             pass

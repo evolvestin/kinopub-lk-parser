@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0014_alter_viewuser_options_viewuser_is_bot_blocked'),
     ]

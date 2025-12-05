@@ -1,19 +1,20 @@
-from typing import Callable, Dict, Any, Awaitable
+import logging
+from typing import Any, Awaitable, Callable, Dict
+
+import client
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, User
-import client
-import logging
+
 
 class UserSyncMiddleware(BaseMiddleware):
     async def __call__(
         self,
         handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
         event: TelegramObject,
-        data: Dict[str, Any]
+        data: Dict[str, Any],
     ) -> Any:
-        
         user: User = data.get('event_from_user')
-        
+
         if user:
             # Запускаем обновление данных в фоне
             try:
@@ -24,9 +25,9 @@ class UserSyncMiddleware(BaseMiddleware):
                     username=user.username,
                     first_name=user.first_name,
                     language_code=user.language_code,
-                    is_active=True 
+                    is_active=True,
                 )
             except Exception as e:
-                logging.error(f"Middleware user sync error: {e}")
+                logging.error(f'Middleware user sync error: {e}')
 
         return await handler(event, data)

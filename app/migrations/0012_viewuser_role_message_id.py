@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0011_viewuser_django_user_viewuser_role'),
     ]
@@ -13,6 +12,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='viewuser',
             name='role_message_id',
-            field=models.IntegerField(blank=True, help_text='ID сообщения в админ-канале для управления ролью', null=True),
+            field=models.IntegerField(
+                blank=True, help_text='ID сообщения в админ-канале для управления ролью', null=True
+            ),
         ),
     ]

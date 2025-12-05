@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0012_viewuser_role_message_id'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -20,6 +19,12 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='viewuser',
             name='django_user',
-            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='view_user', to=settings.AUTH_USER_MODEL),
+            field=models.OneToOneField(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name='view_user',
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]

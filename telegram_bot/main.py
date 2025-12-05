@@ -5,10 +5,10 @@ import sys
 from aiogram import Dispatcher, F, Router
 from aiogram.enums import ChatType
 from aiogram.filters import CommandStart
+from api_server import start_api_server
 from handlers import callbacks, commands, member
 from middlewares import UserSyncMiddleware  # Импорт мидлвари
 from services.bot_instance import BotInstance
-from api_server import start_api_server
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 
@@ -35,26 +35,16 @@ def register_router() -> Router:
         CommandStart(),
         F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}),
     )
-    
+
     # --- Content Search & View ---
     # Обработка команды просмотра конкретного контента (/view_123)
-    router.message.register(
-        commands.handle_view_command,
-        F.text.regexp(r'^/view_\d+$')
-    )
-    
+    router.message.register(commands.handle_view_command, F.text.regexp(r'^/view_\d+$'))
+
     # Обработка любого другого текста как поискового запроса (только в ЛС)
-    router.message.register(
-        commands.handle_search_text,
-        F.chat.type == ChatType.PRIVATE,
-        F.text
-    )
+    router.message.register(commands.handle_search_text, F.chat.type == ChatType.PRIVATE, F.text)
 
     # --- Callbacks ---
-    router.callback_query.register(
-        callbacks.role_switch_handler,
-        F.data.startswith('setrole_')
-    )
+    router.callback_query.register(callbacks.role_switch_handler, F.data.startswith('setrole_'))
 
     return router
 
@@ -73,7 +63,7 @@ async def main():
 
     logging.info('Starting Telegram Bot...')
     await bot.delete_webhook(drop_pending_updates=True)
-    
+
     # Запускаем API сервер и поллинг параллельно
     await start_api_server(bot)
     await dispatcher.start_polling(bot)

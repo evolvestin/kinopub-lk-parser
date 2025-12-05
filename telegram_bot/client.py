@@ -45,11 +45,7 @@ async def register_user(
 
 async def set_user_role(telegram_id: int, role: str, message_id: int) -> dict:
     url = f'{BACKEND_URL}/api/bot/set_role/'
-    payload = {
-        'telegram_id': telegram_id,
-        'role': role,
-        'message_id': message_id
-    }
+    payload = {'telegram_id': telegram_id, 'role': role, 'message_id': message_id}
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload, headers=HEADERS, timeout=5) as response:
@@ -64,11 +60,7 @@ async def set_user_role(telegram_id: int, role: str, message_id: int) -> dict:
 
 
 async def update_user_data(
-    telegram_id: int, 
-    username: str, 
-    first_name: str, 
-    language_code: str,
-    is_active: bool = None
+    telegram_id: int, username: str, first_name: str, language_code: str, is_active: bool = None
 ) -> bool:
     url = f'{BACKEND_URL}/api/bot/update_user/'
     payload = {
@@ -94,7 +86,9 @@ async def search_shows(query: str) -> list:
     url = f'{BACKEND_URL}/api/bot/search/'
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, params={'q': query}, headers=HEADERS, timeout=5) as response:
+            async with session.get(
+                url, params={'q': query}, headers=HEADERS, timeout=5
+            ) as response:
                 if response.status == 200:
                     data = await response.json()
                     return data.get('results', [])
@@ -115,4 +109,3 @@ async def get_show_details(show_id: int) -> dict | None:
     except Exception as e:
         logging.error(f'API Show Details Error: {e}')
         return None
-

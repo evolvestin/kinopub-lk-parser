@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0015_remove_viewuser_is_bot_blocked_and_more'),
     ]
@@ -18,6 +17,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='country',
             name='iso_code',
-            field=models.CharField(blank=True, help_text='ISO 3166-1 alpha-2 code', max_length=2, null=True),
+            field=models.CharField(
+                blank=True, help_text='ISO 3166-1 alpha-2 code', max_length=2, null=True
+            ),
         ),
     ]

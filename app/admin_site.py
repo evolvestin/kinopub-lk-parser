@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 from argparse import _StoreFalseAction, _StoreTrueAction
 from datetime import timedelta
 
@@ -153,21 +155,24 @@ class CustomAdminSite(admin.AdminSite):
                         id=request.POST.get('stop_task_id'), status='RUNNING'
                     )
 
-                    # Пытаемся отправить сигнал в Celery, если есть ID
                     if task_to_stop.celery_task_id:
-                        celery_app.control.revoke(
-                            task_to_stop.celery_task_id, terminate=True, signal='SIGINT'
-                        )
 
-                    # В любом случае меняем статус в БД, чтобы убрать зависшую задачу из интерфейса
+                        def stop_background(tid):
+                            celery_app.control.revoke(tid, terminate=True, signal='SIGINT')
+                            time.sleep(60)
+                            celery_app.control.revoke(tid, terminate=True, signal='SIGKILL')
+
+                        threading.Thread(
+                            target=stop_background, args=(task_to_stop.celery_task_id,), daemon=True
+                        ).start()
+
                     task_to_stop.status = 'STOPPED'
                     task_to_stop.output = (
-                        (task_to_stop.output or '')
-                        + '\n[System] Задача остановлена вручную (или сброшен статус после перезагрузки).'
-                    )
+                        task_to_stop.output or ''
+                    ) + '\n[System] Сигнал остановки отправлен (SIGINT -> wait 10s -> SIGKILL).'
                     task_to_stop.save()
                     messages.warning(
-                        request, f'Задача {task_to_stop.command} переведена в статус Остановлено.'
+                        request, f'Задача {task_to_stop.command} останавливается в фоне.'
                     )
 
                 except TaskRun.DoesNotExist:

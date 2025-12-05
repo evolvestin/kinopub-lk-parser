@@ -8,8 +8,6 @@ from django.utils.html import format_html, format_html_join
 
 # Импортируем нашу кастомную админку
 from app.admin_site import admin_site
-from app.telegram_bot import TelegramSender
-from app.views import sync_user_permissions
 from app.models import (
     Code,
     Country,
@@ -23,6 +21,8 @@ from app.models import (
     ViewUser,
     ViewUserGroup,
 )
+from app.telegram_bot import TelegramSender
+from app.views import sync_user_permissions
 
 admin_site.register(Group, GroupAdmin)
 
@@ -68,8 +68,7 @@ class CustomUserAdmin(UserAdmin):
         if not groups:
             return '-'
         return format_html(
-            '<ul>{}</ul>',
-            format_html_join('', '<li>{}</li>', ((g.name,) for g in groups))
+            '<ul>{}</ul>', format_html_join('', '<li>{}</li>', ((g.name,) for g in groups))
         )
 
     @admin.display(description='User permissions')
@@ -79,7 +78,7 @@ class CustomUserAdmin(UserAdmin):
             return '-'
         return format_html(
             '<div style="max-height: 400px; overflow-y: auto;"><ul>{}</ul></div>',
-            format_html_join('', '<li>{}</li>', ((p,) for p in perms))
+            format_html_join('', '<li>{}</li>', ((p,) for p in perms)),
         )
 
 
@@ -263,7 +262,7 @@ class ViewUserAdmin(admin.ModelAdmin):
     @admin.display(description='Telegram Actions')
     def telegram_actions(self, obj):
         if not obj.id:
-            return "-"
+            return '-'
         return format_html(
             '<a class="button" style="padding:4px 10px; background:#2ecc71; color:white; '
             'text-decoration:none; border-radius:4px;" href="?_resend_telegram=1">'
@@ -276,10 +275,10 @@ class ViewUserAdmin(admin.ModelAdmin):
                 obj = self.get_object(request, object_id)
                 if obj:
                     TelegramSender().send_user_role_message(obj)
-                    self.message_user(request, f"Сообщение для {obj} успешно отправлено в канал.")
+                    self.message_user(request, f'Сообщение для {obj} успешно отправлено в канал.')
             except Exception as e:
-                self.message_user(request, f"Ошибка отправки: {e}", level='ERROR')
-            
+                self.message_user(request, f'Ошибка отправки: {e}', level='ERROR')
+
             return HttpResponseRedirect(request.path)
 
         return super().change_view(request, object_id, form_url, extra_context)
@@ -293,9 +292,9 @@ class ViewUserAdmin(admin.ModelAdmin):
                 sender.send_user_role_message(user)
                 count += 1
             except Exception as e:
-                self.message_user(request, f"Error sending for {user}: {e}", level='ERROR')
-        
-        self.message_user(request, f"Messages resent for {count} users.")
+                self.message_user(request, f'Error sending for {user}: {e}', level='ERROR')
+
+        self.message_user(request, f'Messages resent for {count} users.')
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
@@ -492,7 +491,8 @@ class CountryAdmin(BaseNameAdmin):
                 'fields': ('iso_code', 'emoji_flag'),
                 'classes': (),
             },
-        ),        (
+        ),
+        (
             'Statistics',
             {
                 'fields': ('user_stats', 'related_actors'),

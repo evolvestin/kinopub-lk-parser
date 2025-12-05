@@ -1,9 +1,8 @@
+from django.conf import settings
+from django.contrib.auth.models import User
 from django.db import models
 
-from app.constants import DATETIME_FORMAT
-from django.contrib.auth.models import User
-from app.constants import UserRole
-from django.conf import settings
+from app.constants import DATETIME_FORMAT, UserRole
 from app.telegram_bot import TelegramSender
 
 
@@ -29,12 +28,14 @@ class Code(BaseModel):
 
 class Country(BaseModel):
     name = models.CharField(max_length=100, unique=True)
-    iso_code = models.CharField(max_length=2, null=True, blank=True, help_text="ISO 3166-1 alpha-2 code")
-    emoji_flag = models.CharField(max_length=20, null=True, blank=True, help_text="Emoji flag")
+    iso_code = models.CharField(
+        max_length=2, null=True, blank=True, help_text='ISO 3166-1 alpha-2 code'
+    )
+    emoji_flag = models.CharField(max_length=20, null=True, blank=True, help_text='Emoji flag')
 
     def __str__(self):
         if self.emoji_flag:
-            return f"{self.emoji_flag} {self.name}"
+            return f'{self.emoji_flag} {self.name}'
         return self.name
 
     class Meta:
@@ -69,21 +70,17 @@ class ViewUser(BaseModel):
     username = models.CharField(max_length=255, null=True, blank=True)
     name = models.CharField(max_length=255, default='')
     language = models.CharField(max_length=10, default='en')
-    is_bot_active = models.BooleanField(default=True, verbose_name="Bot Active")
+    is_bot_active = models.BooleanField(default=True, verbose_name='Bot Active')
 
     role = models.CharField(
-        max_length=20,
-        choices=[(r.value, r.name) for r in UserRole],
-        default=UserRole.GUEST
+        max_length=20, choices=[(r.value, r.name) for r in UserRole], default=UserRole.GUEST
     )
     django_user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name='view_user'
+        User, on_delete=models.CASCADE, null=True, blank=True, related_name='view_user'
     )
-    role_message_id = models.IntegerField(null=True, blank=True, help_text="ID сообщения в админ-канале для управления ролью")
+    role_message_id = models.IntegerField(
+        null=True, blank=True, help_text='ID сообщения в админ-канале для управления ролью'
+    )
 
     def delete(self, *args, **kwargs):
         # Удаляем связанного Django-пользователя, если удаление инициировано со стороны ViewUser
@@ -93,13 +90,13 @@ class ViewUser(BaseModel):
             user.delete()
 
     def __str__(self):
-        status_mark = "" if self.is_bot_active else " [BLOCKED]"
+        status_mark = '' if self.is_bot_active else ' [BLOCKED]'
         if self.name:
-            return f"{self.name} ({self.role}){status_mark}"
+            return f'{self.name} ({self.role}){status_mark}'
         if self.username:
-            return f"{self.username} ({self.role}){status_mark}"
-        return f"{self.telegram_id} ({self.role}){status_mark}"
-    
+            return f'{self.username} ({self.role}){status_mark}'
+        return f'{self.telegram_id} ({self.role}){status_mark}'
+
     class Meta:
         verbose_name = 'View User'
         verbose_name_plural = 'View Users'

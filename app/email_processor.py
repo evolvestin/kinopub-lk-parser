@@ -123,7 +123,9 @@ def process_emails(mail, shutdown_flag):
                         telegram_message_id=message_id,
                         received_at=received_at_dt,
                     )
-                    logging.info('Code %s (msg_id: %d) added to the database.', code_str, message_id)
+                    logging.info(
+                        'Code %s (msg_id: %d) added to the database.', code_str, message_id
+                    )
                     BackupManager().schedule_backup()
                     if settings.MARK_AS_SEEN:
                         mail.uid('STORE', uid, '+FLAGS', r'(\Seen)')
