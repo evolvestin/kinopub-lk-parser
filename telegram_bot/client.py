@@ -88,3 +88,31 @@ async def update_user_data(
     except Exception as e:
         logging.error(f'API Update User Error: {e}')
         return False
+
+
+async def search_shows(query: str) -> list:
+    url = f'{BACKEND_URL}/api/bot/search/'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params={'q': query}, headers=HEADERS, timeout=5) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data.get('results', [])
+                return []
+    except Exception as e:
+        logging.error(f'API Search Error: {e}')
+        return []
+
+
+async def get_show_details(show_id: int) -> dict | None:
+    url = f'{BACKEND_URL}/api/bot/show/{show_id}/'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=HEADERS, timeout=5) as response:
+                if response.status == 200:
+                    return await response.json()
+                return None
+    except Exception as e:
+        logging.error(f'API Show Details Error: {e}')
+        return None
+

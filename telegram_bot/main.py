@@ -35,6 +35,20 @@ def register_router() -> Router:
         CommandStart(),
         F.chat.type.in_({ChatType.GROUP, ChatType.SUPERGROUP}),
     )
+    
+    # --- Content Search & View ---
+    # Обработка команды просмотра конкретного контента (/view_123)
+    router.message.register(
+        commands.handle_view_command,
+        F.text.regexp(r'^/view_\d+$')
+    )
+    
+    # Обработка любого другого текста как поискового запроса (только в ЛС)
+    router.message.register(
+        commands.handle_search_text,
+        F.chat.type == ChatType.PRIVATE,
+        F.text
+    )
 
     # --- Callbacks ---
     router.callback_query.register(

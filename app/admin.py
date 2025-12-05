@@ -481,15 +481,22 @@ class BaseNameAdmin(admin.ModelAdmin):
 @admin.register(Country, site=admin_site)
 class CountryAdmin(BaseNameAdmin):
     inlines = [ShowCountryInline]
+    list_display = ('name', 'iso_code', 'emoji_flag', 'created_at', 'updated_at')
     readonly_fields = BaseNameAdmin.readonly_fields + ('related_actors', 'user_stats')
 
     fieldsets = (
         (None, {'fields': ('name',)}),
         (
+            'ISO & Flag',
+            {
+                'fields': ('iso_code', 'emoji_flag'),
+                'classes': (),
+            },
+        ),        (
             'Statistics',
             {
                 'fields': ('user_stats', 'related_actors'),
-                'classes': ('collapse',),
+                'classes': (),
             },
         ),
         (

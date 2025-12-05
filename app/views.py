@@ -4,6 +4,8 @@ import uuid
 from django.conf import settings
 from django.contrib.auth.models import User, Group, Permission
 from django.http import JsonResponse
+from django.db.models import Q
+from app.models import Show
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -266,3 +268,60 @@ def update_bot_user(request):
     except Exception as e:
         logging.error(f"Update user error: {e}")
         return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def bot_search_shows(request):
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'results': []})
+
+    # Поиск по названию или оригинальному названию (макс 10 результатов)
+    shows = Show.objects.filter(
+        Q(title__icontains=query) | Q(original_title__icontains=query)
+    ).distinct()[:10]
+
+    results = []
+    for show in shows:
+        results.append({
+            'id': show.id,
+            'title': show.title,
+            'original_title': show.original_title,
+            'year': show.year,
+            'type': show.type,
+        })
+    
+    return JsonResponse({'results': results})
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def bot_get_show_details(request, show_id):
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        show = Show.objects.prefetch_related('countries', 'genres').get(id=show_id)
+        
+        data = {
+            'id': show.id,
+            'title': show.title,
+            'original_title': show.original_title,
+            'type': show.type,
+            'year': show.year,
+            'status': show.status,
+            'kinopoisk_rating': show.kinopoisk_rating,
+            'imdb_rating': show.imdb_rating,
+            'countries': [c.name for c in show.countries.all()],
+            'genres': [g.name for g in show.genres.all()],
+            'kinopoisk_url': show.kinopoisk_url,
+            'imdb_url': show.imdb_url,
+        }
+        return JsonResponse(data)
+    except Show.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)
+

@@ -29,8 +29,12 @@ class Code(BaseModel):
 
 class Country(BaseModel):
     name = models.CharField(max_length=100, unique=True)
+    iso_code = models.CharField(max_length=2, null=True, blank=True, help_text="ISO 3166-1 alpha-2 code")
+    emoji_flag = models.CharField(max_length=20, null=True, blank=True, help_text="Emoji flag")
 
     def __str__(self):
+        if self.emoji_flag:
+            return f"{self.emoji_flag} {self.name}"
         return self.name
 
     class Meta:

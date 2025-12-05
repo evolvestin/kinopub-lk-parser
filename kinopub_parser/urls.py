@@ -16,6 +16,8 @@ urlpatterns = [
     path('api/bot/register/', views.register_bot_user),
     path('api/bot/set_role/', views.set_bot_user_role),
     path('api/bot/update_user/', views.update_bot_user),
+    path('api/bot/search/', views.bot_search_shows),
+    path('api/bot/show/<int:show_id>/', views.bot_get_show_details),
 ]
 
 if not settings.DEBUG:
