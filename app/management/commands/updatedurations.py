@@ -35,13 +35,37 @@ class Command(BaseCommand):
         show_type = options.get('type')
 
         show_ids_to_update = []
-        is_series_mode = show_type in ['Series', 'serial']
+        
+        # Расширенный список типов, которые считаются сериальными
+        series_types_map = {
+            'Series': 'Series',
+            'serial': 'Series',
+            'Documentary Series': 'Documentary Series',
+            'docuserial': 'Documentary Series',
+            'TV Show': 'TV Show',
+            'tvshow': 'TV Show'
+        }
+        
+        is_series_mode = show_type in series_types_map
+        target_db_type = series_types_map.get(show_type)
 
         if is_series_mode:
-            self.stdout.write('Series mode detected. Limit ignored. Fetching series...')
+            self.stdout.write(f'Series mode detected ({show_type} -> {target_db_type}). Limit ignored. Fetching shows...')
 
+            # Определяем маркер лога в зависимости от типа для совместимости с runnewepisodes
+            if target_db_type == 'Series':
+                log_marker = 'New Episodes Parser Finished'
+            elif target_db_type == 'Documentary Series':
+                log_marker = 'New Episodes Parser Finished (docuserial)'
+            elif target_db_type == 'TV Show':
+                log_marker = 'New Episodes Parser Finished (tvshow)'
+            else:
+                log_marker = 'New Episodes Parser Finished'
+
+            # Ищем лог с учетом точного маркера, чтобы не зацепить (docuserial) при поиске обычных
+            # Используем startswith или exact match логику через contains, но с учетом уникальности суффикса
             first_anchor_log = (
-                LogEntry.objects.filter(message__contains='New Episodes Parser Finished')
+                LogEntry.objects.filter(message__contains=log_marker)
                 .order_by('created_at')
                 .first()
             )
@@ -79,8 +103,8 @@ class Command(BaseCommand):
                 if match:
                     error_ids.add(int(match.group(1)))
 
-            # 3. Получаем все ID сериалов одним запросом
-            all_series_ids = Show.objects.filter(type='Series').values_list('id', flat=True)
+            # 3. Получаем все ID шоу конкретного типа одним запросом
+            all_series_ids = Show.objects.filter(type=target_db_type).values_list('id', flat=True)
 
             # 4. Фильтруем в памяти (быстро)
             # Нужно обновить, если: (НЕ обновлялся успешно) ИЛИ (была ошибка)
