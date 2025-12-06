@@ -6,9 +6,9 @@ import threading
 
 import imaplib2
 from django.conf import settings
-from django.core.management.base import BaseCommand
 
 from app import email_processor
+from app.management.base import LoggableBaseCommand
 
 shutdown_flag = threading.Event()
 
@@ -60,7 +60,7 @@ def run_email_listener(current_shutdown_flag):
             current_shutdown_flag.wait(settings.RECONNECT_DELAY)
 
 
-class Command(BaseCommand):
+class Command(LoggableBaseCommand):
     help = 'Runs the email listener service to process incoming 2FA codes.'
 
     def handle(self, *args, **options):

@@ -2,7 +2,6 @@ import logging
 import time
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
 
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
@@ -15,10 +14,11 @@ from app.history_parser import (
     process_show_durations,
     update_show_details,
 )
+from app.management.base import LoggableBaseCommand
 from app.models import Show, ShowDuration
 
 
-class Command(BaseCommand):
+class Command(LoggableBaseCommand):
     help = 'Parses new episodes from /media/new-serial-episodes daily.'
 
     def handle(self, *args, **options):
@@ -158,8 +158,6 @@ class Command(BaseCommand):
             else:
                 logging.info('No new data found across all categories.')
 
-        except Exception as e:
-            logging.error(f'Critical error in runnewepisodes: {e}', exc_info=True)
         finally:
             close_driver(driver)
             logging.info('--- New Episodes Parser Session Finished ---')

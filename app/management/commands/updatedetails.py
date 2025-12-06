@@ -2,7 +2,7 @@ import logging
 import time
 
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
@@ -10,10 +10,11 @@ from app.history_parser import (
     initialize_driver_session,
     update_show_details,
 )
+from app.management.base import LoggableBaseCommand
 from app.models import Show
 
 
-class Command(BaseCommand):
+class Command(LoggableBaseCommand):
     help = 'Fetches and updates details (year, ratings, etc.) for shows that are missing this information.'
 
     def add_arguments(self, parser):
@@ -106,14 +107,5 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(self.style.SUCCESS('Finished updating show details.'))
 
-        except CommandError:
-            raise
-        except Exception as e:
-            logging.error(
-                'A critical error occurred during the update process: %s',
-                e,
-                exc_info=True,
-            )
-            raise CommandError(f'A critical error occurred: {e}')
         finally:
             close_driver(driver)

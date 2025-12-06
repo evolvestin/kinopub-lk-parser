@@ -2,12 +2,12 @@ import logging
 import os
 
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
 
 from app.gdrive_backup import BackupManager
+from app.management.base import LoggableBaseCommand
 
 
-class Command(BaseCommand):
+class Command(LoggableBaseCommand):
     help = "Creates a superuser if it doesn't exist, using environment variables."
 
     def handle(self, *args, **options):

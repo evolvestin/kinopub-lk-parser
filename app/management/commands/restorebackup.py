@@ -3,12 +3,12 @@ import os
 import subprocess
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
 
 from app.gdrive_backup import BackupManager
+from app.management.base import LoggableBaseCommand
 
 
-class Command(BaseCommand):
+class Command(LoggableBaseCommand):
     help = 'Restores data from a Google Drive backup using pg_restore (binary format).'
 
     def handle(self, *args, **options):
@@ -52,12 +52,6 @@ class Command(BaseCommand):
             logging.info('Restore process completed successfully.')
             manager.schedule_backup()
 
-        except subprocess.CalledProcessError as e:
-            logging.error(f'pg_restore failed: {e}')
-        except Exception as e:
-            logging.error(
-                f'A critical error occurred during backup restoration: {e}', exc_info=True
-            )
         finally:
             if os.path.exists(backup_file_path):
                 os.remove(backup_file_path)

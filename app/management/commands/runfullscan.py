@@ -4,13 +4,14 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import CommandError
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 
 from app.constants import SHOW_TYPE_MAPPING
 from app.gdrive_backup import BackupManager
 from app.history_parser import close_driver, get_total_pages, initialize_driver_session
+from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
 
 
@@ -184,85 +185,64 @@ def run_full_scan_session(headless=True, target_type=None):
 
             base_url = f'{current_base_url}/{mode}'
 
-            try:
+            if driver is None:
+                driver = initialize_driver_session(headless=headless, session_type='aux')
+                if not driver:
+                    logging.error(f'Could not initialize driver for mode {mode}. Skipping.')
+                    continue
+
+            driver.get(base_url)
+            total_pages = get_total_pages(driver)
+            logging.info("Found %d pages for mode '%s'.", total_pages, mode)
+
+            current_page = start_page if mode == start_mode else 1
+            start_page = 1
+
+            for page in range(current_page, total_pages + 1):
                 if driver is None:
+                    logging.info('Restarting Selenium driver...')
                     driver = initialize_driver_session(headless=headless, session_type='aux')
                     if not driver:
-                        logging.error(f'Could not initialize driver for mode {mode}. Skipping.')
+                        raise CommandError('Failed to restart driver. Aborting scan.')
+
+                logging.info("Processing '%s' page %d of %d...", mode, page, total_pages)
+                page_url = f'{base_url}?page={page}&per-page=50'
+
+                try:
+                    try:
+                        _ = driver.current_url
+                    except Exception as e:
+                        raise Exception(f'Driver unresponsive: {e}')
+
+                    driver.get(page_url)
+                    added_count = parse_and_save_catalog_page(driver, mode)
+                    logging.info('Saved %d show records from page %d.', added_count, page)
+                    time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
+                except Exception as e:
+                    err_str = str(e).lower()
+                    if (
+                        'driver unresponsive' in err_str
+                        or 'connection refused' in err_str
+                        or 'max retries exceeded' in err_str
+                        or 'invalid session' in err_str
+                    ):
+                        logging.error('Selenium driver is dead. Restarting session...')
+                        close_driver(driver)
+                        driver = None
+                        continue
+                    else:
+                        logging.error(f'Error processing page {page} in mode {mode}: {e}')
                         continue
 
-                driver.get(base_url)
-                total_pages = get_total_pages(driver)
-                logging.info("Found %d pages for mode '%s'.", total_pages, mode)
-
-                current_page = start_page if mode == start_mode else 1
-                start_page = 1
-
-                for page in range(current_page, total_pages + 1):
-                    if driver is None:
-                        logging.info('Restarting Selenium driver...')
-                        driver = initialize_driver_session(headless=headless, session_type='aux')
-                        if not driver:
-                            raise CommandError('Failed to restart driver. Aborting scan.')
-
-                    logging.info("Processing '%s' page %d of %d...", mode, page, total_pages)
-                    page_url = f'{base_url}?page={page}&per-page=50'
-
-                    try:
-                        try:
-                            _ = driver.current_url
-                        except Exception as e:
-                            raise Exception(f'Driver unresponsive: {e}')
-
-                        driver.get(page_url)
-                        added_count = parse_and_save_catalog_page(driver, mode)
-                        logging.info('Saved %d show records from page %d.', added_count, page)
-                        time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
-                    except Exception as e:
-                        err_str = str(e).lower()
-                        if (
-                            'driver unresponsive' in err_str
-                            or 'connection refused' in err_str
-                            or 'max retries exceeded' in err_str
-                            or 'invalid session' in err_str
-                        ):
-                            logging.error('Selenium driver is dead. Restarting session...')
-                            close_driver(driver)
-                            driver = None
-                            continue
-                        else:
-                            logging.error(f'Error processing page {page} in mode {mode}: {e}')
-                            continue
-
-                backup_manager.schedule_backup()
-
-            except CommandError:
-                raise
-            except Exception as e:
-                logging.error(
-                    "A critical error occurred while processing mode '%s': %s",
-                    mode,
-                    e,
-                    exc_info=True,
-                )
-                raise CommandError(f'Scan failed for mode {mode}: {e}')
+            backup_manager.schedule_backup()
 
         logging.info('--- Full catalog scan session finished successfully. ---')
 
-    except CommandError:
-        raise
-    except Exception as e:
-        logging.error(
-            'An unexpected error occurred in the full scan session: %s',
-            e,
-            exc_info=True,
-        )
-        raise CommandError(f'Full scan session failed: {e}')
     finally:
         close_driver(driver)
 
 
-class Command(BaseCommand):
+class Command(LoggableBaseCommand):
     help = 'Runs a full scan of the site catalog to populate the Show database.'
 
     def add_arguments(self, parser):

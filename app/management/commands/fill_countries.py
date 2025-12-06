@@ -1,9 +1,8 @@
-from django.core.management.base import BaseCommand
-
+from app.management.base import LoggableBaseCommand
 from app.models import Country
 
 
-class Command(BaseCommand):
+class Command(LoggableBaseCommand):
     help = 'Populates countries with ISO codes and Emoji flags'
 
     def handle(self, *args, **options):

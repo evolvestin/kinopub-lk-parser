@@ -6,17 +6,17 @@ import time
 
 from django.conf import settings
 from django.core.management import call_command
-from django.core.management.base import BaseCommand
 
 from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.history_parser import update_show_details
+from app.management.base import LoggableBaseCommand
 from app.management.commands.runemail_listener import run_email_listener, shutdown_flag
 from app.models import Code, Show
 from app.telegram_bot import TelegramSender
 
 
-class Command(BaseCommand):
+class Command(LoggableBaseCommand):
     help = 'Runs a single parser or updater session locally with a foreground browser.'
 
     def add_arguments(self, parser):
@@ -175,9 +175,6 @@ class Command(BaseCommand):
             manager = BackupManager()
             manager.perform_cookies_backup()
 
-        except Exception as e:
-            logging.error(f'A critical error occurred during local execution: {e}', exc_info=True)
-            sys.exit(1)
         finally:
             history_parser.close_driver(driver)
             if email_thread:
