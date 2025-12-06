@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 from django.utils import timezone
 
+from app.constants import SHOW_TYPE_MAPPING
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
     close_driver,
@@ -35,39 +36,37 @@ class Command(BaseCommand):
         show_type = options.get('type')
 
         show_ids_to_update = []
-        
-        # Расширенный список типов, которые считаются сериальными
-        series_types_map = {
-            'Series': 'Series',
-            'serial': 'Series',
-            'Documentary Series': 'Documentary Series',
-            'docuserial': 'Documentary Series',
-            'TV Show': 'TV Show',
-            'tvshow': 'TV Show'
-        }
-        
-        is_series_mode = show_type in series_types_map
-        target_db_type = series_types_map.get(show_type)
+
+        # Получаем тип для БД из константы (ожидается ключ, например 'serial')
+        target_db_type = SHOW_TYPE_MAPPING.get(show_type)
+
+        # Список значений из константы, которые относятся к сериалам
+        series_db_types = [
+            SHOW_TYPE_MAPPING['serial'],
+            SHOW_TYPE_MAPPING['docuserial'],
+            SHOW_TYPE_MAPPING['tvshow'],
+        ]
+
+        is_series_mode = target_db_type in series_db_types
 
         if is_series_mode:
-            self.stdout.write(f'Series mode detected ({show_type} -> {target_db_type}). Limit ignored. Fetching shows...')
+            self.stdout.write(
+                f'Series mode detected ({show_type} -> {target_db_type}). Limit ignored. Fetching shows...'
+            )
 
             # Определяем маркер лога в зависимости от типа для совместимости с runnewepisodes
-            if target_db_type == 'Series':
+            if target_db_type == SHOW_TYPE_MAPPING['serial']:
                 log_marker = 'New Episodes Parser Finished'
-            elif target_db_type == 'Documentary Series':
+            elif target_db_type == SHOW_TYPE_MAPPING['docuserial']:
                 log_marker = 'New Episodes Parser Finished (docuserial)'
-            elif target_db_type == 'TV Show':
+            elif target_db_type == SHOW_TYPE_MAPPING['tvshow']:
                 log_marker = 'New Episodes Parser Finished (tvshow)'
             else:
                 log_marker = 'New Episodes Parser Finished'
 
             # Ищем лог с учетом точного маркера, чтобы не зацепить (docuserial) при поиске обычных
-            # Используем startswith или exact match логику через contains, но с учетом уникальности суффикса
             first_anchor_log = (
-                LogEntry.objects.filter(message__contains=log_marker)
-                .order_by('created_at')
-                .first()
+                LogEntry.objects.filter(message__contains=log_marker).order_by('created_at').first()
             )
 
             anchor_date = (
@@ -131,7 +130,13 @@ class Command(BaseCommand):
 
             base_qs = Show.objects.all()
             if show_type:
-                base_qs = base_qs.filter(type=show_type)
+                # Если передан тип (например 'movie'), фильтруем по нему
+                if target_db_type:
+                    base_qs = base_qs.filter(type=target_db_type)
+                else:
+                    # Если тип не найден в константах, но передан аргумент - пробуем фильтровать напрямую
+                    # на случай ручного ввода, хотя это не рекомендуется
+                    base_qs = base_qs.filter(type=show_type)
 
             # Приоритет отдаем тем, кто с ошибками
             priority_ids = list(

@@ -42,7 +42,7 @@ class Command(BaseCommand):
             for url_type, db_type, log_suffix in categories:
                 logging.info(f'--- Processing category: {db_type} (type={url_type}) ---')
                 base_url = f'{settings.SITE_URL}media/new-serial-episodes?type={url_type}'
-                
+
                 # 1. Determine total pages
                 driver.get(base_url)
                 total_pages = get_total_pages(driver)
@@ -100,7 +100,7 @@ class Command(BaseCommand):
                                 'type': db_type,  # Используем тип из категории
                             },
                         )
-                        
+
                         # Если шоу создано с дефолтным типом, но мы знаем точный тип из категории - обновляем
                         if not created and show.type != db_type:
                             show.type = db_type
@@ -145,13 +145,15 @@ class Command(BaseCommand):
                         if delay_needed:
                             logging.info('Waiting 60s before next request...')
                             time.sleep(60)
-                
+
                 # Логируем завершение категории специальным сообщением, которое ловит updatedurations
                 # Для 'serial' суффикс пустой, получится старый лог. Для других - новый.
                 logging.info(f'--- New Episodes Parser Finished{log_suffix} ---')
 
             if total_processed_count > 0:
-                logging.info(f'Updated {total_processed_count} shows/episodes total. Scheduling backup.')
+                logging.info(
+                    f'Updated {total_processed_count} shows/episodes total. Scheduling backup.'
+                )
                 BackupManager().schedule_backup()
             else:
                 logging.info('No new data found across all categories.')

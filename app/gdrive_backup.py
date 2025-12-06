@@ -46,8 +46,6 @@ class BackupManager:
         logging.info('Database backup scheduled via Celery.')
 
     def _get_drive_service(self):
-        if self._drive:
-            return self._drive
         if not settings.GOOGLE_DRIVE_CREDENTIALS_JSON:
             logging.error('Google Drive credentials are not configured.')
             return None
