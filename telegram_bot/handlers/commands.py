@@ -2,10 +2,9 @@ import os
 import re
 
 import client
-import keyboards
 from aiogram import Bot
 from aiogram.types import Message
-from html_helper import bold, code, html_link, html_secure
+from html_helper import bold, html_link, html_secure
 from sender import MessageSender
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')

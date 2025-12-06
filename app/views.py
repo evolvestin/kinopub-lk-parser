@@ -3,7 +3,7 @@ import logging
 import uuid
 
 from django.conf import settings
-from django.contrib.auth.models import Group, Permission, User
+from django.contrib.auth.models import Permission, User
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render

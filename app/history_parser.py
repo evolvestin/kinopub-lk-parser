@@ -388,25 +388,37 @@ def initialize_driver_session(headless=True, session_type='main'):
 
 
 def get_movie_duration_and_save(driver, show_id):
-    movie_url = f'{settings.SITE_URL}item/view/{show_id}'
+    # Используем формат ссылки s0e1 для фильмов, как требуется сайтом
+    movie_url = f'{settings.SITE_URL}item/play/{show_id}/s0e1'
     logging.info('Requesting duration for movie id%d...', show_id)
     try:
         driver.get(movie_url)
         wait = WebDriverWait(driver, 20)
-        playlist_script_element = wait.until(
+
+        # Ждем появления скрипта с плейлистом
+        wait.until(
             expected_conditions.presence_of_element_located(
-                (By.XPATH, '//script[contains(text(), "var playlist =")]')
+                (By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]')
             )
         )
-        update_show_details(driver, show_id)
-        script_text = playlist_script_element.get_attribute('innerHTML')
-        playlist_match = re.search(r'var playlist = (\[.*?]);', script_text, re.DOTALL)
+
+        # Получаем содержимое скрипта
+        script_element = driver.find_element(
+            By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]'
+        )
+        script_text = script_element.get_attribute('innerHTML')
+
+        # Ищем JSON массив
+        playlist_match = re.search(
+            r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);', script_text, re.DOTALL
+        )
 
         if not playlist_match:
-            logging.warning('Could not find playlist JSON for movie %s', movie_url)
+            logging.warning('Could not find PLAYER_PLAYLIST JSON for movie %s', movie_url)
             return
 
         playlist_data = json.loads(playlist_match.group(1))
+
         if playlist_data and 'duration' in playlist_data[0]:
             duration_sec = playlist_data[0]['duration']
             ShowDuration.objects.update_or_create(
@@ -417,44 +429,56 @@ def get_movie_duration_and_save(driver, show_id):
             )
             logging.info('Cached duration for movie id%d: %d seconds.', show_id, duration_sec)
         else:
-            logging.warning('Could not find playlist JSON for movie %s', movie_url)
+            logging.warning('Playlist data empty or missing duration for movie %s', movie_url)
     except Exception as e:
         logging.error('Error getting duration for movie id%d: %s', show_id, e)
 
 
 def get_season_durations_and_save(driver, show_id, season):
-    episode_url = f'{settings.SITE_URL}item/view/{show_id}/s{season}e1'
+    # Для получения данных о сезоне открываем первый эпизод этого сезона в плеере
+    episode_url = f'{settings.SITE_URL}item/play/{show_id}/s{season}e1'
     logging.info('Requesting season data for s%d of show id%d...', season, show_id)
     try:
         driver.get(episode_url)
         wait = WebDriverWait(driver, 20)
-        playlist_script_element = wait.until(
+
+        wait.until(
             expected_conditions.presence_of_element_located(
-                (By.XPATH, '//script[contains(text(), "var playlist =")]')
+                (By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]')
             )
         )
-        update_show_details(driver, show_id)
-        script_text = playlist_script_element.get_attribute('innerHTML')
-        playlist_match = re.search(r'var playlist = (\[.*?]);', script_text, re.DOTALL)
+
+        script_element = driver.find_element(
+            By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]'
+        )
+        script_text = script_element.get_attribute('innerHTML')
+
+        playlist_match = re.search(
+            r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);', script_text, re.DOTALL
+        )
 
         if not playlist_match:
-            logging.warning('Could not find playlist JSON for %s', episode_url)
+            logging.warning('Could not find PLAYER_PLAYLIST JSON for %s', episode_url)
             return
 
         playlist_data = json.loads(playlist_match.group(1))
         updated_count = 0
+
         for item in playlist_data:
-            if item.get('snumber') == season:
-                episode_num = item.get('vnumber')
-                duration_sec = item.get('duration')
-                if episode_num is not None and duration_sec is not None:
-                    ShowDuration.objects.update_or_create(
-                        show_id=show_id,
-                        season_number=season,
-                        episode_number=episode_num,
-                        defaults={'duration_seconds': duration_sec},
-                    )
-                    updated_count += 1
+            # В новом формате ключи называются season и episode (ранее snumber и vnumber)
+            item_season = item.get('season')
+            item_episode = item.get('episode')
+            duration_sec = item.get('duration')
+
+            # Проверяем, что данные относятся к запрашиваемому сезону
+            if item_season == season and item_episode is not None and duration_sec is not None:
+                ShowDuration.objects.update_or_create(
+                    show_id=show_id,
+                    season_number=item_season,
+                    episode_number=item_episode,
+                    defaults={'duration_seconds': duration_sec},
+                )
+                updated_count += 1
 
         if updated_count > 0:
             logging.info(
@@ -462,6 +486,10 @@ def get_season_durations_and_save(driver, show_id, season):
                 updated_count,
                 show_id,
                 season,
+            )
+        else:
+            logging.warning(
+                'No episodes found in playlist for show id%d season %d', show_id, season
             )
 
     except Exception as e:
@@ -519,6 +547,8 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
                     se_match = re.search(r'Сезон (\d+)\. Эпизод (\d+)', se_text)
                     if se_match:
                         season, episode = int(se_match.group(1)), int(se_match.group(2))
+                        if season == 0:
+                            continue
                 except NoSuchElementException:
                     item_type = 'Movie'
 
@@ -777,45 +807,52 @@ def run_parser_session(headless=True, driver_instance=None):
 def process_show_durations(driver, show):
     """
     Determines if the show is a movie or series and fetches durations accordingly.
-    For series, it parses the available seasons from the page.
+    For series, it parses the available seasons from window.PLAYER_SEASONS on the player page.
     """
-    movie_types = ['Movie', 'Concert', 'Documentary Movie']
+    movie_types = ['Movie', 'Concert', 'Documentary Movie', '3D Movie']
 
     if show.type in movie_types:
         get_movie_duration_and_save(driver, show.id)
     else:
         # Logic for Series, DocuSeries, TV Show, etc.
         try:
-            # Navigate to the show page to find season links
-            show_url = f'{settings.SITE_URL}item/view/{show.id}'
-            driver.get(show_url)
+            # Navigate to the player page of the first episode to access PLAYER_SEASONS
+            # URL format must be explicit: /item/play/<ID>/s1e1
+            player_url = f'{settings.SITE_URL}item/play/{show.id}/s1e1'
+            logging.info(f'Navigating to player to fetch seasons list: {player_url}')
+            driver.get(player_url)
 
-            # Wait for basic load
-            wait = WebDriverWait(driver, 10)
-            wait.until(expected_conditions.presence_of_element_located((By.CSS_SELECTOR, 'h1, h3')))
+            # Wait for the script containing seasons data
+            wait = WebDriverWait(driver, 20)
+            wait.until(
+                expected_conditions.presence_of_element_located(
+                    (By.XPATH, '//script[contains(text(), "window.PLAYER_SEASONS")]')
+                )
+            )
 
-            # Обновляем детали (год, жанры, статус) сразу на главной странице сериала
-            update_show_details(driver, show.id)
+            # Extract the script content
+            script_element = driver.find_element(
+                By.XPATH, '//script[contains(text(), "window.PLAYER_SEASONS")]'
+            )
+            script_text = script_element.get_attribute('innerHTML')
+
+            # Parse JSON from window.PLAYER_SEASONS = [...];
+            match = re.search(r'window\.PLAYER_SEASONS\s*=\s*(\[.*?\]);', script_text, re.DOTALL)
 
             seasons = set()
-            # New layout: Seasons are links like /item/view/ID/s1e1 inside a div
-            # We look for all links containing the show ID and /s followed by a digit
-            links = driver.find_elements(By.CSS_SELECTOR, f'a[href*="/item/view/{show.id}/s"]')
-
-            for link in links:
-                href = link.get_attribute('href')
-                if not href:
-                    continue
-                # Extract season number from pattern .../s(\d+)e1
-                match = re.search(r'/s(\d+)e1', href)
-                if match:
-                    seasons.add(int(match.group(1)))
-
-            # Fallback: if no tabs are found, it might be a single season show
-            if not seasons:
+            if match:
+                seasons_data = json.loads(match.group(1))
+                # seasons_data example: [{"season":1, "season_id":...}, ...]
+                for item in seasons_data:
+                    if 'season' in item:
+                        seasons.add(int(item['season']))
+            else:
+                logging.warning(
+                    f'Could not regex PLAYER_SEASONS for show {show.id}. Defaulting to season 1.'
+                )
                 seasons.add(1)
 
-            logging.info(f'Found seasons {seasons} for show {show.id}')
+            logging.info(f'Found seasons {sorted(list(seasons))} for show {show.id}')
 
             for season in sorted(list(seasons)):
                 get_season_durations_and_save(driver, show.id, season)

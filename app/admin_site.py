@@ -1,6 +1,4 @@
 import json
-import threading
-import time
 from argparse import _StoreFalseAction, _StoreTrueAction
 from datetime import timedelta
 
@@ -155,24 +153,14 @@ class CustomAdminSite(admin.AdminSite):
                         id=request.POST.get('stop_task_id'), status='RUNNING'
                     )
 
-                    if task_to_stop.celery_task_id:
-
-                        def stop_background(tid):
-                            celery_app.control.revoke(tid, terminate=True, signal='SIGINT')
-                            time.sleep(60)
-                            celery_app.control.revoke(tid, terminate=True, signal='SIGKILL')
-
-                        threading.Thread(
-                            target=stop_background, args=(task_to_stop.celery_task_id,), daemon=True
-                        ).start()
-
+                    # Мы больше не убиваем воркер через Celery revoke, так как это плодит зомби-процессы.
+                    # Просто ставим флаг STOPPED в базу. Воркер (run_admin_command) увидит это в цикле
+                    # и корректно завершит дочерний процесс (subprocess.terminate).
                     task_to_stop.status = 'STOPPED'
-                    task_to_stop.output = (
-                        task_to_stop.output or ''
-                    ) + '\n[System] Сигнал остановки отправлен (SIGINT -> wait 10s -> SIGKILL).'
                     task_to_stop.save()
+
                     messages.warning(
-                        request, f'Задача {task_to_stop.command} останавливается в фоне.'
+                        request, f'Сигнал остановки отправлен задаче {task_to_stop.command}.'
                     )
 
                 except TaskRun.DoesNotExist:

@@ -2,13 +2,9 @@ import json
 import logging
 import os
 import subprocess
-import sys
 import time
 
-from django.apps import apps
 from django.conf import settings
-from django.core.management import call_command
-from django.db import connections
 from django.db.models import Max
 from oauth2client.service_account import ServiceAccountCredentials
 from pydrive2.auth import GoogleAuth

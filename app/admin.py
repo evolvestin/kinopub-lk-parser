@@ -408,7 +408,7 @@ class LogEntryAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return True
 
 
 class ShowCountryInline(admin.TabularInline):

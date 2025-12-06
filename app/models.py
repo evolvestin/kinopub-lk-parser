@@ -1,9 +1,7 @@
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
 
 from app.constants import DATETIME_FORMAT, UserRole
-from app.telegram_bot import TelegramSender
 
 
 class BaseModel(models.Model):

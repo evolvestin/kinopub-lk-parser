@@ -3,13 +3,10 @@ import time
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from selenium.webdriver.common.by import By
 
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
     close_driver,
-    get_movie_duration_and_save,
-    get_season_durations_and_save,
     initialize_driver_session,
     update_show_details,
 )

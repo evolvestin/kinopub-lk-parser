@@ -1,8 +1,10 @@
-import io
 import logging
 import shlex
-from contextlib import redirect_stderr, redirect_stdout
-from datetime import datetime, timedelta, timezone
+import subprocess
+import sys
+import tempfile
+import time
+from datetime import timedelta, timezone
 
 from celery import shared_task
 from django.conf import settings
@@ -14,7 +16,6 @@ from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, TaskRun
 from app.telegram_bot import TelegramSender
-from shared.html_helper import italic
 
 
 @shared_task
@@ -97,35 +98,74 @@ def backup_cookies():
 def run_admin_command(self, task_run_id):
     try:
         task_run = TaskRun.objects.get(id=task_run_id)
-        task_run.status = 'RUNNING'
-        task_run.celery_task_id = self.request.id
-        task_run.save()
+    except TaskRun.DoesNotExist:
+        return
 
-        cmd_args = shlex.split(task_run.arguments) if task_run.arguments else []
+    task_run.status = 'RUNNING'
+    task_run.celery_task_id = self.request.id
+    task_run.save()
 
-        out_buffer = io.StringIO()
-        err_buffer = io.StringIO()
+    # Формируем команду запуска через manage.py в отдельном процессе
+    cmd = [sys.executable, 'manage.py', task_run.command]
+    if task_run.arguments:
+        cmd.extend(shlex.split(task_run.arguments))
+
+    # Используем временные файлы для буферизации вывода, чтобы не зависеть от переполнения пайпов
+    with (
+        tempfile.TemporaryFile(mode='w+') as stdout_f,
+        tempfile.TemporaryFile(mode='w+') as stderr_f,
+    ):
+        process = subprocess.Popen(
+            cmd, stdout=stdout_f, stderr=stderr_f, cwd=settings.BASE_DIR, text=True
+        )
 
         try:
-            with redirect_stdout(out_buffer), redirect_stderr(err_buffer):
-                call_command(task_run.command, *cmd_args)
+            while True:
+                # 1. Проверяем, не попросил ли пользователь остановить задачу
+                task_run.refresh_from_db()
+                if task_run.status == 'STOPPED':
+                    process.terminate()  # Посылаем SIGTERM (мягкая остановка)
+                    try:
+                        process.wait(timeout=10)  # Даем 10 сек на завершение (cleanup)
+                    except subprocess.TimeoutExpired:
+                        process.kill()  # SIGKILL, если завис
 
-            task_run.output = out_buffer.getvalue() + '\n' + err_buffer.getvalue()
-            task_run.status = 'SUCCESS'
-        except KeyboardInterrupt:
-            # Обработка остановки задачи (SIGINT)
-            task_run.output = out_buffer.getvalue() + '\nProcess interrupted by user.'
-            task_run.status = 'STOPPED'
+                    # Сохраняем логи
+                    stdout_f.seek(0)
+                    stderr_f.seek(0)
+                    output = stdout_f.read() + '\n' + stderr_f.read()
+                    task_run.output = output + '\n\n[System] Process terminated by user request.'
+                    task_run.save()
+                    return
+
+                # 2. Проверяем, не завершился ли процесс сам
+                retcode = process.poll()
+                if retcode is not None:
+                    stdout_f.seek(0)
+                    stderr_f.seek(0)
+                    output = stdout_f.read() + '\n' + stderr_f.read()
+                    task_run.output = output.strip()
+
+                    if retcode == 0:
+                        task_run.status = 'SUCCESS'
+                    else:
+                        task_run.status = 'FAILURE'
+                        task_run.error_message = f'Exit code: {retcode}'
+
+                    task_run.updated_at = timezone.now()
+                    task_run.save()
+                    return
+
+                # Пауза перед следующей проверкой
+                time.sleep(1)
+
         except Exception as e:
-            task_run.output = out_buffer.getvalue()
-            task_run.error_message = str(e)
+            # Если что-то пошло не так в самом воркере, убиваем процесс
+            if process.poll() is None:
+                process.kill()
             task_run.status = 'FAILURE'
-
-        task_run.updated_at = timezone.now()
-        task_run.save()
-
-    except TaskRun.DoesNotExist:
-        pass
+            task_run.error_message = f'Worker exception: {str(e)}'
+            task_run.save()
 
 
 @shared_task
