@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Optional, Union
 
 from aiogram import Bot, types
 from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter, TelegramServerError
@@ -16,12 +15,12 @@ class MessageSender:
         chat_id: int | str,
         text: str,
         keyboard: types.InlineKeyboardMarkup | types.ReplyKeyboardMarkup = None,
-        edit_message: Union[int, str, types.Message] = None,
-        link_preview: bool = True,
+        edit_message: int | str | types.Message = None,
+        link_preview: bool = False,
         reply_id: int = None,
         parse_mode: str = 'HTML',
         attempt: int = 0,
-    ) -> Optional[types.Message]:
+    ) -> types.Message | None:
         chat_id = int(chat_id)
         disable_link_preview = not link_preview
         response = None

@@ -3,6 +3,7 @@ import os
 import signal
 import socket
 import threading
+import time
 
 import imaplib2
 from django.conf import settings
@@ -26,6 +27,27 @@ def _update_heartbeat():
             os.utime(settings.HEARTBEAT_FILE, None)
     except Exception as e:
         logging.warning('Could not update heartbeat file: %s', e)
+
+
+def _watchdog(stop_event):
+    """
+    Фоновый поток, который принудительно убивает процесс, если heartbeat завис.
+    Это необходимо, чтобы Docker увидел падение процесса и перезапустил контейнер.
+    """
+    threshold = 300  # 5 минут (должно быть больше тайм-аута healthcheck)
+    while not stop_event.is_set():
+        time.sleep(30)
+        try:
+            if os.path.exists(settings.HEARTBEAT_FILE):
+                stat = os.stat(settings.HEARTBEAT_FILE)
+                age = time.time() - stat.st_mtime
+                if age > threshold:
+                    logging.error(
+                        f'Watchdog: Heartbeat stuck ({age:.1f}s > {threshold}s). Killing process to force restart.'
+                    )
+                    os._exit(1)  # Принудительный выход из интерпретатора
+        except Exception as e:
+            logging.error(f'Watchdog error: {e}')
 
 
 def run_idle_loop(mail, current_shutdown_flag):
@@ -67,7 +89,9 @@ class Command(LoggableBaseCommand):
         for sig in (signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, _handle_signal)
 
-        logging.info('Starting email listener...')
+        threading.Thread(target=_watchdog, args=(shutdown_flag,), daemon=True).start()
+
+        logging.info('Starting email listener with Watchdog enabled...')
         _update_heartbeat()
         run_email_listener(shutdown_flag)
         logging.info('Email listener stopped.')

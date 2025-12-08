@@ -136,6 +136,7 @@ ENVIRONMENT = os.getenv('ENVIRONMENT')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CODES_CHANNEL_ID = os.getenv('CODES_CHANNEL_ID')
 USER_MANAGEMENT_CHANNEL_ID = os.getenv('USER_MANAGEMENT_CHANNEL_ID')
+HISTORY_CHANNEL_ID = os.getenv('HISTORY_CHANNEL_ID')
 
 # --- History Parser Config (Main Account) ---
 KINOPUB_LOGIN = os.getenv('KINOPUB_LOGIN')

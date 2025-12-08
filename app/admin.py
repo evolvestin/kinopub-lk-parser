@@ -35,6 +35,7 @@ class CustomUserAdmin(UserAdmin):
         'last_name',
         'is_staff',
         'is_superuser',
+        'get_view_user_link',
     )
     readonly_fields = (
         'last_login',
@@ -80,6 +81,13 @@ class CustomUserAdmin(UserAdmin):
             '<div style="max-height: 400px; overflow-y: auto;"><ul>{}</ul></div>',
             format_html_join('', '<li>{}</li>', ((p,) for p in perms)),
         )
+
+    @admin.display(description='ViewUser Profile')
+    def get_view_user_link(self, obj):
+        if hasattr(obj, 'view_user') and obj.view_user:
+            url = reverse('admin:app_viewuser_change', args=[obj.view_user.id])
+            return format_html('<a href="{}">{}</a>', url, obj.view_user)
+        return '-'
 
 
 admin_site.register(User, CustomUserAdmin)
@@ -240,7 +248,7 @@ class ViewUserAdmin(admin.ModelAdmin):
         'language',
         'role',
         'is_bot_active',
-        'django_user',
+        'get_django_user_link',
         'created_at',
         'updated_at',
     )
@@ -268,6 +276,13 @@ class ViewUserAdmin(admin.ModelAdmin):
             'text-decoration:none; border-radius:4px;" href="?_resend_telegram=1">'
             'Отправить новое сообщение о роли</a>'
         )
+
+    @admin.display(description='Django User', ordering='django_user')
+    def get_django_user_link(self, obj):
+        if obj.django_user:
+            url = reverse('admin:auth_user_change', args=[obj.django_user.id])
+            return format_html('<a href="{}">{}</a>', url, obj.django_user)
+        return '-'
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
         if '_resend_telegram' in request.GET and object_id:

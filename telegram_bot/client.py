@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Any, Optional
 
 import aiohttp
 
@@ -9,103 +10,92 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 HEADERS = {'X-Bot-Token': BOT_TOKEN, 'Content-Type': 'application/json'}
 
 
-async def check_user_exists(telegram_id: int) -> bool:
-    url = f'{BACKEND_URL}/api/bot/check/{telegram_id}/'
+async def _execute_request(
+    path: str, method: str = 'GET', payload: dict = None, params: dict = None
+) -> Optional[Any]:
+    url = f'{BACKEND_URL}/api/bot/{path}'
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=HEADERS, timeout=5) as response:
+            async with session.request(
+                method, url, json=payload, params=params, headers=HEADERS, timeout=5
+            ) as response:
                 if response.status == 200:
-                    data = await response.json()
-                    return data.get('exists', False)
-                logging.error(f'API Check Error: {response.status}')
-                return False
+                    return await response.json()
+                elif response.status == 409:
+                    return {'success': False, 'error': 'outdated'}
+
+                logging.error(f'API Error ({url}): Status {response.status}')
+                return None
     except Exception as e:
-        logging.error(f'API Connection Error: {e}')
-        return False
+        logging.error(f'API Connection Error ({url}): {e}')
+        return None
+
+
+async def check_user_exists(telegram_id: int) -> bool:
+    data = await _execute_request(f'check/{telegram_id}/')
+    return data.get('exists', False) if data else False
 
 
 async def register_user(
     telegram_id: int, username: str, first_name: str, language_code: str
 ) -> bool:
-    url = f'{BACKEND_URL}/api/bot/register/'
     payload = {
         'telegram_id': telegram_id,
         'username': username,
         'first_name': first_name,
         'language_code': language_code,
     }
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=HEADERS, timeout=5) as response:
-                return response.status == 200
-    except Exception as e:
-        logging.error(f'API Registration Error: {e}')
-        return False
+    data = await _execute_request('register/', method='POST', payload=payload)
+    return bool(data)
 
 
 async def set_user_role(telegram_id: int, role: str, message_id: int) -> dict:
-    url = f'{BACKEND_URL}/api/bot/set_role/'
     payload = {'telegram_id': telegram_id, 'role': role, 'message_id': message_id}
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=HEADERS, timeout=5) as response:
-                if response.status == 200:
-                    return {'success': True}
-                elif response.status == 409:
-                    return {'success': False, 'error': 'outdated'}
-                return {'success': False, 'error': 'api_error'}
-    except Exception as e:
-        logging.error(f'API Set Role Error: {e}')
-        return {'success': False, 'error': str(e)}
+    data = await _execute_request('set_role/', method='POST', payload=payload)
+
+    if data:
+        if 'error' in data:
+            return data
+        return {'success': True}
+
+    return {'success': False, 'error': 'api_error'}
 
 
 async def update_user_data(
     telegram_id: int, username: str, first_name: str, language_code: str, is_active: bool = None
 ) -> bool:
-    url = f'{BACKEND_URL}/api/bot/update_user/'
     payload = {
         'telegram_id': telegram_id,
         'username': username,
         'first_name': first_name,
         'language_code': language_code,
     }
-    # Теперь передаем is_active вместо is_blocked
     if is_active is not None:
         payload['is_active'] = is_active
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=HEADERS, timeout=5) as response:
-                return response.status == 200
-    except Exception as e:
-        logging.error(f'API Update User Error: {e}')
-        return False
+    data = await _execute_request('update_user/', method='POST', payload=payload)
+    return bool(data)
 
 
 async def search_shows(query: str) -> list:
-    url = f'{BACKEND_URL}/api/bot/search/'
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                url, params={'q': query}, headers=HEADERS, timeout=5
-            ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    return data.get('results', [])
-                return []
-    except Exception as e:
-        logging.error(f'API Search Error: {e}')
-        return []
+    data = await _execute_request('search/', params={'q': query})
+    return data.get('results', []) if data else []
 
 
 async def get_show_details(show_id: int) -> dict | None:
-    url = f'{BACKEND_URL}/api/bot/show/{show_id}/'
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=HEADERS, timeout=5) as response:
-                if response.status == 200:
-                    return await response.json()
-                return None
-    except Exception as e:
-        logging.error(f'API Show Details Error: {e}')
-        return None
+    return await _execute_request(f'show/{show_id}/')
+
+
+async def get_show_by_imdb_id(imdb_id: str) -> dict | None:
+    return await _execute_request(f'imdb/{imdb_id}/')
+
+
+async def assign_view(telegram_id: int, view_id: int) -> dict | None:
+    payload = {'telegram_id': telegram_id, 'view_id': view_id}
+    return await _execute_request('assign_view/', method='POST', payload=payload)
+
+
+async def unassign_view(telegram_id: int, view_id: int) -> bool:
+    payload = {'telegram_id': telegram_id, 'view_id': view_id}
+    data = await _execute_request('unassign_view/', method='POST', payload=payload)
+    return bool(data)

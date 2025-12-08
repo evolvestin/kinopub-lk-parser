@@ -23,7 +23,8 @@ async def role_switch_handler(callback: CallbackQuery, bot: Bot):
 
         elif result.get('error') == 'outdated':
             await callback.answer(
-                '⚠️ Это сообщение устарело. Используйте более новое сообщение для управления этим пользователем.',
+                '⚠️ Это сообщение устарело.'
+                ' Используйте более новое сообщение для управления этим пользователем.',
                 show_alert=True,
             )
         else:
@@ -31,3 +32,27 @@ async def role_switch_handler(callback: CallbackQuery, bot: Bot):
 
     except Exception as e:
         await callback.answer(f'Произошла ошибка: {e}', show_alert=True)
+
+
+async def cancel_claim_handler(callback: CallbackQuery, bot: Bot):
+    """
+    Обрабатывает отмену привязки просмотра.
+    Format: unclaim_<view_id>
+    """
+    try:
+        _, view_id = callback.data.split('_', 1)
+        view_id = int(view_id)
+        user_id = callback.from_user.id
+
+        success = await client.unassign_view(user_id, view_id)
+
+        if success:
+            await callback.message.edit_text(
+                f'🗑 {italic("Привязка просмотра отменена.")}', reply_markup=None
+            )
+            await callback.answer('Отменено')
+        else:
+            await callback.answer('Ошибка при отмене', show_alert=True)
+
+    except Exception as e:
+        await callback.answer(f'Ошибка: {e}', show_alert=True)

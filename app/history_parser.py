@@ -20,6 +20,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from app.constants import DATE_FORMAT, MONTHS_MAP, SHOW_STATUS_MAPPING, SHOW_TYPE_MAPPING
 from app.gdrive_backup import BackupManager
 from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
+from app.telegram_bot import TelegramSender
 from kinopub_parser import celery_app
 
 
@@ -588,9 +589,18 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
     ]
 
     before_count = ViewHistory.objects.count()
-    ViewHistory.objects.bulk_create(views_to_create, ignore_conflicts=True)
+    created_views = ViewHistory.objects.bulk_create(views_to_create, ignore_conflicts=True)
     after_count = ViewHistory.objects.count()
     views_added = after_count - before_count
+
+    if created_views:
+        sender = TelegramSender()
+        for view in created_views:
+            if view.id:
+                try:
+                    sender.send_history_notification(view)
+                except Exception as e:
+                    logging.error(f'Failed to send history notification: {e}')
 
     three_months_ago = datetime.now(timezone.utc) - timedelta(days=90)
     existing_durations_qs = ShowDuration.objects.filter(

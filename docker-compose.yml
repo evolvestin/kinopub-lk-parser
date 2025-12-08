@@ -147,6 +147,7 @@ services:
         condition: service_started
     volumes:
       - ./shared:/app/shared
+      - ./telegram_bot:/app
     networks:
       - kinopub-net
 

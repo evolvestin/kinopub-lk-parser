@@ -12,7 +12,7 @@ from django.views.decorators.http import require_http_methods
 
 from app.constants import UserRole
 from app.dashboard import dashboard_callback
-from app.models import Show, ViewUser
+from app.models import Show, ViewHistory, ViewUser
 from app.telegram_bot import TelegramSender
 
 
@@ -163,11 +163,16 @@ def set_bot_user_role(request):
         if view_user.django_user:
             sync_user_permissions(view_user.django_user, new_role)
 
-        # Обновляем галочки в сообщении (бекенд сам обновляет Telegram)
         try:
             TelegramSender().update_user_role_message(view_user)
         except Exception:
             pass
+
+        if new_role != UserRole.GUEST:
+            try:
+                TelegramSender().send_role_upgrade_notification(view_user.telegram_id, new_role)
+            except Exception as e:
+                logging.error(f'Failed to send upgrade notification to {telegram_id}: {e}')
 
         return JsonResponse({'status': 'ok', 'new_role': new_role})
     except ViewUser.DoesNotExist:
@@ -314,7 +319,7 @@ def bot_get_show_details(request, show_id):
             'status': show.status,
             'kinopoisk_rating': show.kinopoisk_rating,
             'imdb_rating': show.imdb_rating,
-            'countries': [c.name for c in show.countries.all()],
+            'countries': [str(c) for c in show.countries.all()],
             'genres': [g.name for g in show.genres.all()],
             'kinopoisk_url': show.kinopoisk_url,
             'imdb_url': show.imdb_url,
@@ -322,3 +327,88 @@ def bot_get_show_details(request, show_id):
         return JsonResponse(data)
     except Show.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def bot_get_by_imdb(request, imdb_id):
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        show = (
+            Show.objects.filter(imdb_url__icontains=f'tt{imdb_id}')
+            .prefetch_related('countries', 'genres')
+            .first()
+        )
+
+        if not show:
+            return JsonResponse({'error': 'Not found'}, status=404)
+
+        data = {
+            'id': show.id,
+            'title': show.title,
+            'original_title': show.original_title,
+            'type': show.type,
+            'year': show.year,
+            'status': show.status,
+            'kinopoisk_rating': show.kinopoisk_rating,
+            'imdb_rating': show.imdb_rating,
+            'countries': [str(c) for c in show.countries.all()],
+            'genres': [g.name for g in show.genres.all()],
+            'kinopoisk_url': show.kinopoisk_url,
+            'imdb_url': show.imdb_url,
+        }
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def bot_assign_view(request):
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        telegram_id = data.get('telegram_id')
+        view_id = data.get('view_id')
+
+        user = ViewUser.objects.get(telegram_id=telegram_id)
+        view_history = ViewHistory.objects.get(id=view_id)
+
+        view_history.users.add(user)
+
+        show_title = view_history.show.title or view_history.show.original_title
+        if view_history.season_number:
+            info = f'{show_title} (S{view_history.season_number}E{view_history.episode_number})'
+        else:
+            info = show_title
+
+        return JsonResponse({'status': 'ok', 'info': info})
+    except (ViewUser.DoesNotExist, ViewHistory.DoesNotExist):
+        return JsonResponse({'error': 'Not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def bot_unassign_view(request):
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        telegram_id = data.get('telegram_id')
+        view_id = data.get('view_id')
+
+        user = ViewUser.objects.get(telegram_id=telegram_id)
+        view_history = ViewHistory.objects.get(id=view_id)
+
+        view_history.users.remove(user)
+
+        return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

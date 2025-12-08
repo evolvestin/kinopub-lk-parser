@@ -18,6 +18,9 @@ urlpatterns = [
     path('api/bot/update_user/', views.update_bot_user),
     path('api/bot/search/', views.bot_search_shows),
     path('api/bot/show/<int:show_id>/', views.bot_get_show_details),
+    path('api/bot/imdb/<str:imdb_id>/', views.bot_get_by_imdb),
+    path('api/bot/assign_view/', views.bot_assign_view),
+    path('api/bot/unassign_view/', views.bot_unassign_view),
 ]
 
 if not settings.DEBUG:
