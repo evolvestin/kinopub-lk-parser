@@ -83,11 +83,19 @@ TEMPLATES = [
 DB_PATH = data_dir / DB_BACKUP_FILENAME
 if 'runparserlocal' in sys.argv:
     LOCAL_RUN = True
-    logging.info('"runparserlocal" command detected. Configuring for local SQLite database.')
+    logging.info(
+        '"runparserlocal" command detected. Database will be handled via temporary container.'
+    )
+    # Устанавливаем параметры по умолчанию для локального запуска
+    # Реальные параметры подключения будут установлены динамически внутри команды runparserlocal
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': data_dir / 'local.sqlite3',
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'postgres',
+            'USER': 'postgres',
+            'PASSWORD': 'temporary_secret',
+            'HOST': '127.0.0.1',
+            'PORT': '54320',
         }
     }
 else:

@@ -63,7 +63,10 @@ class BackupManager:
     def _get_file_id(self, drive, filename):
         if filename in self._cached_file_ids:
             return self._cached_file_ids[filename]
-        query = f"'{settings.GOOGLE_DRIVE_FOLDER_ID}' in parents and title = '{filename}' and trashed = false"
+        query = (
+            f"'{settings.GOOGLE_DRIVE_FOLDER_ID}' "
+            f"in parents and title = '{filename}' and trashed = false"
+        )
         file_list = drive.ListFile({'q': query}).GetList()
         if file_list:
             file_id = file_list[0]['id']
@@ -76,7 +79,10 @@ class BackupManager:
             file_id = self._get_file_id(drive, remote_name)
             if not file_id:
                 logging.error(
-                    'File "%s" not found on Google Drive and creation is not supported. Upload aborted.',
+                    (
+                        'File "%s" not found on Google Drive and creation is not supported.'
+                        ' Upload aborted.'
+                    ),
                     remote_name,
                 )
                 return

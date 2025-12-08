@@ -1,23 +1,39 @@
 import logging
-import os
 import sys
-import threading
-import time
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 from django.conf import settings
-from django.core.management import call_command
+from django.core.management.base import BaseCommand
 
 from app import history_parser
-from app.gdrive_backup import BackupManager
-from app.history_parser import update_show_details
-from app.management.base import LoggableBaseCommand
-from app.management.commands.runemail_listener import run_email_listener, shutdown_flag
-from app.models import Code, Show
-from app.telegram_bot import TelegramSender
+from app.constants import SHOW_TYPE_MAPPING
+from app.history_parser import (
+    close_driver,
+    initialize_driver_session,
+    parse_new_episodes_list,
+    process_show_durations,
+    update_show_details,
+)
 
 
-class Command(LoggableBaseCommand):
-    help = 'Runs a single parser or updater session locally with a foreground browser.'
+def _get_windows_chrome_version():
+    import winreg
+
+    try:
+        key_path = r'Software\Google\Chrome\BLBeacon'
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            version, _ = winreg.QueryValueEx(key, 'version')
+            if version:
+                logging.info(f'Detected local Chrome version (Registry): {version}')
+                return int(version.split('.')[0])
+    except Exception as e:
+        logging.warning(f'Could not detect Chrome version via registry: {e}')
+    return None
+
+
+class Command(BaseCommand):
+    help = 'Runs a single parser session locally without database (Mock mode).'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -25,164 +41,159 @@ class Command(LoggableBaseCommand):
             type=str,
             choices=['main', 'aux'],
             default='main',
-            help='The account to use: "main" for history parsing, "aux" for details update (limit 5).',
+            help='The account to use: "main" (history/durations) or "aux" (details).',
+        )
+        parser.add_argument(
+            '--task',
+            type=str,
+            choices=['history', 'details', 'durations'],
+            default=None,
+            help='Specific task to run. If not set, defaults based on account.',
         )
         parser.add_argument(
             '--type',
             type=str,
             dest='type',
-            help='Filter shows by type (e.g. Series, Movie). Only used with --account=aux.',
+            help='Filter shows by type (e.g. serial, movie).',
         )
 
-    def _run_details_update_task(self, driver, limit, account_type, show_type=None):
-        msg = f'Searching for up to {limit} shows with missing year information'
-        if show_type:
-            msg += f' (type: {show_type})'
-        self.stdout.write(f'{msg}...')
+    def _get_live_ids(self, driver, limit=5):
+        logging.info('Fetching live IDs from "New Episodes" page to test parsers...')
+        base_url = f'{settings.SITE_URL}media/new-serial-episodes'
+        driver.get(base_url)
+        items = parse_new_episodes_list(driver)
+        if not items:
+            logging.warning('No items found on new episodes page.')
+            return []
 
-        queryset = Show.objects.filter(year__isnull=True)
-        if show_type:
-            queryset = queryset.filter(type=show_type)
+        unique_ids = list({item['show_id'] for item in items})[:limit]
+        logging.info(f'Found IDs for testing: {unique_ids}')
+        return unique_ids
 
-        show_ids_to_update = list(queryset.order_by('?').values_list('id', flat=True)[:limit])
+    def _setup_mocks(self):
+        logging.info('Setting up database Mocks...')
 
-        if not show_ids_to_update:
-            self.stdout.write(self.style.SUCCESS('No shows found matching criteria.'))
-            return driver
+        mock_show_instance = MagicMock()
+        mock_show_instance.year = None
+        mock_show_instance.updated_at = datetime.min.replace(tzinfo=timezone.utc)
+        mock_show_instance.countries.add = MagicMock(
+            side_effect=lambda *args: print(f'   [MockDB] Added Country: {args}')
+        )
+        mock_show_instance.genres.add = MagicMock(
+            side_effect=lambda *args: print(f'   [MockDB] Added Genre: {args}')
+        )
+        mock_show_instance.directors.add = MagicMock(
+            side_effect=lambda *args: print(f'   [MockDB] Added Director: {args}')
+        )
+        mock_show_instance.actors.add = MagicMock(
+            side_effect=lambda *args: print(f'   [MockDB] Added Actor: {args}')
+        )
 
-        self.stdout.write(f'Found {len(show_ids_to_update)} shows to update.')
+        def save_side_effect(*args, **kwargs):
+            fields = vars(mock_show_instance)
+            useful_fields = {
+                k: v for k, v in fields.items() if not k.startswith('_') and not callable(v)
+            }
+            print(f'   [MockDB] Saving Show: {useful_fields}')
 
-        updated_count = 0
-        base_url = settings.SITE_AUX_URL if account_type == 'aux' else settings.SITE_URL
+        mock_show_instance.save = MagicMock(side_effect=save_side_effect)
 
-        for i, show_id in enumerate(show_ids_to_update):
-            if driver is None:
-                logging.info('Restarting Selenium driver session...')
-                driver = history_parser.initialize_driver_session(
-                    headless=False, session_type=account_type
-                )
-                if driver is None:
-                    self.stderr.write(
-                        self.style.ERROR('Could not restart Selenium driver. Aborting.')
-                    )
-                    break
+        MockShow = MagicMock()
+        MockShow.objects.get.return_value = mock_show_instance
+        MockShow.objects.filter.return_value.exists.return_value = False
+        MockShow.objects.filter.return_value.first.return_value = mock_show_instance
+        MockShow.objects.update_or_create.side_effect = lambda **kwargs: print(
+            f'   [MockDB] Show update_or_create: {kwargs}'
+        )
+        MockShow.objects.bulk_create.side_effect = lambda objs, **kwargs: print(
+            f'   [MockDB] Bulk create Shows: {len(objs)} items'
+        )
 
-            logging.info(f'Processing show {i + 1}/{len(show_ids_to_update)} (ID: {show_id})...')
-            try:
-                try:
-                    _ = driver.current_url
-                except Exception as e:
-                    raise Exception(f'Driver unresponsive: {e}')
+        MockShowDuration = MagicMock()
+        MockShowDuration.objects.update_or_create.side_effect = lambda **kwargs: print(
+            f'   [MockDB] Duration update_or_create: {kwargs}'
+        )
+        MockShowDuration.objects.filter.return_value.exists.return_value = False
 
-                show_url = f'{base_url}item/view/{show_id}'
-                driver.get(show_url)
-                time.sleep(1)
-                update_show_details(driver, show_id)
-                logging.info(f'Successfully updated details for show ID {show_id}.')
-                updated_count += 1
-            except Exception as e:
-                err_str = str(e).lower()
-                if (
-                    'driver unresponsive' in err_str
-                    or 'connection refused' in err_str
-                    or 'max retries exceeded' in err_str
-                    or 'invalid session' in err_str
-                ):
-                    logging.error('Selenium driver is dead. Restarting session...')
-                    history_parser.close_driver(driver)
-                    driver = None
-                    continue
-                logging.error(f'Failed to update show ID {show_id}: {e}')
-                continue
+        MockViewHistory = MagicMock()
+        MockViewHistory.objects.bulk_create.side_effect = lambda objs, **kwargs: (
+            print(f'   [MockDB] ViewHistory bulk_create: {len(objs)} items'),
+            objs,
+        )[1]
+        MockViewHistory.objects.count.return_value = 0
+        MockViewHistory.objects.filter.return_value.aggregate.return_value = {'max_date': None}
 
-        self.stdout.write(self.style.SUCCESS(f'Finished updating {updated_count} show details.'))
-        return driver
+        MockCode = MagicMock()
+        MockCode.objects.filter.return_value.order_by.return_value.first.return_value = None
 
+        return (MockShow, MockShowDuration, MockViewHistory, MockCode)
+
+    @patch('app.history_parser.get_chrome_major_version', side_effect=_get_windows_chrome_version)
     def handle(self, *args, **options):
+        sys.stdout.reconfigure(encoding='utf-8')
+
+        for name in [None, 'app', 'django', 'celery']:
+            logger = logging.getLogger(name)
+            for handler in logger.handlers[:]:
+                if handler.__class__.__name__ == 'DatabaseLogHandler':
+                    logger.removeHandler(handler)
+
+        for name in ['django', 'celery', 'urllib3']:
+            logging.getLogger(name).setLevel(logging.WARNING)
+        logging.getLogger('app').setLevel(logging.INFO)
+
         account = options['account']
-        show_type = options.get('type')
+        task = options['task'] or ('history' if account == 'main' else 'details')
+        show_type_arg = options.get('type')
+        show_type = (
+            SHOW_TYPE_MAPPING.get(show_type_arg, show_type_arg) if show_type_arg else 'Series'
+        )
 
-        if account == 'main':
-            task = 'history'
-        else:
-            task = 'details'
+        print(f'--- Starting local script (Account: {account}, Task: {task}) ---', flush=True)
+        print('--- Note: Database is MOCKED. No data will be saved. ---', flush=True)
 
-        logging.info(f'--- Starting local script (Account: {account}, Task: {task}) ---')
+        MockShow, MockShowDuration, MockViewHistory, MockCode = self._setup_mocks()
 
-        headless = False
-        email_thread = None
-        backup_file_path = None
-        driver = None
+        with (
+            patch('app.history_parser.Show', MockShow),
+            patch('app.history_parser.ShowDuration', MockShowDuration),
+            patch('app.history_parser.ViewHistory', MockViewHistory),
+            patch('app.history_parser.Code', MockCode),
+            patch('app.history_parser.Country', MagicMock()),
+            patch('app.history_parser.Genre', MagicMock()),
+            patch('app.history_parser.Person', MagicMock()),
+        ):
+            driver = None
+            try:
+                driver = initialize_driver_session(headless=False, session_type=account)
+                if driver is None:
+                    logging.error('Failed to initialize driver.')
+                    return
 
-        try:
-            need_restore = True
-            if Show.objects.first():
-                logging.info('Found existing records for details update. Skipping backup restore.')
-                need_restore = False
+                if task == 'history':
+                    logging.info('Running History Parser (Mock Mode)...')
+                    history_parser.run_parser_session(headless=False, driver_instance=driver)
 
-            if need_restore:
-                logging.info('Restoring database from Google Drive for local run...')
-                backup_file_path = BackupManager().restore_from_backup()
+                elif task == 'details':
+                    logging.info('Running Details Updater (Mock Mode)...')
+                    ids = self._get_live_ids(driver)
+                    for show_id in ids:
+                        logging.info(f'Processing details for ID {show_id}...')
+                        update_show_details(driver, show_id)
 
-            logging.info('Running migrations for local database...')
-            call_command('migrate', interactive=False, verbosity=1)
+                elif task == 'durations':
+                    logging.info('Running Durations Updater (Mock Mode)...')
+                    ids = self._get_live_ids(driver)
+                    for show_id in ids:
+                        logging.info(f'Processing durations for ID {show_id}...')
+                        mock_show = MockShow.objects.get()
+                        mock_show.id = show_id
+                        mock_show.type = show_type
+                        process_show_durations(driver, mock_show)
 
-            if need_restore and backup_file_path and os.path.exists(backup_file_path):
-                logging.info(f'Loading data from backup: {backup_file_path}')
-                try:
-                    call_command('loaddata', backup_file_path)
-                except Exception as e:
-                    logging.error(f'Failed to load backup data: {e}')
-            elif need_restore:
-                self.stdout.write(self.style.WARNING('No backup found (or restore skipped).'))
+            except Exception as e:
+                logging.error(f'Critical error in local run: {e}', exc_info=True)
+            finally:
+                close_driver(driver)
 
-            logging.info('Starting email listener in background for 2FA codes...')
-            email_thread = threading.Thread(
-                target=run_email_listener,
-                args=(shutdown_flag,),
-                daemon=True,
-                name='EmailListenerThread',
-            )
-            email_thread.start()
-            time.sleep(5)
-
-            driver = history_parser.initialize_driver_session(
-                headless=headless, session_type=account
-            )
-
-            if driver is None:
-                self.stderr.write(self.style.ERROR('Failed to initialize Selenium driver.'))
-                sys.exit(1)
-
-            if task == 'history':
-                logging.info('--- Starting history parser session in local mode ---')
-                history_parser.run_parser_session(headless=headless, driver_instance=driver)
-            elif task == 'details':
-                logging.info('--- Starting details update session in local mode ---')
-                driver = self._run_details_update_task(
-                    driver, limit=5, account_type=account, show_type=show_type
-                )
-
-            logging.info('Checking for active 2FA codes to expire...')
-            active_codes = Code.objects.all()
-            if active_codes.exists():
-                for code in active_codes:
-                    TelegramSender().edit_message_to_expired(code.telegram_message_id)
-                    code.delete()
-                logging.info('Expired and deleted active codes.')
-
-            logging.info('Performing direct local backup (Cookies only)...')
-            manager = BackupManager()
-            manager.perform_cookies_backup()
-
-        finally:
-            history_parser.close_driver(driver)
-            if email_thread:
-                logging.info('Stopping email listener thread...')
-                shutdown_flag.set()
-                email_thread.join(timeout=5)
-            if backup_file_path and os.path.exists(backup_file_path):
-                logging.info(f'Removing temporary backup file: {backup_file_path}')
-                os.remove(backup_file_path)
-
-        logging.info('--- Local script finished successfully ---')
+        logging.info('--- Local script finished ---')

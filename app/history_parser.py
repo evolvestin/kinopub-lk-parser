@@ -159,6 +159,12 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
         ' Chrome/131.0.0.0 Safari/537.36'
     )
 
+    options.add_argument('--autoplay-policy=user-gesture-required')
+    options.add_argument('--mute-audio')
+    options.add_argument(
+        '--disable-features=PreloadMediaEngagementData,MediaEngagementBypassAutoplayPolicies'
+    )
+
     if randomize:
         width = random.randint(1024, 1920)
         height = random.randint(768, 1080)
@@ -175,7 +181,6 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
         },
     )
 
-    # Определяем версию автоматически
     real_version = get_chrome_major_version()
     logging.info(f'Detected Chrome version: {real_version}')
 
@@ -206,6 +211,29 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
         )
     else:
         driver = uc.Chrome(options=options, version_main=real_version)
+
+    # Блокировка загрузки медиа-файлов на сетевом уровне
+    driver.execute_cdp_cmd('Network.enable', {})
+    driver.execute_cdp_cmd(
+        'Network.setBlockedURLs',
+        {
+            'urls': [
+                '*.mp4',
+                '*.m3u8',
+                '*.ts',
+                '*.webm',
+                '*.mp3',
+                '*.aac',
+                '*.png',
+                '*.jpg',
+                '*.jpeg',
+                '*.gif',
+                '*.svg',
+                '*.woff',
+                '*.woff2',
+            ]
+        },
+    )
 
     driver.set_page_load_timeout(60)
     return driver
