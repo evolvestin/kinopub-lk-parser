@@ -1,5 +1,5 @@
+import datetime
 import email
-import email.utils
 import logging
 import re
 from contextlib import contextmanager
@@ -95,7 +95,7 @@ def process_emails(mail, shutdown_flag):
                     date_header = msg_data[0][1].decode('utf-8').split(':', 1)[1].strip()
                     # parsedate_to_datetime автоматически обрабатывает смещение часового пояса
                     dt = parsedate_to_datetime(date_header)
-                    received_at_dt = dt.astimezone(timezone.utc)
+                    received_at_dt = dt.astimezone(datetime.UTC)
                 except (ValueError, TypeError, IndexError) as e:
                     logging.warning(
                         'Could not parse date for uid=%s (%s). Using current time.', uid, e

@@ -66,7 +66,6 @@ async def handle_edit_message(request):
 
     try:
         if text:
-            # Если есть текст, обновляем текст (и кнопки, если переданы)
             await bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
@@ -75,7 +74,6 @@ async def handle_edit_message(request):
                 reply_markup=reply_markup,
             )
         elif reply_markup:
-            # Если текста нет, но есть кнопки — обновляем только клавиатуру
             await bot.edit_message_reply_markup(
                 chat_id=chat_id, message_id=message_id, reply_markup=reply_markup
             )
@@ -86,7 +84,6 @@ async def handle_edit_message(request):
 
         return web.json_response({'ok': True, 'result': True})
     except TelegramAPIError as e:
-        # Игнорируем ошибку, если сообщение не изменилось
         if 'message is not modified' in str(e):
             return web.json_response({'ok': True, 'result': True})
 
@@ -94,9 +91,30 @@ async def handle_edit_message(request):
         return web.json_response({'ok': False, 'description': str(e)})
 
 
+async def handle_get_me(request):
+    bot: Bot = request.app['bot']
+    try:
+        me = await bot.get_me()
+        return web.json_response(
+            {
+                'ok': True,
+                'result': {
+                    'id': me.id,
+                    'is_bot': me.is_bot,
+                    'first_name': me.first_name,
+                    'username': me.username,
+                },
+            }
+        )
+    except TelegramAPIError as e:
+        logging.error(f'Failed to get bot info: {e}')
+        return web.json_response({'ok': False, 'description': str(e)}, status=500)
+
+
 async def start_api_server(bot: Bot):
     app = web.Application()
     app['bot'] = bot
+    app.router.add_get('/api/get_me', handle_get_me)
     app.router.add_post('/api/send_message', handle_send_message)
     app.router.add_post('/api/edit_message', handle_edit_message)
     app.router.add_post('/api/delete_message', handle_delete_message)

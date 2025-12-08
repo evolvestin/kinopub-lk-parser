@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
 from app import history_parser
 from app.constants import SHOW_TYPE_MAPPING
@@ -88,7 +87,7 @@ class Command(BaseCommand):
 
         mock_show_instance = MagicMock()
         mock_show_instance.year = None
-        mock_show_instance.updated_at = datetime.min.replace(tzinfo=timezone.utc)
+        mock_show_instance.updated_at = datetime.min
         mock_show_instance.countries.add = MagicMock(side_effect=mock_add_country)
         mock_show_instance.genres.add = MagicMock(side_effect=mock_add_genre)
         mock_show_instance.directors.add = MagicMock(side_effect=mock_add_director)

@@ -5,7 +5,6 @@ from datetime import datetime
 
 from django.core.management.base import CommandError
 from django.db.models import Q
-from django.utils import timezone
 
 from app.constants import SHOW_TYPE_MAPPING
 from app.gdrive_backup import BackupManager
@@ -70,11 +69,7 @@ class Command(LoggableBaseCommand):
                 LogEntry.objects.filter(message__contains=log_marker).order_by('created_at').first()
             )
 
-            anchor_date = (
-                first_anchor_log.created_at
-                if first_anchor_log
-                else datetime.min.replace(tzinfo=timezone.utc)
-            )
+            anchor_date = first_anchor_log.created_at if first_anchor_log else datetime.min
 
             success_logs = LogEntry.objects.filter(
                 message__contains='Finished processing durations for show ID',
