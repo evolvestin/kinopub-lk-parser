@@ -53,7 +53,8 @@ class Command(LoggableBaseCommand):
 
         if is_series_mode:
             logging.info(
-                f'Series mode detected ({show_type} -> {target_db_type}). Limit ignored. Fetching shows...'
+                f'Series mode detected ({show_type} -> {target_db_type}).'
+                f' Limit ignored. Fetching shows...'
             )
 
             if target_db_type == SHOW_TYPE_MAPPING['serial']:
@@ -168,7 +169,7 @@ class Command(LoggableBaseCommand):
                     try:
                         _ = driver.current_url
                     except Exception as e:
-                        raise Exception(f'Driver unresponsive: {e}')
+                        raise Exception(f'Driver unresponsive: {e}') from e
 
                     show = Show.objects.get(id=show_id)
                     process_show_durations(driver, show)

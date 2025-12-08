@@ -2,9 +2,8 @@ import email
 import email.utils
 import logging
 import re
-import socket
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import imaplib2
 from django.conf import settings
@@ -25,7 +24,7 @@ def imap_connection():
         mail.select(settings.IMAP_FOLDER, readonly=not settings.MARK_AS_SEEN)
         logging.info('IMAP connection established, folder %s selected.', settings.IMAP_FOLDER)
         yield mail
-    except (imaplib2.IMAP4.error, socket.error, OSError) as e:
+    except (imaplib2.IMAP4.error, OSError) as e:
         logging.error('IMAP connection error: %s', e)
         raise
     finally:
@@ -34,7 +33,7 @@ def imap_connection():
                 mail.close()
                 mail.logout()
                 logging.info('IMAP connection closed.')
-            except (imaplib2.IMAP4.error, socket.error, OSError):
+            except (imaplib2.IMAP4.error, OSError):
                 pass
 
 
@@ -88,14 +87,14 @@ def process_emails(mail, shutdown_flag):
                 break
 
             status, msg_data = mail.uid('FETCH', uid, '(BODY.PEEK[HEADER.FIELDS (DATE)])')
-            received_at_dt = datetime.now(timezone.utc)
+            received_at_dt = datetime.now(UTC)
             if status == 'OK' and msg_data and msg_data[0]:
                 date_header = msg_data[0][1].decode('utf-8').split(':', 1)[1].strip()
                 date_tuple = email.utils.parsedate_tz(date_header)
                 if date_tuple:
                     tz_offset_seconds = date_tuple[9] or 0
                     tz = timezone(timedelta(seconds=tz_offset_seconds))
-                    received_at_dt = datetime(*date_tuple[:6], tzinfo=tz).astimezone(timezone.utc)
+                    received_at_dt = datetime(*date_tuple[:6], tzinfo=tz).astimezone(UTC)
             else:
                 logging.warning('Could not fetch date for uid=%s. Using current time.', uid)
 
@@ -132,6 +131,6 @@ def process_emails(mail, shutdown_flag):
             else:
                 logging.info('No 6-digit code found in message (uid=%s). Leaving UNSEEN.', uid)
 
-    except (imaplib2.IMAP4.error, socket.error, OSError) as e:
+    except (imaplib2.IMAP4.error, OSError) as e:
         logging.error('Error processing emails: %s', e)
         raise

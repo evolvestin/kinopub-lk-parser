@@ -15,7 +15,7 @@ class BotInstance:
             if not token:
                 raise ValueError('BOT_TOKEN is not set')
 
-            cls._instance = super(BotInstance, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance.main_bot = Bot(
                 token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML)
             )

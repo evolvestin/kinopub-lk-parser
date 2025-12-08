@@ -29,7 +29,7 @@ class BackupManager:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(BackupManager, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -119,7 +119,7 @@ class BackupManager:
         last_backup_ts = 0.0
         if os.path.exists(last_ts_file):
             try:
-                with open(last_ts_file, 'r') as f:
+                with open(last_ts_file) as f:
                     last_backup_ts = float(f.read().strip())
             except ValueError:
                 pass

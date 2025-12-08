@@ -14,6 +14,7 @@ from app.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING
 from app.dashboard import dashboard_callback
 from app.models import LogEntry, TaskRun
 from app.tasks import run_admin_command
+from kinopub_parser import celery_app
 
 
 class CustomAdminSite(admin.AdminSite):
@@ -118,7 +119,7 @@ class CustomAdminSite(admin.AdminSite):
 
                         if isinstance(action, (_StoreTrueAction, _StoreFalseAction)):
                             arg_info['type'] = 'checkbox'
-                        elif action.type == int:
+                        elif action.type is int:
                             arg_info['type'] = 'number'
 
                         if action.dest == 'type':
@@ -138,8 +139,6 @@ class CustomAdminSite(admin.AdminSite):
         return commands_dict
 
     def task_control_view(self, request):
-        from kinopub_parser import celery_app  # Импорт здесь во избежание циклической зависимости
-
         commands_info = self._get_app_commands_details()
 
         if (
@@ -152,10 +151,6 @@ class CustomAdminSite(admin.AdminSite):
                     task_to_stop = TaskRun.objects.get(
                         id=request.POST.get('stop_task_id'), status='RUNNING'
                     )
-
-                    # Мы больше не убиваем воркер через Celery revoke, так как это плодит зомби-процессы.
-                    # Просто ставим флаг STOPPED в базу. Воркер (run_admin_command) увидит это в цикле
-                    # и корректно завершит дочерний процесс (subprocess.terminate).
                     task_to_stop.status = 'STOPPED'
                     task_to_stop.save()
 
@@ -184,7 +179,8 @@ class CustomAdminSite(admin.AdminSite):
                 if running_tasks.exists():
                     messages.warning(
                         request,
-                        f"Предыдущие активные задачи '{command_name}' были принудительно остановлены.",
+                        f"Предыдущие активные задачи '{command_name}'"
+                        f" были принудительно остановлены.",
                     )
 
                 # 2. Сбор аргументов
@@ -263,12 +259,12 @@ class CustomAdminSite(admin.AdminSite):
             logs_qs = LogEntry.objects.all()[:30]
             logs_data = [
                 {
-                    'created_at': l.created_at.strftime('%H:%M:%S'),
-                    'level': l.level,
-                    'module': l.module,
-                    'message': l.message,
+                    'created_at': entry.created_at.strftime('%H:%M:%S'),
+                    'level': entry.level,
+                    'module': entry.module,
+                    'message': entry.message,
                 }
-                for l in logs_qs
+                for entry in logs_qs
             ]
             logs_data.reverse()
 

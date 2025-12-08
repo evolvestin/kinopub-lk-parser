@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 
@@ -12,7 +12,7 @@ HEADERS = {'X-Bot-Token': BOT_TOKEN, 'Content-Type': 'application/json'}
 
 async def _execute_request(
     path: str, method: str = 'GET', payload: dict = None, params: dict = None
-) -> Optional[Any]:
+) -> Any | None:
     url = f'{BACKEND_URL}/api/bot/{path}'
     try:
         async with aiohttp.ClientSession() as session:

@@ -1,6 +1,6 @@
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
@@ -75,7 +75,7 @@ class Command(BaseCommand):
 
         mock_show_instance = MagicMock()
         mock_show_instance.year = None
-        mock_show_instance.updated_at = datetime.min.replace(tzinfo=timezone.utc)
+        mock_show_instance.updated_at = datetime.min.replace(tzinfo=UTC)
         mock_show_instance.countries.add = MagicMock(
             side_effect=lambda *args: print(f'   [MockDB] Added Country: {args}')
         )
@@ -98,35 +98,42 @@ class Command(BaseCommand):
 
         mock_show_instance.save = MagicMock(side_effect=save_side_effect)
 
-        MockShow = MagicMock()
-        MockShow.objects.get.return_value = mock_show_instance
-        MockShow.objects.filter.return_value.exists.return_value = False
-        MockShow.objects.filter.return_value.first.return_value = mock_show_instance
-        MockShow.objects.update_or_create.side_effect = lambda **kwargs: print(
+        mock_show_model = MagicMock()
+        mock_show_model.objects.get.return_value = mock_show_instance
+        mock_show_model.objects.filter.return_value.exists.return_value = False
+        mock_show_model.objects.filter.return_value.first.return_value = mock_show_instance
+        mock_show_model.objects.update_or_create.side_effect = lambda **kwargs: print(
             f'   [MockDB] Show update_or_create: {kwargs}'
         )
-        MockShow.objects.bulk_create.side_effect = lambda objs, **kwargs: print(
+        mock_show_model.objects.bulk_create.side_effect = lambda objs, **kwargs: print(
             f'   [MockDB] Bulk create Shows: {len(objs)} items'
         )
 
-        MockShowDuration = MagicMock()
-        MockShowDuration.objects.update_or_create.side_effect = lambda **kwargs: print(
+        mock_show_duration_model = MagicMock()
+        mock_show_duration_model.objects.update_or_create.side_effect = lambda **kwargs: print(
             f'   [MockDB] Duration update_or_create: {kwargs}'
         )
-        MockShowDuration.objects.filter.return_value.exists.return_value = False
+        mock_show_duration_model.objects.filter.return_value.exists.return_value = False
 
-        MockViewHistory = MagicMock()
-        MockViewHistory.objects.bulk_create.side_effect = lambda objs, **kwargs: (
+        mock_view_history_model = MagicMock()
+        mock_view_history_model.objects.bulk_create.side_effect = lambda objs, **kwargs: (
             print(f'   [MockDB] ViewHistory bulk_create: {len(objs)} items'),
             objs,
         )[1]
-        MockViewHistory.objects.count.return_value = 0
-        MockViewHistory.objects.filter.return_value.aggregate.return_value = {'max_date': None}
+        mock_view_history_model.objects.count.return_value = 0
+        mock_view_history_model.objects.filter.return_value.aggregate.return_value = {
+            'max_date': None
+        }
 
-        MockCode = MagicMock()
-        MockCode.objects.filter.return_value.order_by.return_value.first.return_value = None
+        mock_code_model = MagicMock()
+        mock_code_model.objects.filter.return_value.order_by.return_value.first.return_value = None
 
-        return (MockShow, MockShowDuration, MockViewHistory, MockCode)
+        return (
+            mock_show_model,
+            mock_show_duration_model,
+            mock_view_history_model,
+            mock_code_model,
+        )
 
     @patch('app.history_parser.get_chrome_major_version', side_effect=_get_windows_chrome_version)
     def handle(self, *args, **options):
@@ -152,13 +159,18 @@ class Command(BaseCommand):
         print(f'--- Starting local script (Account: {account}, Task: {task}) ---', flush=True)
         print('--- Note: Database is MOCKED. No data will be saved. ---', flush=True)
 
-        MockShow, MockShowDuration, MockViewHistory, MockCode = self._setup_mocks()
+        (
+            mock_show_model,
+            mock_show_duration_model,
+            mock_view_history_model,
+            mock_code_model,
+        ) = self._setup_mocks()
 
         with (
-            patch('app.history_parser.Show', MockShow),
-            patch('app.history_parser.ShowDuration', MockShowDuration),
-            patch('app.history_parser.ViewHistory', MockViewHistory),
-            patch('app.history_parser.Code', MockCode),
+            patch('app.history_parser.Show', mock_show_model),
+            patch('app.history_parser.ShowDuration', mock_show_duration_model),
+            patch('app.history_parser.ViewHistory', mock_view_history_model),
+            patch('app.history_parser.Code', mock_code_model),
             patch('app.history_parser.Country', MagicMock()),
             patch('app.history_parser.Genre', MagicMock()),
             patch('app.history_parser.Person', MagicMock()),
@@ -186,7 +198,7 @@ class Command(BaseCommand):
                     ids = self._get_live_ids(driver)
                     for show_id in ids:
                         logging.info(f'Processing durations for ID {show_id}...')
-                        mock_show = MockShow.objects.get()
+                        mock_show = mock_show_model.objects.get()
                         mock_show.id = show_id
                         mock_show.type = show_type
                         process_show_durations(driver, mock_show)

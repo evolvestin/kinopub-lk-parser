@@ -15,7 +15,10 @@ from app.models import Show
 
 
 class Command(LoggableBaseCommand):
-    help = 'Fetches and updates details (year, ratings, etc.) for shows that are missing this information.'
+    help = (
+        'Fetches and updates details (year, ratings, etc.)'
+        ' for shows that are missing this information.'
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -73,7 +76,7 @@ class Command(LoggableBaseCommand):
                     try:
                         _ = driver.current_url
                     except Exception as e:
-                        raise Exception(f'Driver unresponsive: {e}')
+                        raise Exception(f'Driver unresponsive: {e}') from e
 
                     show_url = f'{base_url}item/view/{show_id}'
                     driver.get(show_url)

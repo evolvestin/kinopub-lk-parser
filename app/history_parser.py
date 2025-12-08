@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import undetected_chromedriver as uc
 from django.conf import settings
@@ -43,7 +43,7 @@ def _extract_int_from_string(text):
 def update_show_details(driver, show_id):
     try:
         show = Show.objects.get(id=show_id)
-        three_months_ago = datetime.now(timezone.utc) - timedelta(days=90)
+        three_months_ago = datetime.now(UTC) - timedelta(days=90)
         if show.year is not None and show.updated_at >= three_months_ago:
             return
 
@@ -292,7 +292,7 @@ def do_login(driver, login, password, cookie_path, base_url):
         timeout = 120
         start_time = time.time()
         used_code_ids = set()
-        expiration_threshold = datetime.now(timezone.utc) - timedelta(
+        expiration_threshold = datetime.now(UTC) - timedelta(
             minutes=settings.CODE_LIFETIME_MINUTES
         )
 
@@ -339,7 +339,8 @@ def do_login(driver, login, password, cookie_path, base_url):
             logging.error('Не удалось пройти проверку Cloudflare.')
         else:
             logging.error(
-                'Failed to log in within the allotted time. The page might be inaccessible or changed.'
+                'Failed to log in within the allotted time.'
+                ' The page might be inaccessible or changed.'
             )
         return False
     except Exception as e:
@@ -369,7 +370,7 @@ def initialize_driver_session(headless=True, session_type='main'):
         driver.get(target_url)
         if os.path.exists(cookie_path):
             try:
-                with open(cookie_path, 'r', encoding='utf-8') as f:
+                with open(cookie_path, encoding='utf-8') as f:
                     cookies = json.load(f)
                 for cookie in cookies:
                     if 'expiry' in cookie and cookie['expiry']:
@@ -547,7 +548,10 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
             if latest_date_in_db and current_date_from_site < latest_date_in_db:
                 if not stop_parsing:
                     logging.info(
-                        'Found a date (%s) older than the latest in DB (%s). Will stop after this page.',
+                        (
+                            'Found a date (%s) older than the latest in DB (%s).'
+                            ' Will stop after this page.'
+                        ),
                         current_date_from_site,
                         latest_date_in_db,
                     )
@@ -630,7 +634,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
                 except Exception as e:
                     logging.error(f'Failed to send history notification: {e}')
 
-    three_months_ago = datetime.now(timezone.utc) - timedelta(days=90)
+    three_months_ago = datetime.now(UTC) - timedelta(days=90)
     existing_durations_qs = ShowDuration.objects.filter(
         show_id__in=[item['show_id'] for item in views_on_page]
     )
@@ -650,7 +654,8 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
         if not updated_at or updated_at < three_months_ago:
             if updated_at:
                 logging.info(
-                    f'Duration for show id={show_id} (s:{season}, e:{episode}) is stale. Re-fetching.'
+                    f'Duration for show id={show_id} (s:{season}, e:{episode}) is stale.'
+                    f' Re-fetching.'
                 )
             if is_movie:
                 unique_movie_ids_to_fetch.add(show_id)
@@ -752,7 +757,7 @@ def _run_parser_for_mode(driver, mode, headless=True, session_type='main'):
         body_text = driver.find_element(By.TAG_NAME, 'body').text
         if 'Для доступа к этой странице нужен PRO-аккаунт' in body_text:
             logging.error(
-                'Failed to access history page: PRO account is required. Aborting scan for mode "%s".',
+                'Failed to access history page: PRO account is required. Aborting scan for "%s".',
                 mode,
             )
             return 0, driver
@@ -829,7 +834,10 @@ def run_parser_session(headless=True, driver_instance=None):
         total_views_added = episodes_added + movies_added
         if total_views_added > 0:
             logging.info(
-                '--- Parser session finished. Total new records added: %d. A database backup will be scheduled. ---',
+                (
+                    '--- Parser session finished. '
+                    'Total new records added: %d. A database backup will be scheduled. ---'
+                ),
                 total_views_added,
             )
             BackupManager().schedule_backup()
@@ -945,7 +953,6 @@ def parse_new_episodes_list(driver):
                     title_el = title_cell.find_element(By.TAG_NAME, 'b')
                     title = title_el.text.strip()
 
-                    # Original title is often in the same cell text, separated by <br> or just text node
                     full_text = title_cell.text
                     original_title = full_text.replace(title, '').strip()
                     if not original_title:

@@ -1,7 +1,6 @@
 import logging
 import os
 import signal
-import socket
 import threading
 import time
 
@@ -43,7 +42,8 @@ def _watchdog(stop_event):
                 age = time.time() - stat.st_mtime
                 if age > threshold:
                     logging.error(
-                        f'Watchdog: Heartbeat stuck ({age:.1f}s > {threshold}s). Killing process to force restart.'
+                        f'Watchdog: Heartbeat stuck ({age:.1f}s > {threshold}s).'
+                        f' Killing process to force restart.'
                     )
                     os._exit(1)  # Принудительный выход из интерпретатора
         except Exception as e:
@@ -62,7 +62,7 @@ def run_idle_loop(mail, current_shutdown_flag):
             )
             _update_heartbeat()
             mail.idle(timeout=settings.IDLE_TIMEOUT)
-        except (imaplib2.IMAP4.error, socket.error, OSError) as e:
+        except (imaplib2.IMAP4.error, OSError) as e:
             logging.warning('Connection lost in IDLE mode. Reconnecting. Error: %s', e)
             break
 
@@ -74,7 +74,7 @@ def run_email_listener(current_shutdown_flag):
         try:
             with email_processor.imap_connection() as mail:
                 run_idle_loop(mail, current_shutdown_flag)
-        except (imaplib2.IMAP4.error, socket.error, OSError) as e:
+        except (imaplib2.IMAP4.error, OSError) as e:
             logging.error('A critical error occurred in the email listener: %s', e)
 
         if not current_shutdown_flag.is_set():

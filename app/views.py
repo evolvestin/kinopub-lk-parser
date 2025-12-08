@@ -101,7 +101,6 @@ def register_bot_user(request):
         )
 
         if user_created:
-            # Устанавливаем случайный пароль, так как вход предполагается через другие механизмы или админом
             django_user.set_password(str(uuid.uuid4()))
             django_user.save()
 
@@ -115,7 +114,6 @@ def register_bot_user(request):
 
         # 4. Отправляем сообщение в админ-канал
         # Если пользователь только создан или сообщения о роли еще нет - создаем новое.
-        # Если уже есть - обновляем существующее (чтобы не спамить при нажатии /start после разблокировки).
         try:
             if created or not view_user.role_message_id:
                 TelegramSender().send_user_role_message(view_user)
@@ -254,7 +252,6 @@ def update_bot_user(request):
                 updated_fields.append('is_bot_active')
 
         if updated_fields:
-            # Используем обычный save() без update_fields, чтобы Django автоматически обновил updated_at
             view_user.save()
 
             # Если изменилось имя/юзернейм, обновляем сообщение в админ-канале

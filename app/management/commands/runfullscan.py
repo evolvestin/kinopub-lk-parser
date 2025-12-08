@@ -1,7 +1,7 @@
 import logging
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from django.conf import settings
 from django.core.management.base import CommandError
@@ -119,7 +119,7 @@ def run_full_scan_session(headless=True, target_type=None):
 
     start_mode = None
     start_page = 1
-    resume_window = datetime.now(timezone.utc) - timedelta(
+    resume_window = datetime.now(UTC) - timedelta(
         hours=settings.FULL_SCAN_RESUME_WINDOW_HOURS
     )
     last_log = (
@@ -212,7 +212,7 @@ def run_full_scan_session(headless=True, target_type=None):
                     try:
                         _ = driver.current_url
                     except Exception as e:
-                        raise Exception(f'Driver unresponsive: {e}')
+                        raise Exception(f'Driver unresponsive: {e}') from e
 
                     driver.get(page_url)
                     added_count = parse_and_save_catalog_page(driver, mode)

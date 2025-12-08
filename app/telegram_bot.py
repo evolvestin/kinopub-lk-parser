@@ -13,7 +13,7 @@ class TelegramSender:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(TelegramSender, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance.service_url = 'http://telegram-bot:8081/api'
             cls._instance._bot_username = None
 
@@ -178,7 +178,6 @@ class TelegramSender:
         if not settings.HISTORY_CHANNEL_ID:
             return
 
-        invite_link = settings.HISTORY_CHANNEL_INVITE_LINK
         # Если ссылка не задана в settings, можно попробовать сформировать стандартную,
         # но для приватных каналов лучше использовать invite link.
         # Для упрощения примера предполагаем, что ID канала достаточно,

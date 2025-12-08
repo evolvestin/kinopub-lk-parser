@@ -1,6 +1,7 @@
 import client
 from aiogram import Bot
 from aiogram.types import CallbackQuery
+from app.telegram_bot.utils.formatting import italic
 
 
 async def role_switch_handler(callback: CallbackQuery, bot: Bot):

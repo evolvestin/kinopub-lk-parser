@@ -72,7 +72,6 @@ class Command(LoggableBaseCommand):
                         season = item['season']
                         episode = item['episode']
 
-                        # Check if Show exists and has basic data (year is a good indicator of details)
                         show_qs = Show.objects.filter(id=show_id)
                         show_exists = show_qs.exists()
                         show_has_details = show_exists and show_qs.first().year is not None
@@ -84,7 +83,8 @@ class Command(LoggableBaseCommand):
 
                         if show_has_details and duration_exists:
                             logging.info(
-                                f'Data exists for {item["title"]} s{season}e{episode}. Stopping scan for {db_type}.'
+                                f'Data exists for {item["title"]} s{season}e{episode}.'
+                                f' Stopping scan for {db_type}.'
                             )
                             stop_parsing = True
                             break
@@ -101,7 +101,6 @@ class Command(LoggableBaseCommand):
                             },
                         )
 
-                        # Если шоу создано с дефолтным типом, но мы знаем точный тип из категории - обновляем
                         if not created and show.type != db_type:
                             show.type = db_type
                             show.save(update_fields=['type'])
@@ -131,7 +130,8 @@ class Command(LoggableBaseCommand):
                         # Logic 2: Series exists, but specific episode duration is missing
                         elif not duration_exists:
                             logging.info(
-                                f'Missing duration for {show_id} s{season}e{episode}. Fetching season...'
+                                f'Missing duration for {show_id} s{season}e{episode}.'
+                                f' Fetching season...'
                             )
                             try:
                                 get_season_durations_and_save(driver, show_id, season)
@@ -146,8 +146,6 @@ class Command(LoggableBaseCommand):
                             logging.info('Waiting 60s before next request...')
                             time.sleep(60)
 
-                # Логируем завершение категории специальным сообщением, которое ловит updatedurations
-                # Для 'serial' суффикс пустой, получится старый лог. Для других - новый.
                 logging.info(f'--- New Episodes Parser Finished{log_suffix} ---')
 
             if total_processed_count > 0:

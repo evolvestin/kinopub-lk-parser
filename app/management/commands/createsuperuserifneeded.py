@@ -11,15 +11,15 @@ class Command(LoggableBaseCommand):
     help = "Creates a superuser if it doesn't exist, using environment variables."
 
     def handle(self, *args, **options):
-        User = get_user_model()
+        user_model = get_user_model()
         username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
 
-        if not User.objects.filter(username=username).exists():
+        if not user_model.objects.filter(username=username).exists():
             logging.info(f"Superuser '{username}' not found, creating...")
             email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@example.com')
             password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
             if password:
-                User.objects.create_superuser(username, email, password)
+                user_model.objects.create_superuser(username, email, password)
                 logging.info(f"Superuser '{username}' created.")
                 BackupManager().schedule_backup()
             else:
