@@ -3,10 +3,11 @@ import email.utils
 import logging
 import re
 from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 
 import imaplib2
 from django.conf import settings
+from django.utils import timezone
 
 from app.gdrive_backup import BackupManager
 from app.models import Code
@@ -87,14 +88,18 @@ def process_emails(mail, shutdown_flag):
                 break
 
             status, msg_data = mail.uid('FETCH', uid, '(BODY.PEEK[HEADER.FIELDS (DATE)])')
-            received_at_dt = datetime.now(UTC)
+            received_at_dt = timezone.now()
+
             if status == 'OK' and msg_data and msg_data[0]:
-                date_header = msg_data[0][1].decode('utf-8').split(':', 1)[1].strip()
-                date_tuple = email.utils.parsedate_tz(date_header)
-                if date_tuple:
-                    tz_offset_seconds = date_tuple[9] or 0
-                    tz = timezone(timedelta(seconds=tz_offset_seconds))
-                    received_at_dt = datetime(*date_tuple[:6], tzinfo=tz).astimezone(UTC)
+                try:
+                    date_header = msg_data[0][1].decode('utf-8').split(':', 1)[1].strip()
+                    # parsedate_to_datetime автоматически обрабатывает смещение часового пояса
+                    dt = parsedate_to_datetime(date_header)
+                    received_at_dt = dt.astimezone(timezone.utc)
+                except (ValueError, TypeError, IndexError) as e:
+                    logging.warning(
+                        'Could not parse date for uid=%s (%s). Using current time.', uid, e
+                    )
             else:
                 logging.warning('Could not fetch date for uid=%s. Using current time.', uid)
 

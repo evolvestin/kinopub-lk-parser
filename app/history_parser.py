@@ -7,11 +7,12 @@ import shutil
 import subprocess
 import time
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 import undetected_chromedriver as uc
 from django.conf import settings
 from django.db.models import Max
+from django.utils import timezone
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
@@ -31,7 +32,12 @@ def close_driver(driver):
             driver.quit()
         except Exception:
             pass
-        driver.quit = lambda: None
+
+    def do_nothing():
+        pass
+
+    if driver:
+        driver.quit = do_nothing
 
 
 def _extract_int_from_string(text):
@@ -43,7 +49,7 @@ def _extract_int_from_string(text):
 def update_show_details(driver, show_id):
     try:
         show = Show.objects.get(id=show_id)
-        three_months_ago = datetime.now(UTC) - timedelta(days=90)
+        three_months_ago = timezone.now() - timedelta(days=90)
         if show.year is not None and show.updated_at >= three_months_ago:
             return
 
@@ -292,9 +298,7 @@ def do_login(driver, login, password, cookie_path, base_url):
         timeout = 120
         start_time = time.time()
         used_code_ids = set()
-        expiration_threshold = datetime.now(UTC) - timedelta(
-            minutes=settings.CODE_LIFETIME_MINUTES
-        )
+        expiration_threshold = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
 
         while time.time() - start_time < timeout:
             if login_url not in driver.current_url:
@@ -417,113 +421,77 @@ def initialize_driver_session(headless=True, session_type='main'):
         return None
 
 
-def get_movie_duration_and_save(driver, show_id):
-    # Используем формат ссылки s0e1 для фильмов, как требуется сайтом
-    movie_url = f'{settings.SITE_URL}item/play/{show_id}/s0e1'
-    logging.info('Requesting duration for movie id%d...', show_id)
+def _fetch_playlist_data(driver, url):
+    logging.info(f'Requesting playlist data from {url}...')
     try:
-        driver.get(movie_url)
+        driver.get(url)
         wait = WebDriverWait(driver, 20)
-
-        # Ждем появления скрипта с плейлистом
         wait.until(
             expected_conditions.presence_of_element_located(
                 (By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]')
             )
         )
-
-        # Получаем содержимое скрипта
         script_element = driver.find_element(
             By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]'
         )
         script_text = script_element.get_attribute('innerHTML')
-
-        # Ищем JSON массив
-        playlist_match = re.search(
-            r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);', script_text, re.DOTALL
-        )
-
-        if not playlist_match:
-            logging.warning('Could not find PLAYER_PLAYLIST JSON for movie %s', movie_url)
-            return
-
-        playlist_data = json.loads(playlist_match.group(1))
-
-        if playlist_data and 'duration' in playlist_data[0]:
-            duration_sec = playlist_data[0]['duration']
-            ShowDuration.objects.update_or_create(
-                show_id=show_id,
-                season_number=None,
-                episode_number=None,
-                defaults={'duration_seconds': duration_sec},
-            )
-            logging.info('Cached duration for movie id%d: %d seconds.', show_id, duration_sec)
-        else:
-            logging.warning('Playlist data empty or missing duration for movie %s', movie_url)
+        match = re.search(r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);', script_text, re.DOTALL)
+        if match:
+            return json.loads(match.group(1))
+        logging.warning(f'Could not find PLAYER_PLAYLIST JSON for {url}')
     except Exception as e:
-        logging.error('Error getting duration for movie id%d: %s', show_id, e)
+        logging.error(f'Error getting playlist data from {url}: {e}')
+    return None
+
+
+def get_movie_duration_and_save(driver, show_id):
+    movie_url = f'{settings.SITE_URL}item/play/{show_id}/s0e1'
+    playlist_data = _fetch_playlist_data(driver, movie_url)
+
+    if playlist_data and 'duration' in playlist_data[0]:
+        duration_sec = playlist_data[0]['duration']
+        ShowDuration.objects.update_or_create(
+            show_id=show_id,
+            season_number=None,
+            episode_number=None,
+            defaults={'duration_seconds': duration_sec},
+        )
+        logging.info('Cached duration for movie id%d: %d seconds.', show_id, duration_sec)
+    elif playlist_data:
+        logging.warning('Playlist data empty or missing duration for movie %s', movie_url)
 
 
 def get_season_durations_and_save(driver, show_id, season):
-    # Для получения данных о сезоне открываем первый эпизод этого сезона в плеере
     episode_url = f'{settings.SITE_URL}item/play/{show_id}/s{season}e1'
-    logging.info('Requesting season data for s%d of show id%d...', season, show_id)
-    try:
-        driver.get(episode_url)
-        wait = WebDriverWait(driver, 20)
+    playlist_data = _fetch_playlist_data(driver, episode_url)
 
-        wait.until(
-            expected_conditions.presence_of_element_located(
-                (By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]')
+    if not playlist_data:
+        return
+
+    updated_count = 0
+    for item in playlist_data:
+        item_season = item.get('season')
+        item_episode = item.get('episode')
+        duration_sec = item.get('duration')
+
+        if item_season == season and item_episode is not None and duration_sec is not None:
+            ShowDuration.objects.update_or_create(
+                show_id=show_id,
+                season_number=item_season,
+                episode_number=item_episode,
+                defaults={'duration_seconds': duration_sec},
             )
+            updated_count += 1
+
+    if updated_count > 0:
+        logging.info(
+            'Cached/updated %d episode durations for show id%d, season %d.',
+            updated_count,
+            show_id,
+            season,
         )
-
-        script_element = driver.find_element(
-            By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]'
-        )
-        script_text = script_element.get_attribute('innerHTML')
-
-        playlist_match = re.search(
-            r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);', script_text, re.DOTALL
-        )
-
-        if not playlist_match:
-            logging.warning('Could not find PLAYER_PLAYLIST JSON for %s', episode_url)
-            return
-
-        playlist_data = json.loads(playlist_match.group(1))
-        updated_count = 0
-
-        for item in playlist_data:
-            # В новом формате ключи называются season и episode (ранее snumber и vnumber)
-            item_season = item.get('season')
-            item_episode = item.get('episode')
-            duration_sec = item.get('duration')
-
-            # Проверяем, что данные относятся к запрашиваемому сезону
-            if item_season == season and item_episode is not None and duration_sec is not None:
-                ShowDuration.objects.update_or_create(
-                    show_id=show_id,
-                    season_number=item_season,
-                    episode_number=item_episode,
-                    defaults={'duration_seconds': duration_sec},
-                )
-                updated_count += 1
-
-        if updated_count > 0:
-            logging.info(
-                'Cached/updated %d episode durations for show id%d, season %d.',
-                updated_count,
-                show_id,
-                season,
-            )
-        else:
-            logging.warning(
-                'No episodes found in playlist for show id%d season %d', show_id, season
-            )
-
-    except Exception as e:
-        logging.error('Error getting duration for season %d of show id%d: %s', season, show_id, e)
+    else:
+        logging.warning('No episodes found in playlist for show id%d season %d', show_id, season)
 
 
 def parse_and_save_history(driver, mode, latest_db_date=None):
@@ -634,7 +602,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
                 except Exception as e:
                     logging.error(f'Failed to send history notification: {e}')
 
-    three_months_ago = datetime.now(UTC) - timedelta(days=90)
+    three_months_ago = timezone.now() - timedelta(days=90)
     existing_durations_qs = ShowDuration.objects.filter(
         show_id__in=[item['show_id'] for item in views_on_page]
     )

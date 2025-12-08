@@ -1,10 +1,11 @@
 import logging
 import sys
-from datetime import UTC, datetime
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from app import history_parser
 from app.constants import SHOW_TYPE_MAPPING
@@ -73,21 +74,25 @@ class Command(BaseCommand):
     def _setup_mocks(self):
         logging.info('Setting up database Mocks...')
 
+        def mock_add_country(*args):
+            print(f'   [MockDB] Added Country: {args}')
+
+        def mock_add_genre(*args):
+            print(f'   [MockDB] Added Genre: {args}')
+
+        def mock_add_director(*args):
+            print(f'   [MockDB] Added Director: {args}')
+
+        def mock_add_actor(*args):
+            print(f'   [MockDB] Added Actor: {args}')
+
         mock_show_instance = MagicMock()
         mock_show_instance.year = None
-        mock_show_instance.updated_at = datetime.min.replace(tzinfo=UTC)
-        mock_show_instance.countries.add = MagicMock(
-            side_effect=lambda *args: print(f'   [MockDB] Added Country: {args}')
-        )
-        mock_show_instance.genres.add = MagicMock(
-            side_effect=lambda *args: print(f'   [MockDB] Added Genre: {args}')
-        )
-        mock_show_instance.directors.add = MagicMock(
-            side_effect=lambda *args: print(f'   [MockDB] Added Director: {args}')
-        )
-        mock_show_instance.actors.add = MagicMock(
-            side_effect=lambda *args: print(f'   [MockDB] Added Actor: {args}')
-        )
+        mock_show_instance.updated_at = datetime.min.replace(tzinfo=timezone.utc)
+        mock_show_instance.countries.add = MagicMock(side_effect=mock_add_country)
+        mock_show_instance.genres.add = MagicMock(side_effect=mock_add_genre)
+        mock_show_instance.directors.add = MagicMock(side_effect=mock_add_director)
+        mock_show_instance.actors.add = MagicMock(side_effect=mock_add_actor)
 
         def save_side_effect(*args, **kwargs):
             fields = vars(mock_show_instance)
@@ -98,28 +103,34 @@ class Command(BaseCommand):
 
         mock_show_instance.save = MagicMock(side_effect=save_side_effect)
 
+        def mock_update_or_create_show(**kwargs):
+            print(f'   [MockDB] Show update_or_create: {kwargs}')
+
+        def mock_bulk_create_shows(objs, **kwargs):
+            print(f'   [MockDB] Bulk create Shows: {len(objs)} items')
+
         mock_show_model = MagicMock()
         mock_show_model.objects.get.return_value = mock_show_instance
         mock_show_model.objects.filter.return_value.exists.return_value = False
         mock_show_model.objects.filter.return_value.first.return_value = mock_show_instance
-        mock_show_model.objects.update_or_create.side_effect = lambda **kwargs: print(
-            f'   [MockDB] Show update_or_create: {kwargs}'
-        )
-        mock_show_model.objects.bulk_create.side_effect = lambda objs, **kwargs: print(
-            f'   [MockDB] Bulk create Shows: {len(objs)} items'
-        )
+        mock_show_model.objects.update_or_create.side_effect = mock_update_or_create_show
+        mock_show_model.objects.bulk_create.side_effect = mock_bulk_create_shows
+
+        def mock_update_or_create_duration(**kwargs):
+            print(f'   [MockDB] Duration update_or_create: {kwargs}')
 
         mock_show_duration_model = MagicMock()
-        mock_show_duration_model.objects.update_or_create.side_effect = lambda **kwargs: print(
-            f'   [MockDB] Duration update_or_create: {kwargs}'
+        mock_show_duration_model.objects.update_or_create.side_effect = (
+            mock_update_or_create_duration
         )
         mock_show_duration_model.objects.filter.return_value.exists.return_value = False
 
+        def mock_bulk_create_history(objs, **kwargs):
+            print(f'   [MockDB] ViewHistory bulk_create: {len(objs)} items')
+            return objs
+
         mock_view_history_model = MagicMock()
-        mock_view_history_model.objects.bulk_create.side_effect = lambda objs, **kwargs: (
-            print(f'   [MockDB] ViewHistory bulk_create: {len(objs)} items'),
-            objs,
-        )[1]
+        mock_view_history_model.objects.bulk_create.side_effect = mock_bulk_create_history
         mock_view_history_model.objects.count.return_value = 0
         mock_view_history_model.objects.filter.return_value.aggregate.return_value = {
             'max_date': None

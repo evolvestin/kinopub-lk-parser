@@ -1,10 +1,11 @@
 import logging
 import re
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.management.base import CommandError
+from django.utils import timezone
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 
@@ -119,9 +120,7 @@ def run_full_scan_session(headless=True, target_type=None):
 
     start_mode = None
     start_page = 1
-    resume_window = datetime.now(UTC) - timedelta(
-        hours=settings.FULL_SCAN_RESUME_WINDOW_HOURS
-    )
+    resume_window = timezone.now() - timedelta(hours=settings.FULL_SCAN_RESUME_WINDOW_HOURS)
     last_log = (
         LogEntry.objects.filter(
             module='runfullscan',

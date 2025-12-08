@@ -20,6 +20,7 @@ select = [
     "UP",  # pyupgrade
     "B",   # bugbear
     "N",   # naming
+    "E731", # do not assign a lambda expression, use a def
 ]
 ignore = [
     "Q000",  # ignore cases with unnecessary escapes
@@ -31,6 +32,7 @@ fixable = [
     "Q002",
     "F401",
     "F841",
+    "W293",
 ]
 
 [tool.ruff.format]

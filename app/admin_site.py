@@ -145,7 +145,6 @@ class CustomAdminSite(admin.AdminSite):
             request.method == 'POST'
             and not request.headers.get('x-requested-with') == 'XMLHttpRequest'
         ):
-            # Обработка остановки задачи
             if 'stop_task_id' in request.POST:
                 try:
                     task_to_stop = TaskRun.objects.get(
@@ -162,11 +161,9 @@ class CustomAdminSite(admin.AdminSite):
                     messages.error(request, 'Задача не найдена или уже завершена.')
                 return redirect('admin:task_control')
 
-            # Обработка запуска новой задачи
             command_name = request.POST.get('command')
 
             if command_name and command_name in commands_info:
-                # 1. Проверяем, есть ли уже запущенная задача этого типа
                 running_tasks = TaskRun.objects.filter(command=command_name, status='RUNNING')
                 for old_task in running_tasks:
                     if old_task.celery_task_id:
@@ -180,10 +177,9 @@ class CustomAdminSite(admin.AdminSite):
                     messages.warning(
                         request,
                         f"Предыдущие активные задачи '{command_name}'"
-                        f" были принудительно остановлены.",
+                        f' были принудительно остановлены.',
                     )
 
-                # 2. Сбор аргументов
                 cmd_config = commands_info[command_name]
                 args_list = []
 
@@ -195,7 +191,6 @@ class CustomAdminSite(admin.AdminSite):
                         if value:
                             args_list.append(str(value))
                     else:
-                        # Опциональные аргументы (флаги)
                         if arg['type'] == 'checkbox':
                             if value == 'on':
                                 args_list.append(arg['name'])
@@ -212,7 +207,6 @@ class CustomAdminSite(admin.AdminSite):
                 messages.success(request, f'Команда {command_name} поставлена в очередь.')
                 return redirect('admin:task_control')
 
-        # Обработка расписания (для отображения таблицы Cron)
         scheduled_tasks = []
         now = timezone.now()
         if hasattr(settings, 'CELERY_BEAT_SCHEDULE'):
@@ -251,9 +245,11 @@ class CustomAdminSite(admin.AdminSite):
                     }
                 )
 
-        scheduled_tasks.sort(key=lambda x: x['seconds_left'])
+        def get_seconds_left(task):
+            return task['seconds_left']
 
-        # AJAX запрос для обновления таблиц
+        scheduled_tasks.sort(key=get_seconds_left)
+
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             recent_tasks = TaskRun.objects.all()[:10]
             logs_qs = LogEntry.objects.all()[:30]
@@ -298,7 +294,7 @@ class CustomAdminSite(admin.AdminSite):
         context = self.each_context(request)
         context.update(
             {
-                'commands_json': json.dumps(commands_info),  # Передаем структуру команд в JS
+                'commands_json': json.dumps(commands_info),
                 'available_commands_list': commands_info.keys(),
                 'recent_tasks': recent_tasks,
                 'scheduled_tasks': scheduled_tasks,
