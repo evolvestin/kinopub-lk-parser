@@ -8,6 +8,7 @@ from django.utils.html import format_html, format_html_join
 
 # Импортируем нашу кастомную админку
 from app.admin_site import admin_site
+from django.templatetags.static import static
 from app.models import (
     Code,
     Country,
@@ -332,10 +333,11 @@ class ViewHistoryAdmin(admin.ModelAdmin):
         'get_season',
         'get_episode',
         'get_users',
+        'get_is_checked_display',
         'created_at',
         'updated_at',
     )
-    list_filter = ('view_date', 'users')
+    list_filter = ('is_checked', 'view_date', 'users')
     search_fields = ('show__title', 'show__original_title')
     autocomplete_fields = ('show',)
     filter_horizontal = ('users',)
@@ -360,6 +362,11 @@ class ViewHistoryAdmin(admin.ModelAdmin):
     def get_episode(self, obj):
         return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
 
+    @admin.display(description='Учтено')
+    def get_is_checked_display(self, obj):
+        if not obj.is_checked:
+            return format_html('<img src="{}" alt="False">', static('admin/img/icon-no.svg'))
+        return ''
 
 @admin.register(ShowDuration, site=admin_site)
 class ShowDurationAdmin(admin.ModelAdmin):

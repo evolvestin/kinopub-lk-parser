@@ -143,14 +143,20 @@ def run_admin_command(self, task_run_id):
                 if retcode is not None:
                     stdout_f.seek(0)
                     stderr_f.seek(0)
-                    output = stdout_f.read() + '\n' + stderr_f.read()
-                    task_run.output = output.strip()
+                    out_text = stdout_f.read()
+                    err_text = stderr_f.read()
+
+                    task_run.output = (out_text + '\n' + err_text).strip()
 
                     if retcode == 0:
                         task_run.status = 'SUCCESS'
                     else:
                         task_run.status = 'FAILURE'
                         task_run.error_message = f'Exit code: {retcode}'
+                        
+                        # Дублируем ошибку в системный лог, чтобы её было видно в Dashboard
+                        log_msg = err_text.strip() or out_text.strip() or 'No output captured'
+                        logging.error(f"Task '{task_run.command}' failed (code {retcode}): {log_msg}")
 
                     task_run.updated_at = timezone.now()
                     task_run.save()

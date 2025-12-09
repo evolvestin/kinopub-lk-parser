@@ -146,6 +146,7 @@ class ViewHistory(BaseModel):
     season_number = models.IntegerField(default=0)
     episode_number = models.IntegerField(default=0)
     users = models.ManyToManyField(ViewUser, related_name='history', blank=True)
+    is_checked = models.BooleanField(default=True, verbose_name='Учтено')
 
     class Meta:
         indexes = [
