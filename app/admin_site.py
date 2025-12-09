@@ -189,13 +189,13 @@ class CustomAdminSite(admin.AdminSite):
 
                     if arg['is_positional']:
                         if value:
-                            args_list.append(str(value))
+                            args_list.append(json.dumps(value))
                     else:
                         if arg['type'] == 'checkbox':
                             if value == 'on':
                                 args_list.append(arg['name'])
                         elif value:
-                            args_list.append(f'{arg["name"]} {value}')
+                            args_list.append(f'{arg["name"]} {json.dumps(value)}')
 
                 arguments_str = ' '.join(args_list)
 
