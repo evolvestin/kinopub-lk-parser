@@ -31,7 +31,7 @@ class Command(LoggableBaseCommand):
 
         # Категории для парсинга: (параметр URL, тип в БД, суффикс лога)
         categories = [
-            ('serial', 'Series', ''),  # Пустой суффикс для сохранения старого формата лога
+            ('serial', 'Series', '(series)'),
             ('docuserial', 'Documentary Series', ' (docuserial)'),
             ('tvshow', 'TV Show', ' (tvshow)'),
         ]

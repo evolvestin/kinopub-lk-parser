@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/bot/imdb/<str:imdb_id>/', views.bot_get_by_imdb),
     path('api/bot/assign_view/', views.bot_assign_view),
     path('api/bot/unassign_view/', views.bot_unassign_view),
+    path('api/bot/toggle_check/', views.bot_toggle_view_check),
 ]
 
 if not settings.DEBUG:

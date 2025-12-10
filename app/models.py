@@ -147,6 +147,7 @@ class ViewHistory(BaseModel):
     episode_number = models.IntegerField(default=0)
     users = models.ManyToManyField(ViewUser, related_name='history', blank=True)
     is_checked = models.BooleanField(default=True, verbose_name='Учтено')
+    telegram_message_id = models.IntegerField(null=True, blank=True)
 
     class Meta:
         indexes = [

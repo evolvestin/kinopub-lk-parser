@@ -57,3 +57,26 @@ async def cancel_claim_handler(callback: CallbackQuery, bot: Bot):
 
     except Exception as e:
         await callback.answer(f'Ошибка: {e}', show_alert=True)
+
+
+async def toggle_check_handler(callback: CallbackQuery, bot: Bot):
+    """
+    Обрабатывает переключение статуса просмотра (Учтено/Не учтено).
+    Format: toggle_check_<view_id>
+    """
+    try:
+        _, view_id = callback.data.split('_', 1)
+        view_id = int(view_id)
+
+        result = await client.toggle_view_check(view_id)
+
+        if result and result.get('status') == 'ok':
+            msg = result.get('message', 'Статус обновлен')
+            await callback.answer(msg)
+            # Само сообщение обновится через TelegramSender со стороны Django
+        else:
+            err = result.get('error') if result else 'Unknown error'
+            await callback.answer(f'Ошибка: {err}', show_alert=True)
+
+    except Exception as e:
+        await callback.answer(f'Ошибка: {e}', show_alert=True)

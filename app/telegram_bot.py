@@ -157,14 +157,23 @@ class TelegramSender:
         else:
             content_info = f'🎬 <b>{title}</b>'
 
+        status_icon = '✅' if view_history_obj.is_checked else '❌'
         text = (
             f'{content_info}\n'
             f'🗓 {view_history_obj.view_date.strftime("%d.%m.%Y")}\n'
             f'<i>Новый просмотр зафиксирован</i>'
         )
 
+        # Кнопка для управления статусом "Учтено"
+        btn_text = f'{status_icon} Учтено' if view_history_obj.is_checked else '❌ Не учтено'
+        
+        # Кнопка присвоения пользователю (Deep Link)
         url = f'https://t.me/{self.bot_username}?start=claim_{view_history_obj.id}'
-        keyboard = [[{'text': '👀 Это я смотрю', 'url': url}]]
+        
+        keyboard = [
+            [{'text': btn_text, 'callback_data': f'toggle_check_{view_history_obj.id}'}],
+            [{'text': '👀 Это я смотрю', 'url': url}]
+        ]
 
         payload = {
             'chat_id': settings.HISTORY_CHANNEL_ID,
@@ -172,7 +181,62 @@ class TelegramSender:
             'parse_mode': 'HTML',
             'reply_markup': {'inline_keyboard': keyboard},
         }
-        self._request('send_message', payload)
+        data = self._request('send_message', payload)
+        
+        if data and data.get('ok'):
+            msg_id = data['result']['message_id']
+            view_history_obj.telegram_message_id = msg_id
+            view_history_obj.save(update_fields=['telegram_message_id'])
+
+    def update_history_message(self, view_history_obj):
+        if not settings.HISTORY_CHANNEL_ID or not view_history_obj.telegram_message_id:
+            return
+
+        show = view_history_obj.show
+        title = show.title or show.original_title or f'Show {show.id}'
+        if show.title and show.original_title and show.title != show.original_title:
+            title = f'{show.title} ({show.original_title})'
+
+        season = view_history_obj.season_number
+        episode = view_history_obj.episode_number
+
+        if season and season > 0:
+            content_info = f'📺 <b>{title}</b>\nS{season:02d}E{episode:02d}'
+        else:
+            content_info = f'🎬 <b>{title}</b>'
+
+        date_str = view_history_obj.view_date.strftime("%d.%m.%Y")
+        
+        if view_history_obj.is_checked:
+            text = (
+                f'{content_info}\n'
+                f'🗓 {date_str}\n'
+                f'<i>Просмотр учтён</i>'
+            )
+            btn_text = '✅ Учтено'
+        else:
+            # Зачеркиваем текст, если не учтено
+            text = (
+                f'<s>{content_info}</s>\n'
+                f'🗓 {date_str}\n'
+                f'<i>Не учитывается в статистике</i>'
+            )
+            btn_text = '❌ Не учтено'
+
+        url = f'https://t.me/{self.bot_username}?start=claim_{view_history_obj.id}'
+        keyboard = [
+            [{'text': btn_text, 'callback_data': f'toggle_check_{view_history_obj.id}'}],
+            [{'text': '👀 Это я смотрю', 'url': url}]
+        ]
+
+        payload = {
+            'chat_id': settings.HISTORY_CHANNEL_ID,
+            'message_id': view_history_obj.telegram_message_id,
+            'text': text,
+            'parse_mode': 'HTML',
+            'reply_markup': {'inline_keyboard': keyboard},
+        }
+        self._request('edit_message', payload)
 
     def send_role_upgrade_notification(self, telegram_id, role):
         if not settings.HISTORY_CHANNEL_ID:

@@ -53,6 +53,7 @@ def register_router() -> Router:
     # --- Callbacks ---
     router.callback_query.register(callbacks.role_switch_handler, F.data.startswith('setrole_'))
     router.callback_query.register(callbacks.cancel_claim_handler, F.data.startswith('unclaim_'))
+    router.callback_query.register(callbacks.toggle_check_handler, F.data.startswith('toggle_check_'))
 
     return router
 

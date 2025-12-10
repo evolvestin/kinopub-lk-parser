@@ -6,7 +6,7 @@ from datetime import datetime
 from django.core.management.base import CommandError
 from django.db.models import Q
 
-from app.constants import SHOW_TYPE_MAPPING
+from app.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
     close_driver,
@@ -37,27 +37,18 @@ class Command(LoggableBaseCommand):
 
         show_ids_to_update = []
 
-        # Универсальное получение типа для БД
         target_db_type = SHOW_TYPE_MAPPING.get(show_type)
         if not target_db_type and show_type in SHOW_TYPE_MAPPING.values():
             target_db_type = show_type
 
-        series_db_types = [
-            SHOW_TYPE_MAPPING['serial'],
-            SHOW_TYPE_MAPPING['docuserial'],
-            SHOW_TYPE_MAPPING['tvshow'],
-        ]
-
-        is_series_mode = target_db_type in series_db_types
-
-        if is_series_mode:
+        if target_db_type in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES:
             logging.info(
                 f'Series mode detected ({show_type} -> {target_db_type}).'
                 f' Limit ignored. Fetching shows...'
             )
 
             if target_db_type == SHOW_TYPE_MAPPING['serial']:
-                log_marker = 'New Episodes Parser Finished'
+                log_marker = 'New Episodes Parser Finished (serial)'
             elif target_db_type == SHOW_TYPE_MAPPING['docuserial']:
                 log_marker = 'New Episodes Parser Finished (docuserial)'
             elif target_db_type == SHOW_TYPE_MAPPING['tvshow']:

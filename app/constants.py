@@ -30,16 +30,32 @@ MONTHS_MAP = {
     'December': '12',
 }
 
+
+class ShowType(StrEnum):
+    SERIES = 'serial'
+    MOVIE = 'movie'
+    MOVIE_3D = '3d'
+    DOCUMENTARY_MOVIE = 'documovie'
+    DOCUMENTARY_SERIES = 'docuserial'
+    TV_SHOW = 'tvshow'
+    CONCERT = 'concert'
+
+
 SHOW_TYPE_MAPPING = {
-    'serial': 'Series',
-    'movie': 'Movie',
-    'concert': 'Concert',
-    'documovie': 'Documentary Movie',
-    'docuserial': 'Documentary Series',
-    'tvshow': 'TV Show',
-    'sport': 'Sports Program',
-    '3d': '3D Movie',
+    ShowType.SERIES: 'Series',
+    ShowType.MOVIE: 'Movie',
+    ShowType.CONCERT: 'Concert',
+    ShowType.DOCUMENTARY_MOVIE: 'Documentary Movie',
+    ShowType.DOCUMENTARY_SERIES: 'Documentary Series',
+    ShowType.TV_SHOW: 'TV Show',
+    ShowType.MOVIE_3D: '3D Movie',
 }
+
+SHOW_TYPES_TRACKED_VIA_NEW_EPISODES = [
+    SHOW_TYPE_MAPPING[ShowType.SERIES],
+    SHOW_TYPE_MAPPING[ShowType.DOCUMENTARY_SERIES],
+    SHOW_TYPE_MAPPING[ShowType.TV_SHOW],
+]
 
 SHOW_STATUS_MAPPING = {
     'окончен': 'Finished',
