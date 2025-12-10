@@ -80,7 +80,7 @@ class Command(LoggableBaseCommand):
 
                     show_url = f'{base_url}item/view/{show_id}'
                     driver.get(show_url)
-                    time.sleep(1)
+                    time.sleep(8)
 
                     update_show_details(driver, show_id)
 
