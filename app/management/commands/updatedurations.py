@@ -33,31 +33,32 @@ class Command(LoggableBaseCommand):
 
     def handle(self, *args, **options):
         limit = options['limit']
-        show_type = options.get('type')
+        input_type = options.get('type')
 
         show_ids_to_update = []
+        target_show_type = None
+        url_type = None
 
-        target_db_type = SHOW_TYPE_MAPPING.get(show_type)
-        if not target_db_type and show_type in SHOW_TYPE_MAPPING.values():
-            target_db_type = show_type
+        if input_type:
+            for key, val in SHOW_TYPE_MAPPING.items():
+                if input_type.lower() in (key.lower(), val.lower()):
+                    url_type = key
+                    target_show_type = val
+                    break
+            
+            if not target_show_type:
+                target_show_type = input_type
 
-        if target_db_type in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES:
+        if url_type in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES:
             logging.info(
-                f'Series mode detected ({show_type} -> {target_db_type}).'
-                f' Limit ignored. Fetching shows...'
+                f'Series mode detected ({target_show_type}). '
+                f'Limit ignored. Fetching shows based on logs...'
             )
-
-            if target_db_type == SHOW_TYPE_MAPPING['serial']:
-                log_marker = 'New Episodes Parser Finished (serial)'
-            elif target_db_type == SHOW_TYPE_MAPPING['docuserial']:
-                log_marker = 'New Episodes Parser Finished (docuserial)'
-            elif target_db_type == SHOW_TYPE_MAPPING['tvshow']:
-                log_marker = 'New Episodes Parser Finished (tvshow)'
-            else:
-                log_marker = 'New Episodes Parser Finished'
-
+            
             first_anchor_log = (
-                LogEntry.objects.filter(message__contains=log_marker).order_by('created_at').first()
+                LogEntry.objects.filter(
+                    message__contains=f'New Episodes Parser Finished ({url_type})'
+                ).order_by('created_at').first()
             )
 
             anchor_date = first_anchor_log.created_at if first_anchor_log else datetime.min
@@ -85,7 +86,7 @@ class Command(LoggableBaseCommand):
                 if match:
                     error_ids.add(int(match.group(1)))
 
-            all_series_ids = Show.objects.filter(type=target_db_type).values_list('id', flat=True)
+            all_series_ids = Show.objects.filter(type=target_show_type).values_list('id', flat=True)
 
             for show_id in all_series_ids:
                 if show_id not in success_ids or show_id in error_ids:
@@ -96,8 +97,8 @@ class Command(LoggableBaseCommand):
                 raise CommandError('Limit must be a positive integer.')
 
             msg = f'Searching for up to {limit} shows with missing duration information'
-            if show_type:
-                msg += f' (type: {show_type})'
+            if input_type:
+                msg += f' (type: {target_show_type})'
             logging.info(f'{msg}...')
 
             error_ids = set()
@@ -108,11 +109,8 @@ class Command(LoggableBaseCommand):
                     error_ids.add(int(match.group(1)))
 
             base_qs = Show.objects.all()
-            if show_type:
-                if target_db_type:
-                    base_qs = base_qs.filter(type=target_db_type)
-                else:
-                    base_qs = base_qs.filter(type=show_type)
+            if target_show_type:
+                base_qs = base_qs.filter(type=target_show_type)
 
             priority_ids = list(
                 base_qs.filter(id__in=error_ids).values_list('id', flat=True)[:limit]

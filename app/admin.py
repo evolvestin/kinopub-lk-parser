@@ -362,11 +362,9 @@ class ViewHistoryAdmin(admin.ModelAdmin):
     def get_episode(self, obj):
         return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
 
-    @admin.display(description='Учтено')
+    @admin.display(description='Учтено', boolean=True)
     def get_is_checked_display(self, obj):
-        if not obj.is_checked:
-            return format_html('<img src="{}" alt="False">', static('admin/img/icon-no.svg'))
-        return ''
+        return obj.is_checked
 
 @admin.register(ShowDuration, site=admin_site)
 class ShowDurationAdmin(admin.ModelAdmin):

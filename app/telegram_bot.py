@@ -26,6 +26,10 @@ class TelegramSender:
 
         return cls._instance
 
+    @property
+    def bot_username(self):
+        return self._bot_username
+
     def _request(self, endpoint: str, payload: dict = None, method: str = 'POST') -> dict | None:
         url = f'{self.service_url}/{endpoint}'
         try:

@@ -9,6 +9,9 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+
+from django.db.models import Q
+
 import undetected_chromedriver as uc
 from django.conf import settings
 from django.db.models import Max
@@ -558,7 +561,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
                     'show_id': show_id,
                     'title': title,
                     'original_title': original_title,
-                    'view_date': formatted_date,
+                    'view_date': current_date_from_site,
                     'season': season,
                     'episode': episode,
                     'type': item_type,
@@ -578,20 +581,40 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
     ]
     Show.objects.bulk_create(shows_to_create, ignore_conflicts=True)
 
-    views_to_create = [
-        ViewHistory(
+    q_objects = Q()
+    for item in views_on_page:
+        q_objects |= Q(
             show_id=item['show_id'],
             view_date=item['view_date'],
             season_number=item['season'],
-            episode_number=item['episode'],
+            episode_number=item['episode']
         )
-        for item in views_on_page
-    ]
 
-    before_count = ViewHistory.objects.count()
-    created_views = ViewHistory.objects.bulk_create(views_to_create, ignore_conflicts=True)
-    after_count = ViewHistory.objects.count()
-    views_added = after_count - before_count
+    existing_set = set()
+    if q_objects:
+        existing_set = set(
+            ViewHistory.objects.filter(q_objects).values_list(
+                'show_id', 'view_date', 'season_number', 'episode_number'
+            )
+        )
+
+    new_views_to_create = []
+    for item in views_on_page:
+        key = (item['show_id'], item['view_date'], item['season'], item['episode'])
+        if key not in existing_set:
+            new_views_to_create.append(ViewHistory(
+                show_id=item['show_id'],
+                view_date=item['view_date'],
+                season_number=item['season'],
+                episode_number=item['episode'],
+            ))
+            existing_set.add(key)
+
+    created_views = []
+    if new_views_to_create:
+        created_views = ViewHistory.objects.bulk_create(new_views_to_create)
+
+    views_added = len(created_views)
 
     for view in created_views:
         view_history_created.send(sender=ViewHistory, instance=view)
