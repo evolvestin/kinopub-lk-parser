@@ -9,7 +9,7 @@ from django.utils import timezone
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 
-from app.constants import SHOW_TYPE_MAPPING
+from app.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 from app.gdrive_backup import BackupManager
 from app.history_parser import close_driver, get_total_pages, initialize_driver_session
 from app.management.base import LoggableBaseCommand
@@ -17,26 +17,52 @@ from app.models import LogEntry, Show
 
 
 def parse_and_save_catalog_page(driver, mode):
-    shows_on_page = []
-    item_blocks = driver.find_elements(By.CSS_SELECTOR, "#items > div[class*='col-']")
-    logging.debug('Found %d item blocks on page.', len(item_blocks))
+    script = """
+    const results = [];
+    const blocks = document.querySelectorAll("#items > div[class*='col-']");
+    
+    blocks.forEach(block => {
+        const linkEl = block.querySelector('.item-poster a');
+        if (!linkEl) return;
+        
+        const titleEl = block.querySelector('.item-title a');
+        const origTitleEl = block.querySelector('.item-author a');
+        const kpLink = block.querySelector(".bottomcenter-2x a[href*='kinopoisk.ru']");
+        const imdbLink = block.querySelector(".bottomcenter-2x a[href*='imdb.com']");
+        
+        results.push({
+            href: linkEl.getAttribute('href'),
+            title: titleEl ? titleEl.textContent.trim() : '',
+            original_title: origTitleEl ? origTitleEl.textContent.trim() : '',
+            kp_url: kpLink ? kpLink.getAttribute('href') : null,
+            kp_rating: kpLink ? kpLink.textContent.trim() : null,
+            imdb_url: imdbLink ? imdbLink.getAttribute('href') : null,
+            imdb_rating: imdbLink ? imdbLink.textContent.trim() : null
+        });
+    });
+    return results;
+    """
 
-    for block in item_blocks:
+    try:
+        items_data = driver.execute_script(script)
+    except Exception as e:
+        logging.error('Error executing JS parser: %s', e)
+        return 0
+
+    if not items_data:
+        return 0
+
+    shows_on_page = []
+    
+    for item in items_data:
         try:
-            link_element = block.find_element(By.CSS_SELECTOR, '.item-poster a')
-            href = link_element.get_attribute('href')
-            match = re.search(r'/item/view/(\d+)', href)
+            match = re.search(r'/item/view/(\d+)', item['href'])
             if not match:
                 continue
+            
             show_id = int(match.group(1))
-
-            title = block.find_element(By.CSS_SELECTOR, '.item-title a').text.strip()
-            try:
-                original_title = block.find_element(By.CSS_SELECTOR, '.item-author a').text.strip()
-            except NoSuchElementException:
-                original_title = title
-            if not original_title:
-                original_title = title
+            title = item['title']
+            original_title = item['original_title'] if item['original_title'] else title
 
             show_data = {
                 'id': show_id,
@@ -49,46 +75,35 @@ def parse_and_save_catalog_page(driver, mode):
                 'imdb_rating': None,
             }
 
-            try:
-                rating_container = block.find_element(By.CSS_SELECTOR, '.bottomcenter-2x')
+            if item['kp_url']:
+                url = item['kp_url']
+                if '/film/' in url and not url.endswith('/film/'):
+                    show_data['kinopoisk_url'] = url
+                    if item['kp_rating']:
+                        try:
+                            show_data['kinopoisk_rating'] = float(item['kp_rating'])
+                        except ValueError:
+                            pass
 
-                try:
-                    kp_link = rating_container.find_element(
-                        By.CSS_SELECTOR, "a[href*='kinopoisk.ru']"
-                    )
-                    href = kp_link.get_attribute('href')
-                    if '/film/' in href and not href.endswith('/film/'):
-                        show_data['kinopoisk_url'] = href
-                        rating_text = kp_link.text.strip()
-                        if rating_text:
-                            show_data['kinopoisk_rating'] = float(rating_text)
-                except (NoSuchElementException, ValueError):
-                    pass
-
-                try:
-                    imdb_link = rating_container.find_element(
-                        By.CSS_SELECTOR, "a[href*='imdb.com']"
-                    )
-                    href = imdb_link.get_attribute('href')
-                    if '/title/tt' in href:
-                        show_data['imdb_url'] = href
-                        rating_text = imdb_link.text.strip()
-                        if rating_text:
-                            show_data['imdb_rating'] = float(rating_text)
-                except (NoSuchElementException, ValueError):
-                    pass
-
-            except NoSuchElementException:
-                logging.debug(f'Rating container not found for show id={show_id}')
+            if item['imdb_url']:
+                url = item['imdb_url']
+                if '/title/tt' in url:
+                    show_data['imdb_url'] = url
+                    if item['imdb_rating']:
+                        try:
+                            show_data['imdb_rating'] = float(item['imdb_rating'])
+                        except ValueError:
+                            pass
 
             shows_on_page.append(show_data)
+
         except Exception as e:
-            logging.error('Error parsing a show block: %s', e)
+            logging.error('Error processing item data: %s', e)
 
     if not shows_on_page:
         return 0
 
-    page_ids = [item['id'] for item in shows_on_page]
+    page_ids = [s['id'] for s in shows_on_page]
     existing_ids = set(Show.objects.filter(id__in=page_ids).values_list('id', flat=True))
     new_count = len(page_ids) - len(existing_ids)
 
@@ -165,8 +180,8 @@ def run_full_scan_session(headless=True, target_type=None):
             if target_type and mode != target_type:
                 continue
 
-            if not target_type and mode == 'serial':
-                logging.info("Skipping 'serial' mode by default. Use --type=serial to force scan.")
+            if not target_type and mode in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES:
+                logging.info(f"Skipping '{mode}' mode by default. Use --type={mode} to force scan.")
                 continue
 
             if not mode_found and mode == start_mode:
@@ -204,7 +219,6 @@ def run_full_scan_session(headless=True, target_type=None):
                     if not driver:
                         raise CommandError('Failed to restart driver. Aborting scan.')
 
-                logging.info("Processing '%s' page %d of %d...", mode, page, total_pages)
                 page_url = f'{base_url}?page={page}&per-page=50'
 
                 try:
@@ -215,7 +229,13 @@ def run_full_scan_session(headless=True, target_type=None):
 
                     driver.get(page_url)
                     added_count = parse_and_save_catalog_page(driver, mode)
-                    logging.info('Saved %d show records from page %d.', added_count, page)
+                    logging.info(
+                        "Processing '%s' page %d of %d. Saved %d records.",
+                        mode,
+                        page,
+                        total_pages,
+                        added_count,
+                    )
                     time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
                 except Exception as e:
                     err_str = str(e).lower()
