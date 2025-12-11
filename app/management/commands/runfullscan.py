@@ -254,6 +254,13 @@ class Command(LoggableBaseCommand):
 
     def handle(self, *args, **options):
         target_type = options.get('type')
+
+        if target_type and target_type not in SHOW_TYPE_MAPPING:
+            for key, val in SHOW_TYPE_MAPPING.items():
+                if val == target_type:
+                    target_type = key
+                    break
+
         if target_type and target_type not in SHOW_TYPE_MAPPING:
             raise CommandError(
                 f'Invalid type: {target_type}. Choices: {", ".join(SHOW_TYPE_MAPPING.keys())}'
