@@ -3,6 +3,7 @@ import os
 from typing import Any
 
 import aiohttp
+
 from shared.constants import UserRole
 
 BACKEND_URL = os.getenv('BACKEND_URL')
@@ -118,6 +119,7 @@ async def toggle_view_user(telegram_id: int, view_id: int) -> dict | None:
     payload = {'telegram_id': telegram_id, 'view_id': view_id}
     return await _execute_request('toggle_view_user/', method='POST', payload=payload)
 
+
 async def rate_show(
     telegram_id: int, show_id: int, rating: float, season: int = None, episode: int = None
 ) -> dict | None:
@@ -129,3 +131,8 @@ async def rate_show(
         'episode': episode,
     }
     return await _execute_request('rate/', method='POST', payload=payload)
+
+
+async def get_show_episodes(show_id: int) -> list:
+    data = await _execute_request(f'show/{show_id}/episodes/')
+    return data.get('episodes', []) if data else []

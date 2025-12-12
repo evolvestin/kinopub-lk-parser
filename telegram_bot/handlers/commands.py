@@ -8,8 +8,8 @@ from aiogram.filters import CommandObject
 from aiogram.types import Message
 from sender import MessageSender
 
-from shared.html_helper import bold, html_secure
 from shared.card_formatter import get_show_card_text
+from shared.html_helper import bold, html_secure
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 
@@ -54,12 +54,14 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
 
                 # Получаем полную информацию о шоу
                 show_data = await client.get_show_details(show_id)
-                
+
                 if show_data:
                     # Отправляем карточку, передавая данные о конкретном эпизоде для кнопок
                     await _send_show_card(sender, user.id, show_data, season, episode)
                 else:
-                    await sender.send_message(chat_id=user.id, text='❌ Информация о шоу не найдена.')
+                    await sender.send_message(
+                        chat_id=user.id, text='❌ Информация о шоу не найдена.'
+                    )
 
             except (IndexError, ValueError):
                 await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка на оценку.')
@@ -79,6 +81,7 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
 
     await sender.send_message(chat_id=user.id, text=text)
 
+
 async def bot_command_start_group(message: Message, bot: Bot):
     sender = MessageSender(bot)
     text = (
@@ -89,20 +92,16 @@ async def bot_command_start_group(message: Message, bot: Bot):
 
 
 async def _send_show_card(
-    sender: MessageSender, 
-    chat_id: int, 
-    show_data: dict, 
-    season: int = None, 
-    episode: int = None
+    sender: MessageSender, chat_id: int, show_data: dict, season: int = None, episode: int = None
 ):
     show_id = show_data.get('id')
     keyboard = None
     if show_id:
         # Передаем сезон и эпизод в генератор клавиатуры, если они есть
         keyboard = keyboards.get_show_card_keyboard(show_id, season, episode)
-    
+
     await sender.send_message(
-        chat_id=chat_id, 
+        chat_id=chat_id,
         text=get_show_card_text(
             show_id=show_id,
             title=show_data.get('title', ''),
@@ -116,10 +115,11 @@ async def _send_show_card(
             imdb_rating=show_data.get('imdb_rating'),
             imdb_url=show_data.get('imdb_url'),
             kp_rating=show_data.get('kinopoisk_rating'),
-            kp_url=show_data.get('kinopoisk_url')
+            kp_url=show_data.get('kinopoisk_url'),
         ),
-        keyboard=keyboard
+        keyboard=keyboard,
     )
+
 
 async def handle_view_command(message: Message, bot: Bot):
     """Обработка команды /view_123"""

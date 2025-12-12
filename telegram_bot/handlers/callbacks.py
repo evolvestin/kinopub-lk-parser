@@ -3,7 +3,8 @@ import keyboards
 from aiogram import Bot
 from aiogram.types import CallbackQuery
 from html_helper import italic
-from shared.constants import UserRole
+
+from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES, UserRole
 
 
 async def role_switch_handler(callback: CallbackQuery, bot: Bot):
@@ -22,8 +23,8 @@ async def role_switch_handler(callback: CallbackQuery, bot: Bot):
         parts = callback.data.split('_')
         # setrole, user_id, role
         if len(parts) < 3:
-            raise ValueError("Invalid callback data format")
-        
+            raise ValueError('Invalid callback data format')
+
         target_user_id = int(parts[1])
         role = parts[2]
 
@@ -110,17 +111,23 @@ async def claim_toggle_handler(callback: CallbackQuery, bot: Bot):
 
     role = await client.check_user_role(user.id)
     if role == UserRole.GUEST:
-        await callback.answer('🔒 Недостаточно прав (Guest). Обратитесь к администратору.', show_alert=True)
+        await callback.answer(
+            '🔒 Недостаточно прав (Guest). Обратитесь к администратору.', show_alert=True
+        )
         return
 
     try:
         view_id = int(callback.data.split('_')[-1])
-        
+
         result = await client.toggle_view_user(user.id, view_id)
 
         if result and result.get('status') == 'ok':
             action = result.get('action')
-            text = "Вы добавлены в список просмотра" if action == 'added' else "Вы убраны из списка просмотра"
+            text = (
+                'Вы добавлены в список просмотра'
+                if action == 'added'
+                else 'Вы убраны из списка просмотра'
+            )
             await callback.answer(text)
         else:
             await callback.answer('Ошибка обновления статуса', show_alert=True)
@@ -131,27 +138,40 @@ async def claim_toggle_handler(callback: CallbackQuery, bot: Bot):
 
 async def rate_show_start_handler(callback: CallbackQuery, bot: Bot):
     """
-    Показывает клавиатуру с выбором оценки.
+    Нажатие кнопки 'Оценить'. Проверяет тип шоу и либо показывает грид, либо меню выбора.
     Format: rate_start_<show_id>
     """
     try:
         show_id = int(callback.data.split('_')[-1])
-        kb = keyboards.get_rating_keyboard(show_id)
-        # Редактируем только клавиатуру
-        await callback.message.edit_reply_markup(reply_markup=kb)
+
+        # Получаем детали шоу, чтобы узнать тип
+        show_data = await client.get_show_details(show_id)
+        if not show_data:
+            await callback.answer('Ошибка: не удалось получить данные шоу', show_alert=True)
+            return
+
+        show_type = show_data.get('type')
+
+        if show_type in [SHOW_TYPE_MAPPING[t] for t in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES]:
+            # Это сериал -> показываем выбор (Целиком или Эпизод)
+            kb = keyboards.get_rate_mode_keyboard(show_id)
+            await callback.message.edit_reply_markup(reply_markup=kb)
+        else:
+            # Это фильм -> сразу показываем оценки
+            # Используем rate_mode_show_ logic (оценка целиком)
+            kb = keyboards.get_rating_keyboard(show_id)
+            await callback.message.edit_reply_markup(reply_markup=kb)
+
         await callback.answer()
     except Exception as e:
         await callback.answer(f'Ошибка: {e}', show_alert=True)
 
 
-async def rate_show_back_handler(callback: CallbackQuery, bot: Bot):
-    """
-    Возвращает клавиатуру карточки сериала.
-    Format: rate_back_<show_id>
-    """
+async def rate_mode_show_handler(callback: CallbackQuery, bot: Bot):
+    """Выбрана оценка сериала целиком (или это фильм). Показываем грид."""
     try:
         show_id = int(callback.data.split('_')[-1])
-        kb = keyboards.get_show_card_keyboard(show_id)
+        kb = keyboards.get_rating_keyboard(show_id)
         await callback.message.edit_reply_markup(reply_markup=kb)
         await callback.answer()
     except Exception as e:
@@ -175,7 +195,7 @@ async def rate_show_set_handler(callback: CallbackQuery, bot: Bot):
             return
 
         result = await client.rate_show(user_id, show_id, rating)
-        
+
         if result and result.get('status') == 'ok':
             await callback.answer(f'Оценка {int(rating)} установлена!')
             # Возвращаем исходную клавиатуру
@@ -186,7 +206,7 @@ async def rate_show_set_handler(callback: CallbackQuery, bot: Bot):
 
     except Exception as e:
         await callback.answer(f'Ошибка: {e}', show_alert=True)
-        
+
 
 async def rate_episode_start_handler(callback: CallbackQuery, bot: Bot):
     try:
@@ -225,5 +245,62 @@ async def rate_episode_set_handler(callback: CallbackQuery, bot: Bot):
         else:
             await callback.answer('Ошибка сохранения оценки', show_alert=True)
 
+    except Exception as e:
+        await callback.answer(f'Ошибка: {e}', show_alert=True)
+
+
+async def rate_mode_ep_handler(callback: CallbackQuery, bot: Bot):
+    """Выбрана оценка эпизода. Загружаем эпизоды и показываем сезоны."""
+    try:
+        show_id = int(callback.data.split('_')[-1])
+        episodes_data = await client.get_show_episodes(show_id)
+
+        if not episodes_data:
+            await callback.answer('Нет информации об эпизодах.', show_alert=True)
+            return
+
+        # Собираем уникальные сезоны
+        seasons = sorted(list(set(item['season_number'] for item in episodes_data)))
+
+        kb = keyboards.get_seasons_keyboard(show_id, seasons)
+        await callback.message.edit_reply_markup(reply_markup=kb)
+        await callback.answer()
+    except Exception as e:
+        await callback.answer(f'Ошибка: {e}', show_alert=True)
+
+
+async def rate_sel_seas_handler(callback: CallbackQuery, bot: Bot):
+    """Выбран сезон. Показываем эпизоды."""
+    try:
+        parts = callback.data.split('_')
+        show_id = int(parts[3])
+        season = int(parts[4])
+
+        episodes_data = await client.get_show_episodes(show_id)
+        # Фильтруем эпизоды для выбранного сезона
+        episodes = [
+            item['episode_number'] for item in episodes_data if item['season_number'] == season
+        ]
+
+        kb = keyboards.get_episodes_keyboard(show_id, season, episodes)
+        await callback.message.edit_reply_markup(reply_markup=kb)
+        await callback.answer()
+    except Exception as e:
+        await callback.answer(f'Ошибка: {e}', show_alert=True)
+
+
+async def rate_show_back_handler(callback: CallbackQuery, bot: Bot):
+    """
+    Кнопка 'Назад' в меню оценок.
+    Если мы были в гриде оценки фильма/сериала целиком -> возвращаемся в карточку.
+    Но если мы зашли в "Оценить сериал целиком" из меню выбора, по идее надо назад в меню выбора?
+    Для простоты: rate_back_ всегда возвращает в карточку (исходное состояние).
+    А внутри вложенных меню есть свои кнопки Назад.
+    """
+    try:
+        show_id = int(callback.data.split('_')[-1])
+        kb = keyboards.get_show_card_keyboard(show_id)
+        await callback.message.edit_reply_markup(reply_markup=kb)
+        await callback.answer()
     except Exception as e:
         await callback.answer(f'Ошибка: {e}', show_alert=True)

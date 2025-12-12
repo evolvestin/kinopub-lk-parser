@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0018_viewhistory_telegram_message_id'),
     ]
@@ -34,6 +33,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='userrating',
-            index=models.Index(fields=['user', 'show', 'season_number', 'episode_number'], name='app_userrat_user_id_22de90_idx'),
+            index=models.Index(
+                fields=['user', 'show', 'season_number', 'episode_number'],
+                name='app_userrat_user_id_22de90_idx',
+            ),
         ),
     ]

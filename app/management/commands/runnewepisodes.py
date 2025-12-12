@@ -2,7 +2,6 @@ import logging
 import time
 
 from django.conf import settings
-from shared.formatters import format_se
 
 from app.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 from app.gdrive_backup import BackupManager
@@ -18,6 +17,7 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import Show, ShowDuration
+from shared.formatters import format_se
 
 
 class Command(LoggableBaseCommand):
@@ -36,7 +36,7 @@ class Command(LoggableBaseCommand):
         try:
             for url_type in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES:
                 show_type = SHOW_TYPE_MAPPING[url_type]
-                
+
                 logging.info(f'--- Processing category: {show_type} (type={url_type}) ---')
                 base_url = f'{settings.SITE_URL}media/new-serial-episodes?type={url_type}'
 

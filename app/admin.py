@@ -8,7 +8,6 @@ from django.utils.html import format_html, format_html_join
 
 # Импортируем нашу кастомную админку
 from app.admin_site import admin_site
-from django.templatetags.static import static
 from app.models import (
     Code,
     Country,
@@ -365,6 +364,7 @@ class ViewHistoryAdmin(admin.ModelAdmin):
     @admin.display(description='Учтено', boolean=True)
     def get_is_checked_display(self, obj):
         return obj.is_checked
+
 
 @admin.register(ShowDuration, site=admin_site)
 class ShowDurationAdmin(admin.ModelAdmin):

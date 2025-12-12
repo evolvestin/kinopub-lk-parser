@@ -10,10 +10,10 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from shared.constants import UserRole
 from app.dashboard import dashboard_callback
-from app.models import Show, ViewHistory, ViewUser, UserRating
+from app.models import Show, ShowDuration, UserRating, ViewHistory, ViewUser
 from app.telegram_bot import TelegramSender
+from shared.constants import UserRole
 from shared.formatters import format_se
 
 
@@ -417,7 +417,10 @@ def bot_assign_view(request):
 
         show_title = view_history.show.title or view_history.show.original_title
         if view_history.season_number:
-            info = f'{show_title} ({format_se(view_history.season_number, view_history.episode_number)})'
+            info = (
+                f'{show_title}'
+                f' ({format_se(view_history.season_number, view_history.episode_number)})'
+            )
         else:
             info = show_title
 
@@ -468,10 +471,9 @@ def bot_toggle_view_check(request):
             season_number=view.season_number,
             episode_number=view.episode_number,
             view_date__lt=view.view_date,
-            is_checked=True
+            is_checked=True,
         )
 
-        updated = False
         message = ''
 
         # Если текущая запись включена и есть старые дубликаты -> выключаем старые
@@ -483,10 +485,9 @@ def bot_toggle_view_check(request):
                 sender.update_history_message(old_view)
                 count += 1
             # Текущая запись остается включенной (мы просто подтвердили её приоритет)
-            sender.update_history_message(view) 
+            sender.update_history_message(view)
             message = f'Предыдущие просмотры ({count}) помечены как неучтенные.'
-            updated = True
-        
+
         # Иначе просто переключаем статус текущей записи
         else:
             view.is_checked = not view.is_checked
@@ -494,7 +495,6 @@ def bot_toggle_view_check(request):
             sender.update_history_message(view)
             status_text = 'учтен' if view.is_checked else 'не учтен'
             message = f'Просмотр теперь {status_text}.'
-            updated = True
 
         return JsonResponse({'status': 'ok', 'message': message, 'is_checked': view.is_checked})
 
@@ -502,7 +502,7 @@ def bot_toggle_view_check(request):
         return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
-    
+
 
 @csrf_exempt
 @require_http_methods(['POST'])
@@ -522,9 +522,9 @@ def bot_toggle_view_user(request):
                 'name': str(telegram_id),
                 'role': UserRole.GUEST,
                 'is_bot_active': True,
-            }
+            },
         )
-        
+
         view_history = ViewHistory.objects.get(id=view_id)
         sender = TelegramSender()
 
@@ -567,11 +567,36 @@ def bot_rate_show(request):
             show=show,
             season_number=season,
             episode_number=episode,
-            defaults={'rating': rating}
+            defaults={'rating': rating},
         )
         return JsonResponse({'status': 'ok', 'rating': rating})
 
-    except (ViewUser.DoesNotExist, Show.DoesNotExist) as e:
+    except (ViewUser.DoesNotExist, Show.DoesNotExist):
         return JsonResponse({'error': 'Not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def bot_get_show_episodes(request, show_id):
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        # Получаем пары сезон-эпизод, для которых известна длительность (значит эпизод существует)
+        durations = (
+            ShowDuration.objects.filter(
+                show_id=show_id,
+                season_number__isnull=False,
+                season_number__gt=0,
+                episode_number__isnull=False,
+                episode_number__gt=0,
+            )
+            .values('season_number', 'episode_number')
+            .order_by('season_number', 'episode_number')
+        )
+
+        return JsonResponse({'episodes': list(durations)})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

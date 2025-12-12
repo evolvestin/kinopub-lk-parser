@@ -153,10 +153,12 @@ def run_admin_command(self, task_run_id):
                     else:
                         task_run.status = 'FAILURE'
                         task_run.error_message = f'Exit code: {retcode}'
-                        
+
                         # Дублируем ошибку в системный лог, чтобы её было видно в Dashboard
                         log_msg = err_text.strip() or out_text.strip() or 'No output captured'
-                        logging.error(f"Task '{task_run.command}' failed (code {retcode}): {log_msg}")
+                        logging.error(
+                            f"Task '{task_run.command}' failed (code {retcode}): {log_msg}"
+                        )
 
                     task_run.updated_at = timezone.now()
                     task_run.save()

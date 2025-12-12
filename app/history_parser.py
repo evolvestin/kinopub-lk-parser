@@ -8,14 +8,10 @@ import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from shared.formatters import format_se
-
-
-from django.db.models import Q
 
 import undetected_chromedriver as uc
 from django.conf import settings
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.utils import timezone
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
@@ -27,6 +23,7 @@ from app.gdrive_backup import BackupManager
 from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
 from app.signals import view_history_created
 from kinopub_parser import celery_app
+from shared.formatters import format_se
 
 
 def close_driver(driver):
@@ -588,7 +585,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
             show_id=item['show_id'],
             view_date=item['view_date'],
             season_number=item['season'],
-            episode_number=item['episode']
+            episode_number=item['episode'],
         )
 
     existing_set = set()
@@ -603,12 +600,14 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
     for item in views_on_page:
         key = (item['show_id'], item['view_date'], item['season'], item['episode'])
         if key not in existing_set:
-            new_views_to_create.append(ViewHistory(
-                show_id=item['show_id'],
-                view_date=item['view_date'],
-                season_number=item['season'],
-                episode_number=item['episode'],
-            ))
+            new_views_to_create.append(
+                ViewHistory(
+                    show_id=item['show_id'],
+                    view_date=item['view_date'],
+                    season_number=item['season'],
+                    episode_number=item['episode'],
+                )
+            )
             existing_set.add(key)
 
     created_views = []

@@ -5,10 +5,9 @@ from django.conf import settings
 
 from app.constants import DATE_FORMAT
 from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
-
-from shared.html_helper import bold, code, html_link, html_secure, italic
 from shared.card_formatter import get_show_card_text
 from shared.formatters import format_se
+from shared.html_helper import bold, code, html_secure, italic
 
 logger = logging.getLogger(__name__)
 

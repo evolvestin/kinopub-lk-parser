@@ -33,11 +33,13 @@ def get_history_notification_keyboard(view_history_obj, bot_username=None):
 
     if view_history_obj.season_number and view_history_obj.episode_number and bot_username:
         url = f'https://t.me/{bot_username}?start=rate_{view_history_obj.show.id}_{view_history_obj.season_number}_{view_history_obj.episode_number}'
-        buttons.append([
-            {
-                'text': '⭐️ Оценить эпизод',
-                'url': url,
-            }
-        ])
+        buttons.append(
+            [
+                {
+                    'text': '⭐️ Оценить эпизод',
+                    'url': url,
+                }
+            ]
+        )
 
     return buttons

@@ -1,10 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-from app.constants import DATETIME_FORMAT
-from app.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
-from shared.constants import UserRole, RATING_VALUES
-
+from app.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
+from shared.constants import RATING_VALUES, UserRole
 
 
 class BaseModel(models.Model):
@@ -198,9 +196,7 @@ class LogEntry(BaseModel):
 
 class UserRating(BaseModel):
     # Генерируем choices на основе единой константы
-    RATING_CHOICES = [
-        (r, str(int(r)) if r.is_integer() else str(r)) for r in RATING_VALUES
-    ]
+    RATING_CHOICES = [(r, str(int(r)) if r.is_integer() else str(r)) for r in RATING_VALUES]
 
     user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='ratings')
     show = models.ForeignKey(Show, on_delete=models.CASCADE, related_name='ratings')
@@ -232,9 +228,7 @@ class UserRating(BaseModel):
             return
 
         episodes = ShowDuration.objects.filter(
-            show=self.show,
-            season_number__isnull=False,
-            episode_number__isnull=False
+            show=self.show, season_number__isnull=False, episode_number__isnull=False
         )
 
         existing_ratings = set(
@@ -242,7 +236,7 @@ class UserRating(BaseModel):
                 user=self.user,
                 show=self.show,
                 season_number__isnull=False,
-                episode_number__isnull=False
+                episode_number__isnull=False,
             ).values_list('season_number', 'episode_number')
         )
 
@@ -255,10 +249,10 @@ class UserRating(BaseModel):
                         show=self.show,
                         rating=self.rating,
                         season_number=ep.season_number,
-                        episode_number=ep.episode_number
+                        episode_number=ep.episode_number,
                     )
                 )
-        
+
         if new_ratings:
             UserRating.objects.bulk_create(new_ratings, ignore_conflicts=True)
 

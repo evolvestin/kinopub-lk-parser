@@ -45,7 +45,7 @@ class Command(LoggableBaseCommand):
                     url_type = key
                     target_show_type = val
                     break
-            
+
             if not target_show_type:
                 target_show_type = input_type
 
@@ -54,11 +54,13 @@ class Command(LoggableBaseCommand):
                 f'Series mode detected ({target_show_type}). '
                 f'Limit ignored. Fetching shows based on logs...'
             )
-            
+
             first_anchor_log = (
                 LogEntry.objects.filter(
                     message__contains=f'New Episodes Parser Finished ({url_type})'
-                ).order_by('created_at').first()
+                )
+                .order_by('created_at')
+                .first()
             )
 
             anchor_date = first_anchor_log.created_at if first_anchor_log else datetime.min

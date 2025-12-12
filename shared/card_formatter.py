@@ -22,13 +22,13 @@ def get_show_card_text(
     """
     raw_title = html_secure(title)
     original_title = html_secure(original_title)
-    
+
     if kinopub_link and show_id:
         header = html_link(f'{kinopub_link.rstrip("/")}/item/view/{show_id}', bold(raw_title))
     else:
         header = bold(raw_title)
     lines = [f'🎬 {header}']
-    
+
     if raw_title != original_title:
         lines.append(italic(f'({original_title})'))
 
@@ -42,7 +42,7 @@ def get_show_card_text(
         meta_data.append(f'🎭 {show_type}')
     if status:
         meta_data.append(status)
-    
+
     if meta_data:
         lines.append(' | '.join(meta_data))
 
@@ -53,7 +53,7 @@ def get_show_card_text(
     if kp_rating:
         rating = f'KP: {kp_rating:.1f}'
         ratings.append(html_link(kp_url, rating) if kp_url else rating)
-    
+
     if ratings:
         lines.append(f'⭐ {" | ".join(ratings)}')
 

@@ -60,10 +60,19 @@ def register_router() -> Router:
         callbacks.rate_show_back_handler, F.data.startswith('rate_back_')
     )
     router.callback_query.register(
-        callbacks.rate_show_set_handler, F.data.startswith('rate_set_')
+        callbacks.rate_mode_show_handler, F.data.startswith('rate_mode_show_')
+    )
+    router.callback_query.register(callbacks.rate_show_set_handler, F.data.startswith('rate_set_'))
+
+    # Рейтинг (Навигация эпизодов)
+    router.callback_query.register(
+        callbacks.rate_mode_ep_handler, F.data.startswith('rate_mode_ep_')
+    )
+    router.callback_query.register(
+        callbacks.rate_sel_seas_handler, F.data.startswith('rate_sel_seas_')
     )
 
-    # Рейтинг (Эпизоды)
+    # Рейтинг (Выставление оценки эпизоду)
     router.callback_query.register(
         callbacks.rate_episode_start_handler, F.data.startswith('rate_ep_start_')
     )

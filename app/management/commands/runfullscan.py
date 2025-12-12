@@ -6,8 +6,6 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.management.base import CommandError
 from django.utils import timezone
-from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.common.by import By
 
 from app.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 from app.gdrive_backup import BackupManager
@@ -20,16 +18,16 @@ def parse_and_save_catalog_page(driver, mode):
     script = """
     const results = [];
     const blocks = document.querySelectorAll("#items > div[class*='col-']");
-    
+
     blocks.forEach(block => {
         const linkEl = block.querySelector('.item-poster a');
         if (!linkEl) return;
-        
+
         const titleEl = block.querySelector('.item-title a');
         const origTitleEl = block.querySelector('.item-author a');
         const kpLink = block.querySelector(".bottomcenter-2x a[href*='kinopoisk.ru']");
         const imdbLink = block.querySelector(".bottomcenter-2x a[href*='imdb.com']");
-        
+
         results.push({
             href: linkEl.getAttribute('href'),
             title: titleEl ? titleEl.textContent.trim() : '',
@@ -53,13 +51,13 @@ def parse_and_save_catalog_page(driver, mode):
         return 0
 
     shows_on_page = []
-    
+
     for item in items_data:
         try:
             match = re.search(r'/item/view/(\d+)', item['href'])
             if not match:
                 continue
-            
+
             show_id = int(match.group(1))
             title = item['title']
             original_title = item['original_title'] if item['original_title'] else title
