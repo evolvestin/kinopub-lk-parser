@@ -10,10 +10,11 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from app.constants import UserRole
+from shared.constants import UserRole
 from app.dashboard import dashboard_callback
-from app.models import Show, ViewHistory, ViewUser
+from app.models import Show, ViewHistory, ViewUser, UserRating
 from app.telegram_bot import TelegramSender
+from shared.formatters import format_se
 
 
 def index(request):
@@ -32,8 +33,45 @@ def check_bot_user(request, telegram_id):
     if not _check_token(request):
         return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-    exists = ViewUser.objects.filter(telegram_id=telegram_id).exists()
-    return JsonResponse({'exists': exists})
+    try:
+        user = ViewUser.objects.get(telegram_id=telegram_id)
+        return JsonResponse({'exists': True, 'role': user.role})
+    except ViewUser.DoesNotExist:
+        return JsonResponse({'exists': False, 'role': UserRole.GUEST})
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def bot_toggle_claim(request):
+    """
+    Переключает участие пользователя в просмотре (добавляет или удаляет).
+    """
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        telegram_id = data.get('telegram_id')
+        view_id = data.get('view_id')
+
+        user = ViewUser.objects.get(telegram_id=telegram_id)
+        view_history = ViewHistory.objects.get(id=view_id)
+
+        if user in view_history.users.all():
+            view_history.users.remove(user)
+            action = 'removed'
+        else:
+            view_history.users.add(user)
+            action = 'added'
+
+        # Обновляем сообщение в канале
+        TelegramSender().update_history_message(view_history)
+
+        return JsonResponse({'status': 'ok', 'action': action})
+    except (ViewUser.DoesNotExist, ViewHistory.DoesNotExist):
+        return JsonResponse({'error': 'Not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
 
 @csrf_exempt
@@ -379,7 +417,7 @@ def bot_assign_view(request):
 
         show_title = view_history.show.title or view_history.show.original_title
         if view_history.season_number:
-            info = f'{show_title} (S{view_history.season_number}E{view_history.episode_number})'
+            info = f'{show_title} ({format_se(view_history.season_number, view_history.episode_number)})'
         else:
             info = show_title
 
@@ -461,6 +499,79 @@ def bot_toggle_view_check(request):
         return JsonResponse({'status': 'ok', 'message': message, 'is_checked': view.is_checked})
 
     except ViewHistory.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def bot_toggle_view_user(request):
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        telegram_id = data.get('telegram_id')
+        view_id = data.get('view_id')
+
+        # Используем get_or_create для обработки новых пользователей из канала
+        user, _ = ViewUser.objects.get_or_create(
+            telegram_id=telegram_id,
+            defaults={
+                'name': str(telegram_id),
+                'role': UserRole.GUEST,
+                'is_bot_active': True,
+            }
+        )
+        
+        view_history = ViewHistory.objects.get(id=view_id)
+        sender = TelegramSender()
+
+        action = 'added'
+        if user in view_history.users.all():
+            view_history.users.remove(user)
+            action = 'removed'
+        else:
+            view_history.users.add(user)
+            action = 'added'
+
+        sender.update_history_message(view_history)
+
+        return JsonResponse({'status': 'ok', 'action': action})
+    except ViewHistory.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def bot_rate_show(request):
+    if not _check_token(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        telegram_id = data.get('telegram_id')
+        show_id = data.get('show_id')
+        rating = float(data.get('rating'))
+        season = data.get('season')
+        episode = data.get('episode')
+
+        user = ViewUser.objects.get(telegram_id=telegram_id)
+        show = Show.objects.get(id=show_id)
+
+        UserRating.objects.update_or_create(
+            user=user,
+            show=show,
+            season_number=season,
+            episode_number=episode,
+            defaults={'rating': rating}
+        )
+        return JsonResponse({'status': 'ok', 'rating': rating})
+
+    except (ViewUser.DoesNotExist, Show.DoesNotExist) as e:
         return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

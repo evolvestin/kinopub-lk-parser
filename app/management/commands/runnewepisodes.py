@@ -2,6 +2,7 @@ import logging
 import time
 
 from django.conf import settings
+from shared.formatters import format_se
 
 from app.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 from app.gdrive_backup import BackupManager
@@ -77,7 +78,7 @@ class Command(LoggableBaseCommand):
 
                         if show_has_details and duration_exists:
                             logging.info(
-                                f'Data exists for {item["title"]} s{season}e{episode}.'
+                                f'Data exists for {item["title"]} {format_se(season, episode)}.'
                                 f' Stopping scan for {show_type}.'
                             )
                             stop_parsing = True
@@ -115,7 +116,7 @@ class Command(LoggableBaseCommand):
 
                         elif not duration_exists:
                             logging.info(
-                                f'Missing duration for {show_id} s{season}e{episode}.'
+                                f'Missing duration for {show_id} {format_se(season, episode)}.'
                                 f' Fetching season...'
                             )
                             try:

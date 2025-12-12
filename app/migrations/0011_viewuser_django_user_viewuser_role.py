@@ -4,7 +4,7 @@ import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
-import app.constants
+from shared.constants import UserRole
 
 
 class Migration(migrations.Migration):
@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
             name='role',
             field=models.CharField(
                 choices=[('guest', 'GUEST'), ('viewer', 'VIEWER'), ('admin', 'ADMIN')],
-                default=app.constants.UserRole['GUEST'],
+                default=UserRole['GUEST'],
                 max_length=20,
             ),
         ),

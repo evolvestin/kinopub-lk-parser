@@ -2,11 +2,14 @@ import os
 import re
 
 import client
+import keyboards
 from aiogram import Bot
 from aiogram.filters import CommandObject
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
-from html_helper import bold, html_link, html_secure, italic
+from aiogram.types import Message
 from sender import MessageSender
+
+from shared.html_helper import bold, html_secure
+from shared.card_formatter import get_show_card_text
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 
@@ -15,46 +18,57 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
     sender = MessageSender(bot)
     user = message.from_user
 
-    # Регистрация / обновление данных пользователя
     success = await client.register_user(
         user.id, user.username, user.first_name, user.language_code or 'ru'
     )
 
-    # Обработка Deep Linking (нажатие кнопки "Это я смотрю")
     args = command.args if command else None
-    if args and args.startswith('claim_'):
-        try:
-            view_id = int(args.split('_')[1])
-            result = await client.assign_view(user.id, view_id)
 
-            if result and result.get('status') == 'ok':
-                info = result.get('info', 'Unknown content')
-                text = f'✅ <b>Просмотр зафиксирован за вами</b>\n{html_secure(info)}'
-                # Кнопка отмены
-                kb = InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [
-                            InlineKeyboardButton(
-                                text='❌ Отменить', callback_data=f'unclaim_{view_id}'
-                            )
-                        ]
-                    ]
-                )
-                await sender.send_message(chat_id=user.id, text=text, keyboard=kb)
-            else:
-                await sender.send_message(
-                    chat_id=user.id,
-                    text='❌ Не удалось привязать просмотр (возможно, запись удалена).',
-                )
-        except (IndexError, ValueError):
-            await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка.')
-        return
+    if args:
+        if args.startswith('claim_'):
+            try:
+                view_id = int(args.split('_')[1])
+                result = await client.assign_view(user.id, view_id)
 
-    # Стандартное приветствие для Гостя
+                if result and result.get('status') == 'ok':
+                    info = result.get('info', 'Unknown content')
+                    text = f'✅ <b>Просмотр зафиксирован за вами</b>\n{html_secure(info)}'
+                    kb = keyboards.get_unclaim_keyboard(view_id)
+                    await sender.send_message(chat_id=user.id, text=text, keyboard=kb)
+                else:
+                    await sender.send_message(
+                        chat_id=user.id,
+                        text='❌ Не удалось привязать просмотр (возможно, запись удалена).',
+                    )
+            except (IndexError, ValueError):
+                await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка.')
+            return
+
+        if args.startswith('rate_'):
+            # Format: rate_showId_season_episode
+            try:
+                parts = args.split('_')
+                show_id = int(parts[1])
+                season = int(parts[2])
+                episode = int(parts[3])
+
+                # Получаем полную информацию о шоу
+                show_data = await client.get_show_details(show_id)
+                
+                if show_data:
+                    # Отправляем карточку, передавая данные о конкретном эпизоде для кнопок
+                    await _send_show_card(sender, user.id, show_data, season, episode)
+                else:
+                    await sender.send_message(chat_id=user.id, text='❌ Информация о шоу не найдена.')
+
+            except (IndexError, ValueError):
+                await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка на оценку.')
+            return
+
     if success:
         text = (
             f'👋 {bold(f"Привет, {html_secure(user.first_name)}!")}\n\n'
-            'Я бот-помощник KinoPub Observer.\n'
+            'Я бот-помощник KinoPub Parser.\n'
             'Пока ваш статус <b>Guest</b>, вам доступны следующие функции:\n\n'
             f'🔍 {bold("Поиск контента")}\n'
             'Просто отправьте мне название фильма или сериала, и я проверю его наличие в базе.\n\n'
@@ -65,7 +79,6 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
 
     await sender.send_message(chat_id=user.id, text=text)
 
-
 async def bot_command_start_group(message: Message, bot: Bot):
     sender = MessageSender(bot)
     text = (
@@ -75,55 +88,38 @@ async def bot_command_start_group(message: Message, bot: Bot):
     await sender.send_message(chat_id=message.chat.id, text=text)
 
 
-async def _send_show_card(sender: MessageSender, chat_id: int, show_data: dict):
-    raw_title = html_secure(show_data['title'])
-    original_title = html_secure(show_data['original_title'])
-
-    site_url = os.getenv('SITE_AUX_URL', '').rstrip('/')
-    if site_url:
-        kp_link = f'{site_url}/item/view/{show_data["id"]}'
-        title = html_link(kp_link, bold(raw_title))
-    else:
-        title = bold(raw_title)
-
-    lines = [f'🎬 {title}']
-
-    if raw_title != original_title:
-        lines.append(italic(f'({original_title})'))
-
-    if countries := show_data.get('countries', []):
-        lines.append(', '.join(countries))
-
-    description_line = []
-    if year := show_data.get('year'):
-        description_line.append(f'📅 {year}')
-    if show_type := show_data.get('type'):
-        description_line.append(f'🎭 {show_type}')
-    if status := show_data.get('status'):
-        description_line.append(status)
-    if description_line:
-        lines.append(' | '.join(description_line))
-
-    ratings = []
-    if imdb := show_data.get('imdb_rating'):
-        val = f'IMDB: {imdb:.1f}'
-        url = show_data.get('imdb_url')
-        ratings.append(html_link(url, val) if url else val)
-
-    if kp := show_data.get('kinopoisk_rating'):
-        val = f'KP: {kp:.1f}'
-        url = show_data.get('kinopoisk_url')
-        ratings.append(html_link(url, val) if url else val)
-
-    if ratings:
-        lines.append(f'⭐ {" | ".join(ratings)}')
-
-    # Жанры
-    if genres := show_data.get('genres', []):
-        lines.append(f'🏷 {", ".join(genres)}')
-
-    await sender.send_message(chat_id=chat_id, text='\n'.join(lines))
-
+async def _send_show_card(
+    sender: MessageSender, 
+    chat_id: int, 
+    show_data: dict, 
+    season: int = None, 
+    episode: int = None
+):
+    show_id = show_data.get('id')
+    keyboard = None
+    if show_id:
+        # Передаем сезон и эпизод в генератор клавиатуры, если они есть
+        keyboard = keyboards.get_show_card_keyboard(show_id, season, episode)
+    
+    await sender.send_message(
+        chat_id=chat_id, 
+        text=get_show_card_text(
+            show_id=show_id,
+            title=show_data.get('title', ''),
+            original_title=show_data.get('original_title'),
+            kinopub_link=os.getenv('SITE_AUX_URL'),
+            year=show_data.get('year'),
+            show_type=show_data.get('type'),
+            status=show_data.get('status'),
+            countries=show_data.get('countries', []),
+            genres=show_data.get('genres', []),
+            imdb_rating=show_data.get('imdb_rating'),
+            imdb_url=show_data.get('imdb_url'),
+            kp_rating=show_data.get('kinopoisk_rating'),
+            kp_url=show_data.get('kinopoisk_url')
+        ),
+        keyboard=keyboard
+    )
 
 async def handle_view_command(message: Message, bot: Bot):
     """Обработка команды /view_123"""

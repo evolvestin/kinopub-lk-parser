@@ -17,16 +17,12 @@ class UserSyncMiddleware(BaseMiddleware):
         user: User = data.get('event_from_user')
 
         if user:
-            # Запускаем обновление данных в фоне
             try:
-                # Если мидлварь сработала, значит пользователь взаимодействует с ботом,
-                # следовательно, бот активен (is_active=True)
-                await client.update_user_data(
+                await client.register_user(
                     telegram_id=user.id,
                     username=user.username,
                     first_name=user.first_name,
-                    language_code=user.language_code,
-                    is_active=True,
+                    language_code=user.language_code or 'en',
                 )
             except Exception as e:
                 logging.error(f'Middleware user sync error: {e}')

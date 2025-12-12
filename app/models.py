@@ -1,7 +1,10 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-from app.constants import DATETIME_FORMAT, UserRole
+from app.constants import DATETIME_FORMAT
+from app.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
+from shared.constants import UserRole, RATING_VALUES
+
 
 
 class BaseModel(models.Model):
@@ -194,22 +197,70 @@ class LogEntry(BaseModel):
 
 
 class UserRating(BaseModel):
-    RATING_CHOICES = [(float(i) / 2, str(float(i) / 2)) for i in range(21)]
+    # Генерируем choices на основе единой константы
+    RATING_CHOICES = [
+        (r, str(int(r)) if r.is_integer() else str(r)) for r in RATING_VALUES
+    ]
 
     user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='ratings')
     show = models.ForeignKey(Show, on_delete=models.CASCADE, related_name='ratings')
+    season_number = models.IntegerField(null=True, blank=True)
+    episode_number = models.IntegerField(null=True, blank=True)
     rating = models.FloatField(choices=RATING_CHOICES)
 
     class Meta:
         verbose_name = 'User Rating'
         verbose_name_plural = 'User Ratings'
-        unique_together = ('user', 'show')
+        unique_together = ('user', 'show', 'season_number', 'episode_number')
         indexes = [
-            models.Index(fields=['user', 'show']),
+            models.Index(fields=['user', 'show', 'season_number', 'episode_number']),
         ]
 
     def __str__(self):
-        return f'{self.user.name}: {self.show.title} - {self.rating}'
+        suffix = ''
+        if self.season_number and self.episode_number:
+            suffix = f' (S{self.season_number}E{self.episode_number})'
+        return f'{self.user.name}: {self.show.title}{suffix} - {self.rating}'
+
+    def save(self, *args, **kwargs):
+        is_series = self.show.type in [
+            SHOW_TYPE_MAPPING[t] for t in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
+        ]
+
+        if not is_series or (self.season_number and self.episode_number):
+            super().save(*args, **kwargs)
+            return
+
+        episodes = ShowDuration.objects.filter(
+            show=self.show,
+            season_number__isnull=False,
+            episode_number__isnull=False
+        )
+
+        existing_ratings = set(
+            UserRating.objects.filter(
+                user=self.user,
+                show=self.show,
+                season_number__isnull=False,
+                episode_number__isnull=False
+            ).values_list('season_number', 'episode_number')
+        )
+
+        new_ratings = []
+        for ep in episodes:
+            if (ep.season_number, ep.episode_number) not in existing_ratings:
+                new_ratings.append(
+                    UserRating(
+                        user=self.user,
+                        show=self.show,
+                        rating=self.rating,
+                        season_number=ep.season_number,
+                        episode_number=ep.episode_number
+                    )
+                )
+        
+        if new_ratings:
+            UserRating.objects.bulk_create(new_ratings, ignore_conflicts=True)
 
 
 class TaskRun(BaseModel):

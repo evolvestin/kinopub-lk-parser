@@ -13,6 +13,7 @@ async def handle_send_message(request):
     chat_id = data.get('chat_id')
     text = data.get('text')
     parse_mode = data.get('parse_mode', 'HTML')
+    disable_web_page_preview = data.get('disable_web_page_preview', False)
     reply_markup_data = data.get('reply_markup')
 
     reply_markup = None
@@ -24,7 +25,11 @@ async def handle_send_message(request):
 
     try:
         message = await bot.send_message(
-            chat_id=chat_id, text=text, parse_mode=parse_mode, reply_markup=reply_markup
+            chat_id=chat_id,
+            text=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup,
+            disable_web_page_preview=disable_web_page_preview,
         )
         return web.json_response({'ok': True, 'result': {'message_id': message.message_id}})
     except TelegramAPIError as e:
@@ -55,6 +60,7 @@ async def handle_edit_message(request):
     message_id = data.get('message_id')
     text = data.get('text')
     parse_mode = data.get('parse_mode', 'HTML')
+    disable_web_page_preview = data.get('disable_web_page_preview', False)
     reply_markup_data = data.get('reply_markup')
 
     reply_markup = None
@@ -72,6 +78,7 @@ async def handle_edit_message(request):
                 text=text,
                 parse_mode=parse_mode,
                 reply_markup=reply_markup,
+                disable_web_page_preview=disable_web_page_preview,
             )
         elif reply_markup:
             await bot.edit_message_reply_markup(

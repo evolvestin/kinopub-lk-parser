@@ -3,6 +3,7 @@ import os
 from typing import Any
 
 import aiohttp
+from shared.constants import UserRole
 
 BACKEND_URL = os.getenv('BACKEND_URL')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
@@ -29,11 +30,6 @@ async def _execute_request(
     except Exception as e:
         logging.error(f'API Connection Error ({url}): {e}')
         return None
-
-
-async def check_user_exists(telegram_id: int) -> bool:
-    data = await _execute_request(f'check/{telegram_id}/')
-    return data.get('exists', False) if data else False
 
 
 async def register_user(
@@ -104,3 +100,32 @@ async def unassign_view(telegram_id: int, view_id: int) -> bool:
 async def toggle_view_check(view_id: int) -> dict | None:
     payload = {'view_id': view_id}
     return await _execute_request('toggle_check/', method='POST', payload=payload)
+
+
+async def check_user_role(telegram_id: int) -> str:
+    data = await _execute_request(f'check/{telegram_id}/')
+    if data and data.get('exists'):
+        return data.get('role', UserRole.GUEST)
+    return UserRole.GUEST
+
+
+async def toggle_claim(telegram_id: int, view_id: int) -> dict | None:
+    payload = {'telegram_id': telegram_id, 'view_id': view_id}
+    return await _execute_request('toggle_claim/', method='POST', payload=payload)
+
+
+async def toggle_view_user(telegram_id: int, view_id: int) -> dict | None:
+    payload = {'telegram_id': telegram_id, 'view_id': view_id}
+    return await _execute_request('toggle_view_user/', method='POST', payload=payload)
+
+async def rate_show(
+    telegram_id: int, show_id: int, rating: float, season: int = None, episode: int = None
+) -> dict | None:
+    payload = {
+        'telegram_id': telegram_id,
+        'show_id': show_id,
+        'rating': rating,
+        'season': season,
+        'episode': episode,
+    }
+    return await _execute_request('rate/', method='POST', payload=payload)

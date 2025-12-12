@@ -3,7 +3,12 @@ import logging
 import requests
 from django.conf import settings
 
-from shared.html_helper import bold, code, html_secure, italic
+from app.constants import DATE_FORMAT
+from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
+
+from shared.html_helper import bold, code, html_link, html_secure, italic
+from shared.card_formatter import get_show_card_text
+from shared.formatters import format_se
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +98,7 @@ class TelegramSender:
             f'{bold("Registered:")} {view_user.created_at.strftime("%Y-%m-%d %H:%M")}'
         )
 
-        keyboard = self._get_role_keyboard(view_user)
+        keyboard = get_role_management_keyboard(view_user)
 
         payload = {
             'chat_id': settings.USER_MANAGEMENT_CHANNEL_ID,
@@ -113,7 +118,7 @@ class TelegramSender:
         if not settings.USER_MANAGEMENT_CHANNEL_ID or not view_user.role_message_id:
             return
 
-        keyboard = [] if empty_keyboard else self._get_role_keyboard(view_user)
+        keyboard = [] if empty_keyboard else get_role_management_keyboard(view_user)
 
         text = (
             f'👤 {bold("User Registration / Role Management")}\n\n'
@@ -132,61 +137,71 @@ class TelegramSender:
         }
         self._request('edit_message', payload)
 
-    def _get_role_keyboard(self, view_user):
-        from app.constants import UserRole
+    def _build_message_payload(self, view_history_obj):
+        lines = []
+        season = view_history_obj.season_number
+        episode = view_history_obj.episode_number
 
-        buttons = []
-        for role in UserRole:
-            is_active = role.value == view_user.role
-            label = f'✅ {role.name}' if is_active else role.name
-            buttons.append(
-                {'text': label, 'callback_data': f'setrole_{view_user.telegram_id}_{role.value}'}
-            )
-        return [buttons]
+        if season and season > 0:
+            lines = [f'📺 Новый просмотр ({italic(format_se(season, episode))}):', '']
+        else:
+            lines = ['📺 Новый просмотр:', '']
+
+        show = view_history_obj.show
+        lines.extend(
+            [
+                get_show_card_text(
+                    show_id=show.id,
+                    title=show.title,
+                    original_title=show.original_title,
+                    kinopub_link=settings.SITE_AUX_URL,
+                    year=show.year,
+                    show_type=show.type,
+                    status=show.status,
+                    countries=[country.name for country in show.countries.all()],
+                    genres=[genre.name for genre in show.genres.all()],
+                    imdb_rating=show.imdb_rating,
+                    imdb_url=show.imdb_url,
+                    kp_rating=show.kinopoisk_rating,
+                    kp_url=show.kinopoisk_url,
+                ),
+                '',
+                f'🗓 Дата просмотра: {view_history_obj.view_date.strftime(DATE_FORMAT)}',
+            ]
+        )
+        if view_history_obj.is_checked:
+            lines.append(f'✅ {italic("Учитывается в статистике")}')
+        else:
+            lines.append(f'❌ {italic("Не учитывается в статистике")}')
+
+        names = [f'@{user.username}' or str(user.name) for user in view_history_obj.users.all()]
+
+        if len(names) == 1:
+            lines.append(f'👀 Смотрит: {names[0]}')
+        elif len(names) > 0:
+            lines.append('👀 Смотрят:')
+            for i, name in enumerate(names, start=1):
+                lines.append(f'{i}. {name}')
+
+        keyboard = get_history_notification_keyboard(view_history_obj, self.bot_username)
+
+        return '\n'.join(lines), keyboard
 
     def send_history_notification(self, view_history_obj):
         if not settings.HISTORY_CHANNEL_ID:
             return
 
-        show = view_history_obj.show
-        title = show.title or show.original_title or f'Show {show.id}'
-        if show.title and show.original_title and show.title != show.original_title:
-            title = f'{show.title} ({show.original_title})'
-
-        season = view_history_obj.season_number
-        episode = view_history_obj.episode_number
-
-        if season and season > 0:
-            content_info = f'📺 <b>{title}</b>\nS{season:02d}E{episode:02d}'
-        else:
-            content_info = f'🎬 <b>{title}</b>'
-
-        status_icon = '✅' if view_history_obj.is_checked else '❌'
-        text = (
-            f'{content_info}\n'
-            f'🗓 {view_history_obj.view_date.strftime("%d.%m.%Y")}\n'
-            f'<i>Новый просмотр зафиксирован</i>'
-        )
-
-        # Кнопка для управления статусом "Учтено"
-        btn_text = f'{status_icon} Учтено' if view_history_obj.is_checked else '❌ Не учтено'
-        
-        # Кнопка присвоения пользователю (Deep Link)
-        url = f'https://t.me/{self.bot_username}?start=claim_{view_history_obj.id}'
-        
-        keyboard = [
-            [{'text': btn_text, 'callback_data': f'toggle_check_{view_history_obj.id}'}],
-            [{'text': '👀 Это я смотрю', 'url': url}]
-        ]
+        text, keyboard = self._build_message_payload(view_history_obj)
 
         payload = {
             'chat_id': settings.HISTORY_CHANNEL_ID,
             'text': text,
             'parse_mode': 'HTML',
             'reply_markup': {'inline_keyboard': keyboard},
+            'disable_web_page_preview': True,
         }
         data = self._request('send_message', payload)
-        
+
         if data and data.get('ok'):
             msg_id = data['result']['message_id']
             view_history_obj.telegram_message_id = msg_id
@@ -196,42 +211,7 @@ class TelegramSender:
         if not settings.HISTORY_CHANNEL_ID or not view_history_obj.telegram_message_id:
             return
 
-        show = view_history_obj.show
-        title = show.title or show.original_title or f'Show {show.id}'
-        if show.title and show.original_title and show.title != show.original_title:
-            title = f'{show.title} ({show.original_title})'
-
-        season = view_history_obj.season_number
-        episode = view_history_obj.episode_number
-
-        if season and season > 0:
-            content_info = f'📺 <b>{title}</b>\nS{season:02d}E{episode:02d}'
-        else:
-            content_info = f'🎬 <b>{title}</b>'
-
-        date_str = view_history_obj.view_date.strftime("%d.%m.%Y")
-        
-        if view_history_obj.is_checked:
-            text = (
-                f'{content_info}\n'
-                f'🗓 {date_str}\n'
-                f'<i>Просмотр учтён</i>'
-            )
-            btn_text = '✅ Учтено'
-        else:
-            # Зачеркиваем текст, если не учтено
-            text = (
-                f'<s>{content_info}</s>\n'
-                f'🗓 {date_str}\n'
-                f'<i>Не учитывается в статистике</i>'
-            )
-            btn_text = '❌ Не учтено'
-
-        url = f'https://t.me/{self.bot_username}?start=claim_{view_history_obj.id}'
-        keyboard = [
-            [{'text': btn_text, 'callback_data': f'toggle_check_{view_history_obj.id}'}],
-            [{'text': '👀 Это я смотрю', 'url': url}]
-        ]
+        text, keyboard = self._build_message_payload(view_history_obj)
 
         payload = {
             'chat_id': settings.HISTORY_CHANNEL_ID,
@@ -239,18 +219,13 @@ class TelegramSender:
             'text': text,
             'parse_mode': 'HTML',
             'reply_markup': {'inline_keyboard': keyboard},
+            'disable_web_page_preview': True,
         }
         self._request('edit_message', payload)
 
     def send_role_upgrade_notification(self, telegram_id, role):
         if not settings.HISTORY_CHANNEL_ID:
             return
-
-        # Если ссылка не задана в settings, можно попробовать сформировать стандартную,
-        # но для приватных каналов лучше использовать invite link.
-        # Для упрощения примера предполагаем, что ID канала достаточно,
-        # но в реальности пользователю нужна ссылка-приглашение.
-        # Здесь выводим ID или заранее заготовленную ссылку из env, если есть.
 
         channel_info = 'Вам открыт доступ к каналу истории просмотров.'
         if (

@@ -37,23 +37,39 @@ def register_router() -> Router:
     )
 
     # --- Content Search & View ---
-
-    # 1. Поиск по команде /search (работает везде, актуально для групп)
     router.message.register(commands.handle_explicit_search, F.text.startswith('/search'))
-
-    # 2. Поиск по паттерну "imdb: \d+" (работает везде)
     router.message.register(commands.handle_imdb_lookup, F.text.regexp(r'(?i)^imdb:\s*\d+$'))
-
-    # 3. Просмотр конкретного контента по ID (/view_123)
     router.message.register(commands.handle_view_command, F.text.regexp(r'^/view_\d+$'))
-
-    # 4. Неявный поиск просто по тексту (ТОЛЬКО ЛС)
     router.message.register(commands.handle_search_text, F.chat.type == ChatType.PRIVATE, F.text)
 
     # --- Callbacks ---
     router.callback_query.register(callbacks.role_switch_handler, F.data.startswith('setrole_'))
     router.callback_query.register(callbacks.cancel_claim_handler, F.data.startswith('unclaim_'))
-    router.callback_query.register(callbacks.toggle_check_handler, F.data.startswith('toggle_check_'))
+    router.callback_query.register(
+        callbacks.toggle_check_handler, F.data.startswith('toggle_check_')
+    )
+    router.callback_query.register(
+        callbacks.claim_toggle_handler, F.data.startswith('claim_toggle_')
+    )
+
+    # Рейтинг (Шоу)
+    router.callback_query.register(
+        callbacks.rate_show_start_handler, F.data.startswith('rate_start_')
+    )
+    router.callback_query.register(
+        callbacks.rate_show_back_handler, F.data.startswith('rate_back_')
+    )
+    router.callback_query.register(
+        callbacks.rate_show_set_handler, F.data.startswith('rate_set_')
+    )
+
+    # Рейтинг (Эпизоды)
+    router.callback_query.register(
+        callbacks.rate_episode_start_handler, F.data.startswith('rate_ep_start_')
+    )
+    router.callback_query.register(
+        callbacks.rate_episode_set_handler, F.data.startswith('rate_ep_set_')
+    )
 
     return router
 

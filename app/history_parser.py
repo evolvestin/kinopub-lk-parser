@@ -8,6 +8,7 @@ import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+from shared.formatters import format_se
 
 
 from django.db.models import Q
@@ -639,7 +640,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
         if not updated_at or updated_at < three_months_ago:
             if updated_at:
                 logging.info(
-                    f'Duration for show id={show_id} (s:{season}, e:{episode}) is stale.'
+                    f'Duration for show id={show_id} ({format_se(season, episode)}) is stale.'
                     f' Re-fetching.'
                 )
             if is_movie:
