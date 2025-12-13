@@ -1,8 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-from app.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
-from shared.constants import RATING_VALUES, UserRole
+from shared.constants import DATETIME_FORMAT, RATING_VALUES, UserRole
 
 
 class BaseModel(models.Model):
@@ -131,6 +130,42 @@ class Show(BaseModel):
     directors = models.ManyToManyField(Person, related_name='directed_shows', blank=True)
     actors = models.ManyToManyField(Person, related_name='acted_in_shows', blank=True)
 
+    def get_internal_rating_data(self):
+        ratings = self.ratings.select_related('user').all()
+        if not ratings:
+            return None, []
+
+        user_sums = {}
+        user_counts = {}
+        user_objs = {}
+
+        for r in ratings:
+            uid = r.user.id
+            if uid not in user_sums:
+                user_sums[uid] = 0.0
+                user_counts[uid] = 0
+                user_objs[uid] = r.user
+
+            user_sums[uid] += r.rating
+            user_counts[uid] += 1
+
+        user_results = []
+        total_avg_sum = 0.0
+
+        for uid, total in user_sums.items():
+            user_avg = total / user_counts[uid]
+            if username := user_objs[uid].username:
+                user_label = f'@{username}'
+            else:
+                user_label = user_objs[uid].name
+            user_results.append({'label': user_label, 'rating': user_avg})
+            total_avg_sum += user_avg
+
+        overall_rating = total_avg_sum / len(user_results)
+        user_results.sort(key=lambda x: x['rating'], reverse=True)
+
+        return overall_rating, user_results
+
     def __str__(self):
         if self.title and self.original_title and self.title != self.original_title:
             return f'{self.title} ({self.original_title})'
@@ -217,44 +252,6 @@ class UserRating(BaseModel):
         if self.season_number and self.episode_number:
             suffix = f' (S{self.season_number}E{self.episode_number})'
         return f'{self.user.name}: {self.show.title}{suffix} - {self.rating}'
-
-    def save(self, *args, **kwargs):
-        is_series = self.show.type in [
-            SHOW_TYPE_MAPPING[t] for t in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
-        ]
-
-        if not is_series or (self.season_number and self.episode_number):
-            super().save(*args, **kwargs)
-            return
-
-        episodes = ShowDuration.objects.filter(
-            show=self.show, season_number__isnull=False, episode_number__isnull=False
-        )
-
-        existing_ratings = set(
-            UserRating.objects.filter(
-                user=self.user,
-                show=self.show,
-                season_number__isnull=False,
-                episode_number__isnull=False,
-            ).values_list('season_number', 'episode_number')
-        )
-
-        new_ratings = []
-        for ep in episodes:
-            if (ep.season_number, ep.episode_number) not in existing_ratings:
-                new_ratings.append(
-                    UserRating(
-                        user=self.user,
-                        show=self.show,
-                        rating=self.rating,
-                        season_number=ep.season_number,
-                        episode_number=ep.episode_number,
-                    )
-                )
-
-        if new_ratings:
-            UserRating.objects.bulk_create(new_ratings, ignore_conflicts=True)
 
 
 class TaskRun(BaseModel):

@@ -7,7 +7,6 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from app import history_parser
-from app.constants import SHOW_TYPE_MAPPING
 from app.history_parser import (
     close_driver,
     initialize_driver_session,
@@ -15,6 +14,7 @@ from app.history_parser import (
     process_show_durations,
     update_show_details,
 )
+from shared.constants import SHOW_TYPE_MAPPING
 
 
 def _get_windows_chrome_version():

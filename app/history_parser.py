@@ -18,11 +18,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
-from app.constants import DATE_FORMAT, MONTHS_MAP, SHOW_STATUS_MAPPING, SHOW_TYPE_MAPPING
 from app.gdrive_backup import BackupManager
 from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
 from app.signals import view_history_created
 from kinopub_parser import celery_app
+from shared.constants import DATE_FORMAT, MONTHS_MAP, SHOW_STATUS_MAPPING, SHOW_TYPE_MAPPING
 from shared.formatters import format_se
 
 

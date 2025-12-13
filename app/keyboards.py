@@ -31,12 +31,15 @@ def get_history_notification_keyboard(view_history_obj, bot_username=None):
         ],
     ]
 
-    if view_history_obj.season_number and view_history_obj.episode_number and bot_username:
-        url = f'https://t.me/{bot_username}?start=rate_{view_history_obj.show.id}_{view_history_obj.season_number}_{view_history_obj.episode_number}'
+    if bot_username:
+        # Если это фильм, номера будут 0, что корректно обрабатывается ботом
+        s_num = view_history_obj.season_number or 0
+        e_num = view_history_obj.episode_number or 0
+        url = f'https://t.me/{bot_username}?start=rate_{view_history_obj.show.id}_{s_num}_{e_num}'
         buttons.append(
             [
                 {
-                    'text': '⭐️ Оценить эпизод',
+                    'text': '⭐️ Оценить',
                     'url': url,
                 }
             ]

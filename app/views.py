@@ -344,6 +344,26 @@ def bot_get_show_details(request, show_id):
 
     try:
         show = Show.objects.prefetch_related('countries', 'genres').get(id=show_id)
+        internal_rating, user_ratings = show.get_internal_rating_data()
+
+        personal_rating = None
+        personal_episodes_count = 0
+        telegram_id = request.GET.get('telegram_id')
+
+        if telegram_id:
+            try:
+                user = ViewUser.objects.get(telegram_id=telegram_id)
+                ur = UserRating.objects.filter(
+                    user=user, show=show, season_number__isnull=True
+                ).first()
+                if ur:
+                    personal_rating = ur.rating
+
+                personal_episodes_count = UserRating.objects.filter(
+                    user=user, show=show, season_number__isnull=False
+                ).count()
+            except ViewUser.DoesNotExist:
+                pass
 
         data = {
             'id': show.id,
@@ -358,6 +378,10 @@ def bot_get_show_details(request, show_id):
             'genres': [g.name for g in show.genres.all()],
             'kinopoisk_url': show.kinopoisk_url,
             'imdb_url': show.imdb_url,
+            'internal_rating': internal_rating,
+            'user_ratings': user_ratings,
+            'personal_rating': personal_rating,
+            'personal_episodes_count': personal_episodes_count,
         }
         return JsonResponse(data)
     except Show.DoesNotExist:
@@ -584,7 +608,23 @@ def bot_get_show_episodes(request, show_id):
         return JsonResponse({'error': 'Unauthorized'}, status=403)
 
     try:
-        # Получаем пары сезон-эпизод, для которых известна длительность (значит эпизод существует)
+        telegram_id = request.GET.get('telegram_id')
+        user_ratings_map = {}
+
+        if telegram_id:
+            try:
+                user = ViewUser.objects.get(telegram_id=telegram_id)
+                ratings = UserRating.objects.filter(user=user, show_id=show_id)
+                for r in ratings:
+                    # Ключ: (сезон, эпизод). Если это оценка всего сериала, ключи будут (None, None)
+                    s = r.season_number
+                    e = r.episode_number
+                    if s and e:
+                        user_ratings_map[(s, e)] = r.rating
+            except ViewUser.DoesNotExist:
+                pass
+
+        # Получаем пары сезон-эпизод
         durations = (
             ShowDuration.objects.filter(
                 show_id=show_id,
@@ -597,6 +637,15 @@ def bot_get_show_episodes(request, show_id):
             .order_by('season_number', 'episode_number')
         )
 
-        return JsonResponse({'episodes': list(durations)})
+        result = []
+        for d in durations:
+            s, e = d['season_number'], d['episode_number']
+            item = {'season_number': s, 'episode_number': e}
+            # Если есть оценка, добавляем её
+            if (s, e) in user_ratings_map:
+                item['rating'] = user_ratings_map[(s, e)]
+            result.append(item)
+
+        return JsonResponse({'episodes': result})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

@@ -1,9 +1,10 @@
+import os
 import client
 import keyboards
 from aiogram import Bot
 from aiogram.types import CallbackQuery
 from html_helper import italic
-
+from shared.card_formatter import get_show_card_text
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES, UserRole
 
 
@@ -143,23 +144,24 @@ async def rate_show_start_handler(callback: CallbackQuery, bot: Bot):
     """
     try:
         show_id = int(callback.data.split('_')[-1])
+        user_id = callback.from_user.id
 
-        # Получаем детали шоу, чтобы узнать тип
-        show_data = await client.get_show_details(show_id)
+        show_data = await client.get_show_details(show_id, telegram_id=user_id)
         if not show_data:
             await callback.answer('Ошибка: не удалось получить данные шоу', show_alert=True)
             return
 
         show_type = show_data.get('type')
+        personal_rating = show_data.get('personal_rating')
 
         if show_type in [SHOW_TYPE_MAPPING[t] for t in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES]:
-            # Это сериал -> показываем выбор (Целиком или Эпизод)
-            kb = keyboards.get_rate_mode_keyboard(show_id)
+            episodes_count = show_data.get('personal_episodes_count', 0)
+            
+            kb = keyboards.get_rate_mode_keyboard(show_id, user_rating=personal_rating, episodes_rated=episodes_count)
             await callback.message.edit_reply_markup(reply_markup=kb)
         else:
-            # Это фильм -> сразу показываем оценки
-            # Используем rate_mode_show_ logic (оценка целиком)
-            kb = keyboards.get_rating_keyboard(show_id)
+            # Для фильмов передаем текущую оценку, чтобы она подсветилась звездочкой
+            kb = keyboards.get_rating_keyboard(show_id, current_rating=personal_rating)
             await callback.message.edit_reply_markup(reply_markup=kb)
 
         await callback.answer()
@@ -171,7 +173,14 @@ async def rate_mode_show_handler(callback: CallbackQuery, bot: Bot):
     """Выбрана оценка сериала целиком (или это фильм). Показываем грид."""
     try:
         show_id = int(callback.data.split('_')[-1])
-        kb = keyboards.get_rating_keyboard(show_id)
+        user_id = callback.from_user.id
+
+        show_data = await client.get_show_details(show_id, telegram_id=user_id)
+        current_rating = None
+        if show_data:
+            current_rating = show_data.get('personal_rating')
+
+        kb = keyboards.get_rating_keyboard(show_id, current_rating=current_rating)
         await callback.message.edit_reply_markup(reply_markup=kb)
         await callback.answer()
     except Exception as e:
@@ -180,7 +189,7 @@ async def rate_mode_show_handler(callback: CallbackQuery, bot: Bot):
 
 async def rate_show_set_handler(callback: CallbackQuery, bot: Bot):
     """
-    Устанавливает оценку и возвращает клавиатуру карточки.
+    Устанавливает оценку и возвращает клавиатуру карточки с обновленным текстом.
     Format: rate_set_<show_id>_<rating>
     """
     user_id = callback.from_user.id
@@ -198,9 +207,32 @@ async def rate_show_set_handler(callback: CallbackQuery, bot: Bot):
 
         if result and result.get('status') == 'ok':
             await callback.answer(f'Оценка {int(rating)} установлена!')
-            # Возвращаем исходную клавиатуру
-            kb = keyboards.get_show_card_keyboard(show_id)
-            await callback.message.edit_reply_markup(reply_markup=kb)
+
+            show_data = await client.get_show_details(show_id)
+            if show_data:
+                text = get_show_card_text(
+                    show_id=show_data.get('id'),
+                    title=show_data.get('title', ''),
+                    original_title=show_data.get('original_title'),
+                    kinopub_link=os.getenv('SITE_AUX_URL'),
+                    year=show_data.get('year'),
+                    show_type=show_data.get('type'),
+                    status=show_data.get('status'),
+                    countries=show_data.get('countries', []),
+                    genres=show_data.get('genres', []),
+                    imdb_rating=show_data.get('imdb_rating'),
+                    imdb_url=show_data.get('imdb_url'),
+                    kp_rating=show_data.get('kinopoisk_rating'),
+                    kp_url=show_data.get('kinopoisk_url'),
+                    internal_rating=show_data.get('internal_rating'),
+                    user_ratings=show_data.get('user_ratings'),
+                )
+                # Передаем новую оценку, чтобы кнопка обновилась на "Изменить оценку (X)"
+                kb = keyboards.get_show_card_keyboard(show_id, user_rating=rating)
+                await callback.message.edit_text(text=text, reply_markup=kb, disable_web_page_preview=True)
+            else:
+                kb = keyboards.get_show_card_keyboard(show_id, user_rating=rating)
+                await callback.message.edit_reply_markup(reply_markup=kb)
         else:
             await callback.answer('Ошибка сохранения оценки', show_alert=True)
 
@@ -209,13 +241,24 @@ async def rate_show_set_handler(callback: CallbackQuery, bot: Bot):
 
 
 async def rate_episode_start_handler(callback: CallbackQuery, bot: Bot):
+    """Открывает сетку оценок для конкретного эпизода, подсвечивая текущую."""
+    user_id = callback.from_user.id
     try:
         parts = callback.data.split('_')
         show_id = int(parts[3])
         season = int(parts[4])
         episode = int(parts[5])
 
-        kb = keyboards.get_episode_rating_keyboard(show_id, season, episode)
+        # Получаем данные, чтобы найти текущую оценку
+        episodes_data = await client.get_show_episodes(show_id, telegram_id=user_id)
+        
+        current_rating = None
+        for item in episodes_data:
+            if item['season_number'] == season and item['episode_number'] == episode:
+                current_rating = item.get('rating')
+                break
+
+        kb = keyboards.get_episode_rating_keyboard(show_id, season, episode, current_rating=current_rating)
         await callback.message.edit_reply_markup(reply_markup=kb)
         await callback.answer()
     except Exception as e:
@@ -240,8 +283,31 @@ async def rate_episode_set_handler(callback: CallbackQuery, bot: Bot):
 
         if result and result.get('status') == 'ok':
             await callback.answer(f'Оценка {int(rating)} для S{season}E{episode} принята!')
-            # Убираем клавиатуру после оценки, чтобы не загромождать
-            await callback.message.edit_reply_markup(reply_markup=None)
+
+            show_data = await client.get_show_details(show_id)
+            if show_data:
+                text = get_show_card_text(
+                    show_id=show_data.get('id'),
+                    title=show_data.get('title', ''),
+                    original_title=show_data.get('original_title'),
+                    kinopub_link=os.getenv('SITE_AUX_URL'),
+                    year=show_data.get('year'),
+                    show_type=show_data.get('type'),
+                    status=show_data.get('status'),
+                    countries=show_data.get('countries', []),
+                    genres=show_data.get('genres', []),
+                    imdb_rating=show_data.get('imdb_rating'),
+                    imdb_url=show_data.get('imdb_url'),
+                    kp_rating=show_data.get('kinopoisk_rating'),
+                    kp_url=show_data.get('kinopoisk_url'),
+                    internal_rating=show_data.get('internal_rating'),
+                    user_ratings=show_data.get('user_ratings'),
+                )
+                kb = keyboards.get_show_card_keyboard(show_id, season, episode)
+                await callback.message.edit_text(text=text, reply_markup=kb, disable_web_page_preview=True)
+            else:
+                kb = keyboards.get_show_card_keyboard(show_id, season, episode)
+                await callback.message.edit_reply_markup(reply_markup=kb)
         else:
             await callback.answer('Ошибка сохранения оценки', show_alert=True)
 
@@ -250,19 +316,25 @@ async def rate_episode_set_handler(callback: CallbackQuery, bot: Bot):
 
 
 async def rate_mode_ep_handler(callback: CallbackQuery, bot: Bot):
-    """Выбрана оценка эпизода. Загружаем эпизоды и показываем сезоны."""
     try:
         show_id = int(callback.data.split('_')[-1])
-        episodes_data = await client.get_show_episodes(show_id)
+        user_id = callback.from_user.id
+        episodes_data = await client.get_show_episodes(show_id, telegram_id=user_id)
 
         if not episodes_data:
             await callback.answer('Нет информации об эпизодах.', show_alert=True)
             return
 
-        # Собираем уникальные сезоны
-        seasons = sorted(list(set(item['season_number'] for item in episodes_data)))
+        season_stats = {}
+        for item in episodes_data:
+            s = item['season_number']
+            if s not in season_stats:
+                season_stats[s] = 0
+            
+            if item.get('rating'):
+                season_stats[s] += 1
 
-        kb = keyboards.get_seasons_keyboard(show_id, seasons)
+        kb = keyboards.get_seasons_keyboard(show_id, season_stats)
         await callback.message.edit_reply_markup(reply_markup=kb)
         await callback.answer()
     except Exception as e:
@@ -270,19 +342,22 @@ async def rate_mode_ep_handler(callback: CallbackQuery, bot: Bot):
 
 
 async def rate_sel_seas_handler(callback: CallbackQuery, bot: Bot):
-    """Выбран сезон. Показываем эпизоды."""
+    """Выбран сезон. Показываем эпизоды с учетом уже выставленных оценок."""
+    user_id = callback.from_user.id
     try:
         parts = callback.data.split('_')
         show_id = int(parts[3])
         season = int(parts[4])
 
-        episodes_data = await client.get_show_episodes(show_id)
-        # Фильтруем эпизоды для выбранного сезона
-        episodes = [
-            item['episode_number'] for item in episodes_data if item['season_number'] == season
+        # Запрашиваем эпизоды вместе с оценками текущего пользователя
+        episodes_data = await client.get_show_episodes(show_id, telegram_id=user_id)
+        
+        # Фильтруем данные только для выбранного сезона
+        season_episodes = [
+            item for item in episodes_data if item['season_number'] == season
         ]
 
-        kb = keyboards.get_episodes_keyboard(show_id, season, episodes)
+        kb = keyboards.get_episodes_keyboard(show_id, season, season_episodes)
         await callback.message.edit_reply_markup(reply_markup=kb)
         await callback.answer()
     except Exception as e:

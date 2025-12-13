@@ -15,6 +15,8 @@ def get_show_card_text(
     imdb_url: str | None,
     kp_rating: float | None,
     kp_url: str | None,
+    internal_rating: float | None = None,
+    user_ratings: list[dict] | None = None,
 ) -> str:
     """
     Генерирует стандартизированный текст карточки сериала/фильма
@@ -53,11 +55,20 @@ def get_show_card_text(
     if kp_rating:
         rating = f'KP: {kp_rating:.1f}'
         ratings.append(html_link(kp_url, rating) if kp_url else rating)
+    if internal_rating:
+        rating = f'LR: {internal_rating:.1f}'
+        ratings.append(rating)
 
     if ratings:
         lines.append(f'⭐ {" | ".join(ratings)}')
 
     if genres:
         lines.append(f'🏷 {", ".join(genres)}')
+
+    if user_ratings:
+        lines.append('')
+        lines.append(bold('🌟 Оценки зрителей:'))
+        for idx, data in enumerate(user_ratings, 1):
+            lines.append(f'{idx}. {data["label"]}: {bold(f"{data['rating']:.1f}")}')
 
     return '\n'.join(lines)

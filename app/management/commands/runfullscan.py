@@ -7,11 +7,11 @@ from django.conf import settings
 from django.core.management.base import CommandError
 from django.utils import timezone
 
-from app.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 from app.gdrive_backup import BackupManager
 from app.history_parser import close_driver, get_total_pages, initialize_driver_session
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
+from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 
 
 def parse_and_save_catalog_page(driver, mode):

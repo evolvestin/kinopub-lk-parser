@@ -3,23 +3,25 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from shared.constants import RATING_VALUES
 
 
-def _create_rating_grid(callback_template: str, back_callback: str = None, items_per_row: int = 5):
-    """
-    Универсальный генератор клавиатуры рейтинга на основе RATING_VALUES.
-    :param callback_template: строка формата 'prefix_{val}', куда подставится значение.
-    :param back_callback: callback_data для кнопки "Назад".
-    :param items_per_row: количество кнопок в ряду.
-    """
+def _create_rating_grid(
+    callback_template: str,
+    back_callback: str = None,
+    items_per_row: int = 5,
+    current_rating: float = None,
+):
     buttons = []
     row = []
 
     for value in RATING_VALUES:
-        # Если число целое, отображаем без точки (1, 2...), иначе с точкой (0.5, 1.5...)
         label = str(int(value)) if value.is_integer() else str(value)
-        # В callback передаем число как есть (или float, если нужно)
         callback_data = callback_template.format(val=label)
 
-        row.append(InlineKeyboardButton(text=label, callback_data=callback_data))
+        if current_rating is not None and value == current_rating:
+            text = f'★ {label}'
+        else:
+            text = label
+
+        row.append(InlineKeyboardButton(text=text, callback_data=callback_data))
 
         if len(row) == items_per_row:
             buttons.append(row)
@@ -29,7 +31,7 @@ def _create_rating_grid(callback_template: str, back_callback: str = None, items
         buttons.append(row)
 
     if back_callback:
-        buttons.append([InlineKeyboardButton(text='🔙 Назад', callback_data=back_callback)])
+        buttons.append([InlineKeyboardButton(text='⬅️ Назад', callback_data=back_callback)])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -61,7 +63,7 @@ def get_unclaim_keyboard(view_id: int):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def get_show_card_keyboard(show_id: int, season: int = None, episode: int = None):
+def get_show_card_keyboard(show_id: int, season: int = None, episode: int = None, user_rating: float = None):
     buttons = []
 
     # Если передан контекст эпизода, даем возможность оценить именно его
@@ -76,76 +78,110 @@ def get_show_card_keyboard(show_id: int, season: int = None, episode: int = None
         )
         buttons.append(
             [
-                InlineKeyboardButton(
-                    text='⭐️ Оценить сериал целиком', callback_data=f'rate_start_{show_id}'
-                )
+                InlineKeyboardButton(text='⭐️ Оценить', callback_data=f'rate_start_{show_id}')
             ]
         )
     else:
-        # Обычный просмотр
+        # Обычный просмотр (Фильм или Сериал в общем контексте)
+        if user_rating is not None:
+            rating_str = str(int(user_rating)) if user_rating.is_integer() else str(user_rating)
+            label = f'⭐️ Изменить оценку ({rating_str})'
+        else:
+            label = '⭐️ Оценить'
+
         buttons.append(
-            [InlineKeyboardButton(text='⭐️ Оценить', callback_data=f'rate_start_{show_id}')]
+            [InlineKeyboardButton(text=label, callback_data=f'rate_start_{show_id}')]
         )
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def get_rating_keyboard(show_id: int):
+def get_rating_keyboard(show_id: int, current_rating: float = None):
     return _create_rating_grid(
-        callback_template=f'rate_set_{show_id}_{{val}}', back_callback=f'rate_back_{show_id}'
+        callback_template=f'rate_set_{show_id}_{{val}}',
+        back_callback=f'rate_back_{show_id}',
+        current_rating=current_rating,
     )
 
 
-def get_episode_rating_keyboard(show_id: int, season: int, episode: int):
-    # Добавляем кнопку назад, возвращающую к списку эпизодов этого сезона
+def get_episode_rating_keyboard(show_id: int, season: int, episode: int, current_rating: float = None):
     return _create_rating_grid(
         callback_template=f'rate_ep_set_{show_id}_{season}_{episode}_{{val}}',
         back_callback=f'rate_sel_seas_{show_id}_{season}',
+        current_rating=current_rating,
     )
 
 
-def get_rate_mode_keyboard(show_id: int):
+def get_rate_mode_keyboard(show_id: int, user_rating: float = None, episodes_rated: int = 0):
+    if user_rating is not None:
+        rating_str = str(int(user_rating)) if user_rating.is_integer() else str(user_rating)
+        show_btn_text = f'⭐️ Изменить оценку сериала ({rating_str}/10)'
+    else:
+        show_btn_text = '⭐️ Оценить сериал'
+
+    if episodes_rated > 0:
+        ep_btn_text = f'📺 Оценить эпизод (оценено: {episodes_rated})'
+    else:
+        ep_btn_text = '📺 Оценить эпизод'
+
     buttons = [
         [
             InlineKeyboardButton(
-                text='⭐️ Оценить сериал целиком', callback_data=f'rate_mode_show_{show_id}'
+                text=show_btn_text, callback_data=f'rate_mode_show_{show_id}'
             ),
         ],
-        [InlineKeyboardButton(text='📺 Оценить эпизод', callback_data=f'rate_mode_ep_{show_id}')],
-        [InlineKeyboardButton(text='🔙 Назад', callback_data=f'rate_back_{show_id}')],
+        [InlineKeyboardButton(text=ep_btn_text, callback_data=f'rate_mode_ep_{show_id}')],
+        [InlineKeyboardButton(text='⬅️ Назад', callback_data=f'rate_back_{show_id}')],
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def get_seasons_keyboard(show_id: int, seasons: list[int]):
+def get_seasons_keyboard(show_id: int, season_stats: dict):
     buttons = []
     row = []
-    for s in sorted(seasons):
-        row.append(InlineKeyboardButton(text=f'S{s}', callback_data=f'rate_sel_seas_{show_id}_{s}'))
+    for s in sorted(season_stats.keys()):
+        count = season_stats[s]
+        label = f'S{s}'
+        if count > 0:
+            label += f' ({count})'
+
+        row.append(InlineKeyboardButton(text=label, callback_data=f'rate_sel_seas_{show_id}_{s}'))
         if len(row) == 5:
             buttons.append(row)
             row = []
     if row:
         buttons.append(row)
 
-    buttons.append([InlineKeyboardButton(text='🔙 Назад', callback_data=f'rate_start_{show_id}')])
+    buttons.append([InlineKeyboardButton(text='⬅️ Назад', callback_data=f'rate_start_{show_id}')])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def get_episodes_keyboard(show_id: int, season: int, episodes: list[int]):
+
+def get_episodes_keyboard(show_id: int, season: int, episodes_data: list[dict]):
     buttons = []
     row = []
-    for e in sorted(episodes):
+    
+    sorted_episodes = sorted(episodes_data, key=lambda x: x['episode_number'])
+
+    for item in sorted_episodes:
+        e = item['episode_number']
+        rating = item.get('rating')
+
+        label = f'E{e}'
+        if rating:
+            rating_val = int(rating) if rating.is_integer() else rating
+            label += f' (★ {rating_val})'
+
         row.append(
             InlineKeyboardButton(
-                text=f'E{e}', callback_data=f'rate_ep_start_{show_id}_{season}_{e}'
+                text=label, callback_data=f'rate_ep_start_{show_id}_{season}_{e}'
             )
         )
-        if len(row) == 5:
+        if len(row) == 4:
             buttons.append(row)
             row = []
     if row:
         buttons.append(row)
 
-    buttons.append([InlineKeyboardButton(text='🔙 Назад', callback_data=f'rate_mode_ep_{show_id}')])
+    buttons.append([InlineKeyboardButton(text='⬅️ Назад', callback_data=f'rate_mode_ep_{show_id}')])
     return InlineKeyboardMarkup(inline_keyboard=buttons)

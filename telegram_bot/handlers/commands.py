@@ -97,8 +97,11 @@ async def _send_show_card(
     show_id = show_data.get('id')
     keyboard = None
     if show_id:
-        # Передаем сезон и эпизод в генератор клавиатуры, если они есть
-        keyboard = keyboards.get_show_card_keyboard(show_id, season, episode)
+        # Передаем персональную оценку пользователя в клавиатуру
+        personal_rating = show_data.get('personal_rating')
+        keyboard = keyboards.get_show_card_keyboard(
+            show_id, season, episode, user_rating=personal_rating
+        )
 
     await sender.send_message(
         chat_id=chat_id,
@@ -116,6 +119,8 @@ async def _send_show_card(
             imdb_url=show_data.get('imdb_url'),
             kp_rating=show_data.get('kinopoisk_rating'),
             kp_url=show_data.get('kinopoisk_url'),
+            internal_rating=show_data.get('internal_rating'),
+            user_ratings=show_data.get('user_ratings'),
         ),
         keyboard=keyboard,
     )

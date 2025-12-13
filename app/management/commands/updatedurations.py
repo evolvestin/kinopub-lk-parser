@@ -6,7 +6,6 @@ from datetime import datetime
 from django.core.management.base import CommandError
 from django.db.models import Q
 
-from app.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
     close_driver,
@@ -15,6 +14,7 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
+from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 
 
 class Command(LoggableBaseCommand):

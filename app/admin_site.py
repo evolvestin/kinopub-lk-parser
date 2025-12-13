@@ -10,11 +10,11 @@ from django.shortcuts import redirect, render
 from django.urls import path, reverse
 from django.utils import timezone
 
-from app.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING
 from app.dashboard import dashboard_callback
 from app.models import LogEntry, TaskRun
 from app.tasks import run_admin_command
 from kinopub_parser import celery_app
+from shared.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING
 
 
 class CustomAdminSite(admin.AdminSite):

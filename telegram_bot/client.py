@@ -79,8 +79,11 @@ async def search_shows(query: str) -> list:
     return data.get('results', []) if data else []
 
 
-async def get_show_details(show_id: int) -> dict | None:
-    return await _execute_request(f'show/{show_id}/')
+async def get_show_details(show_id: int, telegram_id: int = None) -> dict | None:
+    params = {}
+    if telegram_id:
+        params['telegram_id'] = telegram_id
+    return await _execute_request(f'show/{show_id}/', params=params)
 
 
 async def get_show_by_imdb_id(imdb_id: str) -> dict | None:
@@ -133,6 +136,9 @@ async def rate_show(
     return await _execute_request('rate/', method='POST', payload=payload)
 
 
-async def get_show_episodes(show_id: int) -> list:
-    data = await _execute_request(f'show/{show_id}/episodes/')
+async def get_show_episodes(show_id: int, telegram_id: int = None) -> list:
+    params = {}
+    if telegram_id:
+        params['telegram_id'] = telegram_id
+    data = await _execute_request(f'show/{show_id}/episodes/', params=params)
     return data.get('episodes', []) if data else []

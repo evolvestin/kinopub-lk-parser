@@ -3,9 +3,9 @@ import logging
 import requests
 from django.conf import settings
 
-from app.constants import DATE_FORMAT
 from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
 from shared.card_formatter import get_show_card_text
+from shared.constants import DATE_FORMAT
 from shared.formatters import format_se
 from shared.html_helper import bold, code, html_secure, italic
 
@@ -147,6 +147,8 @@ class TelegramSender:
             lines = ['📺 Новый просмотр:', '']
 
         show = view_history_obj.show
+        internal_rating, user_ratings = show.get_internal_rating_data()
+
         lines.extend(
             [
                 get_show_card_text(
@@ -163,6 +165,8 @@ class TelegramSender:
                     imdb_url=show.imdb_url,
                     kp_rating=show.kinopoisk_rating,
                     kp_url=show.kinopoisk_url,
+                    internal_rating=internal_rating,
+                    user_ratings=user_ratings,
                 ),
                 '',
                 f'🗓 Дата просмотра: {view_history_obj.view_date.strftime(DATE_FORMAT)}',
