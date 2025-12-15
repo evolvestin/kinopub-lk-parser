@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
-from django.db.models import Count, Q, Sum
+from django.db.models import Avg, Count, Min, Q, Sum
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
@@ -218,6 +218,30 @@ class UserRatingInline(admin.TabularInline):
     autocomplete_fields = ('user',)
 
 
+class AverageRatingFilter(admin.SimpleListFilter):
+    title = 'Average Rating'
+    parameter_name = 'avg_rating'
+
+    def lookups(self, request, model_admin):
+        return [
+            (f'{i}', f'{i}.0 - {i + 1}.0') for i in range(1, 10)
+        ] + [('10', '10.0')]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            try:
+                value = int(self.value())
+                if '_avg_rating' not in queryset.query.annotations:
+                    queryset = queryset.annotate(_avg_rating=Avg('ratings__rating'))
+
+                if value == 10:
+                    return queryset.filter(_avg_rating__gte=10)
+                return queryset.filter(_avg_rating__gte=value, _avg_rating__lt=value + 1)
+            except ValueError:
+                pass
+        return queryset
+
+
 @admin.register(Show, site=admin_site)
 class ShowAdmin(admin.ModelAdmin):
     list_display = (
@@ -232,7 +256,7 @@ class ShowAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
     )
-    list_filter = ('type', 'status', 'year')
+    list_filter = ('type', 'status', AverageRatingFilter, 'year')
     search_fields = ('title', 'original_title')
     inlines = [ShowDurationInline, ViewHistoryInline, UserRatingInline]
     readonly_fields = (
@@ -259,6 +283,7 @@ class ShowAdmin(admin.ModelAdmin):
         queryset = queryset.annotate(
             _view_count=Count('viewhistory'),
             _total_duration=Sum('showduration__duration_seconds'),
+            _avg_rating=Avg('ratings__rating'),
         )
         return queryset
 
@@ -266,7 +291,7 @@ class ShowAdmin(admin.ModelAdmin):
     def view_count(self, obj):
         return obj._view_count
 
-    @admin.display(description='Duration')
+    @admin.display(description='Duration', ordering='_total_duration')
     def total_duration_hours(self, obj):
         if obj and obj._total_duration:
             total_minutes = int(obj._total_duration // 60)
@@ -278,7 +303,7 @@ class ShowAdmin(admin.ModelAdmin):
             return f'{minutes}м'
         return '-'
 
-    @admin.display(description='Avg Rating')
+    @admin.display(description='Avg Rating', ordering='_avg_rating')
     def get_avg_rating(self, obj):
         ratings = obj.ratings.all()
         if not ratings:
@@ -395,13 +420,14 @@ class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
+        qs = qs.annotate(_first_user_id=Min('users__id'))
         return qs.order_by('-view_date', '-season_number', '-episode_number')
 
-    @admin.display(description='Users')
+    @admin.display(description='Users', ordering='_first_user_id')
     def get_users(self, obj):
         return ', '.join([u.name or u.username or str(u.telegram_id) for u in obj.users.all()])
 
-    @admin.display(description='Учтено', boolean=True)
+    @admin.display(description='Учтено', boolean=True, ordering='is_checked')
     def get_is_checked_display(self, obj):
         return obj.is_checked
 

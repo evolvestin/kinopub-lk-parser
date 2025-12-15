@@ -76,6 +76,14 @@ def index(request):
     return render(request, 'index.html', context)
 
 
+def _check_token(request):
+    """Проверяет наличие и корректность X-Bot-Token в заголовках."""
+    expected_token = settings.BOT_TOKEN
+    if not expected_token:
+        return False
+    return request.headers.get('X-Bot-Token') == expected_token
+
+
 def protected_bot_api(func):
     """Декоратор для проверки токена и стандартной обработки ошибок."""
     @functools.wraps(func)
@@ -430,37 +438,13 @@ def bot_toggle_view_check(request):
         view = ViewHistory.objects.get(id=view_id)
         sender = TelegramSender()
 
-        # Логика обработки дубликатов:
-        # 1. Находим более старые записи того же эпизода/фильма, которые сейчас "учтены"
-        older_duplicates = ViewHistory.objects.filter(
-            show=view.show,
-            season_number=view.season_number,
-            episode_number=view.episode_number,
-            view_date__lt=view.view_date,
-            is_checked=True,
-        )
+        # Просто переключаем статус текущей записи
+        view.is_checked = not view.is_checked
+        view.save(update_fields=['is_checked'])
+        sender.update_history_message(view)
 
-        message = ''
-
-        # Если текущая запись включена и есть старые дубликаты -> выключаем старые
-        if view.is_checked and older_duplicates.exists():
-            count = 0
-            for old_view in older_duplicates:
-                old_view.is_checked = False
-                old_view.save(update_fields=['is_checked'])
-                sender.update_history_message(old_view)
-                count += 1
-            # Текущая запись остается включенной (мы просто подтвердили её приоритет)
-            sender.update_history_message(view)
-            message = f'Предыдущие просмотры ({count}) помечены как неучтенные.'
-
-        # Иначе просто переключаем статус текущей записи
-        else:
-            view.is_checked = not view.is_checked
-            view.save(update_fields=['is_checked'])
-            sender.update_history_message(view)
-            status_text = 'учтен' if view.is_checked else 'не учтен'
-            message = f'Просмотр теперь {status_text}.'
+        status_text = 'учтен' if view.is_checked else 'не учтен'
+        message = f'Просмотр теперь {status_text}.'
 
         return JsonResponse({'status': 'ok', 'message': message, 'is_checked': view.is_checked})
 

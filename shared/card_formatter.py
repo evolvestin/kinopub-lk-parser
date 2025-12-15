@@ -26,10 +26,10 @@ def get_show_card_text(
     original_title = html_secure(original_title)
 
     if kinopub_link and show_id:
-        header = html_link(f'{kinopub_link.rstrip("/")}/item/view/{show_id}', bold(raw_title))
+        link = html_link(f'{kinopub_link.rstrip("/")}/item/view/{show_id}', '🔗')
+        lines = [f'🎬{link} {bold(raw_title)}']
     else:
-        header = bold(raw_title)
-    lines = [f'🎬 {header}']
+        lines = [f'🎬 {bold(raw_title)}']
 
     if raw_title != original_title:
         lines.append(italic(f'({original_title})'))

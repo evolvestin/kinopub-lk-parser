@@ -138,9 +138,9 @@ async def _send_show_card(
     )
 
 
-async def handle_view_command(message: Message, bot: Bot):
-    """Обработка команды /view_123"""
-    match = re.match(r'/view_(\d+)', message.text)
+async def handle_show_command(message: Message, bot: Bot):
+    """Обработка команды /show_123"""
+    match = re.match(r'/show_(\d+)', message.text)
     if not match:
         return
 
@@ -174,7 +174,7 @@ async def _process_search(bot: Bot, chat_id: int, query: str):
         title = html_secure(item['title'])
         original_title = html_secure(item.get('original_title') or '')
         year = item.get('year') or '?'
-        cmd = f'/view_{item["id"]}'
+        cmd = f'/show_{item["id"]}'
 
         if original_title and original_title != title:
             display_title = f'{title} ({original_title})'

@@ -159,7 +159,7 @@ class TelegramSender:
                     year=show.year,
                     show_type=show.type,
                     status=show.status,
-                    countries=[country.name for country in show.countries.all()],
+                    countries=[str(country) for country in show.countries.all()],
                     genres=[genre.name for genre in show.genres.all()],
                     imdb_rating=show.imdb_rating,
                     imdb_url=show.imdb_url,
@@ -244,4 +244,15 @@ class TelegramSender:
         )
 
         payload = {'chat_id': telegram_id, 'text': text, 'parse_mode': 'HTML'}
+        self._request('send_message', payload)
+    
+    def send_private_history_notification(self, telegram_id, view_history_obj):
+        text, keyboard = self._build_message_payload(view_history_obj)
+        payload = {
+            'chat_id': telegram_id,
+            'text': text,
+            'parse_mode': 'HTML',
+            'reply_markup': {'inline_keyboard': keyboard},
+            'disable_web_page_preview': True,
+        }
         self._request('send_message', payload)
