@@ -115,12 +115,12 @@ class BackupManager:
     def perform_backup(self):
         data_dir = str(settings.COOKIES_FILE_PATH_MAIN.parent)
 
-        last_ts_file = os.path.join(data_dir, 'last_db_backup_ts')
-        last_backup_ts = 0.0
-        if os.path.exists(last_ts_file):
+        last_timestamp_file = os.path.join(data_dir, 'last_db_backup_ts')
+        last_backup_timestamp = 0.0
+        if os.path.exists(last_timestamp_file):
             try:
-                with open(last_ts_file) as f:
-                    last_backup_ts = float(f.read().strip())
+                with open(last_timestamp_file) as timestamp_file:
+                    last_backup_timestamp = float(timestamp_file.read().strip())
             except ValueError:
                 pass
 
@@ -138,13 +138,13 @@ class BackupManager:
         max_updated_at = None
 
         for model in check_models:
-            res = model.objects.aggregate(max_ts=Max('updated_at'))
-            ts = res.get('max_ts')
-            if ts:
-                if max_updated_at is None or ts > max_updated_at:
-                    max_updated_at = ts
+            max_updated_at_result = model.objects.aggregate(max_ts=Max('updated_at'))
+            timestamp = max_updated_at_result.get('max_ts')
+            if timestamp:
+                if max_updated_at is None or timestamp > max_updated_at:
+                    max_updated_at = timestamp
 
-        if max_updated_at and max_updated_at.timestamp() <= last_backup_ts:
+        if max_updated_at and max_updated_at.timestamp() <= last_backup_timestamp:
             logging.info('Database has not changed since last backup. Skipping.')
             return
 
@@ -161,7 +161,7 @@ class BackupManager:
             env = os.environ.copy()
             env['PGPASSWORD'] = db_conf['PASSWORD']
 
-            cmd = [
+            command = [
                 'pg_dump',
                 '-h',
                 db_conf['HOST'],
@@ -179,7 +179,7 @@ class BackupManager:
             ]
 
             logging.info(f'Dumping database to {backup_file_path}...')
-            subprocess.run(cmd, env=env, check=True)
+            subprocess.run(command, env=env, check=True)
 
             if os.path.exists(backup_file_path):
                 file_size = os.path.getsize(backup_file_path)
@@ -191,8 +191,8 @@ class BackupManager:
                     self._upload_file(drive, backup_file_path, settings.DB_BACKUP_FILENAME)
 
                 if max_updated_at:
-                    with open(last_ts_file, 'w') as f:
-                        f.write(str(max_updated_at.timestamp()))
+                    with open(last_timestamp_file, 'w') as timestamp_file:
+                        timestamp_file.write(str(max_updated_at.timestamp()))
             else:
                 logging.error(f'Backup file {backup_file_path} was not found after creation.')
 

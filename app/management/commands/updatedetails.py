@@ -12,6 +12,7 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import Show
+from app.history_parser import is_fatal_selenium_error
 
 
 class Command(LoggableBaseCommand):
@@ -87,13 +88,7 @@ class Command(LoggableBaseCommand):
                     logging.info(f'Successfully updated details for show ID {show_id}.')
                     updated_count += 1
                 except Exception as e:
-                    err_str = str(e).lower()
-                    if (
-                        'driver unresponsive' in err_str
-                        or 'connection refused' in err_str
-                        or 'max retries exceeded' in err_str
-                        or 'invalid session' in err_str
-                    ):
+                    if is_fatal_selenium_error(e):
                         logging.error('Selenium driver is dead. Restarting session...')
                         close_driver(driver)
                         driver = None

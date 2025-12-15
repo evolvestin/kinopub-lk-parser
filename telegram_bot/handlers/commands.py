@@ -92,15 +92,27 @@ async def bot_command_start_group(message: Message, bot: Bot):
 
 
 async def _send_show_card(
-    sender: MessageSender, chat_id: int, show_data: dict, season: int = None, episode: int = None
+    sender: MessageSender,
+    chat_id: int,
+    show_data: dict,
+    season: int = None,
+    episode: int = None,
 ):
     show_id = show_data.get('id')
     keyboard = None
     if show_id:
-        # Передаем персональную оценку пользователя в клавиатуру
+        # Передаем персональную оценку пользователя и кол-во эпизодов в клавиатуру
         personal_rating = show_data.get('personal_rating')
+        episodes_count = show_data.get('personal_episodes_count', 0)
+        show_type = show_data.get('type')
+
         keyboard = keyboards.get_show_card_keyboard(
-            show_id, season, episode, user_rating=personal_rating
+            show_id,
+            show_type=show_type,
+            season=season,
+            episode=episode,
+            user_rating=personal_rating,
+            episodes_rated=episodes_count,
         )
 
     await sender.send_message(
@@ -117,8 +129,8 @@ async def _send_show_card(
             genres=show_data.get('genres', []),
             imdb_rating=show_data.get('imdb_rating'),
             imdb_url=show_data.get('imdb_url'),
-            kp_rating=show_data.get('kinopoisk_rating'),
-            kp_url=show_data.get('kinopoisk_url'),
+            kinopoisk_rating=show_data.get('kinopoisk_rating'),
+            kinopoisk_url=show_data.get('kinopoisk_url'),
             internal_rating=show_data.get('internal_rating'),
             user_ratings=show_data.get('user_ratings'),
         ),

@@ -26,6 +26,32 @@ from shared.constants import DATE_FORMAT, MONTHS_MAP, SHOW_STATUS_MAPPING, SHOW_
 from shared.formatters import format_se
 
 
+def is_cloudflare_page(driver):
+    """Проверяет, является ли текущая страница заглушкой Cloudflare."""
+    try:
+        title = driver.title
+        page_source = driver.page_source
+        return (
+            'Один момент' in title
+            or 'Just a moment' in title
+            or 'challenges.cloudflare.com' in page_source
+            or '/cdn-cgi/challenge-platform/' in page_source
+        )
+    except Exception:
+        return False
+
+
+def is_fatal_selenium_error(e):
+    """Определяет, является ли ошибка критической для сессии драйвера."""
+    err_str = str(e).lower()
+    return (
+        'driver unresponsive' in err_str
+        or 'connection refused' in err_str
+        or 'max retries exceeded' in err_str
+        or 'invalid session' in err_str
+    )
+
+
 def close_driver(driver):
     if driver:
         logging.info('Closing Selenium driver.')
@@ -87,21 +113,21 @@ def update_show_details(driver, show_id):
         rating_data = get_row_data('Рейтинг')
         if rating_data:
             try:
-                kp_link = rating_data.find_element(By.CSS_SELECTOR, "a[href*='kinopoisk.ru']")
-                href = kp_link.get_attribute('href')
+                kinopoisk_link = rating_data.find_element(By.CSS_SELECTOR, "a[href*='kinopoisk.ru']")
+                href = kinopoisk_link.get_attribute('href')
                 if '/film/' in href and not href.endswith('/film/'):
                     show.kinopoisk_url = href
-                    show.kinopoisk_rating = float(kp_link.text)
-                    votes_el = kp_link.find_element(By.XPATH, './following-sibling::small')
-                    show.kinopoisk_votes = _extract_int_from_string(votes_el.text)
+                    show.kinopoisk_rating = float(kinopoisk_link.text)
+                    votes_element = kinopoisk_link.find_element(By.XPATH, './following-sibling::small')
+                    show.kinopoisk_votes = _extract_int_from_string(votes_element.text)
             except (NoSuchElementException, ValueError):
                 pass
             try:
                 imdb_link = rating_data.find_element(By.CSS_SELECTOR, "a[href*='imdb.com']")
                 show.imdb_url = imdb_link.get_attribute('href')
                 show.imdb_rating = float(imdb_link.text)
-                votes_el = imdb_link.find_element(By.XPATH, './following-sibling::small')
-                show.imdb_votes = _extract_int_from_string(votes_el.text)
+                votes_element = imdb_link.find_element(By.XPATH, './following-sibling::small')
+                show.imdb_votes = _extract_int_from_string(votes_element.text)
             except (NoSuchElementException, ValueError):
                 pass
 
@@ -117,8 +143,8 @@ def update_show_details(driver, show_id):
             elements_data = get_row_data(label)
             if elements_data:
                 elements = elements_data.find_elements(By.TAG_NAME, 'a')
-                for el in elements:
-                    name = el.text.strip()
+                for link_element in elements:
+                    name = link_element.text.strip()
                     if name:
                         obj, _ = model.objects.update_or_create(name=name)
                         relation.add(obj)
@@ -261,13 +287,7 @@ def save_cookies(driver, file_path):
 def do_login(driver, login, password, cookie_path, base_url):
     login_url = f'{base_url}user/login'
 
-    title = driver.title
-    page_source = driver.page_source
-    if (
-        'Один момент' in title
-        or 'Just a moment' in title
-        or 'challenges.cloudflare.com' in page_source
-    ):
+    if is_cloudflare_page(driver):
         logging.warning('Обнаружена защита Cloudflare на странице входа.')
 
     try:
@@ -543,12 +563,13 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
 
             if mode == 'episodes':
                 try:
-                    se_text = block.find_element(
+                    season_episode_text = block.find_element(
                         By.CSS_SELECTOR, '.topleft-2x .label-success'
                     ).text.strip()
-                    se_match = re.search(r'Сезон (\d+)\. Эпизод (\d+)', se_text)
-                    if se_match:
-                        season, episode = int(se_match.group(1)), int(se_match.group(2))
+                    season_episode_match = re.search(r'Сезон (\d+)\. Эпизод (\d+)', season_episode_text)
+                    if season_episode_match:
+                        season = int(season_episode_match.group(1))
+                        episode = int(season_episode_match.group(2))
                         if season == 0:
                             continue
                 except NoSuchElementException:
@@ -685,17 +706,7 @@ def get_latest_view_date_orm(mode: str):
 def open_url_safe(driver, url, headless=True, session_type='main'):
     driver.get(url)
     try:
-        title = driver.title
-        page_source = driver.page_source
-
-        is_cloudflare = (
-            'Один момент' in title
-            or 'Just a moment' in title
-            or '/cdn-cgi/challenge-platform/' in page_source
-            or 'challenges.cloudflare.com' in page_source
-        )
-
-        if is_cloudflare:
+        if is_cloudflare_page(driver):
             logging.warning(f'Обнаружена защита Cloudflare на {url}. Перезапуск сессии...')
             close_driver(driver)
             time.sleep(10)
@@ -706,14 +717,7 @@ def open_url_safe(driver, url, headless=True, session_type='main'):
 
             new_driver.get(url)
 
-            new_title = new_driver.title
-            new_source = new_driver.page_source
-
-            if (
-                'Один момент' in new_title
-                or 'Just a moment' in new_title
-                or '/cdn-cgi/challenge-platform/' in new_source
-            ):
+            if is_cloudflare_page(new_driver):
                 close_driver(new_driver)
                 raise Exception('Защита Cloudflare срабатывает повторно после перезапуска.')
 
@@ -905,38 +909,38 @@ def parse_new_episodes_list(driver):
         for row in rows:
             try:
                 # Extract URL from onclick attribute or first link
-                onclick_val = row.get_attribute('onclick')
+                onclick_attribute = row.get_attribute('onclick')
                 href = None
 
-                if onclick_val and 'document.location' in onclick_val:
+                if onclick_attribute and 'document.location' in onclick_attribute:
                     # Extract URL from: document.location = '/path/...'
-                    match = re.search(r"['\"]([^'\"]+)['\"]", onclick_val)
+                    match = re.search(r"['\"]([^'\"]+)['\"]", onclick_attribute)
                     if match:
                         href = match.group(1)
 
                 if not href:
                     # Fallback to link inside row
                     try:
-                        link_el = row.find_element(By.TAG_NAME, 'a')
-                        href = link_el.get_attribute('href')
+                        link_element = row.find_element(By.TAG_NAME, 'a')
+                        href = link_element.get_attribute('href')
                     except NoSuchElementException:
                         continue
 
                 # Parse ID, Season, Episode from URL: /item/view/104191/s2e3/Daddy-Issues
                 # Regex must handle: /item/view/<id>/s<S>e<E>...
-                url_match = re.search(r'/item/view/(\d+)/s(\d+)e(\d+)', href)
-                if not url_match:
+                url_match_result = re.search(r'/item/view/(\d+)/s(\d+)e(\d+)', href)
+                if not url_match_result:
                     continue
 
-                show_id = int(url_match.group(1))
-                season_num = int(url_match.group(2))
-                episode_num = int(url_match.group(3))
+                show_id = int(url_match_result.group(1))
+                season_num = int(url_match_result.group(2))
+                episode_num = int(url_match_result.group(3))
 
                 # Parse Titles
                 try:
                     title_cell = row.find_element(By.CSS_SELECTOR, 'td:nth-child(2)')
-                    title_el = title_cell.find_element(By.TAG_NAME, 'b')
-                    title = title_el.text.strip()
+                    title_element = title_cell.find_element(By.TAG_NAME, 'b')
+                    title = title_element.text.strip()
 
                     full_text = title_cell.text
                     original_title = full_text.replace(title, '').strip()

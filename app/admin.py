@@ -24,6 +24,57 @@ from app.models import (
 from app.telegram_bot import TelegramSender
 from app.views import sync_user_permissions
 
+
+def _format_object_list_html(queryset, url_name, count_attr='show_count'):
+    """Универсальная функция для форматирования списка ссылок на объекты в админке."""
+    if not queryset:
+        return 'No items found.'
+
+    html = '<ul>'
+    for item in queryset:
+        link = reverse(url_name, args=[item.id])
+        count = getattr(item, count_attr, 0)
+        html += f'<li><a href="{link}">{item.name}</a> ({count} shows)</li>'
+    html += '</ul>'
+    return format_html(html)
+
+
+def _get_user_stats_html(queryset_filter_q):
+    """Генерирует HTML список статистики просмотров пользователей."""
+    stats = (
+        ViewUser.objects.filter(queryset_filter_q)
+        .distinct()
+        .annotate(
+            shows_count=Count(
+                'history__show', distinct=True, filter=queryset_filter_q
+            )
+        )
+        .order_by('-shows_count')
+    )
+
+    if not stats:
+        return 'No views yet.'
+
+    html = '<ul>'
+    for user in stats:
+        user_label = user.name or user.username or str(user.telegram_id)
+        html += f'<li><strong>{user_label}</strong>: {user.shows_count} shows</li>'
+    html += '</ul>'
+    return format_html(html)
+
+def _get_related_items_html(model, query_filter, url_name):
+    """Генерирует HTML список связанных объектов (актеров, жанров, стран)."""
+    # Для Person поле называется acted_in_shows, для остальных - show
+    relation_field = 'acted_in_shows' if model == Person else 'show'
+    
+    items = (
+        model.objects.filter(query_filter)
+        .distinct()
+        .annotate(show_count=Count(relation_field, filter=query_filter))
+        .order_by('-show_count')[:20]
+    )
+    return _format_object_list_html(items, url_name, count_attr='show_count')
+
 admin_site.register(Group, GroupAdmin)
 
 
@@ -64,22 +115,23 @@ class CustomUserAdmin(UserAdmin):
     )
 
     @admin.display(description='Groups')
-    def get_groups_display(self, obj):
-        groups = obj.groups.all()
+    def get_groups_display(self, user_instance):
+        groups = user_instance.groups.all()
         if not groups:
             return '-'
         return format_html(
-            '<ul>{}</ul>', format_html_join('', '<li>{}</li>', ((g.name,) for g in groups))
+            '<ul>{}</ul>',
+            format_html_join('', '<li>{}</li>', ((group.name,) for group in groups))
         )
 
     @admin.display(description='User permissions')
-    def get_permissions_display(self, obj):
-        perms = obj.user_permissions.all()
-        if not perms:
+    def get_permissions_display(self, user_instance):
+        permissions = user_instance.user_permissions.all()
+        if not permissions:
             return '-'
         return format_html(
             '<div style="max-height: 400px; overflow-y: auto;"><ul>{}</ul></div>',
-            format_html_join('', '<li>{}</li>', ((p,) for p in perms)),
+            format_html_join('', '<li>{}</li>', ((permission,) for permission in permissions)),
         )
 
     @admin.display(description='ViewUser Profile')
@@ -122,7 +174,19 @@ class CodeAdmin(admin.ModelAdmin):
         return False
 
 
-class ShowDurationInline(admin.TabularInline):
+class SeasonEpisodeDisplayMixin:
+    """Миксин для отображения номера сезона и эпизода в админке."""
+
+    @admin.display(description='Season', ordering='season_number')
+    def get_season(self, obj):
+        return obj.season_number if obj.season_number and obj.season_number > 0 else '-'
+
+    @admin.display(description='Episode', ordering='episode_number')
+    def get_episode(self, obj):
+        return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
+
+
+class ShowDurationInline(SeasonEpisodeDisplayMixin, admin.TabularInline):
     model = ShowDuration
     extra = 0
     readonly_fields = (
@@ -134,16 +198,8 @@ class ShowDurationInline(admin.TabularInline):
     )
     can_delete = False
 
-    @admin.display(description='Season')
-    def get_season(self, obj):
-        return obj.season_number if obj.season_number and obj.season_number > 0 else '-'
 
-    @admin.display(description='Episode')
-    def get_episode(self, obj):
-        return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
-
-
-class ViewHistoryInline(admin.TabularInline):
+class ViewHistoryInline(SeasonEpisodeDisplayMixin, admin.TabularInline):
     model = ViewHistory
     extra = 0
     readonly_fields = (
@@ -154,14 +210,6 @@ class ViewHistoryInline(admin.TabularInline):
         'updated_at',
     )
     can_delete = False
-
-    @admin.display(description='Season')
-    def get_season(self, obj):
-        return obj.season_number if obj.season_number and obj.season_number > 0 else '-'
-
-    @admin.display(description='Episode')
-    def get_episode(self, obj):
-        return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
 
 
 class UserRatingInline(admin.TabularInline):
@@ -325,7 +373,7 @@ class ViewUserGroupAdmin(admin.ModelAdmin):
 
 
 @admin.register(ViewHistory, site=admin_site)
-class ViewHistoryAdmin(admin.ModelAdmin):
+class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
     list_display = (
         'show',
         'view_date',
@@ -353,21 +401,13 @@ class ViewHistoryAdmin(admin.ModelAdmin):
     def get_users(self, obj):
         return ', '.join([u.name or u.username or str(u.telegram_id) for u in obj.users.all()])
 
-    @admin.display(description='Season', ordering='season_number')
-    def get_season(self, obj):
-        return obj.season_number if obj.season_number and obj.season_number > 0 else '-'
-
-    @admin.display(description='Episode', ordering='episode_number')
-    def get_episode(self, obj):
-        return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
-
     @admin.display(description='Учтено', boolean=True)
     def get_is_checked_display(self, obj):
         return obj.is_checked
 
 
 @admin.register(ShowDuration, site=admin_site)
-class ShowDurationAdmin(admin.ModelAdmin):
+class ShowDurationAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
     list_display = (
         'show',
         'get_season',
@@ -390,14 +430,6 @@ class ShowDurationAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.order_by('-updated_at', '-season_number', '-episode_number')
-
-    @admin.display(description='Season', ordering='season_number')
-    def get_season(self, obj):
-        return obj.season_number if obj.season_number and obj.season_number > 0 else '-'
-
-    @admin.display(description='Episode', ordering='episode_number')
-    def get_episode(self, obj):
-        return obj.episode_number if obj.episode_number and obj.episode_number > 0 else '-'
 
 
 @admin.register(LogEntry, site=admin_site)
@@ -431,64 +463,43 @@ class LogEntryAdmin(admin.ModelAdmin):
         return True
 
 
-class ShowCountryInline(admin.TabularInline):
+class BaseReadonlyInline(admin.TabularInline):
+    extra = 0
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+class ShowCountryInline(BaseReadonlyInline):
     model = Show.countries.through
     verbose_name = 'Show'
     verbose_name_plural = 'Shows from this country'
-    extra = 0
     autocomplete_fields = ('show',)
-    can_delete = False
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
 
 
-class ShowGenreInline(admin.TabularInline):
+class ShowGenreInline(BaseReadonlyInline):
     model = Show.genres.through
     verbose_name = 'Show'
     verbose_name_plural = 'Shows in this genre'
-    extra = 0
     autocomplete_fields = ('show',)
-    can_delete = False
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
 
 
-class ShowDirectorInline(admin.TabularInline):
+class ShowDirectorInline(BaseReadonlyInline):
     model = Show.directors.through
     verbose_name = 'Directed Show'
     verbose_name_plural = 'Directed Shows'
-    extra = 0
     autocomplete_fields = ('show',)
-    can_delete = False
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
 
 
-class ShowActorInline(admin.TabularInline):
+class ShowActorInline(BaseReadonlyInline):
     model = Show.actors.through
     verbose_name = 'Acted In Show'
     verbose_name_plural = 'Acted In Shows'
-    extra = 0
     autocomplete_fields = ('show',)
-    can_delete = False
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
 
 
 class BaseNameAdmin(admin.ModelAdmin):
@@ -530,46 +541,13 @@ class CountryAdmin(BaseNameAdmin):
 
     @admin.display(description='User Stats (Shows watched)')
     def user_stats(self, obj):
-        # Считаем количество уникальных шоу этой страны, которые посмотрел каждый пользователь
-        stats = (
-            ViewUser.objects.filter(history__show__countries=obj)
-            .distinct()
-            .annotate(
-                shows_count=Count(
-                    'history__show', distinct=True, filter=Q(history__show__countries=obj)
-                )
-            )
-            .order_by('-shows_count')
-        )
-
-        if not stats:
-            return 'No views yet.'
-
-        html = '<ul>'
-        for user in stats:
-            user_label = user.name or user.username or str(user.telegram_id)
-            html += f'<li><strong>{user_label}</strong>: {user.shows_count} shows</li>'
-        html += '</ul>'
-        return format_html(html)
+        return _get_user_stats_html(Q(history__show__countries=obj))
 
     @admin.display(description='Actors')
     def related_actors(self, obj):
-        actors = (
-            Person.objects.filter(acted_in_shows__countries=obj)
-            .distinct()
-            .annotate(show_count=Count('acted_in_shows', filter=Q(acted_in_shows__countries=obj)))
-            .order_by('-show_count')[:20]
+        return _get_related_items_html(
+            Person, Q(acted_in_shows__countries=obj), 'admin:app_person_change'
         )
-
-        if not actors:
-            return 'No related actors found.'
-
-        html = '<ul>'
-        for actor in actors:
-            link = reverse('admin:app_person_change', args=[actor.id])
-            html += f'<li><a href="{link}">{actor.name}</a> ({actor.show_count} shows)</li>'
-        html += '</ul>'
-        return format_html(html)
 
 
 @admin.register(Genre, site=admin_site)
@@ -597,45 +575,13 @@ class GenreAdmin(BaseNameAdmin):
 
     @admin.display(description='User Stats (Shows watched)')
     def user_stats(self, obj):
-        stats = (
-            ViewUser.objects.filter(history__show__genres=obj)
-            .distinct()
-            .annotate(
-                shows_count=Count(
-                    'history__show', distinct=True, filter=Q(history__show__genres=obj)
-                )
-            )
-            .order_by('-shows_count')
-        )
-
-        if not stats:
-            return 'No views yet.'
-
-        html = '<ul>'
-        for user in stats:
-            user_label = user.name or user.username or str(user.telegram_id)
-            html += f'<li><strong>{user_label}</strong>: {user.shows_count} shows</li>'
-        html += '</ul>'
-        return format_html(html)
+        return _get_user_stats_html(Q(history__show__genres=obj))
 
     @admin.display(description='Actors')
     def related_actors(self, obj):
-        actors = (
-            Person.objects.filter(acted_in_shows__genres=obj)
-            .distinct()
-            .annotate(show_count=Count('acted_in_shows', filter=Q(acted_in_shows__genres=obj)))
-            .order_by('-show_count')[:20]
+        return _get_related_items_html(
+            Person, Q(acted_in_shows__genres=obj), 'admin:app_person_change'
         )
-
-        if not actors:
-            return 'No related actors found.'
-
-        html = '<ul>'
-        for actor in actors:
-            link = reverse('admin:app_person_change', args=[actor.id])
-            html += f'<li><a href="{link}">{actor.name}</a> ({actor.show_count} shows)</li>'
-        html += '</ul>'
-        return format_html(html)
 
 
 @admin.register(Person, site=admin_site)
@@ -668,29 +614,9 @@ class PersonAdmin(BaseNameAdmin):
 
     @admin.display(description='User Stats (Shows watched with this person)')
     def user_stats(self, obj):
-        # Пользователи, смотревшие фильмы/сериалы с этим актером или режиссером
-        stats = (
-            ViewUser.objects.filter(Q(history__show__actors=obj) | Q(history__show__directors=obj))
-            .distinct()
-            .annotate(
-                shows_count=Count(
-                    'history__show',
-                    distinct=True,
-                    filter=Q(history__show__actors=obj) | Q(history__show__directors=obj),
-                )
-            )
-            .order_by('-shows_count')
+        return _get_user_stats_html(
+            Q(history__show__actors=obj) | Q(history__show__directors=obj)
         )
-
-        if not stats:
-            return 'No views yet.'
-
-        html = '<ul>'
-        for user in stats:
-            user_label = user.name or user.username or str(user.telegram_id)
-            html += f'<li><strong>{user_label}</strong>: {user.shows_count} shows</li>'
-        html += '</ul>'
-        return format_html(html)
 
     @admin.display(description='Genres')
     def related_genres(self, obj):
@@ -700,16 +626,7 @@ class PersonAdmin(BaseNameAdmin):
             .annotate(show_count=Count('show', filter=Q(show__actors=obj) | Q(show__directors=obj)))
             .order_by('-show_count')[:20]
         )
-
-        if not genres:
-            return 'No related genres found.'
-
-        html = '<ul>'
-        for genre in genres:
-            link = reverse('admin:app_genre_change', args=[genre.id])
-            html += f'<li><a href="{link}">{genre.name}</a> ({genre.show_count} shows)</li>'
-        html += '</ul>'
-        return format_html(html)
+        return _format_object_list_html(genres, 'admin:app_genre_change')
 
     @admin.display(description='Countries')
     def related_countries(self, obj):
@@ -719,13 +636,4 @@ class PersonAdmin(BaseNameAdmin):
             .annotate(show_count=Count('show', filter=Q(show__actors=obj) | Q(show__directors=obj)))
             .order_by('-show_count')[:20]
         )
-
-        if not countries:
-            return 'No related countries found.'
-
-        html = '<ul>'
-        for country in countries:
-            link = reverse('admin:app_country_change', args=[country.id])
-            html += f'<li><a href="{link}">{country.name}</a> ({country.show_count} shows)</li>'
-        html += '</ul>'
-        return format_html(html)
+        return _format_object_list_html(countries, 'admin:app_country_change')

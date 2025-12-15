@@ -80,6 +80,31 @@ class ViewUser(BaseModel):
         null=True, blank=True, help_text='ID сообщения в админ-канале для управления ролью'
     )
 
+    def update_personal_details(self, username, name, language, is_active=None):
+        """Обновляет данные пользователя и возвращает список измененных полей."""
+        updated_fields = []
+        
+        if self.username != username:
+            self.username = username
+            updated_fields.append('username')
+        
+        if self.name != name:
+            self.name = name
+            updated_fields.append('name')
+        
+        if self.language != language:
+            self.language = language
+            updated_fields.append('language')
+            
+        if is_active is not None and self.is_bot_active != is_active:
+            self.is_bot_active = is_active
+            updated_fields.append('is_bot_active')
+
+        if updated_fields:
+            self.save()
+            
+        return updated_fields
+
     def delete(self, *args, **kwargs):
         # Удаляем связанного Django-пользователя, если удаление инициировано со стороны ViewUser
         user = self.django_user
@@ -135,33 +160,33 @@ class Show(BaseModel):
         if not ratings:
             return None, []
 
-        user_sums = {}
-        user_counts = {}
-        user_objs = {}
+        user_ratings_sum = {}
+        user_ratings_count = {}
+        user_objects = {}
 
-        for r in ratings:
-            uid = r.user.id
-            if uid not in user_sums:
-                user_sums[uid] = 0.0
-                user_counts[uid] = 0
-                user_objs[uid] = r.user
+        for rating_entry in ratings:
+            user_id = rating_entry.user.id
+            if user_id not in user_ratings_sum:
+                user_ratings_sum[user_id] = 0.0
+                user_ratings_count[user_id] = 0
+                user_objects[user_id] = rating_entry.user
 
-            user_sums[uid] += r.rating
-            user_counts[uid] += 1
+            user_ratings_sum[user_id] += rating_entry.rating
+            user_ratings_count[user_id] += 1
 
         user_results = []
-        total_avg_sum = 0.0
+        total_average_sum = 0.0
 
-        for uid, total in user_sums.items():
-            user_avg = total / user_counts[uid]
-            if username := user_objs[uid].username:
+        for user_id, total_rating in user_ratings_sum.items():
+            user_average = total_rating / user_ratings_count[user_id]
+            if username := user_objects[user_id].username:
                 user_label = f'@{username}'
             else:
-                user_label = user_objs[uid].name
-            user_results.append({'label': user_label, 'rating': user_avg})
-            total_avg_sum += user_avg
+                user_label = user_objects[user_id].name
+            user_results.append({'label': user_label, 'rating': user_average})
+            total_average_sum += user_average
 
-        overall_rating = total_avg_sum / len(user_results)
+        overall_rating = total_average_sum / len(user_results)
         user_results.sort(key=lambda x: x['rating'], reverse=True)
 
         return overall_rating, user_results

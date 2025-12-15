@@ -15,6 +15,60 @@ from app.models import Show, ShowDuration, UserRating, ViewHistory, ViewUser
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
 from shared.formatters import format_se
+import functools
+from django.core.exceptions import ObjectDoesNotExist
+
+
+def _toggle_user_in_view(user, view_id):
+    """Вспомогательная функция для переключения участия пользователя в просмотре."""
+    view_history = ViewHistory.objects.get(id=view_id)
+    
+    if user in view_history.users.all():
+        view_history.users.remove(user)
+        action = 'removed'
+    else:
+        view_history.users.add(user)
+        action = 'added'
+
+    TelegramSender().update_history_message(view_history)
+    return action
+
+
+def _serialize_show_details(show, user=None):
+    """Собирает словарь с данными о шоу и рейтингами."""
+    internal_rating, user_ratings = show.get_internal_rating_data()
+    personal_rating = None
+    personal_episodes_count = 0
+
+    if user:
+        user_rating_obj = UserRating.objects.filter(
+            user=user, show=show, season_number__isnull=True
+        ).first()
+        if user_rating_obj:
+            personal_rating = user_rating_obj.rating
+
+        personal_episodes_count = UserRating.objects.filter(
+            user=user, show=show, season_number__isnull=False
+        ).count()
+
+    return {
+        'id': show.id,
+        'title': show.title,
+        'original_title': show.original_title,
+        'type': show.type,
+        'year': show.year,
+        'status': show.status,
+        'kinopoisk_rating': show.kinopoisk_rating,
+        'imdb_rating': show.imdb_rating,
+        'countries': [str(country) for country in show.countries.all()],
+        'genres': [genre.name for genre in show.genres.all()],
+        'kinopoisk_url': show.kinopoisk_url,
+        'imdb_url': show.imdb_url,
+        'internal_rating': internal_rating,
+        'user_ratings': user_ratings,
+        'personal_rating': personal_rating,
+        'personal_episodes_count': personal_episodes_count,
+    }
 
 
 def index(request):
@@ -22,17 +76,26 @@ def index(request):
     return render(request, 'index.html', context)
 
 
-def _check_token(request):
-    token = request.headers.get('X-Bot-Token')
-    return token == settings.BOT_TOKEN
+def protected_bot_api(func):
+    """Декоратор для проверки токена и стандартной обработки ошибок."""
+    @functools.wraps(func)
+    def wrapper(request, *args, **kwargs):
+        if not _check_token(request):
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+        try:
+            return func(request, *args, **kwargs)
+        except ObjectDoesNotExist:
+            return JsonResponse({'error': 'Not found'}, status=404)
+        except Exception as e:
+            logging.error(f'API Error in {func.__name__}: {e}')
+            return JsonResponse({'error': str(e)}, status=400)
+    return wrapper
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['GET'])
 def check_bot_user(request, telegram_id):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         user = ViewUser.objects.get(telegram_id=telegram_id)
         return JsonResponse({'exists': True, 'role': user.role})
@@ -41,31 +104,19 @@ def check_bot_user(request, telegram_id):
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['POST'])
 def bot_toggle_claim(request):
     """
     Переключает участие пользователя в просмотре (добавляет или удаляет).
     """
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         data = json.loads(request.body)
         telegram_id = data.get('telegram_id')
         view_id = data.get('view_id')
 
         user = ViewUser.objects.get(telegram_id=telegram_id)
-        view_history = ViewHistory.objects.get(id=view_id)
-
-        if user in view_history.users.all():
-            view_history.users.remove(user)
-            action = 'removed'
-        else:
-            view_history.users.add(user)
-            action = 'added'
-
-        # Обновляем сообщение в канале
-        TelegramSender().update_history_message(view_history)
+        action = _toggle_user_in_view(user, view_id)
 
         return JsonResponse({'status': 'ok', 'action': action})
     except (ViewUser.DoesNotExist, ViewHistory.DoesNotExist):
@@ -76,104 +127,70 @@ def bot_toggle_claim(request):
 
 @csrf_exempt
 @require_http_methods(['POST'])
+@protected_bot_api
 def register_bot_user(request):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    data = json.loads(request.body)
+    telegram_id = data.get('telegram_id')
+    username = data.get('username')
+    first_name = data.get('first_name', '')
+    login_username = username if username else str(telegram_id)
+
+    host = 'localhost'
+    for origin in getattr(settings, 'CSRF_TRUSTED_ORIGINS', []):
+        if 'localhost' not in origin and '127.0.0.1' not in origin:
+            host = origin.replace('https://', '').replace('http://', '').split('/')[0]
+            break
+    email = f'{login_username}@{host}'
+
+    view_user, created = ViewUser.objects.get_or_create(
+        telegram_id=telegram_id,
+        defaults={
+            'username': username,
+            'name': first_name,
+            'language': data.get('language_code', 'ru'),
+            'role': UserRole.GUEST,
+            'is_bot_active': True,
+        },
+    )
+
+    # Используем метод модели для обновления данных (DRY)
+    if not created:
+        view_user.update_personal_details(
+            username=username, 
+            name=first_name, 
+            language=data.get('language_code', 'ru'),
+            is_active=True
+        )
+
+    django_user, user_created = User.objects.get_or_create(
+        username=login_username,
+        defaults={'email': email, 'is_staff': False, 'is_superuser': False, 'first_name': first_name[:30]},
+    )
+    if user_created:
+        django_user.set_password(str(uuid.uuid4()))
+        django_user.save()
+
+    if view_user.django_user != django_user:
+        view_user.django_user = django_user
+        view_user.save()
+
+    sync_user_permissions(django_user, view_user.role)
 
     try:
-        data = json.loads(request.body)
-        telegram_id = data.get('telegram_id')
-        username = data.get('username')
-        first_name = data.get('first_name', '')
-
-        # Основной идентификатор для логина (если username нет, используем ID)
-        login_username = username if username else str(telegram_id)
-
-        # Получаем реальный домен из настроек CSRF, исключая локальные адреса
-        host = 'localhost'
-        trusted_origins = getattr(settings, 'CSRF_TRUSTED_ORIGINS', [])
-        for origin in trusted_origins:
-            if 'localhost' not in origin and '127.0.0.1' not in origin:
-                # Убираем протокол и возможные пути, оставляем чистый домен
-                host = origin.replace('https://', '').replace('http://', '').split('/')[0]
-                break
-
-        email = f'{login_username}@{host}'
-
-        # 1. Создаем или обновляем ViewUser
-        view_user, created = ViewUser.objects.get_or_create(
-            telegram_id=telegram_id,
-            defaults={
-                'username': username,
-                'name': first_name,
-                'language': data.get('language_code', 'ru'),
-                'role': UserRole.GUEST,
-                'is_bot_active': True,
-            },
-        )
-
-        if not created:
-            has_changes = False
-            if view_user.username != username:
-                view_user.username = username
-                has_changes = True
-            if view_user.name != first_name:
-                view_user.name = first_name
-                has_changes = True
-            if not view_user.is_bot_active:
-                view_user.is_bot_active = True
-                has_changes = True
-
-            if has_changes:
-                view_user.save()
-
-        # 2. Создаем или получаем Django User
-        django_user, user_created = User.objects.get_or_create(
-            username=login_username,
-            defaults={
-                'email': email,
-                'is_staff': False,
-                'is_superuser': False,
-                'first_name': first_name[:30],  # Ограничение Django
-            },
-        )
-
-        if user_created:
-            django_user.set_password(str(uuid.uuid4()))
-            django_user.save()
-
-        # Связываем
-        if view_user.django_user != django_user:
-            view_user.django_user = django_user
-            view_user.save()
-
-        # 3. Синхронизация прав на основе роли
-        sync_user_permissions(django_user, view_user.role)
-
-        # 4. Отправляем сообщение в админ-канал
-        # Если пользователь только создан или сообщения о роли еще нет - создаем новое.
-        try:
-            if created or not view_user.role_message_id:
-                TelegramSender().send_user_role_message(view_user)
-            else:
-                TelegramSender().update_user_role_message(view_user)
-        except Exception as e:
-            logging.error(f'Failed to handle role message for {telegram_id}: {e}')
-
-        return JsonResponse(
-            {'status': 'ok', 'created': created, 'role': view_user.role, 'user_id': view_user.id}
-        )
+        if created or not view_user.role_message_id:
+            TelegramSender().send_user_role_message(view_user)
+        else:
+            TelegramSender().update_user_role_message(view_user)
     except Exception as e:
-        logging.error(f'Registration error: {e}')
-        return JsonResponse({'error': str(e)}, status=400)
+        logging.error(f'Role msg error for {telegram_id}: {e}')
+
+    return JsonResponse({'status': 'ok', 'created': created, 'role': view_user.role, 'user_id': view_user.id})
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['POST'])
 def set_bot_user_role(request):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         data = json.loads(request.body)
         telegram_id = data.get('telegram_id')
@@ -245,15 +262,13 @@ def sync_user_permissions(user, role):
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['POST'])
 def update_bot_user(request):
     """
     Обновляет персональные данные пользователя (имя, username, язык) и статус активности.
     Вызывается при любом взаимодействии с ботом.
     """
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         data = json.loads(request.body)
         telegram_id = data.get('telegram_id')
@@ -263,41 +278,20 @@ def update_bot_user(request):
         except ViewUser.DoesNotExist:
             return JsonResponse({'status': 'skipped', 'reason': 'user_not_found'})
 
-        updated_fields = []
+        # Используем метод модели для обновления данных (DRY)
+        updated_fields = view_user.update_personal_details(
+            username=data.get('username'),
+            name=data.get('first_name', ''),
+            language=data.get('language_code', 'en'),
+            is_active=data.get('is_active')
+        )
 
-        # Обновление основных данных
-        new_username = data.get('username')
-        new_name = data.get('first_name', '')
-        new_language = data.get('language_code', 'en')
-
-        if view_user.username != new_username:
-            view_user.username = new_username
-            updated_fields.append('username')
-
-        if view_user.name != new_name:
-            view_user.name = new_name
-            updated_fields.append('name')
-
-        if view_user.language != new_language:
-            view_user.language = new_language
-            updated_fields.append('language')
-
-        # Обновление статуса активности (если передан)
-        is_active = data.get('is_active')
-        if is_active is not None:
-            if view_user.is_bot_active != is_active:
-                view_user.is_bot_active = is_active
-                updated_fields.append('is_bot_active')
-
-        if updated_fields:
-            view_user.save()
-
-            # Если изменилось имя/юзернейм, обновляем сообщение в админ-канале
-            if 'username' in updated_fields or 'name' in updated_fields:
-                try:
-                    TelegramSender().update_user_role_message(view_user)
-                except Exception:
-                    pass
+        # Если изменилось имя/юзернейм, обновляем сообщение в админ-канале
+        if updated_fields and ('username' in updated_fields or 'name' in updated_fields):
+            try:
+                TelegramSender().update_user_role_message(view_user)
+            except Exception:
+                pass
 
         return JsonResponse({'status': 'ok', 'updated': updated_fields})
 
@@ -307,11 +301,9 @@ def update_bot_user(request):
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['GET'])
 def bot_search_shows(request):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     query = request.GET.get('q', '').strip()
     if not query:
         return JsonResponse({'results': []})
@@ -337,63 +329,28 @@ def bot_search_shows(request):
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['GET'])
 def bot_get_show_details(request, show_id):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         show = Show.objects.prefetch_related('countries', 'genres').get(id=show_id)
-        internal_rating, user_ratings = show.get_internal_rating_data()
-
-        personal_rating = None
-        personal_episodes_count = 0
-        telegram_id = request.GET.get('telegram_id')
-
-        if telegram_id:
+        user = None
+        if telegram_id := request.GET.get('telegram_id'):
             try:
                 user = ViewUser.objects.get(telegram_id=telegram_id)
-                ur = UserRating.objects.filter(
-                    user=user, show=show, season_number__isnull=True
-                ).first()
-                if ur:
-                    personal_rating = ur.rating
-
-                personal_episodes_count = UserRating.objects.filter(
-                    user=user, show=show, season_number__isnull=False
-                ).count()
             except ViewUser.DoesNotExist:
                 pass
 
-        data = {
-            'id': show.id,
-            'title': show.title,
-            'original_title': show.original_title,
-            'type': show.type,
-            'year': show.year,
-            'status': show.status,
-            'kinopoisk_rating': show.kinopoisk_rating,
-            'imdb_rating': show.imdb_rating,
-            'countries': [str(c) for c in show.countries.all()],
-            'genres': [g.name for g in show.genres.all()],
-            'kinopoisk_url': show.kinopoisk_url,
-            'imdb_url': show.imdb_url,
-            'internal_rating': internal_rating,
-            'user_ratings': user_ratings,
-            'personal_rating': personal_rating,
-            'personal_episodes_count': personal_episodes_count,
-        }
+        data = _serialize_show_details(show, user)
         return JsonResponse(data)
     except Show.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['GET'])
 def bot_get_by_imdb(request, imdb_id):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         show = (
             Show.objects.filter(imdb_url__icontains=f'tt{imdb_id}')
@@ -423,12 +380,7 @@ def bot_get_by_imdb(request, imdb_id):
         return JsonResponse({'error': str(e)}, status=400)
 
 
-@csrf_exempt
-@require_http_methods(['POST'])
-def bot_assign_view(request):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
+def _manage_view_assignment(request, action):
     try:
         data = json.loads(request.body)
         telegram_id = data.get('telegram_id')
@@ -437,18 +389,17 @@ def bot_assign_view(request):
         user = ViewUser.objects.get(telegram_id=telegram_id)
         view_history = ViewHistory.objects.get(id=view_id)
 
-        view_history.users.add(user)
-
-        show_title = view_history.show.title or view_history.show.original_title
-        if view_history.season_number:
-            info = (
-                f'{show_title}'
-                f' ({format_se(view_history.season_number, view_history.episode_number)})'
-            )
-        else:
+        if action == 'add':
+            view_history.users.add(user)
+            show_title = view_history.show.title or view_history.show.original_title
             info = show_title
+            if view_history.season_number:
+                info += f' ({format_se(view_history.season_number, view_history.episode_number)})'
+            return JsonResponse({'status': 'ok', 'info': info})
+        elif action == 'remove':
+            view_history.users.remove(user)
+            return JsonResponse({'status': 'ok'})
 
-        return JsonResponse({'status': 'ok', 'info': info})
     except (ViewUser.DoesNotExist, ViewHistory.DoesNotExist):
         return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:
@@ -456,32 +407,23 @@ def bot_assign_view(request):
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['POST'])
-def bot_unassign_view(request):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
-    try:
-        data = json.loads(request.body)
-        telegram_id = data.get('telegram_id')
-        view_id = data.get('view_id')
-
-        user = ViewUser.objects.get(telegram_id=telegram_id)
-        view_history = ViewHistory.objects.get(id=view_id)
-
-        view_history.users.remove(user)
-
-        return JsonResponse({'status': 'ok'})
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+def bot_assign_view(request):
+    return _manage_view_assignment(request, 'add')
 
 
 @csrf_exempt
+@protected_bot_api
+@require_http_methods(['POST'])
+def bot_unassign_view(request):
+    return _manage_view_assignment(request, 'remove')
+
+
+@csrf_exempt
+@protected_bot_api
 @require_http_methods(['POST'])
 def bot_toggle_view_check(request):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         data = json.loads(request.body)
         view_id = data.get('view_id')
@@ -529,11 +471,9 @@ def bot_toggle_view_check(request):
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['POST'])
 def bot_toggle_view_user(request):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         data = json.loads(request.body)
         telegram_id = data.get('telegram_id')
@@ -548,19 +488,8 @@ def bot_toggle_view_user(request):
                 'is_bot_active': True,
             },
         )
-
-        view_history = ViewHistory.objects.get(id=view_id)
-        sender = TelegramSender()
-
-        action = 'added'
-        if user in view_history.users.all():
-            view_history.users.remove(user)
-            action = 'removed'
-        else:
-            view_history.users.add(user)
-            action = 'added'
-
-        sender.update_history_message(view_history)
+        
+        action = _toggle_user_in_view(user, view_id)
 
         return JsonResponse({'status': 'ok', 'action': action})
     except ViewHistory.DoesNotExist:
@@ -570,11 +499,9 @@ def bot_toggle_view_user(request):
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['POST'])
 def bot_rate_show(request):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         data = json.loads(request.body)
         telegram_id = data.get('telegram_id')
@@ -602,11 +529,9 @@ def bot_rate_show(request):
 
 
 @csrf_exempt
+@protected_bot_api
 @require_http_methods(['GET'])
 def bot_get_show_episodes(request, show_id):
-    if not _check_token(request):
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
     try:
         telegram_id = request.GET.get('telegram_id')
         user_ratings_map = {}
@@ -615,16 +540,14 @@ def bot_get_show_episodes(request, show_id):
             try:
                 user = ViewUser.objects.get(telegram_id=telegram_id)
                 ratings = UserRating.objects.filter(user=user, show_id=show_id)
-                for r in ratings:
-                    # Ключ: (сезон, эпизод). Если это оценка всего сериала, ключи будут (None, None)
-                    s = r.season_number
-                    e = r.episode_number
-                    if s and e:
-                        user_ratings_map[(s, e)] = r.rating
+                for rating_entry in ratings:
+                    season_number = rating_entry.season_number
+                    episode_number = rating_entry.episode_number
+                    if season_number and episode_number:
+                        user_ratings_map[(season_number, episode_number)] = rating_entry.rating
             except ViewUser.DoesNotExist:
                 pass
 
-        # Получаем пары сезон-эпизод
         durations = (
             ShowDuration.objects.filter(
                 show_id=show_id,
@@ -638,12 +561,13 @@ def bot_get_show_episodes(request, show_id):
         )
 
         result = []
-        for d in durations:
-            s, e = d['season_number'], d['episode_number']
-            item = {'season_number': s, 'episode_number': e}
-            # Если есть оценка, добавляем её
-            if (s, e) in user_ratings_map:
-                item['rating'] = user_ratings_map[(s, e)]
+        for duration_data in durations:
+            season_number = duration_data['season_number']
+            episode_number = duration_data['episode_number']
+            item = {'season_number': season_number, 'episode_number': episode_number}
+            
+            if (season_number, episode_number) in user_ratings_map:
+                item['rating'] = user_ratings_map[(season_number, episode_number)]
             result.append(item)
 
         return JsonResponse({'episodes': result})

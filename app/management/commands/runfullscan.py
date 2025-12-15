@@ -12,6 +12,7 @@ from app.history_parser import close_driver, get_total_pages, initialize_driver_
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
+from app.history_parser import is_fatal_selenium_error
 
 
 def parse_and_save_catalog_page(driver, mode):
@@ -20,20 +21,20 @@ def parse_and_save_catalog_page(driver, mode):
     const blocks = document.querySelectorAll("#items > div[class*='col-']");
 
     blocks.forEach(block => {
-        const linkEl = block.querySelector('.item-poster a');
-        if (!linkEl) return;
+        const linkElement = block.querySelector('.item-poster a');
+        if (!linkElement) return;
 
-        const titleEl = block.querySelector('.item-title a');
-        const origTitleEl = block.querySelector('.item-author a');
-        const kpLink = block.querySelector(".bottomcenter-2x a[href*='kinopoisk.ru']");
+        const titleElement = block.querySelector('.item-title a');
+        const originalTitleElement = block.querySelector('.item-author a');
+        const kinopoiskLink = block.querySelector(".bottomcenter-2x a[href*='kinopoisk.ru']");
         const imdbLink = block.querySelector(".bottomcenter-2x a[href*='imdb.com']");
 
         results.push({
-            href: linkEl.getAttribute('href'),
-            title: titleEl ? titleEl.textContent.trim() : '',
-            original_title: origTitleEl ? origTitleEl.textContent.trim() : '',
-            kp_url: kpLink ? kpLink.getAttribute('href') : null,
-            kp_rating: kpLink ? kpLink.textContent.trim() : null,
+            href: linkElement.getAttribute('href'),
+            title: titleElement ? titleElement.textContent.trim() : '',
+            original_title: originalTitleElement ? originalTitleElement.textContent.trim() : '',
+            kinopoisk_url: kinopoiskLink ? kinopoiskLink.getAttribute('href') : null,
+            kinopoisk_rating: kinopoiskLink ? kinopoiskLink.textContent.trim() : null,
             imdb_url: imdbLink ? imdbLink.getAttribute('href') : null,
             imdb_rating: imdbLink ? imdbLink.textContent.trim() : null
         });
@@ -73,13 +74,13 @@ def parse_and_save_catalog_page(driver, mode):
                 'imdb_rating': None,
             }
 
-            if item['kp_url']:
-                url = item['kp_url']
+            if item['kinopoisk_url']:
+                url = item['kinopoisk_url']
                 if '/film/' in url and not url.endswith('/film/'):
                     show_data['kinopoisk_url'] = url
-                    if item['kp_rating']:
+                    if item['kinopoisk_rating']:
                         try:
-                            show_data['kinopoisk_rating'] = float(item['kp_rating'])
+                            show_data['kinopoisk_rating'] = float(item['kinopoisk_rating'])
                         except ValueError:
                             pass
 
@@ -236,13 +237,7 @@ def run_full_scan_session(headless=True, target_type=None):
                     )
                     time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
                 except Exception as e:
-                    err_str = str(e).lower()
-                    if (
-                        'driver unresponsive' in err_str
-                        or 'connection refused' in err_str
-                        or 'max retries exceeded' in err_str
-                        or 'invalid session' in err_str
-                    ):
+                    if is_fatal_selenium_error(e):
                         logging.error('Selenium driver is dead. Restarting session...')
                         close_driver(driver)
                         driver = None

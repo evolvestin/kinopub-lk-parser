@@ -13,8 +13,8 @@ def get_show_card_text(
     genres: list[str] | None,
     imdb_rating: float | None,
     imdb_url: str | None,
-    kp_rating: float | None,
-    kp_url: str | None,
+    kinopoisk_rating: float | None,
+    kinopoisk_url: str | None,
     internal_rating: float | None = None,
     user_ratings: list[dict] | None = None,
 ) -> str:
@@ -52,9 +52,9 @@ def get_show_card_text(
     if imdb_rating:
         rating = f'IMDB: {imdb_rating:.1f}'
         ratings.append(html_link(imdb_url, rating) if imdb_url else rating)
-    if kp_rating:
-        rating = f'KP: {kp_rating:.1f}'
-        ratings.append(html_link(kp_url, rating) if kp_url else rating)
+    if kinopoisk_rating:
+        rating = f'KP: {kinopoisk_rating:.1f}'
+        ratings.append(html_link(kinopoisk_url, rating) if kinopoisk_url else rating)
     if internal_rating:
         rating = f'LR: {internal_rating:.1f}'
         ratings.append(rating)

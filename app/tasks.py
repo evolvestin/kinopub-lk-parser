@@ -16,6 +16,7 @@ from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, TaskRun
 from app.telegram_bot import TelegramSender
+from contextlib import contextmanager
 
 
 @shared_task
@@ -68,30 +69,29 @@ def delete_old_logs_task():
         logging.error('Celery task: Error in delete_old_logs_task: %s', e)
 
 
-@shared_task
-def backup_database():
+@contextmanager
+def _redis_lock(lock_name, timeout):
     redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
-    lock = redis_client.lock('backup_lock', timeout=300)  # 5 min timeout
+    lock = redis_client.lock(lock_name, timeout=timeout)
     if lock.acquire(blocking=False):
         try:
-            BackupManager().perform_backup()
+            yield
         finally:
             lock.release()
     else:
-        logging.debug('Backup already in progress. Skipping.')
+        logging.debug(f'{lock_name} already in progress. Skipping.')
+
+
+@shared_task
+def backup_database():
+    with _redis_lock('backup_lock', 300):
+        BackupManager().perform_backup()
 
 
 @shared_task
 def backup_cookies():
-    redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
-    lock = redis_client.lock('cookies_backup_lock', timeout=60)
-    if lock.acquire(blocking=False):
-        try:
-            BackupManager().perform_cookies_backup()
-        finally:
-            lock.release()
-    else:
-        logging.debug('Cookies backup already in progress. Skipping.')
+    with _redis_lock('cookies_backup_lock', 60):
+        BackupManager().perform_cookies_backup()
 
 
 @shared_task(bind=True)

@@ -69,7 +69,7 @@ def register_router() -> Router:
         callbacks.rate_mode_ep_handler, F.data.startswith('rate_mode_ep_')
     )
     router.callback_query.register(
-        callbacks.rate_sel_seas_handler, F.data.startswith('rate_sel_seas_')
+        callbacks.rate_select_season_handler, F.data.startswith('rate_sel_seas_')
     )
 
     # Рейтинг (Выставление оценки эпизоду)

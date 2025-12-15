@@ -15,6 +15,7 @@ from app.history_parser import (
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
+from app.history_parser import is_fatal_selenium_error
 
 
 class Command(LoggableBaseCommand):
@@ -172,12 +173,7 @@ class Command(LoggableBaseCommand):
                 except Show.DoesNotExist:
                     logging.warning(f'Show ID {show_id} not found in DB during processing.')
                 except Exception as e:
-                    err_str = str(e).lower()
-                    if (
-                        'driver unresponsive' in err_str
-                        or 'connection refused' in err_str
-                        or 'max retries exceeded' in err_str
-                    ):
+                    if is_fatal_selenium_error(e):
                         logging.error('Selenium driver is dead. Restarting session...')
                         close_driver(driver)
                         driver = None

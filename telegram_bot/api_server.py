@@ -6,6 +6,16 @@ from aiogram.types import InlineKeyboardMarkup
 from aiohttp import web
 
 
+def _get_validated_markup(markup_data):
+    if not markup_data:
+        return None
+    try:
+        return InlineKeyboardMarkup.model_validate(markup_data)
+    except Exception as e:
+        logging.error(f'Markup validation error: {e}')
+        return None
+
+
 async def handle_send_message(request):
     bot: Bot = request.app['bot']
     data = await request.json()
@@ -14,14 +24,8 @@ async def handle_send_message(request):
     text = data.get('text')
     parse_mode = data.get('parse_mode', 'HTML')
     disable_web_page_preview = data.get('disable_web_page_preview', False)
-    reply_markup_data = data.get('reply_markup')
-
-    reply_markup = None
-    if reply_markup_data:
-        try:
-            reply_markup = InlineKeyboardMarkup.model_validate(reply_markup_data)
-        except Exception as e:
-            logging.error(f'Markup validation error: {e}')
+    
+    reply_markup = _get_validated_markup(data.get('reply_markup'))
 
     try:
         message = await bot.send_message(
@@ -61,14 +65,8 @@ async def handle_edit_message(request):
     text = data.get('text')
     parse_mode = data.get('parse_mode', 'HTML')
     disable_web_page_preview = data.get('disable_web_page_preview', False)
-    reply_markup_data = data.get('reply_markup')
-
-    reply_markup = None
-    if reply_markup_data:
-        try:
-            reply_markup = InlineKeyboardMarkup.model_validate(reply_markup_data)
-        except Exception:
-            pass
+    
+    reply_markup = _get_validated_markup(data.get('reply_markup'))
 
     try:
         if text:
