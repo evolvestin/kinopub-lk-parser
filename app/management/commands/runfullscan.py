@@ -128,7 +128,7 @@ def parse_and_save_catalog_page(driver, mode):
     return new_count
 
 
-def run_full_scan_session(headless=True, target_type=None):
+def run_full_scan_session(headless=True, target_type=None, process_all_pages=False):
     logging.info('--- Starting Full Catalog Scan Session ---')
     driver = None
 
@@ -235,6 +235,15 @@ def run_full_scan_session(headless=True, target_type=None):
                         total_pages,
                         added_count,
                     )
+
+                    if added_count == 0 and not process_all_pages:
+                        logging.info(
+                            "No new items found on page %d. Stopping scan for mode '%s'.",
+                            page,
+                            mode,
+                        )
+                        break
+
                     time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
                 except Exception as e:
                     if is_fatal_selenium_error(e):
@@ -264,9 +273,16 @@ class Command(LoggableBaseCommand):
             dest='type',
             help='Filter shows by type (e.g. serial, movie).',
         )
+        parser.add_argument(
+            '--all-pages',
+            action='store_true',
+            dest='all_pages',
+            help='Force scanning of all pages even if no new items are found.',
+        )
 
     def handle(self, *args, **options):
         target_type = options.get('type')
+        process_all_pages = options.get('all_pages', False)
 
         if target_type and target_type not in SHOW_TYPE_MAPPING:
             for key, val in SHOW_TYPE_MAPPING.items():
@@ -278,4 +294,4 @@ class Command(LoggableBaseCommand):
             raise CommandError(
                 f'Invalid type: {target_type}. Choices: {", ".join(SHOW_TYPE_MAPPING.keys())}'
             )
-        run_full_scan_session(target_type=target_type)
+        run_full_scan_session(target_type=target_type, process_all_pages=process_all_pages)
