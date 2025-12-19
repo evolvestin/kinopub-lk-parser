@@ -142,3 +142,8 @@ async def get_show_episodes(show_id: int, telegram_id: int = None) -> list:
         params['telegram_id'] = telegram_id
     data = await _execute_request(f'show/{show_id}/episodes/', params=params)
     return data.get('episodes', []) if data else []
+
+
+async def get_show_ratings_details(show_id: int) -> list:
+    data = await _execute_request(f'show/{show_id}/ratings/')
+    return data.get('ratings', []) if data else []

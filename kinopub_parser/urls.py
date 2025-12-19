@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/bot/search/', views.bot_search_shows),
     path('api/bot/show/<int:show_id>/', views.bot_get_show_details),
     path('api/bot/show/<int:show_id>/episodes/', views.bot_get_show_episodes),
+    path('api/bot/show/<int:show_id>/ratings/', views.bot_get_show_ratings_details),
     path('api/bot/imdb/<str:imdb_id>/', views.bot_get_by_imdb),
     path('api/bot/toggle_claim/', views.bot_toggle_claim),
     path('api/bot/toggle_view_user/', views.bot_toggle_view_user),

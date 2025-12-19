@@ -106,3 +106,36 @@ class MessageSender:
                 logging.error(f'Unexpected error sending message to {chat_id}: {e}')
 
         return response
+    
+    async def send_smart_split_text(
+        self,
+        chat_id: int | str,
+        text_blocks: list[str],
+        header: str = '',
+        separator: str = '\n',
+        parse_mode: str = 'HTML'
+    ):
+        """
+        Универсальный метод для отправки списка текстовых блоков.
+        Гарантирует, что сообщение не превысит лимит 4096 символов.
+        Старается не разрывать блоки.
+        """
+        MAX_LENGTH = 4096
+        current_message = header
+        
+        for block in text_blocks:
+            # Проверяем длину: текущее сообщение + разделитель + блок
+            # Если превышает, отправляем текущее и начинаем новое
+            if len(current_message) + len(separator) + len(block) > MAX_LENGTH:
+                if current_message.strip():
+                    await self.send_message(chat_id, current_message, parse_mode=parse_mode)
+                current_message = block
+            else:
+                if current_message:
+                    current_message += separator + block
+                else:
+                    current_message = block
+        
+        # Отправляем остаток
+        if current_message.strip():
+            await self.send_message(chat_id, current_message, parse_mode=parse_mode)

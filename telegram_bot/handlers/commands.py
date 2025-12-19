@@ -106,6 +106,10 @@ async def _send_show_card(
         episodes_count = show_data.get('personal_episodes_count', 0)
         show_type = show_data.get('type')
 
+        # Проверяем наличие любых оценок для отображения кнопки "Все оценки"
+        user_ratings_list = show_data.get('user_ratings')
+        has_ratings = bool(user_ratings_list and len(user_ratings_list) > 0)
+
         keyboard = keyboards.get_show_card_keyboard(
             show_id,
             show_type=show_type,
@@ -113,6 +117,7 @@ async def _send_show_card(
             episode=episode,
             user_rating=personal_rating,
             episodes_rated=episodes_count,
+            has_any_ratings=has_ratings,
         )
 
     await sender.send_message(
@@ -147,7 +152,7 @@ async def handle_show_command(message: Message, bot: Bot):
     show_id = int(match.group(1))
     sender = MessageSender(bot)
 
-    show_data = await client.get_show_details(show_id)
+    show_data = await client.get_show_details(show_id, telegram_id=message.from_user.id)
     if show_data:
         await _send_show_card(sender, message.chat.id, show_data)
     else:

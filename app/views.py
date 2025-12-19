@@ -504,6 +504,19 @@ def bot_rate_show(request):
             episode_number=episode,
             defaults={'rating': rating},
         )
+
+        history_qs = ViewHistory.objects.filter(
+            show=show,
+            season_number=season or 0,
+            episode_number=episode or 0,
+            users=user,
+            telegram_message_id__isnull=False
+        )
+
+        sender = TelegramSender()
+        for history_item in history_qs:
+            sender.update_history_message(history_item)
+
         return JsonResponse({'status': 'ok', 'rating': rating})
 
     except (ViewUser.DoesNotExist, Show.DoesNotExist):
@@ -555,5 +568,47 @@ def bot_get_show_episodes(request, show_id):
             result.append(item)
 
         return JsonResponse({'episodes': result})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@protected_bot_api
+@require_http_methods(['GET'])
+def bot_get_show_ratings_details(request, show_id):
+    try:
+        ratings = (
+            UserRating.objects.filter(show_id=show_id)
+            .select_related('user')
+            .order_by('user__name', 'season_number', 'episode_number')
+        )
+
+        if not ratings.exists():
+            return JsonResponse({'ratings': []})
+
+        grouped_data = {}
+        
+        for r in ratings:
+            uid = r.user.id
+            if uid not in grouped_data:
+                user_label = r.user.username if r.user.username else r.user.name
+                grouped_data[uid] = {
+                    'user': f'@{user_label}' if r.user.username else user_label,
+                    'show_rating': None,
+                    'episodes': []
+                }
+            
+            if r.season_number is None and r.episode_number is None:
+                grouped_data[uid]['show_rating'] = r.rating
+            else:
+                grouped_data[uid]['episodes'].append({
+                    's': r.season_number,
+                    'e': r.episode_number,
+                    'r': r.rating
+                })
+
+        result = list(grouped_data.values())
+        return JsonResponse({'ratings': result})
+
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

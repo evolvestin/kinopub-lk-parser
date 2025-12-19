@@ -92,12 +92,12 @@ def get_show_card_keyboard(
     episode: int = None,
     user_rating: float = None,
     episodes_rated: int = 0,
+    has_any_ratings: bool = False,
 ):
     buttons = []
     series_types = ['Series', 'Documentary Series', 'TV Show']
     
     if show_type in series_types:
-        # Сериал
         show_label = _get_action_button_text('⭐️ Изменить оценку сериала' if user_rating else '⭐️ Оценить сериал', user_rating)
         buttons.append([InlineKeyboardButton(text=show_label, callback_data=f'rate_mode_show_{show_id}')])
 
@@ -111,9 +111,12 @@ def get_show_card_keyboard(
         buttons.append([InlineKeyboardButton(text=ep_label, callback_data=f'rate_mode_ep_{show_id}')])
 
     else:
-        # Фильм
         label = _get_action_button_text('⭐️ Изменить оценку' if user_rating else '⭐️ Оценить', user_rating)
         buttons.append([InlineKeyboardButton(text=label, callback_data=f'rate_start_{show_id}')])
+
+    # Добавляем кнопку просмотра детальных оценок, если они есть
+    if has_any_ratings:
+        buttons.append([InlineKeyboardButton(text='📋 Все оценки', callback_data=f'show_ratings_{show_id}')])
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

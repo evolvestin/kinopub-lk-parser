@@ -6,7 +6,10 @@ from aiogram import Bot
 from aiogram.types import CallbackQuery
 from html_helper import italic
 from shared.card_formatter import get_show_card_text
+from sender import MessageSender
+from shared.html_helper import bold, code
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES, UserRole
+from shared.formatters import format_se
 
 
 def get_args(data: str, *indices: int) -> list:
@@ -86,12 +89,17 @@ async def _update_show_message(message, user_id, show_id):
         internal_rating=show_data.get('internal_rating'),
         user_ratings=show_data.get('user_ratings'),
     )
+    
+    # Проверяем наличие любых оценок для отображения кнопки
+    user_ratings_list = show_data.get('user_ratings')
+    has_ratings = bool(user_ratings_list and len(user_ratings_list) > 0)
 
     keyboard = keyboards.get_show_card_keyboard(
         show_id,
         show_type=show_data.get('type'),
         user_rating=show_data.get('personal_rating'),
         episodes_rated=show_data.get('personal_episodes_count', 0),
+        has_any_ratings=has_ratings
     )
 
     await message.edit_text(text=text, reply_markup=keyboard, disable_web_page_preview=True)
@@ -253,3 +261,56 @@ async def rate_show_back_handler(callback: CallbackQuery, bot: Bot):
     show_id = get_args(callback.data, -1)
     await _update_show_message(callback.message, callback.from_user.id, show_id)
     await callback.answer()
+
+
+@safe_callback
+async def show_ratings_list_handler(callback: CallbackQuery, bot: Bot):    
+    show_id = get_args(callback.data, -1)
+    
+    # Запрашиваем детали шоу, чтобы узнать общий рейтинг (internal_rating)
+    show_data = await client.get_show_details(show_id)
+    internal_rating = show_data.get('internal_rating') if show_data else None
+
+    ratings_data = await client.get_show_ratings_details(show_id)
+    
+    if not ratings_data:
+        await callback.answer('Оценок пока нет.', show_alert=True)
+        return
+
+    await callback.answer()
+    
+    blocks = []
+    
+    for i, user_data in enumerate(ratings_data, 1):
+        lines = []
+        user_header = f'{i}. {user_data["user"]}'
+        lines.append(user_header)
+        
+        # Общая оценка (если есть)
+        if user_data.get('show_rating'):
+            lines.append(f'Общая: {bold(user_data["show_rating"])}')
+        
+        # Оценки эпизодов
+        episodes = user_data.get('episodes', [])
+        if episodes:
+            for episode in episodes:
+                lines.append(
+                    f'{italic(format_se(season=episode["s"], episode=episode["e"]))}: {episode["r"]}'
+                )
+        
+        blocks.append('\n'.join(lines))
+
+    sender = MessageSender(bot)
+    
+    # Формируем заголовок с рейтингом LR, как в карточке
+    header_text = "📋 Все оценки"
+    if internal_rating:
+        header_text += f" (LR: {internal_rating:.1f})"
+    header = bold(header_text + ":")
+    
+    await sender.send_smart_split_text(
+        chat_id=callback.from_user.id,
+        text_blocks=blocks,
+        header=header,
+        separator='\n\n'
+    )
