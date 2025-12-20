@@ -1,4 +1,7 @@
+from shared.constants import SERIES_TYPES
 from shared.html_helper import bold, html_link, html_secure, italic
+
+RATINGS_TRUNCATE_COUNT = 6
 
 
 def get_show_card_text(
@@ -27,9 +30,9 @@ def get_show_card_text(
 
     if kinopub_link and show_id:
         link = html_link(f'{kinopub_link.rstrip("/")}/item/view/{show_id}', '🔗')
-        lines = [f'🎬{link} {bold(raw_title)}']
+        lines = [ f'🎬{link} {bold(raw_title)}' ]
     else:
-        lines = [f'🎬 {bold(raw_title)}']
+        lines = [ f'🎬 {bold(raw_title)}' ]
 
     if raw_title != original_title:
         lines.append(italic(f'({original_title})'))
@@ -67,8 +70,23 @@ def get_show_card_text(
 
     if user_ratings:
         lines.append('')
-        lines.append(bold('🌟 Оценки зрителей:'))
-        for idx, data in enumerate(user_ratings, 1):
-            lines.append(f'{idx}. {data["label"]}: {bold(f"{data['rating']:.1f}")}')
+
+        truncated = len(user_ratings) > RATINGS_TRUNCATE_COUNT
+
+        ratings_command = ''
+        if show_type in SERIES_TYPES or truncated:
+            ratings_command = f' (/ratings_{show_id})'
+
+        lines.append(f'🌟 {bold("Оценки зрителей")}{ratings_command}:')
+        
+        if len(user_ratings) > 1:
+            for idx, data in enumerate(user_ratings[:RATINGS_TRUNCATE_COUNT], 1):
+                lines.append(f'{idx}. {data["label"]}: {data["rating"]:.1f}')
+            if truncated:
+                lines.append('...')
+        else:
+            data = user_ratings[0]
+            lines.append(f'{data["label"]}: {data["rating"]:.1f}')
+
 
     return '\n'.join(lines)

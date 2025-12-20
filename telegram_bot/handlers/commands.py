@@ -7,6 +7,9 @@ from aiogram import Bot
 from aiogram.filters import CommandObject
 from aiogram.types import Message
 from sender import MessageSender
+from shared.constants import SERIES_TYPES
+from shared.formatters import format_se
+from shared.html_helper import italic
 
 from shared.card_formatter import get_show_card_text
 from shared.html_helper import bold, html_secure
@@ -223,3 +226,69 @@ async def handle_imdb_lookup(message: Message, bot: Bot):
     show_data = await client.get_show_by_imdb_id(imdb_id)
     if show_data:
         await _send_show_card(sender, message.chat.id, show_data)
+
+
+async def handle_ratings_command(message: Message, bot: Bot):
+    """Обработка команды /ratings_123"""
+    match = re.match(r'/ratings_(\d+)', message.text)
+    if not match:
+        return
+
+    show_id = int(match.group(1))
+    sender = MessageSender(bot)
+    
+    show_data = await client.get_show_details(show_id)
+    if not show_data:
+        await sender.send_message(message.chat.id, '❌ Ошибки получения данных.')
+        return
+
+    user_ratings_summary = show_data.get('user_ratings', [])
+    header = f'📋 Все оценки'
+    if internal_rating := show_data.get('internal_rating'):
+        header += f' ({internal_rating:.1f}/10):'
+    
+    blocks = []
+    if show_data.get('type') in SERIES_TYPES:
+        separator = '\n\n'
+        ratings_details = await client.get_show_ratings_details(show_id)
+        if not ratings_details:
+            await sender.send_message(message.chat.id, 'Оценок пока нет.')
+            return
+
+        for i, user_data in enumerate(ratings_details, 1):
+            user_rating = None
+            for ur in user_ratings_summary:
+                if ur['label'] == user_data['user']:
+                    user_rating = ur['rating']
+                    break
+
+            lines = []
+            user_header = f'{i}. {user_data["user"]}:'
+            if user_rating:
+                user_header += f' {bold(f"{user_rating:.1f}")}'
+            lines.append(user_header)
+            
+            if user_data.get('show_rating'):
+                lines.append(f'Общая: {user_data["show_rating"]}')
+            
+            episodes = user_data.get('episodes', [])
+            for ep in episodes:
+                lines.append(f'  {italic(format_se(ep["s"], ep["e"]))}: {ep["r"]}')
+            
+            blocks.append('\n'.join(lines))
+    else:
+        header += '\n'
+        separator = '\n'
+        if not user_ratings_summary:
+            await sender.send_message(message.chat.id, 'Оценок пока нет.')
+            return
+
+        for i, data in enumerate(user_ratings_summary, 1):
+            blocks.append(f'{i}. {data["label"]}: {bold(f"{data['rating']:.1f}")}')
+
+    await sender.send_smart_split_text(
+        chat_id=message.chat.id,
+        text_blocks=blocks,
+        header=bold(header),
+        separator=separator
+    )

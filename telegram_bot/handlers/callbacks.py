@@ -8,7 +8,7 @@ from html_helper import italic
 from shared.card_formatter import get_show_card_text
 from sender import MessageSender
 from shared.html_helper import bold, code
-from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES, UserRole
+from shared.constants import SERIES_TYPES, UserRole
 from shared.formatters import format_se
 
 
@@ -148,6 +148,13 @@ async def toggle_check_handler(callback: CallbackQuery, bot: Bot):
     result = await client.toggle_view_check(view_id)
     if result and result.get('status') == 'ok':
         await callback.answer(result.get('message', 'Статус обновлен'))
+        if payload := result.get('payload'):
+            await MessageSender(bot).send_message(
+                chat_id=callback.message.chat.id,
+                text=payload['text'],
+                keyboard=payload['keyboard'],
+                edit_message=callback.message
+            )
     else:
         await callback.answer(f'Ошибка: {result.get("error") if result else "Unknown"}', show_alert=True)
 
@@ -162,6 +169,13 @@ async def claim_toggle_handler(callback: CallbackQuery, bot: Bot):
     if result and result.get('status') == 'ok':
         text = 'Вы добавлены в список просмотра' if result.get('action') == 'added' else 'Вы убраны из списка просмотра'
         await callback.answer(text)
+        if payload := result.get('payload'):
+            await MessageSender(bot).send_message(
+                chat_id=callback.message.chat.id,
+                text=payload['text'],
+                keyboard=payload['keyboard'],
+                edit_message=callback.message
+            )
     else:
         await callback.answer('Ошибка обновления статуса', show_alert=True)
 
@@ -173,8 +187,7 @@ async def rate_show_start_handler(callback: CallbackQuery, bot: Bot):
     if not show_data:
         return
 
-    tracked_types = [SHOW_TYPE_MAPPING[t] for t in SHOW_TYPES_TRACKED_VIA_NEW_EPISODES]
-    if show_data.get('type') in tracked_types:
+    if show_data.get('type') in SERIES_TYPES:
         kb = keyboards.get_rate_mode_keyboard(
             show_id, 
             user_rating=show_data.get('personal_rating'), 
@@ -266,51 +279,61 @@ async def rate_show_back_handler(callback: CallbackQuery, bot: Bot):
 @safe_callback
 async def show_ratings_list_handler(callback: CallbackQuery, bot: Bot):    
     show_id = get_args(callback.data, -1)
-    
-    # Запрашиваем детали шоу, чтобы узнать общий рейтинг (internal_rating)
     show_data = await client.get_show_details(show_id)
-    internal_rating = show_data.get('internal_rating') if show_data else None
-
-    ratings_data = await client.get_show_ratings_details(show_id)
     
-    if not ratings_data:
-        await callback.answer('Оценок пока нет.', show_alert=True)
+    if not show_data:
+        await callback.answer('Ошибка получения данных.', show_alert=True)
         return
 
-    await callback.answer()
+    user_ratings_summary = show_data.get('user_ratings', [])
+    header = f'📋 Все оценки'
+    if internal_rating := show_data.get('internal_rating'):
+        header += f' ({internal_rating:.1f}/10):'
     
     blocks = []
-    
-    for i, user_data in enumerate(ratings_data, 1):
-        lines = []
-        user_header = f'{i}. {user_data["user"]}'
-        lines.append(user_header)
-        
-        # Общая оценка (если есть)
-        if user_data.get('show_rating'):
-            lines.append(f'Общая: {bold(user_data["show_rating"])}')
-        
-        # Оценки эпизодов
-        episodes = user_data.get('episodes', [])
-        if episodes:
-            for episode in episodes:
-                lines.append(
-                    f'{italic(format_se(season=episode["s"], episode=episode["e"]))}: {episode["r"]}'
-                )
-        
-        blocks.append('\n'.join(lines))
+    if show_data.get('type') in SERIES_TYPES:
+        separator = '\n\n'
+        ratings_details = await client.get_show_ratings_details(show_id)
+        if not ratings_details:
+            await callback.answer('Оценок пока нет.', show_alert=True)
+            return
 
-    sender = MessageSender(bot)
-    
-    # Формируем заголовок с рейтингом LR, как в карточке
-    header_text = "📋 Все оценки"
-    if internal_rating:
-        header_text += f" (LR: {internal_rating:.1f})"
-    header = bold(header_text + ":")
-    
-    await sender.send_smart_split_text(
+        for i, user_data in enumerate(ratings_details, 1):
+            user_rating = None
+            for ur in user_ratings_summary:
+                if ur['label'] == user_data['user']:
+                    user_rating = ur['rating']
+                    break
+
+            lines = []
+            user_header = f'{i}. {user_data["user"]}:'
+            if user_rating:
+                user_header += f' {bold(f"{user_rating:.1f}")}'
+            lines.append(user_header)
+            
+            if user_data.get('show_rating'):
+                lines.append(f'Общая: {user_data["show_rating"]}')
+            
+            episodes = user_data.get('episodes', [])
+            for ep in episodes:
+                lines.append(f'  {italic(format_se(ep["s"], ep["e"]))}: {ep["r"]}')
+            
+            blocks.append('\n'.join(lines))
+    else:
+        header += '\n'
+        separator = '\n'
+        if not user_ratings_summary:
+            await callback.answer('Оценок пока нет.', show_alert=True)
+            return
+
+        for i, data in enumerate(user_ratings_summary, 1):
+            blocks.append(f'{i}. {data["label"]}: {bold(f"{data['rating']:.1f}")}')
+
+    await callback.answer()
+        
+    await MessageSender(bot).send_smart_split_text(
         chat_id=callback.from_user.id,
         text_blocks=blocks,
-        header=header,
-        separator='\n\n'
+        header=bold(header),
+        separator=separator
     )

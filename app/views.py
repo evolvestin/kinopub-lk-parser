@@ -435,18 +435,27 @@ def bot_toggle_view_check(request):
     try:
         data = json.loads(request.body)
         view_id = data.get('view_id')
+        telegram_id = data.get('telegram_id')
         view = ViewHistory.objects.get(id=view_id)
-        sender = TelegramSender()
+        
+        user = None
+        if telegram_id:
+            user = ViewUser.objects.filter(telegram_id=telegram_id).first()
 
-        # Просто переключаем статус текущей записи
         view.is_checked = not view.is_checked
         view.save(update_fields=['is_checked'])
-        sender.update_history_message(view)
+        
+        payload = TelegramSender().update_history_message(view, for_user=user)
 
         status_text = 'учтен' if view.is_checked else 'не учтен'
         message = f'Просмотр теперь {status_text}.'
 
-        return JsonResponse({'status': 'ok', 'message': message, 'is_checked': view.is_checked})
+        return JsonResponse({
+            'status': 'ok', 
+            'message': message, 
+            'is_checked': view.is_checked,
+            'payload': payload
+        })
 
     except ViewHistory.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
@@ -463,7 +472,6 @@ def bot_toggle_view_user(request):
         telegram_id = data.get('telegram_id')
         view_id = data.get('view_id')
 
-        # Используем get_or_create для обработки новых пользователей из канала
         user, _ = ViewUser.objects.get_or_create(
             telegram_id=telegram_id,
             defaults={
@@ -473,9 +481,17 @@ def bot_toggle_view_user(request):
             },
         )
         
-        action = _toggle_user_in_view(user, view_id)
+        view_history = ViewHistory.objects.get(id=view_id)
+        if user in view_history.users.all():
+            view_history.users.remove(user)
+            action = 'removed'
+        else:
+            view_history.users.add(user)
+            action = 'added'
 
-        return JsonResponse({'status': 'ok', 'action': action})
+        payload = TelegramSender().update_history_message(view_history, for_user=user)
+
+        return JsonResponse({'status': 'ok', 'action': action, 'payload': payload})
     except ViewHistory.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:

@@ -40,6 +40,7 @@ def register_router() -> Router:
     router.message.register(commands.handle_explicit_search, F.text.startswith('/search'))
     router.message.register(commands.handle_imdb_lookup, F.text.regexp(r'(?i)^imdb:\s*\d+$'))
     router.message.register(commands.handle_show_command, F.text.regexp(r'^/show_\d+$'))
+    router.message.register(commands.handle_ratings_command, F.text.regexp(r'^/ratings_\d+$'))
     router.message.register(commands.handle_search_text, F.chat.type == ChatType.PRIVATE, F.text)
 
     # --- Callbacks ---

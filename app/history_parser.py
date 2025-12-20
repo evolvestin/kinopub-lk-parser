@@ -22,7 +22,7 @@ from app.gdrive_backup import BackupManager
 from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
 from app.signals import view_history_created
 from kinopub_parser import celery_app
-from shared.constants import DATE_FORMAT, MONTHS_MAP, SHOW_STATUS_MAPPING, SHOW_TYPE_MAPPING
+from shared.constants import DATE_FORMAT, MONTHS_MAP, SERIES_TYPES, SHOW_STATUS_MAPPING, SHOW_TYPE_MAPPING
 from shared.formatters import format_se
 
 
@@ -844,20 +844,14 @@ def process_show_durations(driver, show):
     Determines if the show is a movie or series and fetches durations accordingly.
     For series, it parses the available seasons from window.PLAYER_SEASONS on the player page.
     """
-    movie_types = ['Movie', 'Concert', 'Documentary Movie', '3D Movie']
-
-    if show.type in movie_types:
+    if show.type not in SERIES_TYPES:
         get_movie_duration_and_save(driver, show.id)
     else:
-        # Logic for Series, DocuSeries, TV Show, etc.
         try:
-            # Navigate to the player page of the first episode to access PLAYER_SEASONS
-            # URL format must be explicit: /item/play/<ID>/s1e1
             player_url = f'{settings.SITE_URL}item/play/{show.id}/s1e1'
             logging.info(f'Navigating to player to fetch seasons list: {player_url}')
             driver.get(player_url)
 
-            # Wait for the script containing seasons data
             wait = WebDriverWait(driver, 20)
             wait.until(
                 expected_conditions.presence_of_element_located(
@@ -865,19 +859,16 @@ def process_show_durations(driver, show):
                 )
             )
 
-            # Extract the script content
             script_element = driver.find_element(
                 By.XPATH, '//script[contains(text(), "window.PLAYER_SEASONS")]'
             )
             script_text = script_element.get_attribute('innerHTML')
 
-            # Parse JSON from window.PLAYER_SEASONS = [...];
             match = re.search(r'window\.PLAYER_SEASONS\s*=\s*(\[.*?\]);', script_text, re.DOTALL)
 
             seasons = set()
             if match:
                 seasons_data = json.loads(match.group(1))
-                # seasons_data example: [{"season":1, "season_id":...}, ...]
                 for item in seasons_data:
                     if 'season' in item:
                         seasons.add(int(item['season']))
