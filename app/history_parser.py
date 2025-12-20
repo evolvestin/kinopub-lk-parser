@@ -22,7 +22,13 @@ from app.gdrive_backup import BackupManager
 from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
 from app.signals import view_history_created
 from kinopub_parser import celery_app
-from shared.constants import DATE_FORMAT, MONTHS_MAP, SERIES_TYPES, SHOW_STATUS_MAPPING, SHOW_TYPE_MAPPING
+from shared.constants import (
+    DATE_FORMAT,
+    MONTHS_MAP,
+    SERIES_TYPES,
+    SHOW_STATUS_MAPPING,
+    SHOW_TYPE_MAPPING,
+)
 from shared.formatters import format_se
 
 
@@ -113,12 +119,16 @@ def update_show_details(driver, show_id):
         rating_data = get_row_data('Рейтинг')
         if rating_data:
             try:
-                kinopoisk_link = rating_data.find_element(By.CSS_SELECTOR, "a[href*='kinopoisk.ru']")
+                kinopoisk_link = rating_data.find_element(
+                    By.CSS_SELECTOR, "a[href*='kinopoisk.ru']"
+                )
                 href = kinopoisk_link.get_attribute('href')
                 if '/film/' in href and not href.endswith('/film/'):
                     show.kinopoisk_url = href
                     show.kinopoisk_rating = float(kinopoisk_link.text)
-                    votes_element = kinopoisk_link.find_element(By.XPATH, './following-sibling::small')
+                    votes_element = kinopoisk_link.find_element(
+                        By.XPATH, './following-sibling::small'
+                    )
                     show.kinopoisk_votes = _extract_int_from_string(votes_element.text)
             except (NoSuchElementException, ValueError):
                 pass
@@ -566,7 +576,9 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
                     season_episode_text = block.find_element(
                         By.CSS_SELECTOR, '.topleft-2x .label-success'
                     ).text.strip()
-                    season_episode_match = re.search(r'Сезон (\d+)\. Эпизод (\d+)', season_episode_text)
+                    season_episode_match = re.search(
+                        r'Сезон (\d+)\. Эпизод (\d+)', season_episode_text
+                    )
                     if season_episode_match:
                         season = int(season_episode_match.group(1))
                         episode = int(season_episode_match.group(2))

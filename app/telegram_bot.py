@@ -2,14 +2,13 @@ import logging
 
 import requests
 from django.conf import settings
-from app.models import ViewUser
 
 from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
+from app.models import UserRating, ViewUser
 from shared.card_formatter import get_show_card_text
 from shared.constants import DATE_FORMAT
 from shared.formatters import format_se
 from shared.html_helper import bold, code, html_secure, italic
-from app.models import UserRating
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +136,17 @@ class TelegramSender:
         }
         self._request('edit_message', payload)
 
+    def _get_channel_post_url(self, message_id):
+        """Генерирует ссылку на сообщение в канале."""
+        if not message_id or not settings.HISTORY_CHANNEL_ID:
+            return None
+
+        channel_id = str(settings.HISTORY_CHANNEL_ID)
+        if channel_id.startswith('-100'):
+            clean_id = channel_id[4:]
+            return f'https://t.me/c/{clean_id}/{message_id}'
+        return None
+
     def _build_message_payload(self, view_history_obj, for_user=None, is_channel=False):
         lines = []
         season = view_history_obj.season_number
@@ -150,57 +160,70 @@ class TelegramSender:
         show = view_history_obj.show
         internal_rating, user_ratings = show.get_internal_rating_data()
 
-        lines.extend([
-            get_show_card_text(
-                show_id=show.id,
-                title=show.title,
-                original_title=show.original_title,
-                kinopub_link=settings.SITE_AUX_URL,
-                year=show.year,
-                show_type=show.type,
-                status=show.status,
-                countries=[str(country) for country in show.countries.all()],
-                genres=[genre.name for genre in show.genres.all()],
-                imdb_rating=show.imdb_rating,
-                imdb_url=show.imdb_url,
-                kinopoisk_rating=show.kinopoisk_rating,
-                kinopoisk_url=show.kinopoisk_url,
-                internal_rating=internal_rating,
-                user_ratings=user_ratings,
-                bot_username=self.bot_username,
-            ),
-            '',
-            f'🗓 Дата просмотра: {view_history_obj.view_date.strftime(DATE_FORMAT)}',
-        ])
-        
-        if view_history_obj.is_checked:
-            lines.append(f'✅ {italic("Учитывается в статистике")}')
-        else:
-            lines.append(f'❌ {italic("Не учитывается в статистике")}')
+        lines.extend(
+            [
+                get_show_card_text(
+                    show_id=show.id,
+                    title=show.title,
+                    original_title=show.original_title,
+                    kinopub_link=settings.SITE_AUX_URL,
+                    year=show.year,
+                    show_type=show.type,
+                    status=show.status,
+                    countries=[str(country) for country in show.countries.all()],
+                    genres=[genre.name for genre in show.genres.all()],
+                    imdb_rating=show.imdb_rating,
+                    imdb_url=show.imdb_url,
+                    kinopoisk_rating=show.kinopoisk_rating,
+                    kinopoisk_url=show.kinopoisk_url,
+                    internal_rating=internal_rating,
+                    user_ratings=user_ratings,
+                    bot_username=self.bot_username,
+                ),
+                '',
+                f'🗓 Дата просмотра: {view_history_obj.view_date.strftime(DATE_FORMAT)}',
+            ]
+        )
 
-        names = [f'@{user.username}' or str(user.name) for user in view_history_obj.users.all()]
+        # Статусные строки нужны только в канале
+        if is_channel:
+            if view_history_obj.is_checked:
+                lines.append(f'✅ {italic("Учитывается в статистике")}')
+            else:
+                lines.append(f'❌ {italic("Не учитывается в статистике")}')
 
-        if len(names) == 1:
-            lines.append(f'👀 Смотрит: {names[0]}')
-        elif len(names) > 0:
-            lines.append('👀 Смотрят:')
-            for i, name in enumerate(names, start=1):
-                lines.append(f'{i}. {name}')
+            names = [f'@{user.username}' or str(user.name) for user in view_history_obj.users.all()]
+
+            if len(names) == 1:
+                lines.append(f'👀 Смотрит: {names[0]}')
+            elif len(names) > 0:
+                lines.append('👀 Смотрят:')
+                for i, name in enumerate(names, start=1):
+                    lines.append(f'{i}. {name}')
 
         personal_rating = None
         episodes_count = 0
         if for_user:
-            rating_obj = UserRating.objects.filter(user=for_user, show=show, season_number__isnull=True).first()
+            rating_obj = UserRating.objects.filter(
+                user=for_user, show=show, season_number__isnull=True
+            ).first()
             if rating_obj:
                 personal_rating = rating_obj.rating
-            episodes_count = UserRating.objects.filter(user=for_user, show=show, season_number__isnull=False).count()
+            episodes_count = UserRating.objects.filter(
+                user=for_user, show=show, season_number__isnull=False
+            ).count()
+
+        channel_url = None
+        if not is_channel:
+            channel_url = self._get_channel_post_url(view_history_obj.telegram_message_id)
 
         keyboard = get_history_notification_keyboard(
-            view_history_obj, 
-            self.bot_username, 
-            user_rating=personal_rating, 
+            view_history_obj,
+            self.bot_username,
+            user_rating=personal_rating,
             episodes_rated=episodes_count,
-            is_channel=is_channel
+            is_channel=is_channel,
+            channel_url=channel_url,
         )
 
         return '\n'.join(lines), keyboard
@@ -225,35 +248,26 @@ class TelegramSender:
             view_history_obj.telegram_message_id = msg_id
             view_history_obj.save(update_fields=['telegram_message_id'])
 
-    def update_history_message(self, view_history_obj, for_user=None):
+    def update_history_message(self, view_history_obj):
+        """Обновляет сообщение только в канале."""
         view_history_obj.refresh_from_db()
-        # Обновление сообщения в канале, поэтому is_channel=True
+
+        if not settings.HISTORY_CHANNEL_ID or not view_history_obj.telegram_message_id:
+            return
+
         channel_text, channel_keyboard = self._build_message_payload(
-            view_history_obj,
-            for_user=None,
-            is_channel=True
+            view_history_obj, for_user=None, is_channel=True
         )
 
-        if settings.HISTORY_CHANNEL_ID and view_history_obj.telegram_message_id:
-            payload = {
-                'chat_id': settings.HISTORY_CHANNEL_ID,
-                'message_id': view_history_obj.telegram_message_id,
-                'text': channel_text,
-                'parse_mode': 'HTML',
-                'reply_markup': {'inline_keyboard': channel_keyboard},
-                'disable_web_page_preview': True,
-            }
-            self._request('edit_message', payload)
-
-        if for_user:
-            user_text, user_keyboard = self._build_message_payload(
-                view_history_obj,
-                for_user=for_user,
-                is_channel=False
-            )
-            return {'text': user_text, 'keyboard': {'inline_keyboard': user_keyboard}}
-
-        return {'text': channel_text, 'keyboard': {'inline_keyboard': channel_keyboard}}
+        payload = {
+            'chat_id': settings.HISTORY_CHANNEL_ID,
+            'message_id': view_history_obj.telegram_message_id,
+            'text': channel_text,
+            'parse_mode': 'HTML',
+            'reply_markup': {'inline_keyboard': channel_keyboard},
+            'disable_web_page_preview': True,
+        }
+        self._request('edit_message', payload)
 
     def send_role_upgrade_notification(self, telegram_id, role):
         if not settings.HISTORY_CHANNEL_ID:
@@ -274,11 +288,13 @@ class TelegramSender:
 
         payload = {'chat_id': telegram_id, 'text': text, 'parse_mode': 'HTML'}
         self._request('send_message', payload)
-    
+
     def send_private_history_notification(self, telegram_id, view_history_obj):
         user = ViewUser.objects.filter(telegram_id=telegram_id).first()
         # Отправка в ЛС, поэтому is_channel=False
-        text, keyboard = self._build_message_payload(view_history_obj, for_user=user, is_channel=False)
+        text, keyboard = self._build_message_payload(
+            view_history_obj, for_user=user, is_channel=False
+        )
         payload = {
             'chat_id': telegram_id,
             'text': text,

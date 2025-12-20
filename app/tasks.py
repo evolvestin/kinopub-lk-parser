@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import contextmanager
 from datetime import timedelta
 
 from celery import shared_task
@@ -16,7 +17,6 @@ from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, TaskRun
 from app.telegram_bot import TelegramSender
-from contextlib import contextmanager
 
 
 @shared_task

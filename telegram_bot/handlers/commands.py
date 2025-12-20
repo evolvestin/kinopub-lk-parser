@@ -7,13 +7,11 @@ from aiogram import Bot
 from aiogram.filters import CommandObject
 from aiogram.types import Message
 from sender import MessageSender
-from shared.constants import SERIES_TYPES
-from shared.formatters import format_se
-from shared.html_helper import italic
-
-from shared.card_formatter import get_show_card_text
-from shared.html_helper import bold, html_secure
 from services.bot_instance import BotInstance
+
+from shared.card_formatter import get_ratings_report_blocks, get_show_card_text
+from shared.constants import SERIES_TYPES
+from shared.html_helper import bold, html_secure
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 
@@ -113,14 +111,19 @@ async def _send_show_card(
     show_id = show_data.get('id')
     keyboard = None
     if show_id:
-        # Передаем персональную оценку пользователя и кол-во эпизодов в клавиатуру
         personal_rating = show_data.get('personal_rating')
         episodes_count = show_data.get('personal_episodes_count', 0)
         show_type = show_data.get('type')
 
-        # Проверяем наличие любых оценок для отображения кнопки "Все оценки"
         user_ratings_list = show_data.get('user_ratings')
         has_ratings = bool(user_ratings_list and len(user_ratings_list) > 0)
+
+        # Формируем ссылку на канал
+        channel_url = None
+        msg_id = show_data.get('channel_message_id')
+        hist_channel_id = os.getenv('HISTORY_CHANNEL_ID', '')
+        if msg_id and hist_channel_id and hist_channel_id.startswith('-100'):
+            channel_url = f'https://t.me/c/{hist_channel_id[4:]}/{msg_id}'
 
         keyboard = keyboards.get_show_card_keyboard(
             show_id,
@@ -130,6 +133,7 @@ async def _send_show_card(
             user_rating=personal_rating,
             episodes_rated=episodes_count,
             has_any_ratings=has_ratings,
+            channel_url=channel_url,
         )
 
     bot_username = await BotInstance().get_bot_username()
@@ -258,53 +262,21 @@ async def _send_ratings_report(sender: MessageSender, chat_id: int, show_id: int
         await sender.send_message(chat_id, '❌ Ошибки получения данных.')
         return
 
-    user_ratings_summary = show_data.get('user_ratings', [])
-    header = f'📋 Все оценки'
-    if internal_rating := show_data.get('internal_rating'):
-        header += f' ({internal_rating:.1f}/10):'
-
-    blocks = []
+    ratings_details = None
     if show_data.get('type') in SERIES_TYPES:
-        separator = '\n\n'
         ratings_details = await client.get_show_ratings_details(show_id)
-        if not ratings_details:
-            await sender.send_message(chat_id, 'Оценок пока нет.')
-            return
 
-        for i, user_data in enumerate(ratings_details, 1):
-            user_rating = None
-            for ur in user_ratings_summary:
-                if ur['label'] == user_data['user']:
-                    user_rating = ur['rating']
-                    break
+    header, separator, blocks = get_ratings_report_blocks(
+        show_data.get('type'),
+        show_data.get('user_ratings', []),
+        ratings_details,
+        show_data.get('internal_rating'),
+    )
 
-            lines = []
-            user_header = f'{i}. {user_data["user"]}:'
-            if user_rating:
-                user_header += f' {bold(f"{user_rating:.1f}")}'
-            lines.append(user_header)
-
-            if user_data.get('show_rating'):
-                lines.append(f'Общая: {user_data["show_rating"]}')
-
-            episodes = user_data.get('episodes', [])
-            for ep in episodes:
-                lines.append(f'  {italic(format_se(ep["s"], ep["e"]))}: {ep["r"]}')
-
-            blocks.append('\n'.join(lines))
-    else:
-        header += '\n'
-        separator = '\n'
-        if not user_ratings_summary:
-            await sender.send_message(chat_id, 'Оценок пока нет.')
-            return
-
-        for i, data in enumerate(user_ratings_summary, 1):
-            blocks.append(f'{i}. {data["label"]}: {bold(f"{data["rating"]:.1f}")}')
+    if not blocks:
+        await sender.send_message(chat_id, 'Оценок пока нет.')
+        return
 
     await sender.send_smart_split_text(
-        chat_id=chat_id,
-        text_blocks=blocks,
-        header=bold(header),
-        separator=separator
+        chat_id=chat_id, text_blocks=blocks, header=bold(header), separator=separator
     )

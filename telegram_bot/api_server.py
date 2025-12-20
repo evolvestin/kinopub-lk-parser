@@ -24,7 +24,7 @@ async def handle_send_message(request):
     text = data.get('text')
     parse_mode = data.get('parse_mode', 'HTML')
     disable_web_page_preview = data.get('disable_web_page_preview', False)
-    
+
     reply_markup = _get_validated_markup(data.get('reply_markup'))
 
     try:
@@ -65,7 +65,7 @@ async def handle_edit_message(request):
     text = data.get('text')
     parse_mode = data.get('parse_mode', 'HTML')
     disable_web_page_preview = data.get('disable_web_page_preview', False)
-    
+
     reply_markup = _get_validated_markup(data.get('reply_markup'))
 
     try:

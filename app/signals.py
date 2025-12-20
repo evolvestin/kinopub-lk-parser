@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.db.models.signals import post_delete
@@ -6,7 +7,6 @@ from django.dispatch import Signal, receiver
 
 from app.models import ViewUser
 from app.telegram_bot import TelegramSender
-from datetime import timedelta
 
 # Определение кастомного сигнала для создания записи просмотра
 view_history_created = Signal()
@@ -33,13 +33,17 @@ def handle_new_view_history(sender, instance, **kwargs):
         sender_service = TelegramSender()
 
         if not instance.users.exists():
-            last_view = sender.objects.filter(
-                show=instance.show,
-                users__isnull=False
-            ).exclude(id=instance.id).order_by('-view_date', '-season_number', '-episode_number').first()
+            last_view = (
+                sender.objects.filter(show=instance.show, users__isnull=False)
+                .exclude(id=instance.id)
+                .order_by('-view_date', '-season_number', '-episode_number')
+                .first()
+            )
 
             if last_view:
                 instance.users.set(last_view.users.all())
+
+        sender_service.send_history_notification(instance)
 
         for user in instance.users.all():
             if user.telegram_id:
@@ -60,13 +64,11 @@ def handle_new_view_history(sender, instance, **kwargs):
 
         for old_view in older_duplicates:
             old_users_set = set(old_view.users.values_list('id', flat=True))
-            
+
             if current_users_set == old_users_set:
                 old_view.is_checked = False
                 old_view.save(update_fields=['is_checked'])
                 sender_service.update_history_message(old_view)
-
-        sender_service.send_history_notification(instance)
 
     except Exception as e:
         logging.error(f'Failed to handle new view history signal: {e}')

@@ -1,9 +1,11 @@
+import functools
 import json
 import logging
 import uuid
 
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -15,14 +17,12 @@ from app.models import Show, ShowDuration, UserRating, ViewHistory, ViewUser
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
 from shared.formatters import format_se
-import functools
-from django.core.exceptions import ObjectDoesNotExist
 
 
 def _toggle_user_in_view(user, view_id):
     """Вспомогательная функция для переключения участия пользователя в просмотре."""
     view_history = ViewHistory.objects.get(id=view_id)
-    
+
     if user in view_history.users.all():
         view_history.users.remove(user)
         action = 'removed'
@@ -51,6 +51,14 @@ def _serialize_show_details(show, user=None):
             user=user, show=show, season_number__isnull=False
         ).count()
 
+    # Ищем последний ID сообщения в канале для этого шоу
+    last_view = (
+        ViewHistory.objects.filter(show=show, telegram_message_id__isnull=False)
+        .order_by('-view_date', '-id')
+        .first()
+    )
+    channel_message_id = last_view.telegram_message_id if last_view else None
+
     return {
         'id': show.id,
         'title': show.title,
@@ -68,6 +76,7 @@ def _serialize_show_details(show, user=None):
         'user_ratings': user_ratings,
         'personal_rating': personal_rating,
         'personal_episodes_count': personal_episodes_count,
+        'channel_message_id': channel_message_id,
     }
 
 
@@ -86,6 +95,7 @@ def _check_token(request):
 
 def protected_bot_api(func):
     """Декоратор для проверки токена и стандартной обработки ошибок."""
+
     @functools.wraps(func)
     def wrapper(request, *args, **kwargs):
         if not _check_token(request):
@@ -97,6 +107,7 @@ def protected_bot_api(func):
         except Exception as e:
             logging.error(f'API Error in {func.__name__}: {e}')
             return JsonResponse({'error': str(e)}, status=400)
+
     return wrapper
 
 
@@ -164,15 +175,20 @@ def register_bot_user(request):
     # Используем метод модели для обновления данных (DRY)
     if not created:
         view_user.update_personal_details(
-            username=username, 
-            name=first_name, 
+            username=username,
+            name=first_name,
             language=data.get('language_code', 'ru'),
-            is_active=True
+            is_active=True,
         )
 
     django_user, user_created = User.objects.get_or_create(
         username=login_username,
-        defaults={'email': email, 'is_staff': False, 'is_superuser': False, 'first_name': first_name[:30]},
+        defaults={
+            'email': email,
+            'is_staff': False,
+            'is_superuser': False,
+            'first_name': first_name[:30],
+        },
     )
     if user_created:
         django_user.set_password(str(uuid.uuid4()))
@@ -192,7 +208,9 @@ def register_bot_user(request):
     except Exception as e:
         logging.error(f'Role msg error for {telegram_id}: {e}')
 
-    return JsonResponse({'status': 'ok', 'created': created, 'role': view_user.role, 'user_id': view_user.id})
+    return JsonResponse(
+        {'status': 'ok', 'created': created, 'role': view_user.role, 'user_id': view_user.id}
+    )
 
 
 @csrf_exempt
@@ -291,7 +309,7 @@ def update_bot_user(request):
             username=data.get('username'),
             name=data.get('first_name', ''),
             language=data.get('language_code', 'en'),
-            is_active=data.get('is_active')
+            is_active=data.get('is_active'),
         )
 
         # Если изменилось имя/юзернейм, обновляем сообщение в админ-канале
@@ -435,27 +453,17 @@ def bot_toggle_view_check(request):
     try:
         data = json.loads(request.body)
         view_id = data.get('view_id')
-        telegram_id = data.get('telegram_id')
         view = ViewHistory.objects.get(id=view_id)
-        
-        user = None
-        if telegram_id:
-            user = ViewUser.objects.filter(telegram_id=telegram_id).first()
 
         view.is_checked = not view.is_checked
         view.save(update_fields=['is_checked'])
-        
-        payload = TelegramSender().update_history_message(view, for_user=user)
+
+        TelegramSender().update_history_message(view)
 
         status_text = 'учтен' if view.is_checked else 'не учтен'
         message = f'Просмотр теперь {status_text}.'
 
-        return JsonResponse({
-            'status': 'ok', 
-            'message': message, 
-            'is_checked': view.is_checked,
-            'payload': payload
-        })
+        return JsonResponse({'status': 'ok', 'message': message, 'is_checked': view.is_checked})
 
     except ViewHistory.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
@@ -480,18 +488,10 @@ def bot_toggle_view_user(request):
                 'is_bot_active': True,
             },
         )
-        
-        view_history = ViewHistory.objects.get(id=view_id)
-        if user in view_history.users.all():
-            view_history.users.remove(user)
-            action = 'removed'
-        else:
-            view_history.users.add(user)
-            action = 'added'
 
-        payload = TelegramSender().update_history_message(view_history, for_user=user)
+        action = _toggle_user_in_view(user, view_id)
 
-        return JsonResponse({'status': 'ok', 'action': action, 'payload': payload})
+        return JsonResponse({'status': 'ok', 'action': action})
     except ViewHistory.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:
@@ -526,7 +526,7 @@ def bot_rate_show(request):
             season_number=season or 0,
             episode_number=episode or 0,
             users=user,
-            telegram_message_id__isnull=False
+            telegram_message_id__isnull=False,
         )
 
         sender = TelegramSender()
@@ -578,7 +578,7 @@ def bot_get_show_episodes(request, show_id):
             season_number = duration_data['season_number']
             episode_number = duration_data['episode_number']
             item = {'season_number': season_number, 'episode_number': episode_number}
-            
+
             if (season_number, episode_number) in user_ratings_map:
                 item['rating'] = user_ratings_map[(season_number, episode_number)]
             result.append(item)
@@ -603,7 +603,7 @@ def bot_get_show_ratings_details(request, show_id):
             return JsonResponse({'ratings': []})
 
         grouped_data = {}
-        
+
         for r in ratings:
             uid = r.user.id
             if uid not in grouped_data:
@@ -611,17 +611,15 @@ def bot_get_show_ratings_details(request, show_id):
                 grouped_data[uid] = {
                     'user': f'@{user_label}' if r.user.username else user_label,
                     'show_rating': None,
-                    'episodes': []
+                    'episodes': [],
                 }
-            
+
             if r.season_number is None and r.episode_number is None:
                 grouped_data[uid]['show_rating'] = r.rating
             else:
-                grouped_data[uid]['episodes'].append({
-                    's': r.season_number,
-                    'e': r.episode_number,
-                    'r': r.rating
-                })
+                grouped_data[uid]['episodes'].append(
+                    {'s': r.season_number, 'e': r.episode_number, 'r': r.rating}
+                )
 
         result = list(grouped_data.values())
         return JsonResponse({'ratings': result})

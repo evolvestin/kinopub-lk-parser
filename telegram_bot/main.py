@@ -80,7 +80,7 @@ def register_router() -> Router:
     router.callback_query.register(
         callbacks.rate_episode_set_handler, F.data.startswith('rate_ep_set_')
     )
-    
+
     # Просмотр списка оценок
     router.callback_query.register(
         callbacks.show_ratings_list_handler, F.data.startswith('show_ratings_')

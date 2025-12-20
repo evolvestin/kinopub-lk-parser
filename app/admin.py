@@ -44,11 +44,7 @@ def _get_user_stats_html(queryset_filter_q):
     stats = (
         ViewUser.objects.filter(queryset_filter_q)
         .distinct()
-        .annotate(
-            shows_count=Count(
-                'history__show', distinct=True, filter=queryset_filter_q
-            )
-        )
+        .annotate(shows_count=Count('history__show', distinct=True, filter=queryset_filter_q))
         .order_by('-shows_count')
     )
 
@@ -62,11 +58,12 @@ def _get_user_stats_html(queryset_filter_q):
     html += '</ul>'
     return format_html(html)
 
+
 def _get_related_items_html(model, query_filter, url_name):
     """Генерирует HTML список связанных объектов (актеров, жанров, стран)."""
     # Для Person поле называется acted_in_shows, для остальных - show
     relation_field = 'acted_in_shows' if model == Person else 'show'
-    
+
     items = (
         model.objects.filter(query_filter)
         .distinct()
@@ -74,6 +71,7 @@ def _get_related_items_html(model, query_filter, url_name):
         .order_by('-show_count')[:20]
     )
     return _format_object_list_html(items, url_name, count_attr='show_count')
+
 
 admin_site.register(Group, GroupAdmin)
 
@@ -120,8 +118,7 @@ class CustomUserAdmin(UserAdmin):
         if not groups:
             return '-'
         return format_html(
-            '<ul>{}</ul>',
-            format_html_join('', '<li>{}</li>', ((group.name,) for group in groups))
+            '<ul>{}</ul>', format_html_join('', '<li>{}</li>', ((group.name,) for group in groups))
         )
 
     @admin.display(description='User permissions')
@@ -223,9 +220,7 @@ class AverageRatingFilter(admin.SimpleListFilter):
     parameter_name = 'avg_rating'
 
     def lookups(self, request, model_admin):
-        return [
-            (f'{i}', f'{i}.0 - {i + 1}.0') for i in range(1, 10)
-        ] + [('10', '10.0')]
+        return [(f'{i}', f'{i}.0 - {i + 1}.0') for i in range(1, 10)] + [('10', '10.0')]
 
     def queryset(self, request, queryset):
         if self.value():
@@ -640,26 +635,16 @@ class PersonAdmin(BaseNameAdmin):
 
     @admin.display(description='User Stats (Shows watched with this person)')
     def user_stats(self, obj):
-        return _get_user_stats_html(
-            Q(history__show__actors=obj) | Q(history__show__directors=obj)
-        )
+        return _get_user_stats_html(Q(history__show__actors=obj) | Q(history__show__directors=obj))
 
     @admin.display(description='Genres')
     def related_genres(self, obj):
-        genres = (
-            Genre.objects.filter(Q(show__actors=obj) | Q(show__directors=obj))
-            .distinct()
-            .annotate(show_count=Count('show', filter=Q(show__actors=obj) | Q(show__directors=obj)))
-            .order_by('-show_count')[:20]
+        return _get_related_items_html(
+            Genre, Q(show__actors=obj) | Q(show__directors=obj), 'admin:app_genre_change'
         )
-        return _format_object_list_html(genres, 'admin:app_genre_change')
 
     @admin.display(description='Countries')
     def related_countries(self, obj):
-        countries = (
-            Country.objects.filter(Q(show__actors=obj) | Q(show__directors=obj))
-            .distinct()
-            .annotate(show_count=Count('show', filter=Q(show__actors=obj) | Q(show__directors=obj)))
-            .order_by('-show_count')[:20]
+        return _get_related_items_html(
+            Country, Q(show__actors=obj) | Q(show__directors=obj), 'admin:app_country_change'
         )
-        return _format_object_list_html(countries, 'admin:app_country_change')

@@ -31,9 +31,9 @@ def get_show_card_text(
 
     if kinopub_link and show_id:
         link = html_link(f'{kinopub_link.rstrip("/")}/item/view/{show_id}', '🔗')
-        lines = [ f'🎬{link} {bold(raw_title)}' ]
+        lines = [f'🎬{link} {bold(raw_title)}']
     else:
-        lines = [ f'🎬 {bold(raw_title)}' ]
+        lines = [f'🎬 {bold(raw_title)}']
 
     if raw_title != original_title:
         lines.append(italic(f'({original_title})'))
@@ -83,7 +83,7 @@ def get_show_card_text(
                 ratings_command = f' (/ratings_{show_id})'
 
         lines.append(f'🌟 {bold("Оценки зрителей")}{ratings_command}:')
-        
+
         if len(user_ratings) > 1:
             for idx, data in enumerate(user_ratings[:RATINGS_TRUNCATE_COUNT], 1):
                 lines.append(f'{idx}. {data["label"]}: {data["rating"]:.1f}')
@@ -92,6 +92,5 @@ def get_show_card_text(
         else:
             data = user_ratings[0]
             lines.append(f'{data["label"]}: {data["rating"]:.1f}')
-
 
     return '\n'.join(lines)

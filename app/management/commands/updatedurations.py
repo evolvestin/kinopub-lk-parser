@@ -10,12 +10,12 @@ from app.gdrive_backup import BackupManager
 from app.history_parser import (
     close_driver,
     initialize_driver_session,
+    is_fatal_selenium_error,
     process_show_durations,
 )
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
-from app.history_parser import is_fatal_selenium_error
 
 
 class Command(LoggableBaseCommand):

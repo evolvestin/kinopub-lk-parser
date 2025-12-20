@@ -1,5 +1,4 @@
-from shared.constants import UserRole
-from shared.constants import SERIES_TYPES
+from shared.constants import SERIES_TYPES, UserRole
 
 
 def get_role_management_keyboard(view_user):
@@ -13,61 +12,72 @@ def get_role_management_keyboard(view_user):
     return [buttons]
 
 
-def get_history_notification_keyboard(view_history_obj, bot_username=None, user_rating=None, episodes_rated=0, is_channel=False):
-    status_btn_text = 'Учесть' if not view_history_obj.is_checked else 'Не учитывать'
-    watch_btn_text = '👀 Это я смотрю / Не смотрю'
+def get_history_notification_keyboard(
+    view_history_obj,
+    bot_username=None,
+    user_rating=None,
+    episodes_rated=0,
+    is_channel=False,
+    channel_url=None,
+):
     show_id = view_history_obj.show.id
     show_type = view_history_obj.show.type
     season = view_history_obj.season_number
     episode = view_history_obj.episode_number
+    view_id = view_history_obj.id
 
-    buttons = [
-        [
-            {
-                'text': f'📊 {status_btn_text} в статистике',
-                'callback_data': f'toggle_check_{view_history_obj.id}',
-            }
-        ],
-        [
-            {
-                'text': watch_btn_text,
-                'callback_data': f'claim_toggle_{view_history_obj.id}',
-            }
-        ],
-    ]
+    buttons = []
 
-    # Если это канал и известен юзернейм бота, делаем кнопку-ссылку (Deep Link)
-    if is_channel and bot_username:
-        s_num = season if season else 0
-        e_num = episode if episode else 0
-        
-        # Формируем start_parameter: rate_showID_season_episode
-        url = f'https://t.me/{bot_username}?start=rate_{show_id}_{s_num}_{e_num}'
-        
-        label = '⭐️ Оценить'
-        if user_rating:
-            rating_str = str(int(user_rating)) if user_rating.is_integer() else str(user_rating)
-            label += f' (Ваша: {rating_str})'
-            
-        buttons.append([{'text': label, 'url': url}])
+    if is_channel:
+        status_btn_text = 'Учесть' if not view_history_obj.is_checked else 'Не учитывать'
+        watch_btn_text = '👀 Это я смотрю / Не смотрю'
+
+        buttons.append(
+            [
+                {
+                    'text': f'📊 {status_btn_text} в статистике',
+                    'callback_data': f'toggle_check_{view_id}',
+                }
+            ]
+        )
+        buttons.append([{'text': watch_btn_text, 'callback_data': f'claim_toggle_{view_id}'}])
+
+        if bot_username:
+            s_num = season if season else 0
+            e_num = episode if episode else 0
+            url = f'https://t.me/{bot_username}?start=rate_{show_id}_{s_num}_{e_num}'
+
+            label = '⭐️ Оценить'
+            if user_rating:
+                rating_str = str(int(user_rating)) if user_rating.is_integer() else str(user_rating)
+                label += f' (Ваша: {rating_str})'
+            buttons.append([{'text': label, 'url': url}])
+
         return buttons
 
-    # Логика для личных сообщений (интерактивные кнопки)
     if show_type in SERIES_TYPES:
         label = '⭐️ Изменить оценку сериала' if user_rating else '⭐️ Оценить сериал'
         if user_rating:
             rating_str = str(int(user_rating)) if user_rating.is_integer() else str(user_rating)
             label += f' ({rating_str}/10)'
-        
+
         buttons.append([{'text': label, 'callback_data': f'rate_mode_show_{show_id}'}])
 
         if season and episode:
-            buttons.append([{
-                'text': f'📺 Оценить s{season}e{episode}',
-                'callback_data': f'rate_ep_start_{show_id}_{season}_{episode}'
-            }])
+            buttons.append(
+                [
+                    {
+                        'text': f'📺 Оценить s{season}e{episode}',
+                        'callback_data': f'rate_ep_start_{show_id}_{season}_{episode}',
+                    }
+                ]
+            )
 
-        ep_label = f'📺 Оценить эпизод (оценено: {episodes_rated})' if episodes_rated > 0 else '📺 Оценить эпизод'
+        ep_label = (
+            f'📺 Оценить эпизод (оценено: {episodes_rated})'
+            if episodes_rated > 0
+            else '📺 Оценить эпизод'
+        )
         buttons.append([{'text': ep_label, 'callback_data': f'rate_mode_ep_{show_id}'}])
     else:
         label = '⭐️ Изменить оценку' if user_rating else '⭐️ Оценить'
@@ -75,5 +85,8 @@ def get_history_notification_keyboard(view_history_obj, bot_username=None, user_
             rating_str = str(int(user_rating)) if user_rating.is_integer() else str(user_rating)
             label += f' ({rating_str}/10)'
         buttons.append([{'text': label, 'callback_data': f'rate_start_{show_id}'}])
+
+    if channel_url:
+        buttons.append([{'text': '🔗 Перейти к посту', 'url': channel_url}])
 
     return buttons

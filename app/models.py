@@ -83,26 +83,26 @@ class ViewUser(BaseModel):
     def update_personal_details(self, username, name, language, is_active=None):
         """Обновляет данные пользователя и возвращает список измененных полей."""
         updated_fields = []
-        
+
         if self.username != username:
             self.username = username
             updated_fields.append('username')
-        
+
         if self.name != name:
             self.name = name
             updated_fields.append('name')
-        
+
         if self.language != language:
             self.language = language
             updated_fields.append('language')
-            
+
         if is_active is not None and self.is_bot_active != is_active:
             self.is_bot_active = is_active
             updated_fields.append('is_bot_active')
 
         if updated_fields:
             self.save()
-            
+
         return updated_fields
 
     def delete(self, *args, **kwargs):
