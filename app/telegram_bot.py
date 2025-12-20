@@ -9,6 +9,7 @@ from shared.card_formatter import get_show_card_text
 from shared.constants import DATE_FORMAT
 from shared.formatters import format_se
 from shared.html_helper import bold, code, html_secure, italic
+from app.models import UserRating
 
 logger = logging.getLogger(__name__)
 
@@ -21,18 +22,17 @@ class TelegramSender:
             cls._instance = super().__new__(cls)
             cls._instance.service_url = 'http://telegram-bot:8081/api'
             cls._instance._bot_username = None
-
-            try:
-                data = cls._instance._request('get_me', method='GET')
-                if data and data.get('ok'):
-                    cls._instance._bot_username = data['result']['username']
-            except Exception as e:
-                logger.error(f'Failed to fetch bot username at startup: {e}')
-
         return cls._instance
 
     @property
     def bot_username(self):
+        if self._bot_username is None:
+            try:
+                data = self._request('get_me', method='GET')
+                if data and data.get('ok'):
+                    self._bot_username = data['result']['username']
+            except Exception as e:
+                logger.error(f'Failed to fetch bot username: {e}')
         return self._bot_username
 
     def _request(self, endpoint: str, payload: dict = None, method: str = 'POST') -> dict | None:
@@ -137,8 +137,7 @@ class TelegramSender:
         }
         self._request('edit_message', payload)
 
-    def _build_message_payload(self, view_history_obj, for_user=None):
-        from app.models import UserRating
+    def _build_message_payload(self, view_history_obj, for_user=None, is_channel=False):
         lines = []
         season = view_history_obj.season_number
         episode = view_history_obj.episode_number
@@ -168,6 +167,7 @@ class TelegramSender:
                 kinopoisk_url=show.kinopoisk_url,
                 internal_rating=internal_rating,
                 user_ratings=user_ratings,
+                bot_username=self.bot_username,
             ),
             '',
             f'🗓 Дата просмотра: {view_history_obj.view_date.strftime(DATE_FORMAT)}',
@@ -199,7 +199,8 @@ class TelegramSender:
             view_history_obj, 
             self.bot_username, 
             user_rating=personal_rating, 
-            episodes_rated=episodes_count
+            episodes_rated=episodes_count,
+            is_channel=is_channel
         )
 
         return '\n'.join(lines), keyboard
@@ -208,7 +209,7 @@ class TelegramSender:
         if not settings.HISTORY_CHANNEL_ID:
             return
 
-        text, keyboard = self._build_message_payload(view_history_obj)
+        text, keyboard = self._build_message_payload(view_history_obj, is_channel=True)
 
         payload = {
             'chat_id': settings.HISTORY_CHANNEL_ID,
@@ -226,20 +227,33 @@ class TelegramSender:
 
     def update_history_message(self, view_history_obj, for_user=None):
         view_history_obj.refresh_from_db()
-        text, keyboard = self._build_message_payload(view_history_obj, for_user=for_user)
+        # Обновление сообщения в канале, поэтому is_channel=True
+        channel_text, channel_keyboard = self._build_message_payload(
+            view_history_obj,
+            for_user=None,
+            is_channel=True
+        )
 
         if settings.HISTORY_CHANNEL_ID and view_history_obj.telegram_message_id:
             payload = {
                 'chat_id': settings.HISTORY_CHANNEL_ID,
                 'message_id': view_history_obj.telegram_message_id,
-                'text': text,
+                'text': channel_text,
                 'parse_mode': 'HTML',
-                'reply_markup': {'inline_keyboard': keyboard},
+                'reply_markup': {'inline_keyboard': channel_keyboard},
                 'disable_web_page_preview': True,
             }
             self._request('edit_message', payload)
-        
-        return {'text': text, 'keyboard': {'inline_keyboard': keyboard}}
+
+        if for_user:
+            user_text, user_keyboard = self._build_message_payload(
+                view_history_obj,
+                for_user=for_user,
+                is_channel=False
+            )
+            return {'text': user_text, 'keyboard': {'inline_keyboard': user_keyboard}}
+
+        return {'text': channel_text, 'keyboard': {'inline_keyboard': channel_keyboard}}
 
     def send_role_upgrade_notification(self, telegram_id, role):
         if not settings.HISTORY_CHANNEL_ID:
@@ -263,7 +277,8 @@ class TelegramSender:
     
     def send_private_history_notification(self, telegram_id, view_history_obj):
         user = ViewUser.objects.filter(telegram_id=telegram_id).first()
-        text, keyboard = self._build_message_payload(view_history_obj, for_user=user)
+        # Отправка в ЛС, поэтому is_channel=False
+        text, keyboard = self._build_message_payload(view_history_obj, for_user=user, is_channel=False)
         payload = {
             'chat_id': telegram_id,
             'text': text,

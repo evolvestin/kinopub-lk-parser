@@ -13,6 +13,7 @@ from shared.html_helper import italic
 
 from shared.card_formatter import get_show_card_text
 from shared.html_helper import bold, html_secure
+from services.bot_instance import BotInstance
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 
@@ -70,6 +71,14 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка на оценку.')
             return
 
+        if args.startswith('ratings_'):
+            try:
+                show_id = int(args.split('_')[1])
+                await _send_ratings_report(sender, user.id, show_id)
+            except (IndexError, ValueError):
+                await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка на оценки.')
+            return
+
     if success:
         text = (
             f'👋 {bold(f"Привет, {html_secure(user.first_name)}!")}\n\n'
@@ -123,6 +132,8 @@ async def _send_show_card(
             has_any_ratings=has_ratings,
         )
 
+    bot_username = await BotInstance().get_bot_username()
+
     await sender.send_message(
         chat_id=chat_id,
         text=get_show_card_text(
@@ -141,6 +152,7 @@ async def _send_show_card(
             kinopoisk_url=show_data.get('kinopoisk_url'),
             internal_rating=show_data.get('internal_rating'),
             user_ratings=show_data.get('user_ratings'),
+            bot_username=bot_username,
         ),
         keyboard=keyboard,
     )
@@ -236,23 +248,27 @@ async def handle_ratings_command(message: Message, bot: Bot):
 
     show_id = int(match.group(1))
     sender = MessageSender(bot)
-    
+    await _send_ratings_report(sender, message.chat.id, show_id)
+
+
+async def _send_ratings_report(sender: MessageSender, chat_id: int, show_id: int):
+    """Общая логика отправки отчета с оценками (используется в start и команде)"""
     show_data = await client.get_show_details(show_id)
     if not show_data:
-        await sender.send_message(message.chat.id, '❌ Ошибки получения данных.')
+        await sender.send_message(chat_id, '❌ Ошибки получения данных.')
         return
 
     user_ratings_summary = show_data.get('user_ratings', [])
     header = f'📋 Все оценки'
     if internal_rating := show_data.get('internal_rating'):
         header += f' ({internal_rating:.1f}/10):'
-    
+
     blocks = []
     if show_data.get('type') in SERIES_TYPES:
         separator = '\n\n'
         ratings_details = await client.get_show_ratings_details(show_id)
         if not ratings_details:
-            await sender.send_message(message.chat.id, 'Оценок пока нет.')
+            await sender.send_message(chat_id, 'Оценок пока нет.')
             return
 
         for i, user_data in enumerate(ratings_details, 1):
@@ -267,27 +283,27 @@ async def handle_ratings_command(message: Message, bot: Bot):
             if user_rating:
                 user_header += f' {bold(f"{user_rating:.1f}")}'
             lines.append(user_header)
-            
+
             if user_data.get('show_rating'):
                 lines.append(f'Общая: {user_data["show_rating"]}')
-            
+
             episodes = user_data.get('episodes', [])
             for ep in episodes:
                 lines.append(f'  {italic(format_se(ep["s"], ep["e"]))}: {ep["r"]}')
-            
+
             blocks.append('\n'.join(lines))
     else:
         header += '\n'
         separator = '\n'
         if not user_ratings_summary:
-            await sender.send_message(message.chat.id, 'Оценок пока нет.')
+            await sender.send_message(chat_id, 'Оценок пока нет.')
             return
 
         for i, data in enumerate(user_ratings_summary, 1):
-            blocks.append(f'{i}. {data["label"]}: {bold(f"{data['rating']:.1f}")}')
+            blocks.append(f'{i}. {data["label"]}: {bold(f"{data["rating"]:.1f}")}')
 
     await sender.send_smart_split_text(
-        chat_id=message.chat.id,
+        chat_id=chat_id,
         text_blocks=blocks,
         header=bold(header),
         separator=separator

@@ -13,7 +13,7 @@ def get_role_management_keyboard(view_user):
     return [buttons]
 
 
-def get_history_notification_keyboard(view_history_obj, bot_username=None, user_rating=None, episodes_rated=0):
+def get_history_notification_keyboard(view_history_obj, bot_username=None, user_rating=None, episodes_rated=0, is_channel=False):
     status_btn_text = 'Учесть' if not view_history_obj.is_checked else 'Не учитывать'
     watch_btn_text = '👀 Это я смотрю / Не смотрю'
     show_id = view_history_obj.show.id
@@ -36,6 +36,23 @@ def get_history_notification_keyboard(view_history_obj, bot_username=None, user_
         ],
     ]
 
+    # Если это канал и известен юзернейм бота, делаем кнопку-ссылку (Deep Link)
+    if is_channel and bot_username:
+        s_num = season if season else 0
+        e_num = episode if episode else 0
+        
+        # Формируем start_parameter: rate_showID_season_episode
+        url = f'https://t.me/{bot_username}?start=rate_{show_id}_{s_num}_{e_num}'
+        
+        label = '⭐️ Оценить'
+        if user_rating:
+            rating_str = str(int(user_rating)) if user_rating.is_integer() else str(user_rating)
+            label += f' (Ваша: {rating_str})'
+            
+        buttons.append([{'text': label, 'url': url}])
+        return buttons
+
+    # Логика для личных сообщений (интерактивные кнопки)
     if show_type in SERIES_TYPES:
         label = '⭐️ Изменить оценку сериала' if user_rating else '⭐️ Оценить сериал'
         if user_rating:

@@ -101,8 +101,10 @@ async def unassign_view(telegram_id: int, view_id: int) -> bool:
     return bool(data)
 
 
-async def toggle_view_check(view_id: int) -> dict | None:
+async def toggle_view_check(view_id: int, telegram_id: int = None) -> dict | None:
     payload = {'view_id': view_id}
+    if telegram_id:
+        payload['telegram_id'] = telegram_id
     return await _execute_request('toggle_check/', method='POST', payload=payload)
 
 

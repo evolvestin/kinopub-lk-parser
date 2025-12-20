@@ -20,6 +20,7 @@ def get_show_card_text(
     kinopoisk_url: str | None,
     internal_rating: float | None = None,
     user_ratings: list[dict] | None = None,
+    bot_username: str | None = None,
 ) -> str:
     """
     Генерирует стандартизированный текст карточки сериала/фильма
@@ -75,7 +76,11 @@ def get_show_card_text(
 
         ratings_command = ''
         if show_type in SERIES_TYPES or truncated:
-            ratings_command = f' (/ratings_{show_id})'
+            if bot_username:
+                url = f'https://t.me/{bot_username}?start=ratings_{show_id}'
+                ratings_command = f' ({html_link(url, "/ratings")})'
+            else:
+                ratings_command = f' (/ratings_{show_id})'
 
         lines.append(f'🌟 {bold("Оценки зрителей")}{ratings_command}:')
         

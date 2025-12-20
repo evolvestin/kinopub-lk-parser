@@ -10,6 +10,9 @@ from sender import MessageSender
 from shared.html_helper import bold, code
 from shared.constants import SERIES_TYPES, UserRole
 from shared.formatters import format_se
+from aiogram.enums import ChatType
+
+from services.bot_instance import BotInstance
 
 
 def get_args(data: str, *indices: int) -> list:
@@ -53,7 +56,7 @@ async def _check_guest_restriction(callback: CallbackQuery, user_id: int) -> boo
     return False
 
 
-async def _submit_rating(callback: CallbackQuery, show_id: int, rating: float, season: int = None, episode: int = None):
+async def _submit_rating(callback: CallbackQuery, bot: Bot, show_id: int, rating: float, season: int = None, episode: int = None):
     if await _check_guest_restriction(callback, callback.from_user.id):
         return
 
@@ -62,15 +65,18 @@ async def _submit_rating(callback: CallbackQuery, show_id: int, rating: float, s
     if result and result.get('status') == 'ok':
         target = f'S{season}E{episode}' if season and episode else 'сериала/фильма'
         await callback.answer(f'Оценка {int(rating)} для {target} принята!')
-        await _update_show_message(callback.message, callback.from_user.id, show_id)
+        await _update_show_message(callback.message, bot, callback.from_user.id, show_id)
     else:
         await callback.answer('Ошибка сохранения оценки', show_alert=True)
 
 
-async def _update_show_message(message, user_id, show_id):
+async def _update_show_message(message, bot: Bot, user_id, show_id):
     show_data = await client.get_show_details(show_id, telegram_id=user_id)
     if not show_data:
         return
+
+    # Используем синглтон для получения юзернейма без лишнего API-запроса
+    bot_username = await BotInstance().get_bot_username()
 
     text = get_show_card_text(
         show_id=show_data.get('id'),
@@ -88,6 +94,7 @@ async def _update_show_message(message, user_id, show_id):
         kinopoisk_url=show_data.get('kinopoisk_url'),
         internal_rating=show_data.get('internal_rating'),
         user_ratings=show_data.get('user_ratings'),
+        bot_username=bot_username,
     )
     
     # Проверяем наличие любых оценок для отображения кнопки
@@ -145,16 +152,19 @@ async def toggle_check_handler(callback: CallbackQuery, bot: Bot):
         return
 
     view_id = get_args(callback.data, -1)
-    result = await client.toggle_view_check(view_id)
+    result = await client.toggle_view_check(view_id, telegram_id=callback.from_user.id)
     if result and result.get('status') == 'ok':
         await callback.answer(result.get('message', 'Статус обновлен'))
         if payload := result.get('payload'):
-            await MessageSender(bot).send_message(
-                chat_id=callback.message.chat.id,
-                text=payload['text'],
-                keyboard=payload['keyboard'],
-                edit_message=callback.message
-            )
+            # В канале сообщение обновляется через API бэкенда.
+            # В ЛС обновляем вручную, используя payload для пользователя.
+            if callback.message.chat.type == ChatType.PRIVATE:
+                await MessageSender(bot).send_message(
+                    chat_id=callback.message.chat.id,
+                    text=payload['text'],
+                    keyboard=payload['keyboard'],
+                    edit_message=callback.message
+                )
     else:
         await callback.answer(f'Ошибка: {result.get("error") if result else "Unknown"}', show_alert=True)
 
@@ -170,12 +180,15 @@ async def claim_toggle_handler(callback: CallbackQuery, bot: Bot):
         text = 'Вы добавлены в список просмотра' if result.get('action') == 'added' else 'Вы убраны из списка просмотра'
         await callback.answer(text)
         if payload := result.get('payload'):
-            await MessageSender(bot).send_message(
-                chat_id=callback.message.chat.id,
-                text=payload['text'],
-                keyboard=payload['keyboard'],
-                edit_message=callback.message
-            )
+            # В канале сообщение обновляется через API бэкенда.
+            # В ЛС обновляем вручную.
+            if callback.message.chat.type == ChatType.PRIVATE:
+                await MessageSender(bot).send_message(
+                    chat_id=callback.message.chat.id,
+                    text=payload['text'],
+                    keyboard=payload['keyboard'],
+                    edit_message=callback.message
+                )
     else:
         await callback.answer('Ошибка обновления статуса', show_alert=True)
 
@@ -214,7 +227,7 @@ async def rate_mode_show_handler(callback: CallbackQuery, bot: Bot):
 @safe_callback
 async def rate_show_set_handler(callback: CallbackQuery, bot: Bot):
     show_id, rating = get_args(callback.data, 2, 3)
-    await _submit_rating(callback, show_id, rating)
+    await _submit_rating(callback, bot, show_id, rating)
 
 
 @safe_callback
@@ -235,7 +248,7 @@ async def rate_episode_start_handler(callback: CallbackQuery, bot: Bot):
 @safe_callback
 async def rate_episode_set_handler(callback: CallbackQuery, bot: Bot):
     show_id, season, episode, rating = get_args(callback.data, 3, 4, 5, 6)
-    await _submit_rating(callback, show_id, rating, season, episode)
+    await _submit_rating(callback, bot, show_id, rating, season, episode)
 
 
 @safe_callback
@@ -272,7 +285,22 @@ async def rate_select_season_handler(callback: CallbackQuery, bot: Bot):
 @safe_callback
 async def rate_show_back_handler(callback: CallbackQuery, bot: Bot):
     show_id = get_args(callback.data, -1)
-    await _update_show_message(callback.message, callback.from_user.id, show_id)
+    show_data = await _get_show_data_safe(callback, show_id)
+    if not show_data:
+        return
+
+    user_ratings_list = show_data.get('user_ratings')
+    has_ratings = bool(user_ratings_list and len(user_ratings_list) > 0)
+
+    keyboard = keyboards.get_show_card_keyboard(
+        show_id,
+        show_type=show_data.get('type'),
+        user_rating=show_data.get('personal_rating'),
+        episodes_rated=show_data.get('personal_episodes_count', 0),
+        has_any_ratings=has_ratings
+    )
+
+    await callback.message.edit_reply_markup(reply_markup=keyboard)
     await callback.answer()
 
 
