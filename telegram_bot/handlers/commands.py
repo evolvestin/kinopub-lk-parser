@@ -55,7 +55,7 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 episode = int(parts[3])
 
                 # Получаем полную информацию о шоу
-                show_data = await client.get_show_details(show_id)
+                show_data = await client.get_show_details(show_id, telegram_id=user.id)
 
                 if show_data:
                     # Отправляем карточку, передавая данные о конкретном эпизоде для кнопок

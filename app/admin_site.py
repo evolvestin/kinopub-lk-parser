@@ -52,7 +52,7 @@ class CustomAdminSite(admin.AdminSite):
             'app_list': app_list,
             **(extra_context or {}),
         }
-        context = dashboard_callback(request, context)
+        context = dashboard_callback(context)
         return render(request, 'admin/index.html', context)
 
     def _get_app_commands_details(self):

@@ -79,6 +79,16 @@ class TelegramSender:
         payload = {'chat_id': chat_id, 'message_id': message_id}
         self._request('delete_message', payload)
 
+    def _get_role_message_text(self, view_user):
+        return (
+            f'👤 {bold("User Registration / Role Management")}\n\n'
+            f'{bold("Name:")} {html_secure(view_user.name or "N/A")}\n'
+            f'{bold("Username:")} @{html_secure(view_user.username or "N/A")}\n'
+            f'{bold("ID:")} {code(view_user.telegram_id)}\n'
+            f'{bold("Language:")} {view_user.language}\n'
+            f'{bold("Registered:")} {view_user.created_at.strftime("%Y-%m-%d %H:%M")}'
+        )
+
     def send_user_role_message(self, view_user):
         if not settings.USER_MANAGEMENT_CHANNEL_ID:
             logger.error('USER_MANAGEMENT_CHANNEL_ID is not set.')
@@ -88,15 +98,7 @@ class TelegramSender:
             self.update_user_role_message(view_user, empty_keyboard=True)
             self.delete_message(settings.USER_MANAGEMENT_CHANNEL_ID, view_user.role_message_id)
 
-        text = (
-            f'👤 {bold("User Registration / Role Management")}\n\n'
-            f'{bold("Name:")} {html_secure(view_user.name or "N/A")}\n'
-            f'{bold("Username:")} @{html_secure(view_user.username or "N/A")}\n'
-            f'{bold("ID:")} {code(view_user.telegram_id)}\n'
-            f'{bold("Language:")} {view_user.language}\n'
-            f'{bold("Registered:")} {view_user.created_at.strftime("%Y-%m-%d %H:%M")}'
-        )
-
+        text = self._get_role_message_text(view_user)
         keyboard = get_role_management_keyboard(view_user)
 
         payload = {
@@ -118,15 +120,7 @@ class TelegramSender:
             return
 
         keyboard = [] if empty_keyboard else get_role_management_keyboard(view_user)
-
-        text = (
-            f'👤 {bold("User Registration / Role Management")}\n\n'
-            f'{bold("Name:")} {html_secure(view_user.name or "N/A")}\n'
-            f'{bold("Username:")} @{html_secure(view_user.username or "N/A")}\n'
-            f'{bold("ID:")} {code(view_user.telegram_id)}\n'
-            f'{bold("Language:")} {view_user.language}\n'
-            f'{bold("Registered:")} {view_user.created_at.strftime("%Y-%m-%d %H:%M")}'
-        )
+        text = self._get_role_message_text(view_user)
 
         payload = {
             'chat_id': settings.USER_MANAGEMENT_CHANNEL_ID,

@@ -81,7 +81,7 @@ def _serialize_show_details(show, user=None):
 
 
 def index(request):
-    context = dashboard_callback(request, {})
+    context = dashboard_callback({})
     return render(request, 'index.html', context)
 
 
@@ -618,7 +618,11 @@ def bot_get_show_ratings_details(request, show_id):
                 grouped_data[uid]['show_rating'] = r.rating
             else:
                 grouped_data[uid]['episodes'].append(
-                    {'s': r.season_number, 'e': r.episode_number, 'r': r.rating}
+                    {
+                        'season': r.season_number,
+                        'episode': r.episode_number,
+                        'rating': r.rating,
+                    }
                 )
 
         result = list(grouped_data.values())

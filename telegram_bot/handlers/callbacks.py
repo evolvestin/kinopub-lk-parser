@@ -5,14 +5,13 @@ import client
 import keyboards
 from aiogram import Bot
 from aiogram.types import CallbackQuery
-from html_helper import italic
 from sender import MessageSender
 from services.bot_instance import BotInstance
 
 from shared.card_formatter import get_ratings_report_blocks, get_show_card_text
 from shared.constants import SERIES_TYPES, UserRole
-from shared.html_helper import bold
-
+from shared.formatters import format_se
+from shared.html_helper import bold, italic
 
 def get_args(data: str, *indices: int) -> list:
     """Извлекает аргументы из callback_data по индексам, приводя числа к int/float."""
@@ -71,8 +70,17 @@ async def _submit_rating(
     result = await client.rate_show(callback.from_user.id, show_id, rating, season, episode)
 
     if result and result.get('status') == 'ok':
-        target = f'S{season}E{episode}' if season and episode else 'сериала/фильма'
-        await callback.answer(f'Оценка {int(rating)} для {target} принята!')
+        target = 'контента'
+
+        if season and episode:
+            target = format_se(season, episode)
+        else:
+            show_data = await client.get_show_details(show_id)
+            if show_data:
+                target = 'сериала' if show_data.get('type') in SERIES_TYPES else 'фильма'
+
+        rating_str = str(int(rating)) if rating.is_integer() else str(rating)
+        await callback.answer(f'Оценка {rating_str} для {target} принята!')
         await _update_show_message(callback.message, bot, callback.from_user.id, show_id)
     else:
         await callback.answer('Ошибка сохранения оценки', show_alert=True)
@@ -107,12 +115,12 @@ async def _update_show_message(message, bot: Bot, user_id, show_id):
     user_ratings_list = show_data.get('user_ratings')
     has_ratings = bool(user_ratings_list and len(user_ratings_list) > 0)
 
+    # Логика формирования ссылки на канал
     channel_url = None
     msg_id = show_data.get('channel_message_id')
     hist_channel_id = os.getenv('HISTORY_CHANNEL_ID', '')
-    if msg_id and hist_channel_id:
-        if hist_channel_id.startswith('-100'):
-            channel_url = f'https://t.me/c/{hist_channel_id[4:]}/{msg_id}'
+    if msg_id and hist_channel_id and hist_channel_id.startswith('-100'):
+        channel_url = f'https://t.me/c/{hist_channel_id[4:]}/{msg_id}'
 
     keyboard = keyboards.get_show_card_keyboard(
         show_id,
@@ -201,7 +209,10 @@ async def claim_toggle_handler(callback: CallbackQuery, bot: Bot):
 
 @safe_callback
 async def rate_show_start_handler(callback: CallbackQuery, bot: Bot):
-    show_id = get_args(callback.data, -1)
+    parts = callback.data.split('_')
+    show_id = int(parts[2])
+    is_notify = parts[-1] == 'n'
+
     show_data = await _get_show_data_safe(callback, show_id)
     if not show_data:
         return
@@ -211,9 +222,12 @@ async def rate_show_start_handler(callback: CallbackQuery, bot: Bot):
             show_id,
             user_rating=show_data.get('personal_rating'),
             episodes_rated=show_data.get('personal_episodes_count', 0),
+            is_notify=is_notify,
         )
     else:
-        kb = keyboards.get_rating_keyboard(show_id, current_rating=show_data.get('personal_rating'))
+        kb = keyboards.get_rating_keyboard(
+            show_id, current_rating=show_data.get('personal_rating'), is_notify=is_notify
+        )
 
     await callback.message.edit_reply_markup(reply_markup=kb)
     await callback.answer()
@@ -221,11 +235,14 @@ async def rate_show_start_handler(callback: CallbackQuery, bot: Bot):
 
 @safe_callback
 async def rate_mode_show_handler(callback: CallbackQuery, bot: Bot):
-    show_id = get_args(callback.data, -1)
+    parts = callback.data.split('_')
+    show_id = int(parts[3])
+    is_notify = parts[-1] == 'n'
+
     show_data = await _get_show_data_safe(callback, show_id)
     rating = show_data.get('personal_rating') if show_data else None
 
-    kb = keyboards.get_rating_keyboard(show_id, current_rating=rating)
+    kb = keyboards.get_rating_keyboard(show_id, current_rating=rating, is_notify=is_notify)
     await callback.message.edit_reply_markup(reply_markup=kb)
     await callback.answer()
 
@@ -238,7 +255,11 @@ async def rate_show_set_handler(callback: CallbackQuery, bot: Bot):
 
 @safe_callback
 async def rate_episode_start_handler(callback: CallbackQuery, bot: Bot):
-    show_id, season, episode = get_args(callback.data, 3, 4, 5)
+    parts = callback.data.split('_')
+    show_id = int(parts[3])
+    season = int(parts[4])
+    episode = int(parts[5])
+    is_notify = parts[-1] == 'n'
 
     episodes_data = await client.get_show_episodes(show_id, telegram_id=callback.from_user.id)
     current_rating = next(
@@ -251,7 +272,7 @@ async def rate_episode_start_handler(callback: CallbackQuery, bot: Bot):
     )
 
     kb = keyboards.get_episode_rating_keyboard(
-        show_id, season, episode, current_rating=current_rating
+        show_id, season, episode, current_rating=current_rating, is_notify=is_notify
     )
     await callback.message.edit_reply_markup(reply_markup=kb)
     await callback.answer()
@@ -265,7 +286,10 @@ async def rate_episode_set_handler(callback: CallbackQuery, bot: Bot):
 
 @safe_callback
 async def rate_mode_ep_handler(callback: CallbackQuery, bot: Bot):
-    show_id = int(callback.data.split('_')[-1])
+    parts = callback.data.split('_')
+    show_id = int(parts[3])
+    is_notify = parts[-1] == 'n'
+
     episodes_data = await client.get_show_episodes(show_id, telegram_id=callback.from_user.id)
 
     if not episodes_data:
@@ -277,19 +301,22 @@ async def rate_mode_ep_handler(callback: CallbackQuery, bot: Bot):
         s = item['season_number']
         season_stats[s] = season_stats.get(s, 0) + (1 if item.get('rating') else 0)
 
-    kb = keyboards.get_seasons_keyboard(show_id, season_stats)
+    kb = keyboards.get_seasons_keyboard(show_id, season_stats, is_notify=is_notify)
     await callback.message.edit_reply_markup(reply_markup=kb)
     await callback.answer()
 
 
 @safe_callback
 async def rate_select_season_handler(callback: CallbackQuery, bot: Bot):
-    show_id, season = get_args(callback.data, 3, 4)
+    parts = callback.data.split('_')
+    show_id = int(parts[3])
+    season = int(parts[4])
+    is_notify = parts[-1] == 'n'
 
     episodes_data = await client.get_show_episodes(show_id, telegram_id=callback.from_user.id)
     season_episodes = [i for i in episodes_data if i['season_number'] == season]
 
-    keyboard = keyboards.get_episodes_keyboard(show_id, season, season_episodes)
+    keyboard = keyboards.get_episodes_keyboard(show_id, season, season_episodes, is_notify=is_notify)
     await callback.message.edit_reply_markup(reply_markup=keyboard)
     await callback.answer()
 
@@ -298,34 +325,9 @@ async def rate_select_season_handler(callback: CallbackQuery, bot: Bot):
 async def rate_show_back_handler(callback: CallbackQuery, bot: Bot):
     parts = callback.data.split('_')
     show_id = int(parts[2])
-    season = int(parts[3]) if len(parts) > 3 else None
-    episode = int(parts[4]) if len(parts) > 4 else None
 
-    show_data = await _get_show_data_safe(callback, show_id)
-    if not show_data:
-        return
-
-    user_ratings_list = show_data.get('user_ratings')
-    has_ratings = bool(user_ratings_list and len(user_ratings_list) > 0)
-
-    channel_url = None
-    msg_id = show_data.get('channel_message_id')
-    hist_channel_id = os.getenv('HISTORY_CHANNEL_ID', '')
-    if msg_id and hist_channel_id and hist_channel_id.startswith('-100'):
-        channel_url = f'https://t.me/c/{hist_channel_id[4:]}/{msg_id}'
-
-    keyboard = keyboards.get_show_card_keyboard(
-        show_id,
-        show_type=show_data.get('type'),
-        user_rating=show_data.get('personal_rating'),
-        episodes_rated=show_data.get('personal_episodes_count', 0),
-        has_any_ratings=has_ratings,
-        season=season,
-        episode=episode,
-        channel_url=channel_url,
-    )
-
-    await callback.message.edit_reply_markup(reply_markup=keyboard)
+    # Используем общую функцию обновления, чтобы избежать дублирования логики
+    await _update_show_message(callback.message, bot, callback.from_user.id, show_id)
     await callback.answer()
 
 

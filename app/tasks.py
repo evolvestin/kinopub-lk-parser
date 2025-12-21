@@ -105,12 +105,10 @@ def run_admin_command(self, task_run_id):
     task_run.celery_task_id = self.request.id
     task_run.save()
 
-    # Формируем команду запуска через manage.py в отдельном процессе
     cmd = [sys.executable, 'manage.py', task_run.command]
     if task_run.arguments:
         cmd.extend(shlex.split(task_run.arguments))
 
-    # Используем временные файлы для буферизации вывода, чтобы не зависеть от переполнения пайпов
     with (
         tempfile.TemporaryFile(mode='w+') as stdout_f,
         tempfile.TemporaryFile(mode='w+') as stderr_f,
@@ -121,16 +119,14 @@ def run_admin_command(self, task_run_id):
 
         try:
             while True:
-                # 1. Проверяем, не попросил ли пользователь остановить задачу
                 task_run.refresh_from_db()
                 if task_run.status == 'STOPPED':
-                    process.terminate()  # Посылаем SIGTERM (мягкая остановка)
+                    process.terminate()
                     try:
-                        process.wait(timeout=10)  # Даем 10 сек на завершение (cleanup)
+                        process.wait(timeout=10)
                     except subprocess.TimeoutExpired:
-                        process.kill()  # SIGKILL, если завис
+                        process.kill()
 
-                    # Сохраняем логи
                     stdout_f.seek(0)
                     stderr_f.seek(0)
                     output = stdout_f.read() + '\n' + stderr_f.read()
@@ -138,7 +134,6 @@ def run_admin_command(self, task_run_id):
                     task_run.save()
                     return
 
-                # 2. Проверяем, не завершился ли процесс сам
                 retcode = process.poll()
                 if retcode is not None:
                     stdout_f.seek(0)
@@ -154,8 +149,12 @@ def run_admin_command(self, task_run_id):
                         task_run.status = 'FAILURE'
                         task_run.error_message = f'Exit code: {retcode}'
 
-                        # Дублируем ошибку в системный лог, чтобы её было видно в Dashboard
-                        log_msg = err_text.strip() or out_text.strip() or 'No output captured'
+                        full_log = err_text.strip() or out_text.strip() or 'No output captured'
+                        if len(full_log) > 2000:
+                            log_msg = f'... [truncated] ...\n{full_log[-2000:]}'
+                        else:
+                            log_msg = full_log
+
                         logging.error(
                             f"Task '{task_run.command}' failed (code {retcode}): {log_msg}"
                         )
@@ -164,11 +163,9 @@ def run_admin_command(self, task_run_id):
                     task_run.save()
                     return
 
-                # Пауза перед следующей проверкой
                 time.sleep(1)
 
         except Exception as e:
-            # Если что-то пошло не так в самом воркере, убиваем процесс
             if process.poll() is None:
                 process.kill()
             task_run.status = 'FAILURE'

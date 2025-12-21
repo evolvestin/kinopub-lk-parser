@@ -189,6 +189,14 @@ def get_chrome_major_version():
 
 
 def setup_driver(headless=True, profile_key='main', randomize=False):
+    if headless:
+        try:
+            subprocess.run(['pkill', '-f', 'chromium'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['pkill', '-f', 'chromedriver'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(1)
+        except Exception:
+            pass
+
     options = uc.ChromeOptions()
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')

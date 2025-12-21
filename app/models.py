@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from shared.constants import DATETIME_FORMAT, RATING_VALUES, UserRole
+from shared.formatters import format_se
 
 
 class BaseModel(models.Model):
@@ -255,7 +256,6 @@ class LogEntry(BaseModel):
 
 
 class UserRating(BaseModel):
-    # Генерируем choices на основе единой константы
     RATING_CHOICES = [(r, str(int(r)) if r.is_integer() else str(r)) for r in RATING_VALUES]
 
     user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='ratings')
@@ -275,7 +275,7 @@ class UserRating(BaseModel):
     def __str__(self):
         suffix = ''
         if self.season_number and self.episode_number:
-            suffix = f' (S{self.season_number}E{self.episode_number})'
+            suffix = f' ({format_se(self.season_number, self.episode_number)})'
         return f'{self.user.name}: {self.show.title}{suffix} - {self.rating}'
 
 

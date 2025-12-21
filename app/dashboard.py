@@ -7,7 +7,7 @@ from django.utils import timezone
 from app.models import ShowDuration, ViewHistory
 
 
-def dashboard_callback(request, context):
+def dashboard_callback(context):
     episode_duration_query = ShowDuration.objects.filter(
         show_id=OuterRef('show_id'),
         season_number=OuterRef('season_number'),

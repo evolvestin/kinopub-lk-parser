@@ -94,3 +94,53 @@ def get_show_card_text(
             lines.append(f'{data["label"]}: {data["rating"]:.1f}')
 
     return '\n'.join(lines)
+
+
+def get_ratings_report_blocks(
+    show_type: str,
+    user_ratings_summary: list[dict],
+    ratings_details: list[dict] = None,
+    internal_rating: float | None = None,
+) -> tuple[str, str, list[str]]:
+    from shared.formatters import format_se
+
+    header = f'📋 Все оценки'
+    if internal_rating:
+        header += f' ({internal_rating:.1f}/10):'
+
+    blocks = []
+    separator = '\n'
+
+    if show_type in SERIES_TYPES:
+        separator = '\n\n'
+        if ratings_details:
+            for i, user_data in enumerate(ratings_details, 1):
+                user_rating = None
+                for ur in user_ratings_summary:
+                    if ur['label'] == user_data['user']:
+                        user_rating = ur['rating']
+                        break
+
+                lines = []
+                user_header = f'{i}. {user_data["user"]}:'
+                if user_rating:
+                    user_header += f' {bold(f"{user_rating:.1f}")}'
+                lines.append(user_header)
+
+                if user_data.get('show_rating'):
+                    lines.append(f'Общая: {user_data["show_rating"]}')
+
+                episodes = user_data.get('episodes', [])
+                for episode_data in episodes:
+                    formatted_se = format_se(episode_data['season'], episode_data['episode'])
+                    lines.append(f'  {italic(formatted_se)}: {episode_data["rating"]}')
+
+                blocks.append('\n'.join(lines))
+    else:
+        header += '\n'
+        separator = '\n'
+        if user_ratings_summary:
+            for i, data in enumerate(user_ratings_summary, 1):
+                blocks.append(f'{i}. {data["label"]}: {bold(f"{data["rating"]:.1f}")}')
+
+    return header, separator, blocks
