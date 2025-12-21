@@ -171,8 +171,10 @@ async def cancel_claim_handler(callback: CallbackQuery, bot: Bot):
 
 @safe_callback
 async def toggle_check_handler(callback: CallbackQuery, bot: Bot):
-    if await client.check_user_role(callback.from_user.id) != UserRole.ADMIN:
-        await callback.answer('⛔️ Только для администраторов.', show_alert=True)
+    # Разрешаем доступ Admin и Viewer (логика проверки привязки к просмотру находится на бэкенде)
+    role = await client.check_user_role(callback.from_user.id)
+    if role == UserRole.GUEST:
+        await callback.answer('⛔️ У вас нет прав.', show_alert=True)
         return
 
     view_id = get_args(callback.data, -1)
@@ -180,12 +182,11 @@ async def toggle_check_handler(callback: CallbackQuery, bot: Bot):
 
     if result and result.get('status') == 'ok':
         # Сообщение в канале обновляется бэкендом (app/views.py -> TelegramSender),
-        # нам нужно только уведомить админа всплывашкой.
+        # нам нужно только уведомить пользователя всплывашкой.
         await callback.answer(result.get('message', 'Статус обновлен'))
     else:
-        await callback.answer(
-            f'Ошибка: {result.get("error") if result else "Unknown"}', show_alert=True
-        )
+        error_text = result.get('error') if result else "Неизвестная ошибка"
+        await callback.answer(f'Ошибка: {error_text}', show_alert=True)
 
 
 @safe_callback

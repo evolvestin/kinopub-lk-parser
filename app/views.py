@@ -453,7 +453,27 @@ def bot_toggle_view_check(request):
     try:
         data = json.loads(request.body)
         view_id = data.get('view_id')
+        telegram_id = data.get('telegram_id')
+
         view = ViewHistory.objects.get(id=view_id)
+
+        # Проверка прав доступа
+        if telegram_id:
+            try:
+                user = ViewUser.objects.get(telegram_id=telegram_id)
+                if user.role == UserRole.VIEWER:
+                    # VIEWER может менять статус только если он сам есть в списке зрителей
+                    if not view.users.filter(id=user.id).exists():
+                        return JsonResponse(
+                            {
+                                'status': 'error',
+                                'error': 'Вы должны быть в списке зрителей, чтобы менять статус.',
+                            }
+                        )
+                elif user.role != UserRole.ADMIN:
+                    return JsonResponse({'status': 'error', 'error': 'Недостаточно прав.'})
+            except ViewUser.DoesNotExist:
+                return JsonResponse({'status': 'error', 'error': 'Пользователь не найден.'})
 
         view.is_checked = not view.is_checked
         view.save(update_fields=['is_checked'])

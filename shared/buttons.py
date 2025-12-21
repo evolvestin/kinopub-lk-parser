@@ -33,7 +33,7 @@ def get_rate_episodes_button_data(
     suffix = '_n' if is_notify else ''
     label = '🌟 Оценить эпизод'
     if episodes_rated:
-        label += f' ({episodes_rated} оценено)'
+        label += f' (оценено: {episodes_rated})'
     return {'text': label, 'callback_data': f'rate_mode_ep_{show_id}{suffix}'}
 
 

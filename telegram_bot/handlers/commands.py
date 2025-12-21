@@ -118,13 +118,6 @@ async def _send_show_card(
         user_ratings_list = show_data.get('user_ratings')
         has_ratings = bool(user_ratings_list and len(user_ratings_list) > 0)
 
-        # Формируем ссылку на канал
-        channel_url = None
-        msg_id = show_data.get('channel_message_id')
-        hist_channel_id = os.getenv('HISTORY_CHANNEL_ID', '')
-        if msg_id and hist_channel_id and hist_channel_id.startswith('-100'):
-            channel_url = f'https://t.me/c/{hist_channel_id[4:]}/{msg_id}'
-
         keyboard = keyboards.get_show_card_keyboard(
             show_id,
             show_type=show_type,
@@ -133,7 +126,7 @@ async def _send_show_card(
             user_rating=personal_rating,
             episodes_rated=episodes_count,
             has_any_ratings=has_ratings,
-            channel_url=channel_url,
+            channel_url=None,
         )
 
     bot_username = await BotInstance().get_bot_username()
