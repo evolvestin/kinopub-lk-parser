@@ -13,6 +13,7 @@ from shared.constants import SERIES_TYPES, UserRole
 from shared.formatters import format_se
 from shared.html_helper import bold, italic
 
+
 def get_args(data: str, *indices: int) -> list:
     """Извлекает аргументы из callback_data по индексам, приводя числа к int/float."""
     parts = data.split('_')
@@ -51,7 +52,7 @@ async def _get_show_data_safe(callback: CallbackQuery, show_id: int):
 async def _check_guest_restriction(callback: CallbackQuery, user_id: int) -> bool:
     role = await client.check_user_role(user_id)
     if role == UserRole.GUEST:
-        await callback.answer('🔒 Гости не могут ставить оценки.', show_alert=True)
+        await callback.answer('🔒 Функция недоступна.', show_alert=True)
         return True
     return False
 
@@ -64,9 +65,6 @@ async def _submit_rating(
     season: int = None,
     episode: int = None,
 ):
-    if await _check_guest_restriction(callback, callback.from_user.id):
-        return
-
     result = await client.rate_show(callback.from_user.id, show_id, rating, season, episode)
 
     if result and result.get('status') == 'ok':
@@ -92,6 +90,7 @@ async def _update_show_message(message, bot: Bot, user_id, show_id):
         return
 
     bot_username = await BotInstance().get_bot_username()
+    role = await client.check_user_role(user_id)
 
     text = get_show_card_text(
         show_id=show_data.get('id'),
@@ -110,6 +109,7 @@ async def _update_show_message(message, bot: Bot, user_id, show_id):
         internal_rating=show_data.get('internal_rating'),
         user_ratings=show_data.get('user_ratings'),
         bot_username=bot_username,
+        show_history=(role != UserRole.GUEST),
     )
 
     user_ratings_list = show_data.get('user_ratings')
@@ -185,7 +185,7 @@ async def toggle_check_handler(callback: CallbackQuery, bot: Bot):
         # нам нужно только уведомить пользователя всплывашкой.
         await callback.answer(result.get('message', 'Статус обновлен'))
     else:
-        error_text = result.get('error') if result else "Неизвестная ошибка"
+        error_text = result.get('error') if result else 'Неизвестная ошибка'
         await callback.answer(f'Ошибка: {error_text}', show_alert=True)
 
 
@@ -317,7 +317,9 @@ async def rate_select_season_handler(callback: CallbackQuery, bot: Bot):
     episodes_data = await client.get_show_episodes(show_id, telegram_id=callback.from_user.id)
     season_episodes = [i for i in episodes_data if i['season_number'] == season]
 
-    keyboard = keyboards.get_episodes_keyboard(show_id, season, season_episodes, is_notify=is_notify)
+    keyboard = keyboards.get_episodes_keyboard(
+        show_id, season, season_episodes, is_notify=is_notify
+    )
     await callback.message.edit_reply_markup(reply_markup=keyboard)
     await callback.answer()
 

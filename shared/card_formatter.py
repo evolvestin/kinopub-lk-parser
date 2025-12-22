@@ -21,6 +21,7 @@ def get_show_card_text(
     internal_rating: float | None = None,
     user_ratings: list[dict] | None = None,
     bot_username: str | None = None,
+    show_history: bool = True,
 ) -> str:
     """
     Генерирует стандартизированный текст карточки сериала/фильма
@@ -71,11 +72,10 @@ def get_show_card_text(
 
     if user_ratings is not None:
         lines.append('')
-        
-        # Формирование команд для бота
+
         ratings_command = ''
         history_command = ''
-        
+
         if show_id:
             if bot_username:
                 r_url = f'https://t.me/{bot_username}?start=ratings_{show_id}'
@@ -86,9 +86,12 @@ def get_show_card_text(
                 ratings_command = f' (/ratings_{show_id})'
                 history_command = f' (/history_{show_id})'
 
-        lines.append(f'🌟 {bold("Оценки")}{ratings_command} | 📜 {bold("История")}{history_command}')
-        
-        # Отображаем краткий список оценок
+        footer_parts = [f'🌟 {bold("Оценки")}{ratings_command}']
+        if show_history:
+            footer_parts.append(f'📜 {bold("История")}{history_command}')
+
+        lines.append(' | '.join(footer_parts))
+
         if user_ratings:
             truncated = len(user_ratings) > RATINGS_TRUNCATE_COUNT
             if len(user_ratings) > 1:
@@ -111,7 +114,7 @@ def get_ratings_report_blocks(
 ) -> tuple[str, str, list[str]]:
     from shared.formatters import format_se
 
-    header = f'📋 Все оценки'
+    header = '📋 Все оценки'
     if internal_rating:
         header += f' ({internal_rating:.1f}/10):'
 
@@ -148,6 +151,6 @@ def get_ratings_report_blocks(
         separator = '\n'
         if user_ratings_summary:
             for i, data in enumerate(user_ratings_summary, 1):
-                blocks.append(f'{i}. {data["label"]}: {bold(f"{data["rating"]:.1f}")}')
+                blocks.append(f'{i}. {data["label"]}: {bold(f"{data['rating']:.1f}")}')
 
     return header, separator, blocks

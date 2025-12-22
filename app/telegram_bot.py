@@ -6,7 +6,7 @@ from django.conf import settings
 from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
 from app.models import UserRating, ViewUser
 from shared.card_formatter import get_show_card_text
-from shared.constants import DATE_FORMAT
+from shared.constants import DATE_FORMAT, UserRole
 from shared.formatters import format_se
 from shared.html_helper import bold, code, html_secure, italic
 
@@ -154,6 +154,10 @@ class TelegramSender:
         show = view_history_obj.show
         internal_rating, user_ratings = show.get_internal_rating_data()
 
+        show_history = True
+        if for_user and for_user.role == UserRole.GUEST:
+            show_history = False
+
         lines.extend(
             [
                 get_show_card_text(
@@ -173,6 +177,7 @@ class TelegramSender:
                     internal_rating=internal_rating,
                     user_ratings=user_ratings,
                     bot_username=self.bot_username,
+                    show_history=show_history,
                 ),
                 '',
                 f'🗓 Дата просмотра: {view_history_obj.view_date.strftime(DATE_FORMAT)}',

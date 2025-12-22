@@ -57,7 +57,7 @@ def _serialize_show_details(show, user=None):
         .prefetch_related('users')
         .order_by('-view_date', '-id')
     )
-    
+
     view_history_list = []
     last_message_id = None
 
@@ -65,12 +65,18 @@ def _serialize_show_details(show, user=None):
         if not last_message_id and h.telegram_message_id:
             last_message_id = h.telegram_message_id
 
-        view_history_list.append({
-            'id': h.id,
-            'date': h.view_date.strftime('%Y-%m-%d'),
-            'users': [f'@{u.username}' if u.username else u.name or str(u.telegram_id) for u in h.users.all()],
-            'message_id': h.telegram_message_id
-        })
+        view_history_list.append(
+            {
+                'id': h.id,
+                'date': h.view_date.strftime('%Y-%m-%d'),
+                'users': [
+                    f'@{u.username}' if u.username else u.name or str(u.telegram_id)
+                    for u in h.users.all()
+                ],
+                'message_id': h.telegram_message_id,
+                'is_viewer': user in h.users.all() if user else False,
+            }
+        )
 
     return {
         'id': show.id,
@@ -433,7 +439,7 @@ def _manage_view_assignment(request, action):
         if action == 'add':
             view_history.users.add(user)
             TelegramSender().update_history_message(view_history)
-            
+
             show_title = view_history.show.title or view_history.show.original_title
             info = show_title
             if view_history.season_number:
@@ -442,7 +448,7 @@ def _manage_view_assignment(request, action):
         elif action == 'remove':
             view_history.users.remove(user)
             TelegramSender().update_history_message(view_history)
-            
+
             return JsonResponse({'status': 'ok'})
 
     except (ViewUser.DoesNotExist, ViewHistory.DoesNotExist):

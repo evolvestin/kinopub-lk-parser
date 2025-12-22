@@ -42,29 +42,67 @@ def expire_codes_task():
     logging.debug('Running periodic check for expired codes...')
     try:
         expiration_threshold = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
-        expired_codes = Code.objects.filter(received_at__lt=expiration_threshold)
-        if expired_codes.exists():
-            logging.info('Found %d expired codes to process.', expired_codes.count())
-            for code in expired_codes:
-                TelegramSender().edit_message_to_expired(code.telegram_message_id)
-                code.delete()
+
+        # Получаем все устаревшие коды, которые еще не обработаны
+        expired_codes = list(
+            Code.objects.filter(received_at__lt=expiration_threshold).exclude(
+                telegram_message_id=-1
+            )
+        )
+
+        if expired_codes:
+            logging.info('Found %d expired codes to mark in Telegram.', len(expired_codes))
+
+            # Собираем список telegram_message_id для редактирования
+            telegram_ids = [c.telegram_message_id for c in expired_codes]
+            # Редактируем сообщения в Telegram
+            sender = TelegramSender()
+            for telegram_id in telegram_ids:
+                sender.edit_message_to_expired(telegram_id)
+
+            Code.objects.filter(id__in=[c.id for c in expired_codes]).update(telegram_message_id=-1)
+
+            # Планируем бэкап
             BackupManager().schedule_backup()
+
     except Exception as e:
         logging.error('Celery task: Error in expire_codes_task: %s', e)
 
 
 @shared_task
 def delete_old_logs_task():
-    logging.info('Running periodic check for old log entries...')
+    logging.info('Running periodic cleanup of logs and data...')
     try:
-        cutoff_date = timezone.now() - timedelta(days=settings.LOG_RETENTION_DAYS)
-        deleted_count, _ = (
-            LogEntry.objects.filter(created_at__lt=cutoff_date)
-            .exclude(message__contains='New Episodes Parser Finished')
-            .delete()
-        )
-        if deleted_count > 0:
-            logging.info('Deleted %d old log entries.', deleted_count)
+        now = timezone.now()
+
+        # 1. Очистка логов по уровням
+        # INFO и DEBUG: храним 1 месяц (30 дней)
+        cutoff_info = now - timedelta(days=30)
+        LogEntry.objects.filter(created_at__lt=cutoff_info, level__in=['INFO', 'DEBUG']).exclude(
+            message__contains='New Episodes Parser Finished'
+        ).delete()
+
+        # WARNING: храним 2 месяца (60 дней)
+        cutoff_warning = now - timedelta(days=60)
+        LogEntry.objects.filter(created_at__lt=cutoff_warning, level='WARNING').delete()
+
+        # ERROR и CRITICAL: храним 3 месяца (90 дней)
+        cutoff_error = now - timedelta(days=90)
+        LogEntry.objects.filter(
+            created_at__lt=cutoff_error, level__in=['ERROR', 'CRITICAL']
+        ).delete()
+
+        # 2. Очистка кодов
+        # Коды храним 3 месяца (90 дней)
+        cutoff_codes = now - timedelta(days=90)
+        deleted_codes, _ = Code.objects.filter(received_at__lt=cutoff_codes).delete()
+
+        logging.info('Cleanup completed. Deleted old codes: %d', deleted_codes)
+
+        # Если были удаления, можно запланировать бэкап (опционально)
+        if deleted_codes > 0:
+            BackupManager().schedule_backup()
+
     except Exception as e:
         logging.error('Celery task: Error in delete_old_logs_task: %s', e)
 

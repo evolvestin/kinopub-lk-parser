@@ -3,6 +3,7 @@ import logging
 
 from aiogram import Bot, types
 from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter, TelegramServerError
+
 from shared.html_helper import html_secure, sub_tag
 
 MAX_LENGTH = 4096

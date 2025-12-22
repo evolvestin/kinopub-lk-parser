@@ -51,9 +51,7 @@ def get_show_control_buttons(
     buttons = []
 
     if show_type in SERIES_TYPES:
-        buttons.append(
-            [get_rate_main_button_data(show_id, show_type, user_rating, is_notify)]
-        )
+        buttons.append([get_rate_main_button_data(show_id, show_type, user_rating, is_notify)])
 
         if season and episode:
             buttons.append(
@@ -65,13 +63,9 @@ def get_show_control_buttons(
                 ]
             )
 
-        buttons.append(
-            [get_rate_episodes_button_data(show_id, episodes_rated, is_notify)]
-        )
+        buttons.append([get_rate_episodes_button_data(show_id, episodes_rated, is_notify)])
     else:
-        buttons.append(
-            [get_rate_main_button_data(show_id, show_type, user_rating, is_notify)]
-        )
+        buttons.append([get_rate_main_button_data(show_id, show_type, user_rating, is_notify)])
 
     if channel_url:
         buttons.append([{'text': '🔗 Просмотр', 'url': channel_url}])

@@ -1,10 +1,11 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from shared.buttons import get_show_control_buttons
-from shared.constants import RATING_VALUES
-from shared.formatters import format_se
-from shared.buttons import get_rate_episodes_button_data, get_rate_main_button_data
-from shared.constants import ShowType
+from shared.buttons import (
+    get_rate_episodes_button_data,
+    get_rate_main_button_data,
+    get_show_control_buttons,
+)
+from shared.constants import RATING_VALUES, ShowType
 
 
 def _build_grid_keyboard(
@@ -96,7 +97,7 @@ def get_show_card_keyboard(
     channel_url: str = None,
 ):
     # Получаем структуру кнопок из общего модуля
-    # В боте обычно is_notify=False, если это прямой просмотр, но 
+    # В боте обычно is_notify=False, если это прямой просмотр, но
     # если это пришло из уведомления, логика навигации обрабатывается в handlers
     raw_buttons = get_show_control_buttons(
         show_id=show_id,
@@ -106,7 +107,7 @@ def get_show_card_keyboard(
         user_rating=user_rating,
         episodes_rated=episodes_rated,
         channel_url=channel_url,
-        is_notify=False 
+        is_notify=False,
     )
 
     # Конвертируем словари в объекты Aiogram InlineKeyboardButton
@@ -117,7 +118,11 @@ def get_show_card_keyboard(
             if 'url' in btn_data:
                 aiogram_row.append(InlineKeyboardButton(text=btn_data['text'], url=btn_data['url']))
             else:
-                aiogram_row.append(InlineKeyboardButton(text=btn_data['text'], callback_data=btn_data['callback_data']))
+                aiogram_row.append(
+                    InlineKeyboardButton(
+                        text=btn_data['text'], callback_data=btn_data['callback_data']
+                    )
+                )
         aiogram_buttons.append(aiogram_row)
 
     return InlineKeyboardMarkup(inline_keyboard=aiogram_buttons)
@@ -150,15 +155,21 @@ def get_rate_mode_keyboard(
 
     # Используем общую логику из shared/buttons.py
     # Принудительно передаем тип Series, так как это меню выбора режима только для сериалов
-    main_btn_data = get_rate_main_button_data(
-        show_id, ShowType.SERIES, user_rating, is_notify
-    )
+    main_btn_data = get_rate_main_button_data(show_id, ShowType.SERIES, user_rating, is_notify)
     ep_btn_data = get_rate_episodes_button_data(show_id, episodes_rated, is_notify)
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=main_btn_data['text'], callback_data=main_btn_data['callback_data'])],
-            [InlineKeyboardButton(text=ep_btn_data['text'], callback_data=ep_btn_data['callback_data'])],
+            [
+                InlineKeyboardButton(
+                    text=main_btn_data['text'], callback_data=main_btn_data['callback_data']
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=ep_btn_data['text'], callback_data=ep_btn_data['callback_data']
+                )
+            ],
             [InlineKeyboardButton(text='⬅️ Назад', callback_data=f'rate_back_{show_id}{suffix}')],
         ]
     )
@@ -175,10 +186,14 @@ def get_seasons_keyboard(show_id: int, season_stats: dict, is_notify: bool = Fal
             InlineKeyboardButton(text=label, callback_data=f'rate_sel_seas_{show_id}_{s}{suffix}')
         )
 
-    return _build_grid_keyboard(buttons, items_per_row=5, back_callback=f'rate_back_{show_id}{suffix}')
+    return _build_grid_keyboard(
+        buttons, items_per_row=5, back_callback=f'rate_back_{show_id}{suffix}'
+    )
 
 
-def get_episodes_keyboard(show_id: int, season: int, episodes_data: list[dict], is_notify: bool = False):
+def get_episodes_keyboard(
+    show_id: int, season: int, episodes_data: list[dict], is_notify: bool = False
+):
     suffix = '_n' if is_notify else ''
     buttons = []
     for item in sorted(episodes_data, key=lambda x: x['episode_number']):
@@ -191,8 +206,11 @@ def get_episodes_keyboard(show_id: int, season: int, episodes_data: list[dict], 
 
         buttons.append(
             InlineKeyboardButton(
-                text=label, callback_data=f'rate_ep_start_{show_id}_{season}_{episode_number}{suffix}'
+                text=label,
+                callback_data=f'rate_ep_start_{show_id}_{season}_{episode_number}{suffix}',
             )
         )
 
-    return _build_grid_keyboard(buttons, items_per_row=4, back_callback=f'rate_mode_ep_{show_id}{suffix}')
+    return _build_grid_keyboard(
+        buttons, items_per_row=4, back_callback=f'rate_mode_ep_{show_id}{suffix}'
+    )

@@ -10,8 +10,8 @@ from sender import MessageSender
 from services.bot_instance import BotInstance
 
 from shared.card_formatter import get_ratings_report_blocks, get_show_card_text
-from shared.constants import SERIES_TYPES
-from shared.html_helper import bold, html_secure, html_link
+from shared.constants import SERIES_TYPES, UserRole
+from shared.html_helper import bold, html_link, html_secure
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 
@@ -27,38 +27,42 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
     args = command.args if command else None
 
     if args:
-        if args.startswith('claim_'):
+        if args.startswith('claim_') or args.startswith('unclaim_'):
             try:
-                view_id = int(args.split('_')[1])
-                result = await client.assign_view(user.id, view_id)
+                parts = args.split('_')
+                action = parts[0]
+                view_id = int(parts[1])
+                show_id = int(parts[2]) if len(parts) > 2 else None
 
-                if result and result.get('status') == 'ok':
-                    info = result.get('info', 'Unknown content')
-                    text = f'✅ <b>Просмотр зафиксирован за вами</b>\n{html_secure(info)}'
-                    kb = keyboards.get_unclaim_keyboard(view_id)
-                    await sender.send_message(chat_id=user.id, text=text, keyboard=kb)
+                if action == 'claim':
+                    result = await client.assign_view(user.id, view_id)
+                    if not (result and result.get('status') == 'ok'):
+                        await sender.send_message(user.id, '❌ Не удалось добавить просмотр.')
                 else:
-                    await sender.send_message(
-                        chat_id=user.id,
-                        text='❌ Не удалось привязать просмотр (возможно, запись удалена).',
-                    )
+                    success_unclaim = await client.unassign_view(user.id, view_id)
+                    if not success_unclaim:
+                        await sender.send_message(user.id, '❌ Не удалось убрать просмотр.')
+
+                if show_id:
+                    await _send_history_report(sender, user.id, show_id)
+                else:
+                    msg = '✅ Просмотр добавлен.' if action == 'claim' else '🗑 Просмотр убран.'
+                    await sender.send_message(user.id, msg)
+
             except (IndexError, ValueError):
                 await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка.')
             return
 
         if args.startswith('rate_'):
-            # Format: rate_showId_season_episode
             try:
                 parts = args.split('_')
                 show_id = int(parts[1])
                 season = int(parts[2])
                 episode = int(parts[3])
 
-                # Получаем полную информацию о шоу
                 show_data = await client.get_show_details(show_id, telegram_id=user.id)
 
                 if show_data:
-                    # Отправляем карточку, передавая данные о конкретном эпизоде для кнопок
                     await _send_show_card(sender, user.id, show_data, season, episode)
                 else:
                     await sender.send_message(
@@ -78,21 +82,24 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
             return
 
         if args.startswith('history_'):
+            role = await client.check_user_role(user.id)
+            if role == UserRole.GUEST:
+                return
+
             try:
                 show_id = int(args.split('_')[1])
                 await _send_history_report(sender, user.id, show_id)
             except (IndexError, ValueError):
-                await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка на историю.')
+                await sender.send_message(
+                    chat_id=user.id, text='❌ Некорректная ссылка на историю.'
+                )
             return
 
     if success:
         text = (
             f'👋 {bold(f"Привет, {html_secure(user.first_name)}!")}\n\n'
             'Я бот-помощник KinoPub Parser.\n'
-            'Пока ваш статус <b>Guest</b>, вам доступны следующие функции:\n\n'
-            f'🔍 {bold("Поиск контента")}\n'
-            'Просто отправьте мне название фильма или сериала, и я проверю его наличие в базе.\n\n'
-            'ℹ️ Для получения доступа к истории просмотров и статистике обратитесь к администратору.'
+            'Просто отправьте мне название фильма или сериала, и я проверю его наличие в базе.'
         )
     else:
         text = f'⚠️ {bold("Ошибка регистрации.")}\nПопробуйте позже.'
@@ -101,9 +108,13 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
 
 
 async def handle_history_command(message: Message, bot: Bot):
-    """Обработка команды /history_123"""
     match = re.match(r'/history_(\d+)', message.text)
     if not match:
+        return
+
+    user_id = message.from_user.id
+    role = await client.check_user_role(user_id)
+    if role == UserRole.GUEST:
         return
 
     show_id = int(match.group(1))
@@ -112,7 +123,7 @@ async def handle_history_command(message: Message, bot: Bot):
 
 
 async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int):
-    show_data = await client.get_show_details(show_id)
+    show_data = await client.get_show_details(show_id, telegram_id=chat_id)
     if not show_data:
         await sender.send_message(chat_id, '❌ Ошибки получения данных.')
         return
@@ -120,34 +131,39 @@ async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int
     title = html_secure(show_data.get('title', 'Unknown'))
     history = show_data.get('view_history', [])
     bot_username = await BotInstance().get_bot_username()
-    
+
     lines = [f'📜 История просмотров: {bold(title)}', '']
-    
+
     if not history:
         lines.append('Просмотров нет.')
     else:
         channel_id = os.getenv('HISTORY_CHANNEL_ID')
         for item in history:
             date_str = item['date']
-            
-            # Если есть ID сообщения и известен ID канала, делаем ссылку на пост
+            view_id = item.get('id')
+
             if item.get('message_id') and channel_id:
                 link = None
                 if channel_id.startswith('-100'):
-                    link = f"https://t.me/c/{channel_id[4:]}/{item['message_id']}"
-                
+                    link = f'https://t.me/c/{channel_id[4:]}/{item["message_id"]}'
+
                 if link:
                     date_str = html_link(link, date_str)
-            
-            line = date_str
+
+            cmd_part = ''
+            if view_id:
+                if item.get('is_viewer'):
+                    url = f'https://t.me/{bot_username}?start=unclaim_{view_id}_{show_id}'
+                    cmd_part = f' ({html_link(url, "unclaim")})'
+                else:
+                    url = f'https://t.me/{bot_username}?start=claim_{view_id}_{show_id}'
+                    cmd_part = f' ({html_link(url, "claim")})'
+
+            line = f'{date_str}{cmd_part}'
+
             if users := item['users']:
                 line += f': {", ".join(users)}'
 
-            # Добавляем кнопку-ссылку для клейма просмотра, если есть ID
-            if item.get('id') and bot_username:
-                claim_url = f"https://t.me/{bot_username}?start=claim_{item['id']}"
-                line += f' {html_link(claim_url, "🙋‍♂️")}'
-            
             lines.append(line)
 
     await sender.send_message(chat_id, '\n'.join(lines))
@@ -191,6 +207,7 @@ async def _send_show_card(
         )
 
     bot_username = await BotInstance().get_bot_username()
+    role = await client.check_user_role(chat_id)
 
     await sender.send_message(
         chat_id=chat_id,
@@ -211,6 +228,7 @@ async def _send_show_card(
             internal_rating=show_data.get('internal_rating'),
             user_ratings=show_data.get('user_ratings'),
             bot_username=bot_username,
+            show_history=(role != UserRole.GUEST),
         ),
         keyboard=keyboard,
     )
@@ -334,3 +352,28 @@ async def _send_ratings_report(sender: MessageSender, chat_id: int, show_id: int
     await sender.send_smart_split_text(
         chat_id=chat_id, text_blocks=blocks, header=bold(header), separator=separator
     )
+
+
+async def handle_history_action_command(message: Message, bot: Bot):
+    match = re.match(r'^/(claim|unclaim)_(\d+)_(\d+)$', message.text)
+    if not match:
+        return
+
+    action, view_id, show_id = match.groups()
+    view_id, show_id = int(view_id), int(show_id)
+    user_id = message.from_user.id
+    sender = MessageSender(bot)
+
+    if action == 'claim':
+        result = await client.assign_view(user_id, view_id)
+        if not (result and result.get('status') == 'ok'):
+            await sender.send_message(user_id, '❌ Не удалось добавить просмотр.')
+            return
+    else:
+        success = await client.unassign_view(user_id, view_id)
+        if not success:
+            await sender.send_message(user_id, '❌ Не удалось убрать просмотр.')
+            return
+
+    # Обновляем список, присылая новое сообщение
+    await _send_history_report(sender, user_id, show_id)

@@ -1,8 +1,5 @@
-from shared.constants import SERIES_TYPES, UserRole
-from shared.formatters import format_se
-from shared.buttons import get_show_control_buttons
 from shared.buttons import get_rating_label_text, get_show_control_buttons
-
+from shared.constants import UserRole
 
 
 def get_role_management_keyboard(view_user):
@@ -48,7 +45,9 @@ def get_history_notification_keyboard(
         if bot_username:
             season_number = season if season else 0
             episode_number = episode if episode else 0
-            url = f'https://t.me/{bot_username}?start=rate_{show_id}_{season_number}_{episode_number}'
+            url = (
+                f'https://t.me/{bot_username}?start=rate_{show_id}_{season_number}_{episode_number}'
+            )
 
             label = '🌟 Оценить'
             if user_rating:

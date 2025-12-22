@@ -42,6 +42,9 @@ def register_router() -> Router:
     router.message.register(commands.handle_show_command, F.text.regexp(r'^/show_\d+$'))
     router.message.register(commands.handle_ratings_command, F.text.regexp(r'^/ratings_\d+$'))
     router.message.register(commands.handle_history_command, F.text.regexp(r'^/history_\d+$'))
+    router.message.register(
+        commands.handle_history_action_command, F.text.regexp(r'^/(claim|unclaim)_\d+_\d+$')
+    )
     router.message.register(commands.handle_search_text, F.chat.type == ChatType.PRIVATE, F.text)
 
     # --- Callbacks ---
