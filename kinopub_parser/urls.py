@@ -21,6 +21,8 @@ urlpatterns = [
     path('api/bot/show/<int:show_id>/episodes/', views.bot_get_show_episodes),
     path('api/bot/show/<int:show_id>/ratings/', views.bot_get_show_ratings_details),
     path('api/bot/imdb/<str:imdb_id>/', views.bot_get_by_imdb),
+    path('api/bot/assign_view/', views.bot_assign_view),
+    path('api/bot/unassign_view/', views.bot_unassign_view),
     path('api/bot/toggle_claim/', views.bot_toggle_claim),
     path('api/bot/toggle_view_user/', views.bot_toggle_view_user),
     path('api/bot/toggle_check/', views.bot_toggle_view_check),

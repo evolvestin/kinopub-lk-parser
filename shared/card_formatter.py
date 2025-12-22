@@ -69,29 +69,36 @@ def get_show_card_text(
     if genres:
         lines.append(f'🏷 {", ".join(genres)}')
 
-    if user_ratings:
+    if user_ratings is not None:
         lines.append('')
-
-        truncated = len(user_ratings) > RATINGS_TRUNCATE_COUNT
-
+        
+        # Формирование команд для бота
         ratings_command = ''
-        if show_type in SERIES_TYPES or truncated:
+        history_command = ''
+        
+        if show_id:
             if bot_username:
-                url = f'https://t.me/{bot_username}?start=ratings_{show_id}'
-                ratings_command = f' ({html_link(url, "/ratings")})'
+                r_url = f'https://t.me/{bot_username}?start=ratings_{show_id}'
+                h_url = f'https://t.me/{bot_username}?start=history_{show_id}'
+                ratings_command = f' ({html_link(r_url, "/ratings")})'
+                history_command = f' ({html_link(h_url, "/history")})'
             else:
                 ratings_command = f' (/ratings_{show_id})'
+                history_command = f' (/history_{show_id})'
 
-        lines.append(f'🌟 {bold("Оценки зрителей")}{ratings_command}:')
-
-        if len(user_ratings) > 1:
-            for idx, data in enumerate(user_ratings[:RATINGS_TRUNCATE_COUNT], 1):
-                lines.append(f'{idx}. {data["label"]}: {data["rating"]:.1f}')
-            if truncated:
-                lines.append('...')
-        else:
-            data = user_ratings[0]
-            lines.append(f'{data["label"]}: {data["rating"]:.1f}')
+        lines.append(f'🌟 {bold("Оценки")}{ratings_command} | 📜 {bold("История")}{history_command}')
+        
+        # Отображаем краткий список оценок
+        if user_ratings:
+            truncated = len(user_ratings) > RATINGS_TRUNCATE_COUNT
+            if len(user_ratings) > 1:
+                for idx, data in enumerate(user_ratings[:RATINGS_TRUNCATE_COUNT], 1):
+                    lines.append(f'{idx}. {data["label"]}: {data["rating"]:.1f}')
+                if truncated:
+                    lines.append('...')
+            else:
+                data = user_ratings[0]
+                lines.append(f'{data["label"]}: {data["rating"]:.1f}')
 
     return '\n'.join(lines)
 

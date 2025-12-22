@@ -11,7 +11,7 @@ from services.bot_instance import BotInstance
 
 from shared.card_formatter import get_ratings_report_blocks, get_show_card_text
 from shared.constants import SERIES_TYPES
-from shared.html_helper import bold, html_secure
+from shared.html_helper import bold, html_secure, html_link
 
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 
@@ -77,6 +77,14 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка на оценки.')
             return
 
+        if args.startswith('history_'):
+            try:
+                show_id = int(args.split('_')[1])
+                await _send_history_report(sender, user.id, show_id)
+            except (IndexError, ValueError):
+                await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка на историю.')
+            return
+
     if success:
         text = (
             f'👋 {bold(f"Привет, {html_secure(user.first_name)}!")}\n\n'
@@ -90,6 +98,59 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
         text = f'⚠️ {bold("Ошибка регистрации.")}\nПопробуйте позже.'
 
     await sender.send_message(chat_id=user.id, text=text)
+
+
+async def handle_history_command(message: Message, bot: Bot):
+    """Обработка команды /history_123"""
+    match = re.match(r'/history_(\d+)', message.text)
+    if not match:
+        return
+
+    show_id = int(match.group(1))
+    sender = MessageSender(bot)
+    await _send_history_report(sender, message.chat.id, show_id)
+
+
+async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int):
+    show_data = await client.get_show_details(show_id)
+    if not show_data:
+        await sender.send_message(chat_id, '❌ Ошибки получения данных.')
+        return
+
+    title = html_secure(show_data.get('title', 'Unknown'))
+    history = show_data.get('view_history', [])
+    bot_username = await BotInstance().get_bot_username()
+    
+    lines = [f'📜 История просмотров: {bold(title)}', '']
+    
+    if not history:
+        lines.append('Просмотров нет.')
+    else:
+        channel_id = os.getenv('HISTORY_CHANNEL_ID')
+        for item in history:
+            date_str = item['date']
+            
+            # Если есть ID сообщения и известен ID канала, делаем ссылку на пост
+            if item.get('message_id') and channel_id:
+                link = None
+                if channel_id.startswith('-100'):
+                    link = f"https://t.me/c/{channel_id[4:]}/{item['message_id']}"
+                
+                if link:
+                    date_str = html_link(link, date_str)
+            
+            line = date_str
+            if users := item['users']:
+                line += f': {", ".join(users)}'
+
+            # Добавляем кнопку-ссылку для клейма просмотра, если есть ID
+            if item.get('id') and bot_username:
+                claim_url = f"https://t.me/{bot_username}?start=claim_{item['id']}"
+                line += f' {html_link(claim_url, "🙋‍♂️")}'
+            
+            lines.append(line)
+
+    await sender.send_message(chat_id, '\n'.join(lines))
 
 
 async def bot_command_start_group(message: Message, bot: Bot):

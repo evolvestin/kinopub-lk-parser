@@ -51,13 +51,26 @@ def _serialize_show_details(show, user=None):
             user=user, show=show, season_number__isnull=False
         ).count()
 
-    # Ищем последний ID сообщения в канале для этого шоу
-    last_view = (
-        ViewHistory.objects.filter(show=show, telegram_message_id__isnull=False)
+    # Сбор истории просмотров
+    history_qs = (
+        ViewHistory.objects.filter(show=show)
+        .prefetch_related('users')
         .order_by('-view_date', '-id')
-        .first()
     )
-    channel_message_id = last_view.telegram_message_id if last_view else None
+    
+    view_history_list = []
+    last_message_id = None
+
+    for h in history_qs:
+        if not last_message_id and h.telegram_message_id:
+            last_message_id = h.telegram_message_id
+
+        view_history_list.append({
+            'id': h.id,
+            'date': h.view_date.strftime('%Y-%m-%d'),
+            'users': [f'@{u.username}' if u.username else u.name or str(u.telegram_id) for u in h.users.all()],
+            'message_id': h.telegram_message_id
+        })
 
     return {
         'id': show.id,
@@ -76,7 +89,8 @@ def _serialize_show_details(show, user=None):
         'user_ratings': user_ratings,
         'personal_rating': personal_rating,
         'personal_episodes_count': personal_episodes_count,
-        'channel_message_id': channel_message_id,
+        'channel_message_id': last_message_id,
+        'view_history': view_history_list,
     }
 
 
@@ -172,9 +186,10 @@ def register_bot_user(request):
         },
     )
 
-    # Используем метод модели для обновления данных (DRY)
+    # Используем метод модели для обновления данных (DRY) и запоминаем изменения
+    updated_fields = []
     if not created:
-        view_user.update_personal_details(
+        updated_fields = view_user.update_personal_details(
             username=username,
             name=first_name,
             language=data.get('language_code', 'ru'),
@@ -203,7 +218,7 @@ def register_bot_user(request):
     try:
         if created or not view_user.role_message_id:
             TelegramSender().send_user_role_message(view_user)
-        else:
+        elif updated_fields and ('username' in updated_fields or 'name' in updated_fields):
             TelegramSender().update_user_role_message(view_user)
     except Exception as e:
         logging.error(f'Role msg error for {telegram_id}: {e}')
@@ -417,6 +432,8 @@ def _manage_view_assignment(request, action):
 
         if action == 'add':
             view_history.users.add(user)
+            TelegramSender().update_history_message(view_history)
+            
             show_title = view_history.show.title or view_history.show.original_title
             info = show_title
             if view_history.season_number:
@@ -424,6 +441,8 @@ def _manage_view_assignment(request, action):
             return JsonResponse({'status': 'ok', 'info': info})
         elif action == 'remove':
             view_history.users.remove(user)
+            TelegramSender().update_history_message(view_history)
+            
             return JsonResponse({'status': 'ok'})
 
     except (ViewUser.DoesNotExist, ViewHistory.DoesNotExist):

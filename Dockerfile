@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    tini \
     chromium \
     chromium-driver \
     tzdata \
@@ -35,5 +36,7 @@ ENV PATH=/home/app/bin:$PATH \
     LOG_LEVEL=INFO \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=kinopub_parser.settings
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD python /app/manage.py healthcheck
