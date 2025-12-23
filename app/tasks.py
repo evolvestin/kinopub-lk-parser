@@ -7,9 +7,7 @@ import time
 from contextlib import contextmanager
 from datetime import timedelta
 
-from asgiref.sync import async_to_sync
 from celery import shared_task
-from channels.layers import get_channel_layer
 from django.conf import settings
 from django.core.management import call_command
 from django.utils import timezone

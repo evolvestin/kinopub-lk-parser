@@ -130,10 +130,24 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [('redis', 6379)],
+            'hosts': [('redis', 6379)],
         },
     },
 }
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': 'redis://redis:6379/1',
+    }
+}
+
+
+if DEBUG:
+    WEBSOCKET_URL = 'ws://127.0.0.1:8013/ws/logs/'
+else:
+    # Для продакшена - относительный путь
+    WEBSOCKET_URL = '/ws/logs/'
 
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
@@ -234,7 +248,7 @@ LOGGING = {
 CELERY_BEAT_SCHEDULE = {
     'expire_codes': {
         'task': 'app.tasks.expire_codes_task',
-        'schedule': 20,  # every 20s
+        'schedule': crontab(),  # Каждую минуту в :00 секунд
     },
     'delete_old_logs': {
         'task': 'app.tasks.delete_old_logs_task',
@@ -247,7 +261,7 @@ if ENVIRONMENT == 'PROD':
         {
             'run_history_parser': {
                 'task': 'app.tasks.run_history_parser_task',
-                'schedule': 3600 * HISTORY_PARSER_INTERVAL_HOURS,
+                'schedule': crontab(minute=0, hour=f'*/{HISTORY_PARSER_INTERVAL_HOURS}'),
             },
             'run_new_episodes': {
                 'task': 'app.tasks.run_new_episodes_task',

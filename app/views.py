@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from app.dashboard import dashboard_callback
-from app.models import Show, ShowDuration, UserRating, ViewHistory, ViewUser
+from app.models import Show, ShowDuration, TelegramLog, UserRating, ViewHistory, ViewUser
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
 from shared.formatters import format_se
@@ -673,5 +673,23 @@ def bot_get_show_ratings_details(request, show_id):
         result = list(grouped_data.values())
         return JsonResponse({'ratings': result})
 
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@protected_bot_api
+@require_http_methods(['POST'])
+def bot_log_message(request):
+    try:
+        data = json.loads(request.body)
+        TelegramLog.objects.create(
+            direction=data.get('direction', 'IN'),
+            chat_id=data.get('chat_id'),
+            message_id=data.get('message_id'),
+            text=data.get('text', ''),
+            raw_data=data.get('raw_data', {}),
+        )
+        return JsonResponse({'status': 'ok'})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

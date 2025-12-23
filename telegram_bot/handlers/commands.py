@@ -98,7 +98,7 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
     if success:
         text = (
             f'👋 {bold(f"Привет, {html_secure(user.first_name)}!")}\n\n'
-            'Я бот-помощник KinoPub Parser.\n'
+            'Я бот-помощник KinoPub Observer.\n'
             'Просто отправьте мне название фильма или сериала, и я проверю его наличие в базе.'
         )
     else:

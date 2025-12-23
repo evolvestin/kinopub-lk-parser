@@ -1,5 +1,6 @@
 import logging
 
+import client
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineKeyboardMarkup
@@ -35,6 +36,20 @@ async def handle_send_message(request):
             reply_markup=reply_markup,
             disable_web_page_preview=disable_web_page_preview,
         )
+
+        # Логируем исходящее сообщение из API
+        try:
+            msg_dump = message.model_dump(mode='json', exclude_none=True)
+            await client.log_telegram_event(
+                direction='OUT',
+                chat_id=message.chat.id,
+                message_id=message.message_id,
+                text=message.text or message.caption,
+                raw_data=msg_dump,
+            )
+        except Exception as e:
+            logging.error(f'API logging error: {e}')
+
         return web.json_response({'ok': True, 'result': {'message_id': message.message_id}})
     except TelegramAPIError as e:
         logging.error(f'Failed to send message: {e}')

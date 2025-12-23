@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+import client
 from aiogram import Bot, types
 from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter, TelegramServerError
 
@@ -107,6 +108,20 @@ class MessageSender:
                 pass
             else:
                 logging.error(f'Unexpected error sending message to {chat_id}: {e}')
+
+        if response:
+            try:
+                # Логируем успешную отправку
+                msg_dump = response.model_dump(mode='json', exclude_none=True)
+                await client.log_telegram_event(
+                    direction='OUT',
+                    chat_id=response.chat.id,
+                    message_id=response.message_id,
+                    text=response.text or response.caption,
+                    raw_data=msg_dump,
+                )
+            except Exception as e:
+                logging.error(f'Failed to log outgoing message: {e}')
 
         return response
 

@@ -302,3 +302,28 @@ class TaskRun(BaseModel):
 
     def __str__(self):
         return f'{self.command} ({self.status})'
+
+
+class TelegramLog(BaseModel):
+    DIRECTION_CHOICES = [
+        ('IN', 'Incoming'),
+        ('OUT', 'Outgoing'),
+    ]
+
+    direction = models.CharField(max_length=3, choices=DIRECTION_CHOICES)
+    chat_id = models.BigIntegerField(null=True, blank=True)
+    message_id = models.BigIntegerField(null=True, blank=True)
+    text = models.TextField(null=True, blank=True)
+    raw_data = models.JSONField(default=dict)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Telegram Log'
+        verbose_name_plural = 'Telegram Logs'
+        indexes = [
+            models.Index(fields=['chat_id', 'message_id']),
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f'[{self.direction}] {self.chat_id}:{self.message_id}'

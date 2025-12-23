@@ -1,16 +1,16 @@
 import logging
 from datetime import timedelta
 
+from asgiref.sync import async_to_sync
+from celery.signals import task_postrun, task_prerun
+from channels.layers import get_channel_layer
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import Signal, receiver
 from django.utils import timezone
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from celery.signals import task_postrun, task_prerun
 
-from app.models import ViewUser, ViewHistory, TaskRun
+from app.models import TaskRun, ViewUser
 from app.telegram_bot import TelegramSender
 from shared.constants import DATETIME_FORMAT
 
@@ -81,18 +81,18 @@ def task_run_update(sender, instance, created, **kwargs):
     channel_layer = get_channel_layer()
     if channel_layer:
         created_str = instance.created_at.strftime(DATETIME_FORMAT)
-        
+
         async_to_sync(channel_layer.group_send)(
-            "logs",
+            'logs',
             {
-                "type": "task_update",
-                "id": instance.id,
-                "command": instance.command,
-                "arguments": instance.arguments or '-',
-                "status": instance.status,
-                "status_display": instance.get_status_display(),
-                "created_at": created_str,
-            }
+                'type': 'task_update',
+                'id': instance.id,
+                'command': instance.command,
+                'arguments': instance.arguments or '-',
+                'status': instance.status,
+                'status_display': instance.get_status_display(),
+                'created_at': created_str,
+            },
         )
 
 
@@ -101,25 +101,30 @@ def notify_schedule_update(sender, **kwargs):
     try:
         channel_layer = get_channel_layer()
         if channel_layer:
-            async_to_sync(channel_layer.group_send)(
-                "logs",
-                {"type": "schedule_changed"}
-            )
+            async_to_sync(channel_layer.group_send)('logs', {'type': 'schedule_changed'})
     except Exception as e:
-        logging.warning(f"Failed to send schedule update signal: {e}")
+        logging.warning(f'Failed to send schedule update signal: {e}')
 
 
 @receiver(task_prerun)
 def record_task_start(sender, **kwargs):
     try:
-        if hasattr(sender, 'name') and sender.name:
-            cache.set(f'last_run_{sender.name}', timezone.now(), timeout=None)
-            
+        # Пытаемся получить имя задачи (с учетом разных способов вызова)
+        task_name = getattr(sender, 'name', None)
+        if not task_name and hasattr(sender, 'request'):
+            task_name = sender.request.task
+
+        if task_name:
+            # Используем общий кэш Redis
+            cache.set(f'last_run_{task_name}', timezone.now(), timeout=None)
+
+            # Логируем для отладки
+            logging.info(f'Signal: Task {task_name} started. Sending WS update.')
+
             channel_layer = get_channel_layer()
             if channel_layer:
-                async_to_sync(channel_layer.group_send)(
-                    "logs",
-                    {"type": "schedule_changed"}
-                )
-    except Exception:
-        pass
+                async_to_sync(channel_layer.group_send)('logs', {'type': 'schedule_changed'})
+            print('СРАБОТАНО!', task_name)
+    except Exception as e:
+        # Логируем ошибку, чтобы она была видна в docker logs kinopub-parser-celery
+        logging.error(f'Error in task_prerun signal: {e}')

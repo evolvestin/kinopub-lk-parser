@@ -16,6 +16,7 @@ from app.models import (
     Person,
     Show,
     ShowDuration,
+    TelegramLog,
     UserRating,
     ViewHistory,
     ViewUser,
@@ -648,3 +649,43 @@ class PersonAdmin(BaseNameAdmin):
         return _get_related_items_html(
             Country, Q(show__actors=obj) | Q(show__directors=obj), 'admin:app_country_change'
         )
+
+
+@admin.register(TelegramLog, site=admin_site)
+class TelegramLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'direction',
+        'chat_id',
+        'message_id',
+        'short_text',
+        'created_at',
+    )
+    list_filter = ('direction', 'created_at')
+    search_fields = ('chat_id', 'message_id', 'text', 'raw_data')
+    readonly_fields = (
+        'direction',
+        'chat_id',
+        'message_id',
+        'text',
+        'formatted_raw_data',
+        'created_at',
+        'updated_at',
+    )
+
+    @admin.display(description='Text')
+    def short_text(self, obj):
+        if obj.text and len(obj.text) > 50:
+            return obj.text[:50] + '...'
+        return obj.text
+
+    @admin.display(description='Raw Data (JSON)')
+    def formatted_raw_data(self, obj):
+        import json
+
+        return format_html('<pre>{}</pre>', json.dumps(obj.raw_data, indent=2, ensure_ascii=False))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

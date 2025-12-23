@@ -1,6 +1,5 @@
 import json
 from argparse import _StoreFalseAction, _StoreTrueAction
-from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import admin, messages
@@ -8,14 +7,12 @@ from django.core.management import get_commands, load_command_class
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import path, reverse
-from django.utils import timezone
 
-from app.dashboard import dashboard_callback
-from app.models import LogEntry, TaskRun
+from app.dashboard import dashboard_callback, get_scheduled_tasks_info  # Обновленный импорт
+from app.models import TaskRun
 from app.tasks import run_admin_command
 from kinopub_parser import celery_app
 from shared.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING
-from django.core.cache import cache
 
 
 class CustomAdminSite(admin.AdminSite):
@@ -208,58 +205,8 @@ class CustomAdminSite(admin.AdminSite):
                 messages.success(request, f'Команда {command_name} поставлена в очередь.')
                 return redirect('admin:task_control')
 
-        scheduled_tasks = []
-        now = timezone.now()
-        if hasattr(settings, 'CELERY_BEAT_SCHEDULE'):
-            for name, config in settings.CELERY_BEAT_SCHEDULE.items():
-                schedule_obj = config.get('schedule')
-                task_path = config.get('task')
-                next_run_dt = now
-                
-                try:
-                    last_run_time = cache.get(f'last_run_{task_path}') if task_path else None
-
-                    if isinstance(schedule_obj, (int, float, timedelta)):
-                        if isinstance(schedule_obj, timedelta):
-                            interval = schedule_obj.total_seconds()
-                        else:
-                            interval = float(schedule_obj)
-                            
-                        if last_run_time:
-                            next_run_dt = last_run_time + timedelta(seconds=interval)
-                            
-                            while next_run_dt <= now:
-                                next_run_dt += timedelta(seconds=interval)
-                        else:
-                            next_run_dt = now + timedelta(seconds=interval - (now.timestamp() % interval))
-
-                        if next_run_dt.replace(microsecond=0) <= now:
-                            next_run_dt += timedelta(seconds=interval)
-
-                    elif hasattr(schedule_obj, 'is_due'):
-                        is_due, next_seconds = schedule_obj.is_due(now)
-                        next_run_dt = now + timedelta(seconds=next_seconds)
-
-                    next_run_dt = (next_run_dt + timedelta(microseconds=500000)).replace(microsecond=0)
-
-                except Exception:
-                    pass
-
-                seconds_left = (next_run_dt - now).total_seconds()
-                
-                scheduled_tasks.append(
-                    {
-                        'name': name,
-                        'next_run_dt': next_run_dt,
-                        'seconds_left': seconds_left,
-                        'next_run_display': next_run_dt.strftime(DATETIME_FORMAT),
-                    }
-                )
-
-        def get_seconds_left(task):
-            return task['seconds_left']
-
-        scheduled_tasks.sort(key=get_seconds_left)
+        # Используем общую функцию для получения расписания
+        scheduled_tasks = get_scheduled_tasks_info()
 
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             recent_tasks = TaskRun.objects.all()[:10]
@@ -298,6 +245,7 @@ class CustomAdminSite(admin.AdminSite):
                 'recent_tasks': recent_tasks,
                 'scheduled_tasks': scheduled_tasks,
                 'title': 'Управление задачами',
+                'websocket_url': settings.WEBSOCKET_URL,
             }
         )
         return render(request, 'admin/task_control.html', context)

@@ -7,7 +7,10 @@ from aiogram.enums import ChatType
 from aiogram.filters import CommandStart
 from api_server import start_api_server
 from handlers import callbacks, commands, member
-from middlewares import UserSyncMiddleware  # Импорт мидлвари
+from middlewares import (
+    LoggingMiddleware,
+    UserSyncMiddleware,  # Импорт мидлвари
+)
 from services.bot_instance import BotInstance
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -102,11 +105,11 @@ async def main():
 
     # Register handlers
     dispatcher = Dispatcher()
+    dispatcher.update.outer_middleware(LoggingMiddleware())
     router = register_router()
     dispatcher.include_router(router)
 
     logging.info('Starting Telegram Bot...')
-    await bot.delete_webhook(drop_pending_updates=True)
 
     # Запускаем API сервер и поллинг параллельно
     await start_api_server(bot)
