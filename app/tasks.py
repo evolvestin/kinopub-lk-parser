@@ -7,7 +7,9 @@ import time
 from contextlib import contextmanager
 from datetime import timedelta
 
+from asgiref.sync import async_to_sync
 from celery import shared_task
+from channels.layers import get_channel_layer
 from django.conf import settings
 from django.core.management import call_command
 from django.utils import timezone
@@ -43,7 +45,6 @@ def expire_codes_task():
     try:
         expiration_threshold = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
 
-        # Получаем все устаревшие коды, которые еще не обработаны
         expired_codes = list(
             Code.objects.filter(received_at__lt=expiration_threshold).exclude(
                 telegram_message_id=-1
@@ -53,16 +54,13 @@ def expire_codes_task():
         if expired_codes:
             logging.info('Found %d expired codes to mark in Telegram.', len(expired_codes))
 
-            # Собираем список telegram_message_id для редактирования
             telegram_ids = [c.telegram_message_id for c in expired_codes]
-            # Редактируем сообщения в Telegram
             sender = TelegramSender()
             for telegram_id in telegram_ids:
                 sender.edit_message_to_expired(telegram_id)
 
             Code.objects.filter(id__in=[c.id for c in expired_codes]).update(telegram_message_id=-1)
 
-            # Планируем бэкап
             BackupManager().schedule_backup()
 
     except Exception as e:

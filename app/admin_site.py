@@ -15,6 +15,7 @@ from app.models import LogEntry, TaskRun
 from app.tasks import run_admin_command
 from kinopub_parser import celery_app
 from shared.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING
+from django.core.cache import cache
 
 
 class CustomAdminSite(admin.AdminSite):
@@ -212,30 +213,55 @@ class CustomAdminSite(admin.AdminSite):
         if hasattr(settings, 'CELERY_BEAT_SCHEDULE'):
             for name, config in settings.CELERY_BEAT_SCHEDULE.items():
                 schedule_obj = config.get('schedule')
+                task_path = config.get('task')
                 next_run_dt = now
+                
                 try:
-                    if isinstance(schedule_obj, (int, float)):
-                        interval = float(schedule_obj)
-                        next_run_dt = now + timedelta(
-                            seconds=interval - (now.timestamp() % interval)
-                        )
-                    elif isinstance(schedule_obj, timedelta):
-                        interval = schedule_obj.total_seconds()
-                        next_run_dt = now + timedelta(
-                            seconds=interval - (now.timestamp() % interval)
-                        )
+                    # 1. Пытаемся получить время РЕАЛЬНОГО последнего запуска из кэша
+                    last_run_time = cache.get(f'last_run_{task_path}') if task_path else None
+
+                    # 2. Логика для интервалов (число или timedelta)
+                    if isinstance(schedule_obj, (int, float, timedelta)):
+                        # Приводим к секундам
+                        if isinstance(schedule_obj, timedelta):
+                            interval = schedule_obj.total_seconds()
+                        else:
+                            interval = float(schedule_obj)
+                            
+                        if last_run_time:
+                            # Самый точный расчет: Время последнего старта + интервал
+                            next_run_dt = last_run_time + timedelta(seconds=interval)
+                            
+                            # Если сервер был выключен или очередь стояла и время уже прошло,
+                            # "шагаем" интервалами до ближайшего будущего времени
+                            while next_run_dt <= now:
+                                next_run_dt += timedelta(seconds=interval)
+                        else:
+                            # Если запуска еще не было, используем выравнивание по сетке (как раньше)
+                            next_run_dt = now + timedelta(seconds=interval - (now.timestamp() % interval))
+
+                        # Гарантируем, что после округления микросекунд время будет в будущем.
+                        # Иначе seconds_left <= 0 приведет к вечному "Запущено" на фронтенде до следующего обновления.
+                        if next_run_dt.replace(microsecond=0) <= now:
+                            next_run_dt += timedelta(seconds=interval)
+
+                    # 3. Логика для crontab (остается стандартной, т.к. она абсолютная)
                     elif hasattr(schedule_obj, 'is_due'):
                         is_due, next_seconds = schedule_obj.is_due(now)
                         next_run_dt = now + timedelta(seconds=next_seconds)
 
-                    if next_run_dt.microsecond >= 500000:
-                        next_run_dt += timedelta(seconds=1)
-                    next_run_dt = next_run_dt.replace(microsecond=0)
+                    # Убираем микросекунды для красоты отображения (с округлением, чтобы 23:59:59.999 превращалось в 00:00:00)
+                    next_run_dt = (next_run_dt + timedelta(microseconds=500000)).replace(microsecond=0)
 
                 except Exception:
                     pass
 
                 seconds_left = (next_run_dt - now).total_seconds()
+                
+                # Логируем расчеты для отладки
+                if seconds_left <= 0:
+                     print(f"[DEBUG] Task {name}: Now={now}, Next={next_run_dt}, Left={seconds_left}")
+
                 scheduled_tasks.append(
                     {
                         'name': name,
@@ -252,18 +278,8 @@ class CustomAdminSite(admin.AdminSite):
 
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             recent_tasks = TaskRun.objects.all()[:10]
-            logs_qs = LogEntry.objects.all()[:30]
-            logs_data = [
-                {
-                    'created_at': entry.created_at.strftime('%H:%M:%S'),
-                    'level': entry.level,
-                    'module': entry.module,
-                    'message': entry.message,
-                }
-                for entry in logs_qs
-            ]
-            logs_data.reverse()
-
+            # Логи больше не передаем в json polling ответе, чтобы не дублировать трафик
+            
             return JsonResponse(
                 {
                     'schedule': [
@@ -285,7 +301,7 @@ class CustomAdminSite(admin.AdminSite):
                         }
                         for t in recent_tasks
                     ],
-                    'logs': logs_data,
+                    # 'logs': [] — поле можно убрать или оставить пустым
                 }
             )
 

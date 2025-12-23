@@ -27,11 +27,11 @@ services:
         python manage.py migrate --noinput &&
         python manage.py createsuperuserifneeded &&
         if [ \"$DJANGO_DEBUG\" = \"true\" ] || [ \"$DJANGO_DEBUG\" = \"True\" ]; then
-          echo \"Starting Django Development Server...\" &&
+          echo \"Starting Django Development Server (ASGI)...\" &&
           python manage.py runserver 0.0.0.0:8000;
         else
-          echo \"Starting Gunicorn...\" &&
-          gunicorn kinopub_parser.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60;
+          echo \"Starting Gunicorn (WSGI)...\" &&
+          gunicorn kinopub_parser.wsgi:application --bind 0.0.0.0:8000 --workers 3 --threads 2;
         fi
       "
     healthcheck:
@@ -44,6 +44,29 @@ services:
         condition: service_completed_successfully
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - kinopub-net
+
+  asgi:
+    build: .
+    container_name: kinopub-parser-asgi
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8013:8001"
+    volumes:
+      - .:/app:delegated
+    command: daphne -b 0.0.0.0 -p 8001 kinopub_parser.asgi:application
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      web:
+        condition: service_started
       redis:
         condition: service_started
     networks:

@@ -167,10 +167,114 @@
         const descEl = document.getElementById('cmdDescription');
         const argsContainer = document.getElementById('dynamicArgsContainer');
         const submitBtn = document.getElementById('submitBtn');
-        let isFirstLogLoad = true; 
-
-        // Получаем CSRF токен один раз из существующей формы на странице
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const logsContainer = document.getElementById('logsContainer');
+
+        // WebSocket Setup
+        let socket = null;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            socket = new WebSocket(protocol + '//' + window.location.hostname + ':8013/ws/logs/');
+
+            socket.onopen = function(e) {
+                console.log("[WebSocket] Connection established");
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'log_message') {
+                    appendLog(data);
+                } else if (data.type === 'task_update') {
+                    updateTaskRow(data);
+                } else if (data.type === 'schedule_changed') {
+                    // При получении сигнала от сервера обновляем таблицу расписания
+                    fetchInitialData();
+                }
+            };
+
+            socket.onclose = function(event) {
+                console.log(`[WebSocket] Connection closed, reconnecting... (Code: ${event.code})`);
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function appendLog(log) {
+            // Удаляем заглушку "Ожидание логов" если она есть
+            if (logsContainer.children.length === 1 && logsContainer.children[0].textContent.includes('Ожидание')) {
+                logsContainer.innerHTML = '';
+            }
+
+            const div = document.createElement('div');
+            div.className = "flex space-x-2 hover:bg-gray-900 p-0.5 rounded animate-fade-in";
+            div.innerHTML = `
+                <span class="text-gray-500 flex-shrink-0">[${log.created_at}]</span>
+                <span class="${getLogLevelColor(log.level)} font-bold w-16 flex-shrink-0">${log.level}</span>
+                <span class="break-words text-gray-300">[${log.module}] ${log.message}</span>
+            `;
+            
+            logsContainer.appendChild(div);
+            
+            // Автоскролл
+            if (logsContainer.scrollHeight - logsContainer.scrollTop - logsContainer.clientHeight < 100) {
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+            
+            // Лимит логов в DOM
+            if (logsContainer.children.length > 200) {
+                logsContainer.removeChild(logsContainer.firstChild);
+            }
+        }
+
+        // Обновление или добавление строки задачи при получении события по сокету
+        function updateTaskRow(task) {
+            const tasksBody = document.getElementById('tasksTableBody');
+            
+            // Удаляем заглушку "История пуста", если она есть
+            const emptyRow = tasksBody.querySelector('td[colspan="4"]');
+            if (emptyRow) tasksBody.innerHTML = '';
+
+            let row = document.getElementById(`task-row-${task.id}`);
+            const rowHTML = `
+                <td class="px-4 py-2 whitespace-nowrap text-xs">${task.created_at}</td>
+                <td class="px-4 py-2 text-white font-medium">${task.command}</td>
+                <td class="px-4 py-2 text-xs break-all">${task.arguments}</td>
+                <td class="px-4 py-2 text-right flex justify-end items-center space-x-2">
+                    ${getStatusBadge(task.status, task.status_display)}
+                    ${getActionButton(task)}
+                </td>
+            `;
+
+            if (row) {
+                // Обновляем существующую строку
+                row.innerHTML = rowHTML;
+            } else {
+                // Вставляем новую строку в начало
+                row = document.createElement('tr');
+                row.id = `task-row-${task.id}`;
+                row.className = "border-b border-gray-700 hover:bg-gray-700 animate-pulse-once";
+                row.innerHTML = rowHTML;
+                tasksBody.prepend(row);
+                
+                // Оставляем только 10 последних
+                if (tasksBody.children.length > 10) {
+                    tasksBody.lastElementChild.remove();
+                }
+            }
+        }
+
+        function getActionButton(task) {
+            if (task.status === 'RUNNING') {
+                return `
+                    <form method="post" action="" class="inline ml-2">
+                        <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
+                        <input type="hidden" name="stop_task_id" value="${task.id}">
+                        <button type="submit" class="bg-red-700 hover:bg-red-600 text-white text-xs px-2 py-0.5 rounded" title="Безопасно остановить">Stop</button>
+                    </form>
+                `;
+            }
+            return '';
+        }
 
         function renderArguments(cmdName) {
             argsContainer.innerHTML = '';
@@ -199,11 +303,7 @@
                 label.className = "block text-sm font-medium text-gray-400 mb-1";
                 
                 let labelText = arg.name;
-                if (!arg.is_positional) {
-                    labelText = `${arg.name} (опционально)`;
-                } else {
-                    labelText += " (обязательно)";
-                }
+                labelText += !arg.is_positional ? " (опционально)" : " (обязательно)";
                 
                 if (arg.help) {
                     labelText += ` - <span class="text-gray-500 text-xs font-normal">${arg.help}</span>`;
@@ -215,7 +315,6 @@
                 }
 
                 let input;
-
                 if (arg.type === 'checkbox') {
                     input = document.createElement('input');
                     input.type = 'checkbox';
@@ -227,7 +326,6 @@
                     wrapper.innerHTML = '';
                     wrapper.appendChild(label);
                     label.prepend(input);
-                
                 } else if (arg.type === 'select') {
                     input = document.createElement('select');
                     input.name = `arg_${arg.dest}`;
@@ -248,26 +346,16 @@
                         });
                     }
                     wrapper.appendChild(input);
-
-                } else if (arg.type === 'number') {
-                    input = document.createElement('input');
-                    input.name = `arg_${arg.dest}`;
-                    input.className = "bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full";
-                    input.type = 'number';
-                    if(arg.default !== '') input.value = arg.default;
-                    wrapper.appendChild(input);
-
                 } else {
                     input = document.createElement('input');
                     input.name = `arg_${arg.dest}`;
                     input.className = "bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-blue-500 w-full";
-                    input.type = 'text';
+                    input.type = arg.type === 'number' ? 'number' : 'text';
                     if(arg.default !== '') input.value = arg.default;
                     wrapper.appendChild(input);
                 }
 
                 if(arg.required && arg.type !== 'checkbox') input.required = true;
-
                 argsContainer.appendChild(wrapper);
             });
         }
@@ -278,8 +366,13 @@
         }
 
         function formatDuration(seconds) {
-            seconds = Math.floor(seconds);
-            if (seconds <= 0) return "Запущено";
+            // Возвращаем условие <= 0, чтобы надпись не появлялась слишком рано (на 0.9 сек).
+            if (seconds < 0) return "Запущено";
+            
+            // Используем Math.ceil (округление вверх), чтобы 0.5 сек отображалось как "00:00:01",
+            // а не "00:00:00". Это обеспечит переход: 2 -> 1 -> Запущено.
+            seconds = Math.ceil(seconds);
+            
             const days = Math.floor(seconds / 86400);
             seconds %= 86400;
             const hours = Math.floor(seconds / 3600);
@@ -305,87 +398,88 @@
             return map[level] || 'text-gray-400';
         }
 
-        async function fetchData() {
+        // Локальный таймер для обновления секунд без запросов к серверу
+        function updateTimers() {
+            const timerElements = document.querySelectorAll('.schedule-timer');
+            timerElements.forEach(el => {
+                let seconds = parseFloat(el.getAttribute('data-seconds'));
+                if (!isNaN(seconds)) {
+                    seconds -= 0.25;
+                    el.setAttribute('data-seconds', seconds);
+                    
+                    const textEl = document.getElementById(`timer-text-${el.dataset.id}`);
+                    if (textEl) {
+                        textEl.textContent = formatDuration(seconds);
+                        if (seconds < 0) {
+                            textEl.className = "text-green-500 font-bold";
+                        } else {
+                            textEl.className = "text-yellow-500";
+                        }
+                    }
+                }
+            });
+        }
+
+        async function fetchInitialData() {
             try {
-                const response = await fetch(window.location.href, {
+                // Добавляем timestamp в URL для гарантированного обхода кэша
+                const url = new URL(window.location.href);
+                url.searchParams.set('_ts', new Date().getTime());
+                
+                console.log("[JS] Fetching schedule from:", url.toString());
+
+                const response = await fetch(url.toString(), {
                     headers: {'X-Requested-With': 'XMLHttpRequest'}
                 });
-                if (!response.ok) return;
+                
+                if (!response.ok) {
+                    console.error("[JS] Fetch failed:", response.status);
+                    return;
+                }
+                
                 const data = await response.json();
+                console.log("[JS] Received schedule data:", data.schedule);
 
                 const schedBody = document.getElementById('scheduleTableBody');
                 if (data.schedule.length === 0) {
                     schedBody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-center">Нет запланированных задач</td></tr>`;
                 } else {
-                    schedBody.innerHTML = data.schedule.map(task => `
+                    schedBody.innerHTML = data.schedule.map((task, index) => `
                         <tr class="border-b border-gray-700 hover:bg-gray-750 transition-colors">
                             <td class="px-4 py-2 font-medium text-white">${task.name}</td>
                             <td class="px-4 py-2 font-mono text-gray-400 text-xs">${task.next_run_display}</td>
-                            <td class="px-4 py-2 text-right font-mono ${task.seconds_left <= 0 ? 'text-green-500' : 'text-yellow-500'}">
-                                ${formatDuration(task.seconds_left)}
+                            <td class="px-4 py-2 text-right font-mono schedule-timer" data-id="${index}" data-seconds="${task.seconds_left}">
+                                <span id="timer-text-${index}" class="${task.seconds_left <= 0 ? 'text-green-500' : 'text-yellow-500'}">
+                                    ${formatDuration(task.seconds_left)}
+                                </span>
                             </td>
                         </tr>
                     `).join('');
                 }
 
+                // Рендер таблицы истории
                 const tasksBody = document.getElementById('tasksTableBody');
                 if (data.history.length === 0) {
                     tasksBody.innerHTML = `<tr><td colspan="4" class="px-4 py-2 text-center">История пуста</td></tr>`;
                 } else {
-                    tasksBody.innerHTML = data.history.map(run => {
-                        let actionBtn = '';
-                        if (run.status === 'RUNNING') {
-                            actionBtn = `
-                                <form method="post" action="" class="inline ml-2">
-                                    <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
-                                    <input type="hidden" name="stop_task_id" value="${run.id}">
-                                    <button type="submit" class="bg-red-700 hover:bg-red-600 text-white text-xs px-2 py-0.5 rounded" title="Безопасно остановить">Stop</button>
-                                </form>
-                            `;
-                        }
-
-                        return `
-                        <tr class="border-b border-gray-700 hover:bg-gray-700">
-                            <td class="px-4 py-2 whitespace-nowrap text-xs">${run.created_at}</td>
-                            <td class="px-4 py-2 text-white font-medium">${run.command}</td>
-                            <td class="px-4 py-2 text-xs break-all">${run.arguments}</td>
-                            <td class="px-4 py-2 text-right flex justify-end items-center space-x-2">
-                                ${getStatusBadge(run.status, run.status_display)}
-                                ${actionBtn}
-                            </td>
-                        </tr>
-                    `}).join('');
-                }
-
-                const logsContainer = document.getElementById('logsContainer');
-                const isScrolledToBottom = logsContainer.scrollHeight - logsContainer.scrollTop - logsContainer.clientHeight < 50;
-                
-                if (data.logs.length === 0) {
-                    logsContainer.innerHTML = `<div class="text-gray-600 italic">Логов нет</div>`;
-                } else {
-                    logsContainer.innerHTML = data.logs.map(log => `
-                        <div class="flex space-x-2 hover:bg-gray-900 p-0.5 rounded">
-                            <span class="text-gray-500 flex-shrink-0">[${log.created_at}]</span>
-                            <span class="${getLogLevelColor(log.level)} font-bold w-16 flex-shrink-0">${log.level}</span>
-                            <span class="break-words text-gray-300">[${log.module}] ${log.message}</span>
-                        </div>
-                    `).join('');
-                    
-                    if (isFirstLogLoad || isScrolledToBottom) {
-                        setTimeout(() => {
-                            logsContainer.scrollTop = logsContainer.scrollHeight;
-                        }, 0);
-                        isFirstLogLoad = false;
-                    }
+                    // Используем функцию updateTaskRow для отрисовки (для единообразия), 
+                    // но здесь просто вставляем HTML
+                    tasksBody.innerHTML = ''; 
+                    // data.history приходит отсортированным (свежие сверху), добавляем их
+                    // Чтобы использовать updateTaskRow корректно (он делает prepend), идем с конца
+                    [...data.history].reverse().forEach(task => updateTaskRow(task));
                 }
             } catch (e) { 
-                console.error("Update failed", e); 
-            } finally {
-                setTimeout(fetchData, 1000);
+                console.error("Initial data load failed", e); 
             }
         }
 
-        fetchData();
+        // Init
+        fetchInitialData();
+        connectWebSocket();
+        
+        // Запускаем локальный таймер каждую секунду
+        setInterval(updateTimers, 250);
     </script>
 </body>
 </html>

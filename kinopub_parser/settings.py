@@ -42,6 +42,7 @@ FORMAT_MODULE_PATH = ['kinopub_parser.formats']
 LANGUAGE_CODE = 'en'
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'app',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -121,6 +123,17 @@ STATICFILES_DIRS = []
 static_src = BASE_DIR / 'kinopub_parser' / 'static'
 if static_src.exists():
     STATICFILES_DIRS.append(static_src)
+
+ASGI_APPLICATION = 'kinopub_parser.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('redis', 6379)],
+        },
+    },
+}
 
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
