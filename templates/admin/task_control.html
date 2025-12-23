@@ -159,10 +159,8 @@
     </main>
 
     <script>
-        // Data from backend
         const commandsData = {{ commands_json|safe }};
 
-        // UI References
         const select = document.getElementById('commandSelect');
         const descEl = document.getElementById('cmdDescription');
         const argsContainer = document.getElementById('dynamicArgsContainer');
@@ -170,7 +168,6 @@
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         const logsContainer = document.getElementById('logsContainer');
 
-        // WebSocket Setup
         let socket = null;
 
         function connectWebSocket() {
@@ -178,7 +175,6 @@
             socket = new WebSocket(protocol + '//' + window.location.hostname + ':8013/ws/logs/');
 
             socket.onopen = function(e) {
-                console.log("[WebSocket] Connection established");
             };
 
             socket.onmessage = function(event) {
@@ -188,19 +184,16 @@
                 } else if (data.type === 'task_update') {
                     updateTaskRow(data);
                 } else if (data.type === 'schedule_changed') {
-                    // При получении сигнала от сервера обновляем таблицу расписания
                     fetchInitialData();
                 }
             };
 
             socket.onclose = function(event) {
-                console.log(`[WebSocket] Connection closed, reconnecting... (Code: ${event.code})`);
                 setTimeout(connectWebSocket, 3000);
             };
         }
 
         function appendLog(log) {
-            // Удаляем заглушку "Ожидание логов" если она есть
             if (logsContainer.children.length === 1 && logsContainer.children[0].textContent.includes('Ожидание')) {
                 logsContainer.innerHTML = '';
             }
@@ -215,22 +208,18 @@
             
             logsContainer.appendChild(div);
             
-            // Автоскролл
             if (logsContainer.scrollHeight - logsContainer.scrollTop - logsContainer.clientHeight < 100) {
                 logsContainer.scrollTop = logsContainer.scrollHeight;
             }
             
-            // Лимит логов в DOM
             if (logsContainer.children.length > 200) {
                 logsContainer.removeChild(logsContainer.firstChild);
             }
         }
 
-        // Обновление или добавление строки задачи при получении события по сокету
         function updateTaskRow(task) {
             const tasksBody = document.getElementById('tasksTableBody');
             
-            // Удаляем заглушку "История пуста", если она есть
             const emptyRow = tasksBody.querySelector('td[colspan="4"]');
             if (emptyRow) tasksBody.innerHTML = '';
 
@@ -246,17 +235,14 @@
             `;
 
             if (row) {
-                // Обновляем существующую строку
                 row.innerHTML = rowHTML;
             } else {
-                // Вставляем новую строку в начало
                 row = document.createElement('tr');
                 row.id = `task-row-${task.id}`;
                 row.className = "border-b border-gray-700 hover:bg-gray-700 animate-pulse-once";
                 row.innerHTML = rowHTML;
                 tasksBody.prepend(row);
                 
-                // Оставляем только 10 последних
                 if (tasksBody.children.length > 10) {
                     tasksBody.lastElementChild.remove();
                 }
@@ -366,11 +352,8 @@
         }
 
         function formatDuration(seconds) {
-            // Возвращаем условие <= 0, чтобы надпись не появлялась слишком рано (на 0.9 сек).
             if (seconds < 0) return "Запущено";
             
-            // Используем Math.ceil (округление вверх), чтобы 0.5 сек отображалось как "00:00:01",
-            // а не "00:00:00". Это обеспечит переход: 2 -> 1 -> Запущено.
             seconds = Math.ceil(seconds);
             
             const days = Math.floor(seconds / 86400);
@@ -398,7 +381,6 @@
             return map[level] || 'text-gray-400';
         }
 
-        // Локальный таймер для обновления секунд без запросов к серверу
         function updateTimers() {
             const timerElements = document.querySelectorAll('.schedule-timer');
             timerElements.forEach(el => {
@@ -422,23 +404,18 @@
 
         async function fetchInitialData() {
             try {
-                // Добавляем timestamp в URL для гарантированного обхода кэша
                 const url = new URL(window.location.href);
                 url.searchParams.set('_ts', new Date().getTime());
                 
-                console.log("[JS] Fetching schedule from:", url.toString());
-
                 const response = await fetch(url.toString(), {
                     headers: {'X-Requested-With': 'XMLHttpRequest'}
                 });
                 
                 if (!response.ok) {
-                    console.error("[JS] Fetch failed:", response.status);
                     return;
                 }
                 
                 const data = await response.json();
-                console.log("[JS] Received schedule data:", data.schedule);
 
                 const schedBody = document.getElementById('scheduleTableBody');
                 if (data.schedule.length === 0) {
@@ -457,28 +434,20 @@
                     `).join('');
                 }
 
-                // Рендер таблицы истории
                 const tasksBody = document.getElementById('tasksTableBody');
                 if (data.history.length === 0) {
                     tasksBody.innerHTML = `<tr><td colspan="4" class="px-4 py-2 text-center">История пуста</td></tr>`;
                 } else {
-                    // Используем функцию updateTaskRow для отрисовки (для единообразия), 
-                    // но здесь просто вставляем HTML
                     tasksBody.innerHTML = ''; 
-                    // data.history приходит отсортированным (свежие сверху), добавляем их
-                    // Чтобы использовать updateTaskRow корректно (он делает prepend), идем с конца
                     [...data.history].reverse().forEach(task => updateTaskRow(task));
                 }
             } catch (e) { 
-                console.error("Initial data load failed", e); 
             }
         }
 
-        // Init
         fetchInitialData();
         connectWebSocket();
         
-        // Запускаем локальный таймер каждую секунду
         setInterval(updateTimers, 250);
     </script>
 </body>
