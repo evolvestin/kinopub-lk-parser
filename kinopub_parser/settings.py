@@ -148,7 +148,7 @@ if DEBUG:
     WEBSOCKET_PORT = 8013
 else:
     WEBSOCKET_URL = '/ws/logs/'
-    WEBSOCKET_PORT = 8013
+    WEBSOCKET_PORT = ''
 
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'

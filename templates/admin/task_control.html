@@ -215,9 +215,10 @@
 
             if (wsUrl.startsWith('/')) {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                // Если порт задан в настройках, используем его (для разделения WSGI/ASGI портов)
+                // Если порт не задан (пустая строка), используем текущий порт страницы или стандартный
                 const port = wsPort ? wsPort : window.location.port;
-                wsUrl = protocol + '//' + window.location.hostname + ':' + port + wsUrl;
+                const portPart = port ? ':' + port : '';
+                wsUrl = protocol + '//' + window.location.hostname + portPart + wsUrl;
             }
 
             socket = new WebSocket(wsUrl);
@@ -231,7 +232,6 @@
                 } else if (data.type === 'task_update') {
                     updateTaskRow(data);
                 } else if (data.type === 'schedule_data_update') {
-                    // Прямой рендеринг данных из сокета без запроса к API
                     renderDashboard(data);
                 }
             };

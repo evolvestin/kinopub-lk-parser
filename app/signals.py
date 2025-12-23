@@ -115,16 +115,10 @@ def record_task_start(sender, **kwargs):
             task_name = sender.request.task
 
         if task_name:
-            # Используем общий кэш Redis
             cache.set(f'last_run_{task_name}', timezone.now(), timeout=None)
-
-            # Логируем для отладки
-            logging.info(f'Signal: Task {task_name} started. Sending WS update.')
-
             channel_layer = get_channel_layer()
             if channel_layer:
                 async_to_sync(channel_layer.group_send)('logs', {'type': 'schedule_changed'})
-            print('СРАБОТАНО!', task_name)
     except Exception as e:
         # Логируем ошибку, чтобы она была видна в docker logs kinopub-parser-celery
         logging.error(f'Error in task_prerun signal: {e}')

@@ -22,10 +22,9 @@ class DatabaseLogHandler(logging.Handler):
             now = timezone.now()
             msg = record.getMessage()
 
-            # Сохранение в БД
             self.log_entry_model.objects.create(
-                level=record.levelname,
-                module=record.module,
+                level=record.levelname[:10],
+                module=record.module[:100],
                 message=msg,
                 created_at=now,
                 updated_at=now,
