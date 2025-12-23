@@ -246,6 +246,7 @@ class CustomAdminSite(admin.AdminSite):
                 'scheduled_tasks': scheduled_tasks,
                 'title': 'Управление задачами',
                 'websocket_url': settings.WEBSOCKET_URL,
+                'websocket_port': settings.WEBSOCKET_PORT,
             }
         )
         return render(request, 'admin/task_control.html', context)

@@ -211,10 +211,13 @@
 
         function connectWebSocket() {
             let wsUrl = "{{ websocket_url }}";
+            const wsPort = "{{ websocket_port }}";
 
             if (wsUrl.startsWith('/')) {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                wsUrl = protocol + '//' + window.location.host + wsUrl;
+                // Если порт задан в настройках, используем его (для разделения WSGI/ASGI портов)
+                const port = wsPort ? wsPort : window.location.port;
+                wsUrl = protocol + '//' + window.location.hostname + ':' + port + wsUrl;
             }
 
             socket = new WebSocket(wsUrl);

@@ -145,9 +145,10 @@ CACHES = {
 
 if DEBUG:
     WEBSOCKET_URL = 'ws://127.0.0.1:8013/ws/logs/'
+    WEBSOCKET_PORT = 8013
 else:
-    # Для продакшена - относительный путь
     WEBSOCKET_URL = '/ws/logs/'
+    WEBSOCKET_PORT = 8013
 
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
