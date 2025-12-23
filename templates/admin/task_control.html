@@ -295,7 +295,7 @@
             if (status === 'RUNNING') colorClass = "bg-blue-900 text-blue-200 animate-pulse";
             else if (status === 'SUCCESS') colorClass = "bg-green-900 text-green-200";
             else if (status === 'FAILURE') colorClass = "bg-red-900 text-red-200";
-            else if (status === 'STOPPED') colorClass = "bg-orange-900 text-orange-200"; // Added color for STOPPED
+            else if (status === 'STOPPED') colorClass = "bg-orange-900 text-orange-200"; 
             else if (status === 'QUEUED') colorClass = "bg-yellow-900 text-yellow-200";
             return `<span class="px-2 py-0.5 rounded text-xs ${colorClass}">${display}</span>`;
         }
@@ -313,7 +313,6 @@
                 if (!response.ok) return;
                 const data = await response.json();
 
-                // Обновление расписания
                 const schedBody = document.getElementById('scheduleTableBody');
                 if (data.schedule.length === 0) {
                     schedBody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-center">Нет запланированных задач</td></tr>`;
@@ -329,14 +328,12 @@
                     `).join('');
                 }
 
-                // Обновление истории
                 const tasksBody = document.getElementById('tasksTableBody');
                 if (data.history.length === 0) {
                     tasksBody.innerHTML = `<tr><td colspan="4" class="px-4 py-2 text-center">История пуста</td></tr>`;
                 } else {
                     tasksBody.innerHTML = data.history.map(run => {
                         let actionBtn = '';
-                        // Используем JS переменную csrfToken вместо шаблонного тега внутри строки
                         if (run.status === 'RUNNING') {
                             actionBtn = `
                                 <form method="post" action="" class="inline ml-2">
@@ -360,7 +357,6 @@
                     `}).join('');
                 }
 
-                // Обновление логов
                 const logsContainer = document.getElementById('logsContainer');
                 const isScrolledToBottom = logsContainer.scrollHeight - logsContainer.scrollTop - logsContainer.clientHeight < 50;
                 
@@ -382,10 +378,13 @@
                         isFirstLogLoad = false;
                     }
                 }
-            } catch (e) { console.error("Update failed", e); }
+            } catch (e) { 
+                console.error("Update failed", e); 
+            } finally {
+                setTimeout(fetchData, 1000);
+            }
         }
 
-        setInterval(fetchData, 1000);
         fetchData();
     </script>
 </body>
