@@ -89,6 +89,14 @@ class Command(LoggableBaseCommand):
         for sig in (signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, _handle_signal)
 
+        if settings.DEBUG:
+            logging.info('DEBUG mode detected. Email listener disabled (idling).')
+            _update_heartbeat()
+            while not shutdown_flag.is_set():
+                shutdown_flag.wait(30)
+                _update_heartbeat()
+            return
+
         threading.Thread(target=_watchdog, args=(shutdown_flag,), daemon=True).start()
 
         logging.info('Starting email listener with Watchdog enabled...')

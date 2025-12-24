@@ -306,6 +306,7 @@ class TaskRun(BaseModel):
 
 class TelegramLog(BaseModel):
     raw_data = models.JSONField(default=dict)
+    is_alive = models.BooleanField(default=True, verbose_name='Alive')
 
     class Meta:
         ordering = ['-created_at']

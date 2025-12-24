@@ -9,7 +9,7 @@ from api_server import start_api_server
 from handlers import callbacks, commands, member
 from middlewares import (
     LoggingMiddleware,
-    UserSyncMiddleware,  # Импорт мидлвари
+    UserSyncMiddleware,
 )
 from services.bot_instance import BotInstance
 
@@ -113,7 +113,20 @@ async def main():
 
     # Запускаем API сервер и поллинг параллельно
     await start_api_server(bot)
-    await dispatcher.start_polling(bot)
+
+    # Явно указываем типы обновлений, чтобы получать события редактирования,
+    # даже если для них нет логических хендлеров (необходимо для Middleware логирования).
+    allowed_updates = [
+        'message',
+        'edited_message',
+        'channel_post',
+        'edited_channel_post',
+        'callback_query',
+        'my_chat_member',
+        'chat_member',
+    ]
+
+    await dispatcher.start_polling(bot, allowed_updates=allowed_updates)
 
 
 if __name__ == '__main__':

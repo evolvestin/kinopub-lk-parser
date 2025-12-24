@@ -745,11 +745,10 @@ class TelegramLogAdmin(admin.ModelAdmin):
         'get_chat_id',
         'get_message_id',
         'get_content_info',
-        'get_view_user_link',
-        'get_django_user_link',
+        'is_alive',
         'created_at',
     )
-    list_filter = ('created_at', TelegramLogDirectionFilter, TelegramLogChatIdFilter)
+    list_filter = ('created_at', 'is_alive', TelegramLogDirectionFilter, TelegramLogChatIdFilter)
 
     search_fields = (
         'id',
@@ -767,14 +766,20 @@ class TelegramLogAdmin(admin.ModelAdmin):
     )
 
     fields = (
+        'message_history',
         'formatted_raw_data',
+        'is_alive',
+        'delete_message_button',
         'created_at',
         'updated_at',
     )
     readonly_fields = (
+        'message_history',
         'created_at',
         'updated_at',
         'formatted_raw_data',
+        'is_alive',
+        'delete_message_button',
     )
 
     def get_queryset(self, request):
@@ -800,12 +805,118 @@ class TelegramLogAdmin(admin.ModelAdmin):
             ),
         )
 
+    def _get_raw_ids(self, obj):
+        """Извлекает чистые ID чата и сообщения из raw_data."""
+        data = obj.raw_data
+        chat_id = None
+        message_id = None
+
+        if 'message' in data:
+            chat_id = data['message'].get('chat', {}).get('id')
+            message_id = data['message'].get('message_id')
+        elif 'edited_message' in data:
+            chat_id = data['edited_message'].get('chat', {}).get('id')
+            message_id = data['edited_message'].get('message_id')
+        elif 'callback_query' in data and 'message' in data['callback_query']:
+            chat_id = data['callback_query']['message'].get('chat', {}).get('id')
+            message_id = data['callback_query']['message'].get('message_id')
+        elif 'chat_id' in data and 'message_id' in data:
+            chat_id = data.get('chat_id')
+            message_id = data.get('message_id')
+        # Для исходящих запросов часто chat_id и message_id лежат в корне или payload
+        elif (
+            'chat' in data and 'id' in data['chat']
+        ):  # Структура может отличаться в зависимости от API call
+            chat_id = data['chat']['id']
+            message_id = data.get('message_id')
+
+        return chat_id, message_id
+
+    @admin.display(description='Message History (Thread)')
+    def message_history(self, obj):
+        """Отображает хронологию событий, связанных с этим сообщением."""
+        chat_id, message_id = self._get_raw_ids(obj)
+
+        if not chat_id or not message_id:
+            return 'Could not determine Chat ID or Message ID for grouping.'
+
+        # Ищем все логи, связанные с этой парой chat_id + message_id
+        # Учитываем различные варианты расположения ID в JSON
+        related_logs = TelegramLog.objects.filter(
+            Q(raw_data__message__chat__id=chat_id, raw_data__message__message_id=message_id)
+            | Q(
+                raw_data__edited_message__chat__id=chat_id,
+                raw_data__edited_message__message_id=message_id,
+            )
+            | Q(
+                raw_data__callback_query__message__chat__id=chat_id,
+                raw_data__callback_query__message__message_id=message_id,
+            )
+            | Q(raw_data__chat_id=chat_id, raw_data__message_id=message_id)
+        ).order_by('created_at')
+
+        if not related_logs.exists():
+            return 'No related history found.'
+
+        html = """
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+                <tr style="background-color: #f5f5f5; text-align: left;">
+                    <th style="padding: 8px; border: 1px solid #ddd;">Time</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">Type</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">User</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">Content</th>
+                    <th style="padding: 8px; border: 1px solid #ddd;">Link</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
+
+        for log in related_logs:
+            data = log.raw_data
+            event_type = 'Unknown'
+            if 'message' in data:
+                event_type = 'Message'
+            elif 'edited_message' in data:
+                event_type = 'Edit'
+            elif 'callback_query' in data:
+                event_type = 'Callback'
+            elif 'deleted_business_messages' in data:
+                event_type = 'Delete'
+            elif 'chat_id' in data:
+                event_type = 'Outgoing'  # Предположение для исходящих
+
+            bg_style = 'background-color: #e8f5e9;' if log.id == obj.id else ''
+
+            link = reverse('admin:app_telegramlog_change', args=[log.id])
+            content_info = self.get_content_info(log)
+            username = self.get_username(log)
+
+            html += f"""
+                <tr style="{bg_style}">
+                    <td style="padding: 8px; border: 1px solid #ddd;">
+                        {log.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+                    </td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{event_type}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{username}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{content_info}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">
+                        <a href="{link}">View Log #{log.id}</a>
+                    </td>
+                </tr>
+            """
+
+        html += '</tbody></table>'
+        return format_html(html)
+
     def _get_from_user(self, obj):
         data = obj.raw_data
         if 'from_user' in data:
             return data['from_user']
         if 'message' in data:
             return data['message'].get('from_user')
+        if 'edited_message' in data:
+            return data['edited_message'].get('from_user')
         if 'callback_query' in data:
             return data['callback_query'].get('from_user')
         if 'my_chat_member' in data:
@@ -824,30 +935,6 @@ class TelegramLogAdmin(admin.ModelAdmin):
             return '-'
         return f'@{username}'
 
-    @admin.display(description='View User')
-    def get_view_user_link(self, obj):
-        user = self._get_from_user(obj)
-        if not user:
-            return '-'
-        tg_id = user.get('id')
-        view_user = ViewUser.objects.filter(telegram_id=tg_id).first()
-        if view_user:
-            url = reverse('admin:app_viewuser_change', args=[view_user.id])
-            return format_html('<a href="{}">{}</a>', url, view_user)
-        return '-'
-
-    @admin.display(description='Django User')
-    def get_django_user_link(self, obj):
-        user = self._get_from_user(obj)
-        if not user:
-            return '-'
-        tg_id = user.get('id')
-        view_user = ViewUser.objects.filter(telegram_id=tg_id).select_related('django_user').first()
-        if view_user and view_user.django_user:
-            url = reverse('admin:auth_user_change', args=[view_user.django_user.id])
-            return format_html('<a href="{}">{}</a>', url, 'Link')
-        return '-'
-
     @admin.display(description='Direction', ordering='_direction_sort')
     def get_direction(self, obj):
         if obj.raw_data.get('update_id'):
@@ -856,27 +943,13 @@ class TelegramLogAdmin(admin.ModelAdmin):
 
     @admin.display(description='Chat ID', ordering='_chat_id_sort')
     def get_chat_id(self, obj):
-        data = obj.raw_data
-        if 'message' in data and 'chat' in data['message']:
-            return data['message']['chat'].get('id')
-        if 'callback_query' in data and 'message' in data['callback_query']:
-            return data['callback_query']['message']['chat'].get('id')
-        if 'my_chat_member' in data:
-            return data['my_chat_member']['chat'].get('id')
-        if 'chat' in data:
-            return data['chat'].get('id')
-        return '-'
+        chat_id, _ = self._get_raw_ids(obj)
+        return chat_id if chat_id else '-'
 
     @admin.display(description='Message ID', ordering='_message_id_sort')
     def get_message_id(self, obj):
-        data = obj.raw_data
-        if 'message' in data:
-            return data['message'].get('message_id')
-        if 'callback_query' in data and 'message' in data['callback_query']:
-            return data['callback_query']['message'].get('message_id')
-        if 'message_id' in data:
-            return data['message_id']
-        return '-'
+        _, message_id = self._get_raw_ids(obj)
+        return message_id if message_id else '-'
 
     @admin.display(description='Content')
     def get_content_info(self, obj):
@@ -887,6 +960,14 @@ class TelegramLogAdmin(admin.ModelAdmin):
         if 'message' in data:
             msg = data['message']
             text = msg.get('text') or msg.get('caption') or ''
+        elif 'edited_message' in data:
+            prefix = '[EDIT] '
+            msg = data['edited_message']
+            text = msg.get('text') or msg.get('caption') or ''
+        elif 'deleted_business_messages' in data:
+            prefix = '[DEL] '
+            ids = data['deleted_business_messages'].get('message_ids', [])
+            text = f'IDs: {ids}'
         elif 'callback_query' in data:
             prefix = '[CB] '
             text = data['callback_query'].get('data', '')
@@ -897,11 +978,56 @@ class TelegramLogAdmin(admin.ModelAdmin):
             text = data['text']
 
         if not text:
+            content = '-'
+        else:
+            if len(text) > 50:
+                text = text[:50] + '...'
+            content = f'{prefix}{text}'
+
+        if not obj.is_alive:
+            return format_html(
+                '<span style="opacity: 0.5; text-decoration: line-through;">{}</span>', content
+            )
+        return content
+
+    @admin.display(description='Delete')
+    def delete_message_button(self, obj):
+        if not obj.is_alive:
             return '-'
 
-        if len(text) > 50:
-            text = text[:50] + '...'
-        return f'{prefix}{text}'
+        url = reverse('admin:app_telegramlog_change', args=[obj.id]) + '?_delete_api=1'
+        return format_html(
+            '<a class="button" style="background-color: #c0392b; color: white; '
+            'padding: 4px 8px; border-radius: 4px;" href="{}">Delete</a>',
+            url,
+        )
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        if '_delete_api' in request.GET and object_id:
+            try:
+                obj = self.get_object(request, object_id)
+                if obj and obj.is_alive:
+                    chat_id, message_id = self._get_raw_ids(obj)
+
+                    if chat_id and message_id:
+                        TelegramSender().delete_message(chat_id, message_id)
+                        obj.is_alive = False
+                        obj.save(update_fields=['is_alive'])
+                        self.message_user(request, 'Сообщение успешно удалено в Telegram.')
+                    else:
+                        self.message_user(
+                            request, 'Не удалось определить Chat ID или Message ID.', level='ERROR'
+                        )
+                else:
+                    self.message_user(
+                        request, 'Сообщение уже удалено или не найдено.', level='WARNING'
+                    )
+            except Exception as e:
+                self.message_user(request, f'Ошибка удаления: {e}', level='ERROR')
+
+            return HttpResponseRedirect(request.path.split('?')[0])
+
+        return super().change_view(request, object_id, form_url, extra_context)
 
     @admin.display(description='Data')
     def formatted_raw_data(self, obj):
@@ -911,4 +1037,4 @@ class TelegramLogAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
-        return False
+        return True
