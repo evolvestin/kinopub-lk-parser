@@ -1,3 +1,4 @@
+import functools
 import logging
 import shlex
 import subprocess
@@ -19,113 +20,131 @@ from app.models import Code, LogEntry, TaskRun
 from app.telegram_bot import TelegramSender
 
 
-@shared_task
-def run_history_parser_task():
-    logging.info('Starting periodic history parser task.')
-    try:
-        history_parser.run_parser_session()
-    except Exception as e:
-        logging.error('Celery task: history parser run failed: %s', e, exc_info=True)
-
-
-@shared_task
-def run_full_scan_task():
-    logging.info('Starting quarterly full scan task.')
-    try:
-        call_command('runfullscan')
-    except Exception as e:
-        logging.error('Celery task: full scan run failed: %s', e, exc_info=True)
-
-
-@shared_task
-def expire_codes_task():
-    logging.debug('Running periodic check for expired codes...')
-    try:
-        expiration_threshold = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
-
-        expired_codes = list(
-            Code.objects.filter(received_at__lt=expiration_threshold).exclude(
-                telegram_message_id=-1
-            )
-        )
-
-        if expired_codes:
-            logging.info('Found %d expired codes to mark in Telegram.', len(expired_codes))
-
-            telegram_ids = [c.telegram_message_id for c in expired_codes]
-            sender = TelegramSender()
-            for telegram_id in telegram_ids:
-                sender.edit_message_to_expired(telegram_id)
-
-            Code.objects.filter(id__in=[c.id for c in expired_codes]).update(telegram_message_id=-1)
-
-            BackupManager().schedule_backup()
-
-    except Exception as e:
-        logging.error('Celery task: Error in expire_codes_task: %s', e)
-
-
-@shared_task
-def delete_old_logs_task():
-    logging.info('Running periodic cleanup of logs and data...')
-    try:
-        now = timezone.now()
-
-        # 1. Очистка логов по уровням
-        # INFO и DEBUG: храним 1 месяц (30 дней)
-        cutoff_info = now - timedelta(days=30)
-        LogEntry.objects.filter(created_at__lt=cutoff_info, level__in=['INFO', 'DEBUG']).exclude(
-            message__contains='New Episodes Parser Finished'
-        ).delete()
-
-        # WARNING: храним 2 месяца (60 дней)
-        cutoff_warning = now - timedelta(days=60)
-        LogEntry.objects.filter(created_at__lt=cutoff_warning, level='WARNING').delete()
-
-        # ERROR и CRITICAL: храним 3 месяца (90 дней)
-        cutoff_error = now - timedelta(days=90)
-        LogEntry.objects.filter(
-            created_at__lt=cutoff_error, level__in=['ERROR', 'CRITICAL']
-        ).delete()
-
-        # 2. Очистка кодов
-        # Коды храним 3 месяца (90 дней)
-        cutoff_codes = now - timedelta(days=90)
-        deleted_codes, _ = Code.objects.filter(received_at__lt=cutoff_codes).delete()
-
-        logging.info('Cleanup completed. Deleted old codes: %d', deleted_codes)
-
-        # Если были удаления, можно запланировать бэкап (опционально)
-        if deleted_codes > 0:
-            BackupManager().schedule_backup()
-
-    except Exception as e:
-        logging.error('Celery task: Error in delete_old_logs_task: %s', e)
-
-
 @contextmanager
 def _redis_lock(lock_name, timeout):
     redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
     lock = redis_client.lock(lock_name, timeout=timeout)
-    if lock.acquire(blocking=False):
-        try:
-            yield
-        finally:
+    acquired = lock.acquire(blocking=False)
+    try:
+        yield acquired
+    finally:
+        if acquired:
             lock.release()
-    else:
-        logging.debug(f'{lock_name} already in progress. Skipping.')
+
+
+def single_instance_task(lock_name, timeout):
+    """Декоратор для задач, требующих блокировки для предотвращения параллельного запуска."""
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            with _redis_lock(lock_name, timeout) as acquired:
+                if not acquired:
+                    logging.warning(f'Skipping task {func.__name__}: Resource {lock_name} is busy.')
+                    return
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    logging.error(f'Celery task {func.__name__} failed: {e}', exc_info=True)
+
+        return wrapper
+
+    return decorator
+
+
+def safe_execution(func):
+    """Декоратор для безопасного выполнения задач с логированием ошибок."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logging.error(f'Celery task: {func.__name__} failed: {e}', exc_info=True)
+
+    return wrapper
 
 
 @shared_task
+@single_instance_task(lock_name='selenium_global_lock', timeout=7200)
+def run_history_parser_task():
+    logging.info('Starting periodic history parser task.')
+    history_parser.run_parser_session()
+
+
+@shared_task
+@safe_execution
+def run_full_scan_task():
+    logging.info('Starting quarterly full scan task.')
+    call_command('runfullscan')
+
+
+@shared_task
+@safe_execution
+def expire_codes_task():
+    logging.debug('Running periodic check for expired codes...')
+    expiration_threshold = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
+
+    expired_codes = list(
+        Code.objects.filter(received_at__lt=expiration_threshold).exclude(telegram_message_id=-1)
+    )
+
+    if expired_codes:
+        logging.info('Found %d expired codes to mark in Telegram.', len(expired_codes))
+
+        telegram_ids = [c.telegram_message_id for c in expired_codes]
+        sender = TelegramSender()
+        for telegram_id in telegram_ids:
+            sender.edit_message_to_expired(telegram_id)
+
+        Code.objects.filter(id__in=[c.id for c in expired_codes]).update(telegram_message_id=-1)
+
+        BackupManager().schedule_backup()
+
+
+@shared_task
+@safe_execution
+def delete_old_logs_task():
+    logging.info('Running periodic cleanup of logs and data...')
+    now = timezone.now()
+
+    # 1. Очистка логов по уровням
+    # INFO и DEBUG: храним 1 месяц (30 дней)
+    cutoff_info = now - timedelta(days=30)
+    LogEntry.objects.filter(created_at__lt=cutoff_info, level__in=['INFO', 'DEBUG']).exclude(
+        message__contains='New Episodes Parser Finished'
+    ).delete()
+
+    # WARNING: храним 2 месяца (60 дней)
+    cutoff_warning = now - timedelta(days=60)
+    LogEntry.objects.filter(created_at__lt=cutoff_warning, level='WARNING').delete()
+
+    # ERROR и CRITICAL: храним 3 месяца (90 дней)
+    cutoff_error = now - timedelta(days=90)
+    LogEntry.objects.filter(created_at__lt=cutoff_error, level__in=['ERROR', 'CRITICAL']).delete()
+
+    # 2. Очистка кодов
+    # Коды храним 3 месяца (90 дней)
+    cutoff_codes = now - timedelta(days=90)
+    deleted_codes, _ = Code.objects.filter(received_at__lt=cutoff_codes).delete()
+
+    logging.info('Cleanup completed. Deleted old codes: %d', deleted_codes)
+
+    # Если были удаления, можно запланировать бэкап (опционально)
+    if deleted_codes > 0:
+        BackupManager().schedule_backup()
+
+
+@shared_task
+@single_instance_task(lock_name='backup_lock', timeout=300)
 def backup_database():
-    with _redis_lock('backup_lock', 300):
-        BackupManager().perform_backup()
+    BackupManager().perform_backup()
 
 
 @shared_task
+@single_instance_task(lock_name='cookies_backup_lock', timeout=60)
 def backup_cookies():
-    with _redis_lock('cookies_backup_lock', 60):
-        BackupManager().perform_cookies_backup()
+    BackupManager().perform_cookies_backup()
 
 
 @shared_task(bind=True)
@@ -208,9 +227,7 @@ def run_admin_command(self, task_run_id):
 
 
 @shared_task
+@single_instance_task(lock_name='selenium_global_lock', timeout=3600)
 def run_new_episodes_task():
     logging.info('Starting daily new episodes parser task.')
-    try:
-        call_command('runnewepisodes')
-    except Exception as e:
-        logging.error('Celery task: new episodes run failed: %s', e, exc_info=True)
+    call_command('runnewepisodes')

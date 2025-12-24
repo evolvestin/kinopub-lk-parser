@@ -1,7 +1,23 @@
+import json
+
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
-from django.db.models import Avg, Count, Min, Q, Sum
+from django.db.models import (
+    Avg,
+    Case,
+    CharField,
+    Count,
+    F,
+    Min,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
@@ -276,9 +292,19 @@ class ShowAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
+
+        # Используем подзапрос для подсчета длительности,
+        # чтобы избежать умножения суммы на количество просмотров (проблема JOIN)
+        duration_subquery = (
+            ShowDuration.objects.filter(show=OuterRef('pk'))
+            .values('show')
+            .annotate(total=Sum('duration_seconds'))
+            .values('total')
+        )
+
         queryset = queryset.annotate(
-            _view_count=Count('viewhistory'),
-            _total_duration=Sum('showduration__duration_seconds'),
+            _view_count=Count('viewhistory', distinct=True),
+            _total_duration=Subquery(duration_subquery),
             _avg_rating=Avg('ratings__rating'),
         )
         return queryset
@@ -651,37 +677,234 @@ class PersonAdmin(BaseNameAdmin):
         )
 
 
+class TelegramLogDirectionFilter(admin.SimpleListFilter):
+    title = 'Direction'
+    parameter_name = 'direction'
+
+    def lookups(self, request, model_admin):
+        return [('IN', 'Incoming'), ('OUT', 'Outgoing')]
+
+    def queryset(self, request, queryset):
+        if self.value() == 'IN':
+            # Входящие события (Update) всегда имеют update_id
+            return queryset.filter(raw_data__has_key='update_id')
+        if self.value() == 'OUT':
+            # Исходящие (Message) не имеют update_id
+            return queryset.filter(raw_data__message_id__isnull=False).exclude(
+                raw_data__has_key='update_id'
+            )
+        return queryset
+
+
+class TelegramLogChatIdFilter(admin.SimpleListFilter):
+    title = 'Chat ID'
+    parameter_name = 'chat_id'
+
+    def lookups(self, request, model_admin):
+        qs = model_admin.get_queryset(request)
+
+        chat_ids = (
+            qs.exclude(_chat_id_sort__isnull=True)
+            .values_list('_chat_id_sort', flat=True)
+            .distinct()
+            .order_by('_chat_id_sort')
+        )
+
+        result = []
+
+        for chat_id in chat_ids:
+            log = qs.filter(_chat_id_sort=chat_id).first()
+            display_name = '-'
+
+            if log:
+                user = model_admin._get_from_user(log)
+                if user:
+                    if user.get('username'):
+                        display_name = f'@{user["username"]}'
+                    else:
+                        if first_name := user.get('first_name'):
+                            display_name = first_name
+                        if title := user.get('title'):
+                            display_name = title
+            result.append((str(chat_id), f'{display_name} ({chat_id})'))
+
+        return result
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(_chat_id_sort=self.value())
+        return queryset
+
+
 @admin.register(TelegramLog, site=admin_site)
 class TelegramLogAdmin(admin.ModelAdmin):
     list_display = (
-        'direction',
-        'chat_id',
-        'message_id',
-        'short_text',
+        'id',
+        'get_direction',
+        'get_username',
+        'get_chat_id',
+        'get_message_id',
+        'get_content_info',
+        'get_view_user_link',
+        'get_django_user_link',
         'created_at',
     )
-    list_filter = ('direction', 'created_at')
-    search_fields = ('chat_id', 'message_id', 'text', 'raw_data')
-    readonly_fields = (
-        'direction',
-        'chat_id',
-        'message_id',
-        'text',
+    list_filter = ('created_at', TelegramLogDirectionFilter, TelegramLogChatIdFilter)
+
+    search_fields = (
+        'id',
+        'raw_data__message__chat__id',
+        'raw_data__callback_query__message__chat__id',
+        'raw_data__my_chat_member__chat__id',
+        'raw_data__chat__id',
+        'raw_data__message__text',
+        'raw_data__text',
+        'raw_data__callback_query__data',
+        'raw_data__message__message_id',
+        'raw_data__message_id',
+        'raw_data__message__from__username',
+        'raw_data__callback_query__from__username',
+    )
+
+    fields = (
         'formatted_raw_data',
         'created_at',
         'updated_at',
     )
+    readonly_fields = (
+        'created_at',
+        'updated_at',
+        'formatted_raw_data',
+    )
 
-    @admin.display(description='Text')
-    def short_text(self, obj):
-        if obj.text and len(obj.text) > 50:
-            return obj.text[:50] + '...'
-        return obj.text
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(
+            _direction_sort=Case(
+                When(raw_data__has_key='update_id', then=Value(1)),
+                default=Value(2),
+                output_field=CharField(),
+            ),
+            _chat_id_sort=Coalesce(
+                F('raw_data__message__chat__id'),
+                F('raw_data__callback_query__message__chat__id'),
+                F('raw_data__my_chat_member__chat__id'),
+                F('raw_data__chat__id'),
+                output_field=CharField(),
+            ),
+            _message_id_sort=Coalesce(
+                F('raw_data__message__message_id'),
+                F('raw_data__callback_query__message__message_id'),
+                F('raw_data__message_id'),
+                output_field=CharField(),
+            ),
+        )
 
-    @admin.display(description='Raw Data (JSON)')
+    def _get_from_user(self, obj):
+        data = obj.raw_data
+        if 'from_user' in data:
+            return data['from_user']
+        if 'message' in data:
+            return data['message'].get('from_user')
+        if 'callback_query' in data:
+            return data['callback_query'].get('from_user')
+        if 'my_chat_member' in data:
+            return data['my_chat_member'].get('from_user')
+        if 'chat' in data:
+            return data['chat']
+        return None
+
+    @admin.display(description='Sender Username')
+    def get_username(self, obj):
+        user = self._get_from_user(obj)
+        if not user:
+            return '-'
+        username = user.get('username')
+        if not username:
+            return '-'
+        return f'@{username}'
+
+    @admin.display(description='View User')
+    def get_view_user_link(self, obj):
+        user = self._get_from_user(obj)
+        if not user:
+            return '-'
+        tg_id = user.get('id')
+        view_user = ViewUser.objects.filter(telegram_id=tg_id).first()
+        if view_user:
+            url = reverse('admin:app_viewuser_change', args=[view_user.id])
+            return format_html('<a href="{}">{}</a>', url, view_user)
+        return '-'
+
+    @admin.display(description='Django User')
+    def get_django_user_link(self, obj):
+        user = self._get_from_user(obj)
+        if not user:
+            return '-'
+        tg_id = user.get('id')
+        view_user = ViewUser.objects.filter(telegram_id=tg_id).select_related('django_user').first()
+        if view_user and view_user.django_user:
+            url = reverse('admin:auth_user_change', args=[view_user.django_user.id])
+            return format_html('<a href="{}">{}</a>', url, 'Link')
+        return '-'
+
+    @admin.display(description='Direction', ordering='_direction_sort')
+    def get_direction(self, obj):
+        if obj.raw_data.get('update_id'):
+            return format_html('<span style="color: green;">IN</span>')
+        return format_html('<span style="color: grey;">OUT</span>')
+
+    @admin.display(description='Chat ID', ordering='_chat_id_sort')
+    def get_chat_id(self, obj):
+        data = obj.raw_data
+        if 'message' in data and 'chat' in data['message']:
+            return data['message']['chat'].get('id')
+        if 'callback_query' in data and 'message' in data['callback_query']:
+            return data['callback_query']['message']['chat'].get('id')
+        if 'my_chat_member' in data:
+            return data['my_chat_member']['chat'].get('id')
+        if 'chat' in data:
+            return data['chat'].get('id')
+        return '-'
+
+    @admin.display(description='Message ID', ordering='_message_id_sort')
+    def get_message_id(self, obj):
+        data = obj.raw_data
+        if 'message' in data:
+            return data['message'].get('message_id')
+        if 'callback_query' in data and 'message' in data['callback_query']:
+            return data['callback_query']['message'].get('message_id')
+        if 'message_id' in data:
+            return data['message_id']
+        return '-'
+
+    @admin.display(description='Content')
+    def get_content_info(self, obj):
+        data = obj.raw_data
+        text = ''
+        prefix = ''
+
+        if 'message' in data:
+            msg = data['message']
+            text = msg.get('text') or msg.get('caption') or ''
+        elif 'callback_query' in data:
+            prefix = '[CB] '
+            text = data['callback_query'].get('data', '')
+        elif 'my_chat_member' in data:
+            prefix = '[Status] '
+            text = data['my_chat_member'].get('new_chat_member', {}).get('status', '')
+        elif 'text' in data:
+            text = data['text']
+
+        if not text:
+            return '-'
+
+        if len(text) > 50:
+            text = text[:50] + '...'
+        return f'{prefix}{text}'
+
+    @admin.display(description='Data')
     def formatted_raw_data(self, obj):
-        import json
-
         return format_html('<pre>{}</pre>', json.dumps(obj.raw_data, indent=2, ensure_ascii=False))
 
     def has_add_permission(self, request):

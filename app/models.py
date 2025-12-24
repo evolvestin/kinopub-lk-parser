@@ -305,15 +305,6 @@ class TaskRun(BaseModel):
 
 
 class TelegramLog(BaseModel):
-    DIRECTION_CHOICES = [
-        ('IN', 'Incoming'),
-        ('OUT', 'Outgoing'),
-    ]
-
-    direction = models.CharField(max_length=3, choices=DIRECTION_CHOICES)
-    chat_id = models.BigIntegerField(null=True, blank=True)
-    message_id = models.BigIntegerField(null=True, blank=True)
-    text = models.TextField(null=True, blank=True)
     raw_data = models.JSONField(default=dict)
 
     class Meta:
@@ -321,9 +312,11 @@ class TelegramLog(BaseModel):
         verbose_name = 'Telegram Log'
         verbose_name_plural = 'Telegram Logs'
         indexes = [
-            models.Index(fields=['chat_id', 'message_id']),
             models.Index(fields=['created_at']),
         ]
 
     def __str__(self):
-        return f'[{self.direction}] {self.chat_id}:{self.message_id}'
+        direction = self.raw_data.get('direction', '?')
+        chat_id = self.raw_data.get('chat_id', '?')
+        msg_id = self.raw_data.get('message_id', '?')
+        return f'[{direction}] {chat_id}:{msg_id}'

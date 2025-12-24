@@ -683,13 +683,8 @@ def bot_get_show_ratings_details(request, show_id):
 def bot_log_message(request):
     try:
         data = json.loads(request.body)
-        TelegramLog.objects.create(
-            direction=data.get('direction', 'IN'),
-            chat_id=data.get('chat_id'),
-            message_id=data.get('message_id'),
-            text=data.get('text', ''),
-            raw_data=data.get('raw_data', {}),
-        )
+        # Сохраняем весь пришедший JSON (включая direction, chat_id, message_id) в поле raw_data
+        TelegramLog.objects.create(raw_data=data)
         return JsonResponse({'status': 'ok'})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

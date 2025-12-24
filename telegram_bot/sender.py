@@ -111,15 +111,9 @@ class MessageSender:
 
         if response:
             try:
-                # Логируем успешную отправку
+                # Логируем успешную отправку (чистый объект Message)
                 msg_dump = response.model_dump(mode='json', exclude_none=True)
-                await client.log_telegram_event(
-                    direction='OUT',
-                    chat_id=response.chat.id,
-                    message_id=response.message_id,
-                    text=response.text or response.caption,
-                    raw_data=msg_dump,
-                )
+                await client.log_telegram_event(msg_dump)
             except Exception as e:
                 logging.error(f'Failed to log outgoing message: {e}')
 

@@ -3,6 +3,7 @@ import os
 import subprocess
 
 from django.conf import settings
+from django.db import connection
 
 from app.gdrive_backup import BackupManager
 from app.management.base import LoggableBaseCommand
@@ -23,6 +24,11 @@ class Command(LoggableBaseCommand):
         logging.info(f'Using backup file at {backup_file_path}')
 
         try:
+            logging.info('Dropping public schema to clean database...')
+            with connection.cursor() as cursor:
+                cursor.execute('DROP SCHEMA public CASCADE;')
+                cursor.execute('CREATE SCHEMA public;')
+
             db_conf = settings.DATABASES['default']
             env = os.environ.copy()
             env['PGPASSWORD'] = db_conf['PASSWORD']
@@ -37,7 +43,6 @@ class Command(LoggableBaseCommand):
                 db_conf['USER'],
                 '-d',
                 db_conf['NAME'],
-                '-c',
                 '--no-owner',
                 '-v',
                 backup_file_path,

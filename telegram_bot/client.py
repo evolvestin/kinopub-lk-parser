@@ -151,25 +151,13 @@ async def get_show_ratings_details(show_id: int) -> list:
     return data.get('ratings', []) if data else []
 
 
-async def log_telegram_event(
-    direction: str,
-    raw_data: dict,
-    chat_id: int | None = None,
-    message_id: int | None = None,
-    text: str | None = None,
-):
+async def log_telegram_event(raw_data: dict):
     """
     Отправляет лог события (сообщения) в Django API.
+    Принимает только сырые данные, логика разбора находится на стороне получателя (Admin).
     """
-    payload = {
-        'direction': direction,
-        'chat_id': chat_id,
-        'message_id': message_id,
-        'text': text,
-        'raw_data': raw_data,
-    }
-    # Используем fire-and-forget, чтобы не блокировать основной поток ошибками логирования
+    # Используем fire-and-forget
     try:
-        await _execute_request('log/', method='POST', payload=payload)
+        await _execute_request('log/', method='POST', payload=raw_data)
     except Exception:
         pass
