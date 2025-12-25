@@ -231,3 +231,10 @@ def run_admin_command(self, task_run_id):
 def run_new_episodes_task():
     logging.info('Starting daily new episodes parser task.')
     call_command('runnewepisodes')
+
+
+@shared_task
+@single_instance_task(lock_name='selenium_global_lock', timeout=14400)
+def run_daily_sync_task():
+    logging.info('Starting Daily Synchronization Task via Celery.')
+    call_command('rundailysync')

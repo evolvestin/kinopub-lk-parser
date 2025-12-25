@@ -48,7 +48,9 @@ class Command(LoggableBaseCommand):
         if show_type:
             queryset = queryset.filter(type=show_type)
 
-        show_ids_to_update = list(queryset.order_by('?').values_list('id', flat=True)[:limit])
+        show_ids_to_update = list(
+            queryset.order_by('-created_at').values_list('id', flat=True)[:limit]
+        )
 
         if not show_ids_to_update:
             self.stdout.write(
@@ -98,12 +100,9 @@ class Command(LoggableBaseCommand):
                     continue
 
             if updated_count > 0:
-                self.stdout.write(
-                    self.style.SUCCESS(f'Finished updating {updated_count} show details.')
-                )
+                logging.info(f'Finished updating {updated_count} show details.')
                 BackupManager().schedule_backup()
             else:
-                self.stdout.write(self.style.SUCCESS('Finished updating show details.'))
-
+                logging.info('Finished updating show details. 0 updated.')
         finally:
             close_driver(driver)

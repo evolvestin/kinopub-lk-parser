@@ -135,6 +135,7 @@ def parse_and_save_catalog_page(driver, mode):
 def run_full_scan_session(headless=True, target_type=None, process_all_pages=False):
     logging.info('--- Starting Full Catalog Scan Session ---')
     driver = None
+    total_added = 0
 
     start_mode = None
     start_page = 1
@@ -232,6 +233,8 @@ def run_full_scan_session(headless=True, target_type=None, process_all_pages=Fal
 
                     driver.get(page_url)
                     added_count = parse_and_save_catalog_page(driver, mode)
+                    total_added += added_count
+
                     logging.info(
                         "Processing '%s' page %d of %d. Saved %d records.",
                         mode,
@@ -261,7 +264,10 @@ def run_full_scan_session(headless=True, target_type=None, process_all_pages=Fal
 
             backup_manager.schedule_backup()
 
-        logging.info('--- Full catalog scan session finished successfully. ---')
+        logging.info(
+            '--- Full catalog scan session finished successfully. Total new: %d ---', total_added
+        )
+        return total_added
 
     finally:
         close_driver(driver)
@@ -298,4 +304,4 @@ class Command(LoggableBaseCommand):
             raise CommandError(
                 f'Invalid type: {target_type}. Choices: {", ".join(SHOW_TYPE_MAPPING.keys())}'
             )
-        run_full_scan_session(target_type=target_type, process_all_pages=process_all_pages)
+        return run_full_scan_session(target_type=target_type, process_all_pages=process_all_pages)

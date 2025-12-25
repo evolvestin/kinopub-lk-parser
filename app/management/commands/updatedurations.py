@@ -15,7 +15,7 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
-from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
+from shared.constants import SERIES_TYPES, SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 
 
 class Command(LoggableBaseCommand):
@@ -114,6 +114,8 @@ class Command(LoggableBaseCommand):
             base_qs = Show.objects.all()
             if target_show_type:
                 base_qs = base_qs.filter(type=target_show_type)
+            else:
+                base_qs = base_qs.exclude(type__in=SERIES_TYPES)
 
             priority_ids = list(
                 base_qs.filter(id__in=error_ids).values_list('id', flat=True)[:limit]
@@ -125,7 +127,7 @@ class Command(LoggableBaseCommand):
                 random_ids = list(
                     base_qs.filter(showduration__isnull=True)
                     .exclude(id__in=priority_ids)
-                    .order_by('?')
+                    .order_by('-created_at')
                     .values_list('id', flat=True)
                     .distinct()[:remaining_limit]
                 )
