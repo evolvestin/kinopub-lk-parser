@@ -21,9 +21,10 @@ class Command(LoggableBaseCommand):
         # 3. Обновление деталей и длительностей, если найдены новые элементы
         if new_items_count > 0:
             logging.info(f'Updating details for {new_items_count} new items...')
-            call_command('updatedetails', new_items_count)
+            # call_command ожидает строковые аргументы для парсинга, передача int вызывает ошибку
+            call_command('updatedetails', str(new_items_count))
 
             logging.info(f'Updating durations for {new_items_count} new items...')
-            call_command('updatedurations', new_items_count)
+            call_command('updatedurations', str(new_items_count))
 
         logging.info('Daily Synchronization Command Completed.')
