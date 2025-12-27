@@ -284,7 +284,7 @@ class TelegramSender:
             channel_info += f'\nСсылка: {settings.HISTORY_CHANNEL_INVITE_LINK}'
 
         text = (
-            f'🎉 <b>Ваш уровень доступа повышен до {role.upper()}!</b>\n\n'
+            f'🎉 {bold("Ваш уровень доступа повышен!")}\n\n'
             f'Теперь вам доступны расширенные возможности бота.\n'
             f'{channel_info}'
         )
@@ -322,7 +322,7 @@ class TelegramSender:
             env_label = settings.ENVIRONMENT or 'unknown'
 
             header = (
-                f'🚨 <b>Error {bot_link} ({env_label.lower()}):</b>\n'
+                f'🚨 {bold(f"Error {bot_link} ({env_label.lower()}):")}\n'
                 f'Level: {bold(level)}\n'
                 f'Module: {code(module)}\n'
             )
