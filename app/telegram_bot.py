@@ -1,14 +1,14 @@
 import logging
 
 import requests
+from django.apps import apps
 from django.conf import settings
 
 from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
-from app.models import UserRating, ViewUser
 from shared.card_formatter import get_show_card_text
 from shared.constants import DATE_FORMAT, UserRole
 from shared.formatters import format_se
-from shared.html_helper import bold, code, html_secure, italic
+from shared.html_helper import bold, code, html_link, html_secure, italic
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,11 @@ class TelegramSender:
             return response.json()
         except requests.RequestException as e:
             logger.error(f'Internal Bot API request error ({endpoint}): {e}')
+            return None
+        except ValueError as e:
+            logger.error(
+                f'Invalid JSON response from {endpoint}: {e}. Content: {response.text[:200]}'
+            )
             return None
 
     def send_message(self, message: str) -> int | None:
@@ -131,7 +136,6 @@ class TelegramSender:
         self._request('edit_message', payload)
 
     def _get_channel_post_url(self, message_id):
-        """Генерирует ссылку на сообщение в канале."""
         if not message_id or not settings.HISTORY_CHANNEL_ID:
             return None
 
@@ -142,6 +146,8 @@ class TelegramSender:
         return None
 
     def _build_message_payload(self, view_history_obj, for_user=None, is_channel=False):
+        UserRating = apps.get_model('app', 'UserRating')
+
         lines = []
         season = view_history_obj.season_number
         episode = view_history_obj.episode_number
@@ -184,7 +190,6 @@ class TelegramSender:
             ]
         )
 
-        # Статусные строки нужны только в канале
         if is_channel:
             if view_history_obj.is_checked:
                 lines.append(f'✅ {italic("Учитывается в статистике")}')
@@ -248,7 +253,6 @@ class TelegramSender:
             view_history_obj.save(update_fields=['telegram_message_id'])
 
     def update_history_message(self, view_history_obj):
-        """Обновляет сообщение только в канале."""
         view_history_obj.refresh_from_db()
 
         if not settings.HISTORY_CHANNEL_ID or not view_history_obj.telegram_message_id:
@@ -289,8 +293,9 @@ class TelegramSender:
         self._request('send_message', payload)
 
     def send_private_history_notification(self, telegram_id, view_history_obj):
+        ViewUser = apps.get_model('app', 'ViewUser')
         user = ViewUser.objects.filter(telegram_id=telegram_id).first()
-        # Отправка в ЛС, поэтому is_channel=False
+
         text, keyboard = self._build_message_payload(
             view_history_obj, for_user=user, is_channel=False
         )
@@ -302,3 +307,35 @@ class TelegramSender:
             'disable_web_page_preview': True,
         }
         self._request('send_message', payload)
+
+    def send_dev_log(self, level: str, module: str, message: str):
+        if not settings.DEV_CHANNEL_ID:
+            return
+
+        for pattern in settings.LOG_IGNORE_PATTERNS:
+            if pattern in message:
+                return
+
+        try:
+            bot_username = self.bot_username or 'Bot'
+            bot_link = html_link(f'https://t.me/{bot_username}', bot_username)
+            env_label = settings.ENVIRONMENT or 'unknown'
+
+            header = (
+                f'🚨 <b>Error {bot_link} ({env_label.lower()}):</b>\n'
+                f'Level: {bold(level)}\n'
+                f'Module: {code(module)}\n'
+            )
+
+            self._request(
+                'send_split_message',
+                payload={
+                    'chat_id': settings.DEV_CHANNEL_ID,
+                    'text_blocks': [html_secure(message)],
+                    'header': header,
+                    'separator': '\n\n',
+                    'parse_mode': 'HTML',
+                },
+            )
+        except Exception as e:
+            print(f'Failed to send dev log: {e}')

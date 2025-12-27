@@ -2,6 +2,7 @@ import asyncio
 import logging
 import sys
 
+import client
 from aiogram import Dispatcher, F, Router
 from aiogram.enums import ChatType
 from aiogram.filters import CommandStart
@@ -13,7 +14,51 @@ from middlewares import (
 )
 from services.bot_instance import BotInstance
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
+class RemoteLogHandler(logging.Handler):
+    """
+    Перехватывает логи бота и отправляет их в базу данных Django через API.
+    """
+
+    def emit(self, record):
+        try:
+            # Игнорируем логи от самого aiohttp, чтобы не получить бесконечный цикл при ошибках сети
+            if record.name.startswith('aiohttp'):
+                return
+
+            # Формируем сообщение
+            msg = self.format(record)
+
+            # Пытаемся отправить задачу в текущий event loop
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(
+                        client.send_log_entry(
+                            level=record.levelname, module=record.name, message=msg
+                        )
+                    )
+            except RuntimeError:
+                # Если loop не запущен (например, при старте или shutdown), пишем в stderr
+                pass
+
+        except Exception:
+            self.handleError(record)
+
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# Консольный хендлер
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s [%(name)s] %(message)s'))
+root_logger.addHandler(console_handler)
+
+# Удаленный хендлер (только для важных ошибок)
+remote_handler = RemoteLogHandler()
+remote_handler.setLevel(logging.WARNING)
+remote_handler.setFormatter(logging.Formatter('%(message)s'))
+root_logger.addHandler(remote_handler)
 
 
 def register_router() -> Router:

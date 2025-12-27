@@ -5,6 +5,8 @@ from channels.layers import get_channel_layer
 from django.apps import apps
 from django.utils import timezone
 
+from app.telegram_bot import TelegramSender
+
 
 class DatabaseLogHandler(logging.Handler):
     def __init__(self, *args, **kwargs):
@@ -43,5 +45,9 @@ class DatabaseLogHandler(logging.Handler):
                         'message': msg,
                     },
                 )
+
+            if record.levelno >= logging.ERROR:
+                TelegramSender().send_dev_log(record.levelname, record.module, msg)
+
         except Exception:
             self.handleError(record)

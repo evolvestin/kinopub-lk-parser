@@ -161,3 +161,23 @@ async def log_telegram_event(raw_data: dict):
         await _execute_request('log/', method='POST', payload=raw_data)
     except Exception:
         pass
+
+
+async def send_log_entry(level: str, module: str, message: str):
+    """
+    Отправляет системный лог (ошибку/предупреждение) в базу Django.
+    Ошибки при отправке игнорируются или выводятся в stderr, чтобы избежать рекурсии логгера.
+    """
+    payload = {
+        'level': level,
+        'module': module,
+        'message': message,
+    }
+    url = f'{BACKEND_URL}/api/bot/log_entry/'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload, headers=HEADERS, timeout=5) as response:
+                if response.status != 200:
+                    print(f'Failed to send log entry to backend. Status: {response.status}')
+    except Exception as e:
+        print(f'Connection error while sending log entry: {e}')

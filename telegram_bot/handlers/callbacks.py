@@ -36,7 +36,14 @@ def safe_callback(func):
         try:
             await func(callback, bot, *args, **kwargs)
         except Exception as e:
-            await callback.answer(f'Ошибка: {e}', show_alert=True)
+            # Логируем полный трейсбек ошибки, он уйдет в базу данных через RemoteLogHandler
+            import logging
+
+            logging.error(f'Error in callback {callback.data}: {e}', exc_info=True)
+            try:
+                await callback.answer(f'Произошла ошибка: {e}', show_alert=True)
+            except Exception:
+                pass
 
     return wrapper
 

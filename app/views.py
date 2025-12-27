@@ -9,11 +9,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from app.dashboard import dashboard_callback
-from app.models import Show, ShowDuration, TelegramLog, UserRating, ViewHistory, ViewUser
+from app.models import LogEntry, Show, ShowDuration, TelegramLog, UserRating, ViewHistory, ViewUser
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
 from shared.formatters import format_se
@@ -454,6 +455,7 @@ def _manage_view_assignment(request, action):
     except (ViewUser.DoesNotExist, ViewHistory.DoesNotExist):
         return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:
+        logging.error(f'Error in _manage_view_assignment ({action}): {e}', exc_info=True)
         return JsonResponse({'error': str(e)}, status=400)
 
 
@@ -685,6 +687,37 @@ def bot_log_message(request):
         data = json.loads(request.body)
         # Сохраняем весь пришедший JSON (включая direction, chat_id, message_id) в поле raw_data
         TelegramLog.objects.create(raw_data=data)
+        return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@protected_bot_api
+@require_http_methods(['POST'])
+def bot_create_log_entry(request):
+    try:
+        data = json.loads(request.body)
+        level = data.get('level', 'INFO')
+        module = data.get('module', 'bot')
+        message = data.get('message', '')
+
+        # Добавляем префикс bot. к модулю для ясности в общей таблице
+        if not module.startswith('bot.'):
+            module = f'bot.{module}'
+
+        LogEntry.objects.create(
+            level=level[:10],
+            module=module[:100],
+            message=message,
+            created_at=timezone.now(),
+            updated_at=timezone.now(),
+        )
+
+        # Если это ошибка от бота, тоже отправляем в DEV канал
+        if level in ('ERROR', 'CRITICAL'):
+            TelegramSender().send_dev_log(level, module, message)
+
         return JsonResponse({'status': 'ok'})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

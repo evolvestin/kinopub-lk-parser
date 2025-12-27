@@ -5,6 +5,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineKeyboardMarkup
 from aiohttp import web
+from sender import MessageSender
 
 
 def _get_validated_markup(markup_data):
@@ -124,11 +125,46 @@ async def handle_get_me(request):
         return web.json_response({'ok': False, 'description': str(e)}, status=500)
 
 
+async def handle_send_split_message(request):
+    """
+    Эндпоинт для отправки длинных сообщений с автоматическим разбиением.
+    Используется для отправки логов.
+    """
+    bot: Bot = request.app['bot']
+    data = await request.json()
+
+    chat_id = data.get('chat_id')
+    text_blocks = data.get('text_blocks', [])
+    header = data.get('header', '')
+    separator = data.get('separator', '\n')
+    parse_mode = data.get('parse_mode', 'HTML')
+
+    if not chat_id or not text_blocks:
+        return web.json_response(
+            {'ok': False, 'description': 'Missing chat_id or text_blocks'}, status=400
+        )
+
+    sender = MessageSender(bot)
+    try:
+        await sender.send_smart_split_text(
+            chat_id=chat_id,
+            text_blocks=text_blocks,
+            header=header,
+            separator=separator,
+            parse_mode=parse_mode,
+        )
+        return web.json_response({'ok': True, 'result': True})
+    except Exception as e:
+        logging.error(f'Failed to send split message: {e}')
+        return web.json_response({'ok': False, 'description': str(e)}, status=500)
+
+
 async def start_api_server(bot: Bot):
     app = web.Application()
     app['bot'] = bot
     app.router.add_get('/api/get_me', handle_get_me)
     app.router.add_post('/api/send_message', handle_send_message)
+    app.router.add_post('/api/send_split_message', handle_send_split_message)
     app.router.add_post('/api/edit_message', handle_edit_message)
     app.router.add_post('/api/delete_message', handle_delete_message)
 

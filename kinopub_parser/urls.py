@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/bot/toggle_check/', views.bot_toggle_view_check),
     path('api/bot/rate/', views.bot_rate_show),
     path('api/bot/log/', views.bot_log_message),
+    path('api/bot/log_entry/', views.bot_create_log_entry),
 ]
 
 if not settings.DEBUG:

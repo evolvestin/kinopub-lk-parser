@@ -29,7 +29,10 @@ def _redis_lock(lock_name, timeout):
         yield acquired
     finally:
         if acquired:
-            lock.release()
+            try:
+                lock.release()
+            except Exception as e:
+                logging.warning(f'Failed to release lock {lock_name}: {e}')
 
 
 def single_instance_task(lock_name, timeout):
@@ -203,8 +206,11 @@ def run_admin_command(self, task_run_id):
                         task_run.error_message = f'Exit code: {retcode}'
 
                         full_log = err_text.strip() or out_text.strip() or 'No output captured'
-                        if len(full_log) > 2000:
-                            log_msg = f'... [truncated] ...\n{full_log[-2000:]}'
+
+                        if len(full_log) > 10000:
+                            log_msg = (
+                                f'{full_log[:5000]}\n... [middle truncated] ...\n{full_log[-5000:]}'
+                            )
                         else:
                             log_msg = full_log
 
@@ -221,6 +227,9 @@ def run_admin_command(self, task_run_id):
         except Exception as e:
             if process.poll() is None:
                 process.kill()
+            logging.error(
+                f'Internal error executing command {task_run.command}: {e}', exc_info=True
+            )
             task_run.status = 'FAILURE'
             task_run.error_message = f'Worker exception: {str(e)}'
             task_run.save()

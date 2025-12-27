@@ -76,7 +76,10 @@ def close_driver(driver):
 def _extract_int_from_string(text):
     if not text:
         return None
-    return int(''.join(c for c in text if c.isdigit()))
+    digits = ''.join(c for c in text if c.isdigit())
+    if not digits:
+        return None
+    return int(digits)
 
 
 def update_show_details(driver, show_id):
@@ -297,15 +300,18 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
 
 
 def save_cookies(driver, file_path):
-    cookies = driver.get_cookies()
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(cookies, f, ensure_ascii=False, indent=2)
-    logging.info('Cookies successfully saved to %s', file_path)
-    if not settings.LOCAL_RUN:
-        celery_app.send_task('app.tasks.backup_cookies')
-        logging.info('Cookies backup scheduled via Celery.')
-    else:
-        logging.info('Local run detected, skipping Celery cookies backup task.')
+    try:
+        cookies = driver.get_cookies()
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(cookies, f, ensure_ascii=False, indent=2)
+        logging.info('Cookies successfully saved to %s', file_path)
+        if not settings.LOCAL_RUN:
+            celery_app.send_task('app.tasks.backup_cookies')
+            logging.info('Cookies backup scheduled via Celery.')
+        else:
+            logging.info('Local run detected, skipping Celery cookies backup task.')
+    except Exception as e:
+        logging.error(f'Failed to save cookies to {file_path}: {e}')
 
 
 def do_login(driver, login, password, cookie_path, base_url):
@@ -461,7 +467,9 @@ def initialize_driver_session(headless=True, session_type='main'):
                 close_driver(driver)
                 return None
     except Exception as e:
-        logging.error('An unexpected error occurred during session initialization: %s', e)
+        logging.error(
+            'An unexpected error occurred during session initialization: %s', e, exc_info=True
+        )
         close_driver(driver)
         return None
 
