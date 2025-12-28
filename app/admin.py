@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
@@ -21,6 +22,7 @@ from django.db.models.functions import Coalesce
 from django.http import HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
+from redis import Redis
 
 # Импортируем нашу кастомную админку
 from app.admin_site import admin_site
@@ -38,7 +40,6 @@ from app.models import (
     ViewUser,
     ViewUserGroup,
 )
-from app.tasks import run_specific_show_update
 from app.telegram_bot import TelegramSender
 from app.views import sync_user_permissions
 
@@ -274,7 +275,7 @@ class ShowAdmin(admin.ModelAdmin):
     inlines = [ShowDurationInline, ViewHistoryInline, UserRatingInline]
     readonly_fields = (
         'id',
-        'admin_actions',  # Добавляем наше новое поле
+        'admin_actions',
         'title',
         'original_title',
         'type',
@@ -344,10 +345,10 @@ class ShowAdmin(admin.ModelAdmin):
         return format_html(
             '<div style="display: flex; gap: 10px;">'
             '<a class="button" style="background-color: #3498db; color: white;" href="{}">'
-            'Force Update Details'
+            'Queue Update Details'
             '</a>'
             '<a class="button" style="background-color: #9b59b6; color: white;" href="{}">'
-            'Force Update Durations'
+            'Queue Update Durations'
             '</a>'
             '</div>',
             url_details,
@@ -370,14 +371,26 @@ class ShowAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
+    def _add_to_redis_queue(self, queue_name, object_id):
+        try:
+            r = Redis.from_url(settings.CELERY_BROKER_URL)
+            r.sadd(queue_name, object_id)
+            return True
+        except Exception:
+            return False
+
     def process_update_details(self, request, object_id):
-        run_specific_show_update.delay(object_id, 'updatedetails')
-        self.message_user(request, f'Task "Update Details" for Show {object_id} queued.')
+        if self._add_to_redis_queue('queue:update_details', object_id):
+            self.message_user(request, f'Show {object_id} added to "Update Details" queue.')
+        else:
+            self.message_user(request, 'Error connecting to Redis.', level='ERROR')
         return HttpResponseRedirect(reverse('admin:app_show_change', args=[object_id]))
 
     def process_update_durations(self, request, object_id):
-        run_specific_show_update.delay(object_id, 'updatedurations')
-        self.message_user(request, f'Task "Update Durations" for Show {object_id} queued.')
+        if self._add_to_redis_queue('queue:update_durations', object_id):
+            self.message_user(request, f'Show {object_id} added to "Update Durations" queue.')
+        else:
+            self.message_user(request, 'Error connecting to Redis.', level='ERROR')
         return HttpResponseRedirect(reverse('admin:app_show_change', args=[object_id]))
 
 

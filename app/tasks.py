@@ -16,7 +16,7 @@ from redis import Redis
 
 from app import history_parser
 from app.gdrive_backup import BackupManager
-from app.models import Code, LogEntry, TaskRun
+from app.models import Code, LogEntry, Show, TaskRun
 from app.telegram_bot import TelegramSender
 
 
@@ -249,14 +249,94 @@ def run_daily_sync_task():
     call_command('rundailysync')
 
 
-@shared_task
-@single_instance_task(lock_name='selenium_global_lock', timeout=600)
-def run_specific_show_update(show_id, command_name):
+def _process_batch_from_queue(queue_name, session_type, process_func, batch_size=50):
     """
-    Запускает обновление деталей или длительности для конкретного шоу.
+    Универсальная функция для обработки пакета ID из Redis очереди.
     """
-    logging.info(f'Starting forced {command_name} for Show ID {show_id}...')
+    redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
+
+    # Получаем количество элементов
+    count = redis_client.scard(queue_name)
+    if count == 0:
+        return
+
+    logging.info(f'Found {count} items in {queue_name}. Starting batch processing...')
+
+    # Забираем ID из множества (batch_size штук)
+    # spop удаляет элементы и возвращает их, это атомарно
+    raw_ids = redis_client.spop(queue_name, count=batch_size)
+    if not raw_ids:
+        return
+
+    show_ids = [int(id_bytes) for id_bytes in raw_ids]
+    logging.info(f'Processing batch of {len(show_ids)} shows: {show_ids}')
+
+    driver = history_parser.initialize_driver_session(headless=True, session_type=session_type)
+    if not driver:
+        # Если драйвер не стартанул, возвращаем ID обратно в очередь, чтобы не потерять
+        logging.error('Failed to init driver. Returning items to queue.')
+        redis_client.sadd(queue_name, *show_ids)
+        return
+
+    processed_count = 0
     try:
-        call_command(command_name, id=show_id)
-    except Exception as e:
-        logging.error(f'Error executing {command_name} for {show_id}: {e}', exc_info=True)
+        for show_id in show_ids:
+            try:
+                # Проверка на зависание сессии перед каждым действием
+                _ = driver.current_url
+
+                # Загружаем страницу шоу для подготовки (необходимо для некоторых функций)
+                driver.get(f'{settings.SITE_URL}item/view/{show_id}')
+                time.sleep(2)  # Небольшая пауза между запросами
+
+                if session_type == 'aux':
+                    # Для update_show_details
+                    process_func(driver, show_id)
+                else:
+                    # Для process_show_durations нам нужен объект Show
+                    try:
+                        show = Show.objects.get(id=show_id)
+                        process_func(driver, show)
+                    except Show.DoesNotExist:
+                        logging.warning(f'Show {show_id} not found in DB, skipping.')
+                        continue
+
+                processed_count += 1
+            except Exception as e:
+                logging.error(f'Error processing show {show_id} in batch: {e}')
+                if history_parser.is_fatal_selenium_error(e):
+                    logging.critical('Fatal driver error. Stopping batch.')
+                    break
+
+        if processed_count > 0:
+            logging.info(f'Batch finished. Processed {processed_count}/{len(show_ids)} items.')
+            BackupManager().schedule_backup()
+
+    finally:
+        history_parser.close_driver(driver)
+
+
+@shared_task
+@single_instance_task(lock_name='selenium_global_lock', timeout=1800)
+def process_details_queue_task():
+    """
+    Периодическая задача для обработки очереди обновлений деталей (aux account).
+    """
+    _process_batch_from_queue(
+        queue_name='queue:update_details',
+        session_type='aux',
+        process_func=history_parser.update_show_details,
+    )
+
+
+@shared_task
+@single_instance_task(lock_name='selenium_global_lock', timeout=1800)
+def process_durations_queue_task():
+    """
+    Периодическая задача для обработки очереди обновлений длительностей (main account).
+    """
+    _process_batch_from_queue(
+        queue_name='queue:update_durations',
+        session_type='main',
+        process_func=history_parser.process_show_durations,
+    )

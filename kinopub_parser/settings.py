@@ -261,6 +261,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.tasks.delete_old_logs_task',
         'schedule': crontab(minute=0, hour=0),  # every 24 hours
     },
+    'process_details_queue': {
+        'task': 'app.tasks.process_details_queue_task',
+        'schedule': crontab(minute='*/5'),  # Каждые 5 минут
+    },
+    'process_durations_queue': {
+        'task': 'app.tasks.process_durations_queue_task',
+        'schedule': crontab(minute='*/5'),  # Каждые 5 минут
+    },
 }
 
 if ENVIRONMENT == 'PROD':
