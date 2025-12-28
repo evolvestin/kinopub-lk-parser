@@ -19,7 +19,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 from django.http import HttpResponseRedirect
-from django.urls import reverse
+from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 
 # Импортируем нашу кастомную админку
@@ -38,6 +38,7 @@ from app.models import (
     ViewUser,
     ViewUserGroup,
 )
+from app.tasks import run_specific_show_update
 from app.telegram_bot import TelegramSender
 from app.views import sync_user_permissions
 
@@ -273,6 +274,7 @@ class ShowAdmin(admin.ModelAdmin):
     inlines = [ShowDurationInline, ViewHistoryInline, UserRatingInline]
     readonly_fields = (
         'id',
+        'admin_actions',  # Добавляем наше новое поле
         'title',
         'original_title',
         'type',
@@ -293,8 +295,6 @@ class ShowAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
 
-        # Используем подзапрос для подсчета длительности,
-        # чтобы избежать умножения суммы на количество просмотров (проблема JOIN)
         duration_subquery = (
             ShowDuration.objects.filter(show=OuterRef('pk'))
             .values('show')
@@ -332,6 +332,53 @@ class ShowAdmin(admin.ModelAdmin):
             return '-'
         avg = sum(r.rating for r in ratings) / len(ratings)
         return round(avg, 2)
+
+    @admin.display(description='Actions')
+    def admin_actions(self, obj):
+        if not obj.id:
+            return '-'
+
+        url_details = reverse('admin:show_update_details', args=[obj.id])
+        url_durations = reverse('admin:show_update_durations', args=[obj.id])
+
+        return format_html(
+            '<div style="display: flex; gap: 10px;">'
+            '<a class="button" style="background-color: #3498db; color: white;" href="{}">'
+            'Force Update Details'
+            '</a>'
+            '<a class="button" style="background-color: #9b59b6; color: white;" href="{}">'
+            'Force Update Durations'
+            '</a>'
+            '</div>',
+            url_details,
+            url_durations,
+        )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                '<int:object_id>/update-details/',
+                self.admin_site.admin_view(self.process_update_details),
+                name='show_update_details',
+            ),
+            path(
+                '<int:object_id>/update-durations/',
+                self.admin_site.admin_view(self.process_update_durations),
+                name='show_update_durations',
+            ),
+        ]
+        return custom_urls + urls
+
+    def process_update_details(self, request, object_id):
+        run_specific_show_update.delay(object_id, 'updatedetails')
+        self.message_user(request, f'Task "Update Details" for Show {object_id} queued.')
+        return HttpResponseRedirect(reverse('admin:app_show_change', args=[object_id]))
+
+    def process_update_durations(self, request, object_id):
+        run_specific_show_update.delay(object_id, 'updatedurations')
+        self.message_user(request, f'Task "Update Durations" for Show {object_id} queued.')
+        return HttpResponseRedirect(reverse('admin:app_show_change', args=[object_id]))
 
 
 @admin.register(ViewUser, site=admin_site)

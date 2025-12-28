@@ -3,6 +3,7 @@ import time
 
 from django.conf import settings
 from django.core.management.base import CommandError
+from django.utils import timezone
 
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
@@ -22,8 +23,14 @@ class Command(LoggableBaseCommand):
     )
 
     def add_arguments(self, parser):
+        # Делаем limit опциональным, так как при --id он не нужен,
+        # но для обратной совместимости оставляем nargs='?' и дефолт.
         parser.add_argument(
-            'limit', type=int, help='The maximum number of shows to process in one run.'
+            'limit',
+            type=int,
+            nargs='?',
+            default=10,
+            help='The maximum number of shows to process in one run.',
         )
         parser.add_argument(
             '--type',
@@ -31,26 +38,44 @@ class Command(LoggableBaseCommand):
             dest='type',
             help='Filter shows by type (e.g. Series, Movie).',
         )
+        parser.add_argument(
+            '--id',
+            type=int,
+            dest='id',
+            help='Specific Show ID to update (bypasses missing year check).',
+        )
 
     def handle(self, *args, **options):
         limit = options['limit']
         show_type = options.get('type')
+        specific_id = options.get('id')
 
-        if limit <= 0:
-            raise CommandError('Limit must be a positive integer.')
+        show_ids_to_update = []
 
-        msg = f'Searching for up to {limit} shows with missing year information'
-        if show_type:
-            msg += f' (type: {show_type})'
-        self.stdout.write(f'{msg}...')
+        if specific_id:
+            self.stdout.write(f'Forcing update for specific Show ID: {specific_id}...')
+            # Проверяем существование, но не проверяем year__isnull
+            if Show.objects.filter(id=specific_id).exists():
+                show_ids_to_update = [specific_id]
+            else:
+                self.stdout.write(self.style.ERROR(f'Show ID {specific_id} not found.'))
+                return
+        else:
+            if limit <= 0:
+                raise CommandError('Limit must be a positive integer.')
 
-        queryset = Show.objects.filter(year__isnull=True)
-        if show_type:
-            queryset = queryset.filter(type=show_type)
+            msg = f'Searching for up to {limit} shows with missing year information'
+            if show_type:
+                msg += f' (type: {show_type})'
+            self.stdout.write(f'{msg}...')
 
-        show_ids_to_update = list(
-            queryset.order_by('-created_at').values_list('id', flat=True)[:limit]
-        )
+            queryset = Show.objects.filter(year__isnull=True)
+            if show_type:
+                queryset = queryset.filter(type=show_type)
+
+            show_ids_to_update = list(
+                queryset.order_by('-created_at').values_list('id', flat=True)[:limit]
+            )
 
         if not show_ids_to_update:
             self.stdout.write(
@@ -84,6 +109,11 @@ class Command(LoggableBaseCommand):
                     show_url = f'{base_url}item/view/{show_id}'
                     driver.get(show_url)
                     time.sleep(8)
+
+                    # Если это принудительное обновление, очищаем год перед обновлением,
+                    # чтобы update_show_details точно отработала
+                    if specific_id:
+                        Show.objects.filter(id=show_id).update(year=None, updated_at=timezone.now())
 
                     update_show_details(driver, show_id)
 

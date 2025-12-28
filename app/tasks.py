@@ -247,3 +247,16 @@ def run_new_episodes_task():
 def run_daily_sync_task():
     logging.info('Starting Daily Synchronization Task via Celery.')
     call_command('rundailysync')
+
+
+@shared_task
+@single_instance_task(lock_name='selenium_global_lock', timeout=600)
+def run_specific_show_update(show_id, command_name):
+    """
+    Запускает обновление деталей или длительности для конкретного шоу.
+    """
+    logging.info(f'Starting forced {command_name} for Show ID {show_id}...')
+    try:
+        call_command(command_name, id=show_id)
+    except Exception as e:
+        logging.error(f'Error executing {command_name} for {show_id}: {e}', exc_info=True)

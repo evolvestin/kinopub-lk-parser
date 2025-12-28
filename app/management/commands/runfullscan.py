@@ -140,7 +140,8 @@ def run_full_scan_session(headless=True, target_type=None, process_all_pages=Fal
     start_mode = None
     start_page = 1
     resume_window = timezone.now() - timedelta(hours=settings.FULL_SCAN_RESUME_WINDOW_HOURS)
-    last_log = (
+
+    last_processing_log = (
         LogEntry.objects.filter(
             module='runfullscan',
             message__contains='Processing',
@@ -150,8 +151,25 @@ def run_full_scan_session(headless=True, target_type=None, process_all_pages=Fal
         .first()
     )
 
-    if last_log:
-        match = re.search(r"Processing '(\w+)' page (\d+)", last_log.message)
+    last_success_log = (
+        LogEntry.objects.filter(
+            module='runfullscan',
+            message__contains='Full catalog scan session finished successfully',
+            created_at__gte=resume_window,
+        )
+        .order_by('-created_at')
+        .first()
+    )
+
+    should_resume = False
+    if last_processing_log:
+        if not last_success_log or last_processing_log.created_at > last_success_log.created_at:
+            should_resume = True
+        else:
+            logging.info('Previous session finished successfully. Starting fresh scan.')
+
+    if should_resume and last_processing_log:
+        match = re.search(r"Processing '(\w+)' page (\d+)", last_processing_log.message)
         if match:
             found_mode = match.group(1)
             found_page = int(match.group(2))
