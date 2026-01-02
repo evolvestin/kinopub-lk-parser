@@ -1,3 +1,4 @@
+import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -35,9 +36,6 @@ class UserSyncMiddleware(BaseMiddleware):
 class LoggingMiddleware(BaseMiddleware):
     def __init__(self):
         super().__init__()
-        # Инициализируем логгер лениво или при создании, если бот доступен.
-        # Но BotInstance инициализируется в main.py.
-        # Здесь мы будем получать бота динамически через BotInstance в момент вызова.
         self._logger = None
 
     @property
@@ -53,14 +51,13 @@ class LoggingMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        # 1. Логируем входящее событие в БД Django (Raw JSON)
         try:
-            event_dict = event.model_dump(mode='json', exclude_none=True)
+            event_json = event.model_dump_json(exclude_none=True)
+            event_dict = json.loads(event_json)
             await client.log_telegram_event(event_dict)
         except Exception as e:
             logging.error(f'LoggingMiddleware (DB) error: {e}')
 
-        # 2. Логируем в Telegram канал (Formatted HTML)
         try:
             await self.logger.log_update(event)
         except Exception as e:

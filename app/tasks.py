@@ -317,26 +317,35 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
 
 
 @shared_task
-@single_instance_task(lock_name='selenium_global_lock', timeout=1800)
-def process_details_queue_task():
+@single_instance_task(lock_name='selenium_global_lock', timeout=3600)
+def process_queues_unified_task():
     """
-    Периодическая задача для обработки очереди обновлений деталей (aux account).
+    Объединенная задача для последовательной обработки очередей Redis.
+    Сначала обрабатывает детали (aux аккаунт), затем длительности (main аккаунт).
     """
-    _process_batch_from_queue(
-        queue_name='queue:update_details',
-        session_type='aux',
-        process_func=history_parser.update_show_details,
-    )
+    logging.info('Starting Unified Queue Processing Task.')
 
+    # 1. Processing Details (Aux account)
+    try:
+        _process_batch_from_queue(
+            queue_name='queue:update_details',
+            session_type='aux',
+            process_func=history_parser.update_show_details,
+        )
+    except Exception as e:
+        logging.error(f'Error during details processing phase: {e}', exc_info=True)
 
-@shared_task
-@single_instance_task(lock_name='selenium_global_lock', timeout=1800)
-def process_durations_queue_task():
-    """
-    Периодическая задача для обработки очереди обновлений длительностей (main account).
-    """
-    _process_batch_from_queue(
-        queue_name='queue:update_durations',
-        session_type='main',
-        process_func=history_parser.process_show_durations,
-    )
+    # Небольшая пауза между сессиями для очистки ресурсов
+    time.sleep(5)
+
+    # 2. Processing Durations (Main account)
+    try:
+        _process_batch_from_queue(
+            queue_name='queue:update_durations',
+            session_type='main',
+            process_func=history_parser.process_show_durations,
+        )
+    except Exception as e:
+        logging.error(f'Error during durations processing phase: {e}', exc_info=True)
+
+    logging.info('Unified Queue Processing Task Finished.')

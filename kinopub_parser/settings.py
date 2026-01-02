@@ -255,19 +255,15 @@ LOGGING = {
 CELERY_BEAT_SCHEDULE = {
     'expire_codes': {
         'task': 'app.tasks.expire_codes_task',
-        'schedule': crontab(),  # Каждую минуту в :00 секунд
+        'schedule': crontab(),  # Каждую минуту
     },
     'delete_old_logs': {
         'task': 'app.tasks.delete_old_logs_task',
         'schedule': crontab(minute=0, hour=0),  # every 24 hours
     },
-    'process_details_queue': {
-        'task': 'app.tasks.process_details_queue_task',
-        'schedule': crontab(minute='*/5'),  # Каждые 5 минут
-    },
-    'process_durations_queue': {
-        'task': 'app.tasks.process_durations_queue_task',
-        'schedule': crontab(minute='*/5'),  # Каждые 5 минут
+    'process_queues_unified': {
+        'task': 'app.tasks.process_queues_unified_task',
+        'schedule': crontab(minute='*/15'),  # Каждые 15 минут
     },
 }
 

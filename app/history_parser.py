@@ -91,11 +91,16 @@ def update_show_details(driver, show_id):
 
         logging.info(f'Fetching extended details for show id={show_id}')
 
-        info_table = driver.find_element(By.CSS_SELECTOR, '.table-responsive table')
+        wait = WebDriverWait(driver, 10)
+        info_table = wait.until(
+            expected_conditions.presence_of_element_located(
+                (By.CSS_SELECTOR, 'table.table-striped')
+            )
+        )
 
         def get_row_data(text_label):
             try:
-                row = info_table.find_element(By.XPATH, f".//tr[td[strong[text()='{text_label}']]]")
+                row = info_table.find_element(By.XPATH, f".//tr[td[contains(., '{text_label}')]]")
                 return row.find_element(By.CSS_SELECTOR, 'td:nth-child(2)')
             except NoSuchElementException:
                 return None
@@ -164,7 +169,7 @@ def update_show_details(driver, show_id):
 
         show.save()
 
-    except (NoSuchElementException, Show.DoesNotExist) as e:
+    except (NoSuchElementException, TimeoutException, Show.DoesNotExist) as e:
         logging.error(
             f'Could not fetch extended details for show id={show_id}. Info table may be missing.',
             exc_info=e,
