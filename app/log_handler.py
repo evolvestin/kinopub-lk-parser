@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -24,10 +25,16 @@ class DatabaseLogHandler(logging.Handler):
             now = timezone.now()
             msg = record.getMessage()
 
+            tb_str = None
+            if record.exc_info:
+                # Формируем полный трейсбек в строку
+                tb_str = ''.join(traceback.format_exception(*record.exc_info))
+
             self.log_entry_model.objects.create(
                 level=record.levelname[:10],
                 module=record.module[:100],
                 message=msg,
+                traceback=tb_str,
                 created_at=now,
                 updated_at=now,
             )
@@ -47,7 +54,10 @@ class DatabaseLogHandler(logging.Handler):
                 )
 
             if record.levelno >= logging.ERROR:
-                TelegramSender().send_dev_log(record.levelname, record.module, msg)
+                # Передаем также трейсбек
+                TelegramSender().send_dev_log(
+                    record.levelname, record.module, msg, traceback_str=tb_str
+                )
 
         except Exception:
             self.handleError(record)

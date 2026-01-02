@@ -702,7 +702,8 @@ def bot_create_log_entry(request):
         module = data.get('module', 'bot')
         message = data.get('message', '')
 
-        # Добавляем префикс bot. к модулю для ясности в общей таблице
+        traceback_str = data.get('traceback', None)
+
         if not module.startswith('bot.'):
             module = f'bot.{module}'
 
@@ -710,13 +711,13 @@ def bot_create_log_entry(request):
             level=level[:10],
             module=module[:100],
             message=message,
+            traceback=traceback_str,
             created_at=timezone.now(),
             updated_at=timezone.now(),
         )
 
-        # Если это ошибка от бота, тоже отправляем в DEV канал
         if level in ('ERROR', 'CRITICAL'):
-            TelegramSender().send_dev_log(level, module, message)
+            TelegramSender().send_dev_log(level, module, message, traceback_str)
 
         return JsonResponse({'status': 'ok'})
     except Exception as e:

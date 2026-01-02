@@ -261,9 +261,13 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.tasks.delete_old_logs_task',
         'schedule': crontab(minute=0, hour=0),  # every 24 hours
     },
-    'process_queues_unified': {
-        'task': 'app.tasks.process_queues_unified_task',
+    'process_queues': {
+        'task': 'app.tasks.process_queues_task',
         'schedule': crontab(minute='*/15'),  # Каждые 15 минут
+    },
+    'process_error_queue': {
+        'task': 'app.tasks.process_error_queue_task',
+        'schedule': crontab(minute='*/1'),  # Проверяем каждую минуту (отправка раз в 10 мин)
     },
 }
 

@@ -5,10 +5,11 @@ from django.apps import apps
 from django.conf import settings
 
 from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
+from app.services.error_aggregator import ErrorAggregator
 from shared.card_formatter import get_show_card_text
 from shared.constants import DATE_FORMAT, UserRole
 from shared.formatters import format_se
-from shared.html_helper import bold, code, html_link, html_secure, italic
+from shared.html_helper import bold, code, html_secure, italic
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +309,7 @@ class TelegramSender:
         }
         self._request('send_message', payload)
 
-    def send_dev_log(self, level: str, module: str, message: str):
+    def send_dev_log(self, level: str, module: str, message: str, traceback_str: str | None = None):
         if not settings.DEV_CHANNEL_ID:
             return
 
@@ -317,25 +318,48 @@ class TelegramSender:
                 return
 
         try:
-            bot_username = self.bot_username or 'Bot'
-            bot_link = html_link(f'https://t.me/{bot_username}', bot_username)
-            env_label = settings.ENVIRONMENT or 'unknown'
+            aggregator = ErrorAggregator()
+            aggregator.push_error(level, module, message, traceback_str)
+        except Exception as e:
+            print(f'Failed to push dev log to aggregator: {e}')
 
-            header = (
-                f'🚨 {bold(f"Error {bot_link} ({env_label.lower()}):")}\n'
-                f'Level: {bold(level)}\n'
-                f'Module: {code(module)}\n'
+    def send_batch_logs(self, logs: list[dict]):
+        """Метод для отправки пачки логов (вызывается из Celery задачи)."""
+        if not settings.DEV_CHANNEL_ID or not logs:
+            return
+
+        text_blocks = []
+        bot_username = self.bot_username or 'Bot'
+        env_label = settings.ENVIRONMENT or 'unknown'
+
+        header = f'🔥 {bold(f"Error Report ({len(logs)})")} | {env_label} | @{bot_username}'
+
+        for log in logs:
+            tb_info = ''
+            if log.get('traceback'):
+                # Обрезаем трейсбек, если он слишком огромный, чтобы влезло больше ошибок
+                tb_preview = log['traceback'][-1000:]
+                if len(log['traceback']) > 1000:
+                    tb_preview = f'...{tb_preview}'
+                tb_info = f'\n{code(tb_preview)}'
+
+            block = (
+                f'{bold(log["level"])} in {code(log["module"])}\n'
+                f'{html_secure(log["message"])}\n'
+                f'{tb_info}'
             )
+            text_blocks.append(block)
 
+        try:
             self._request(
                 'send_split_message',
                 payload={
                     'chat_id': settings.DEV_CHANNEL_ID,
-                    'text_blocks': [html_secure(message)],
+                    'text_blocks': text_blocks,
                     'header': header,
-                    'separator': '\n\n',
+                    'separator': '\n' + ('-' * 20) + '\n',
                     'parse_mode': 'HTML',
                 },
             )
         except Exception as e:
-            print(f'Failed to send dev log: {e}')
+            logger.error(f'Failed to send batch logs: {e}')

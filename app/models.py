@@ -241,6 +241,7 @@ class LogEntry(BaseModel):
     level = models.CharField(max_length=10)
     module = models.CharField(max_length=100)
     message = models.TextField()
+    traceback = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return (

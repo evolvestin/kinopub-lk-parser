@@ -17,6 +17,7 @@ from redis import Redis
 from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, Show, TaskRun
+from app.services.error_aggregator import ErrorAggregator
 from app.telegram_bot import TelegramSender
 
 
@@ -318,7 +319,7 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
 
 @shared_task
 @single_instance_task(lock_name='selenium_global_lock', timeout=3600)
-def process_queues_unified_task():
+def process_queues_task():
     """
     Объединенная задача для последовательной обработки очередей Redis.
     Сначала обрабатывает детали (aux аккаунт), затем длительности (main аккаунт).
@@ -349,3 +350,20 @@ def process_queues_unified_task():
         logging.error(f'Error during durations processing phase: {e}', exc_info=True)
 
     logging.info('Unified Queue Processing Task Finished.')
+
+
+@shared_task
+@safe_execution
+def process_error_queue_task():
+    """
+    Периодическая задача для отправки накопленных ошибок в Telegram.
+    Срабатывает раз в N минут (настраивается в агрегаторе), но запускается
+    планировщиком чаще для проверки готовности.
+    """
+
+    aggregator = ErrorAggregator()
+    batch = aggregator.get_batch_to_send()
+
+    if batch:
+        logging.info(f'Sending batch of {len(batch)} errors to Telegram.')
+        TelegramSender().send_batch_logs(batch)

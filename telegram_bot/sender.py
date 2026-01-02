@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 import client
@@ -111,8 +112,7 @@ class MessageSender:
 
         if response:
             try:
-                # Логируем успешную отправку (чистый объект Message)
-                msg_dump = response.model_dump(mode='json', exclude_none=True)
+                msg_dump = json.loads(response.model_dump_json(exclude_none=True))
                 await client.log_telegram_event(msg_dump)
             except Exception as e:
                 logging.error(f'Failed to log outgoing message: {e}')

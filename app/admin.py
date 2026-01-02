@@ -604,8 +604,8 @@ class ShowDurationAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
 class LogEntryAdmin(admin.ModelAdmin):
     list_display = ('colored_level', 'module', 'message', 'created_at', 'updated_at')
     list_filter = ('level', 'module', 'created_at')
-    search_fields = ('module', 'message')
-    readonly_fields = ('level', 'module', 'message', 'created_at', 'updated_at')
+    search_fields = ('module', 'message', 'traceback')
+    readonly_fields = ('level', 'module', 'message', 'traceback', 'created_at', 'updated_at')
 
     @admin.display(description='Level', ordering='level')
     def colored_level(self, obj):
