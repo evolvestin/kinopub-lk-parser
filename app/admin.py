@@ -10,6 +10,7 @@ from django.db.models import (
     CharField,
     Count,
     F,
+    IntegerField,
     Min,
     OuterRef,
     Q,
@@ -42,6 +43,7 @@ from app.models import (
 )
 from app.telegram_bot import TelegramSender
 from app.views import sync_user_permissions
+from shared.constants import UserRole
 
 
 def _format_object_list_html(queryset, url_name, count_attr='show_count'):
@@ -292,6 +294,7 @@ class ShowAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = ('directors', 'actors')
     filter_horizontal = ('countries', 'genres')
+    actions = ['action_update_details', 'action_update_durations']
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -393,15 +396,31 @@ class ShowAdmin(admin.ModelAdmin):
             self.message_user(request, 'Error connecting to Redis.', level='ERROR')
         return HttpResponseRedirect(reverse('admin:app_show_change', args=[object_id]))
 
+    @admin.action(description='Queue Update Details for selected shows')
+    def action_update_details(self, request, queryset):
+        count = 0
+        for show in queryset:
+            if self._add_to_redis_queue('queue:update_details', show.id):
+                count += 1
+        self.message_user(request, f'{count} shows added to "Update Details" queue.')
+
+    @admin.action(description='Queue Update Durations for selected shows')
+    def action_update_durations(self, request, queryset):
+        count = 0
+        for show in queryset:
+            if self._add_to_redis_queue('queue:update_durations', show.id):
+                count += 1
+        self.message_user(request, f'{count} shows added to "Update Durations" queue.')
+
 
 @admin.register(ViewUser, site=admin_site)
 class ViewUserAdmin(admin.ModelAdmin):
     list_display = (
         'telegram_id',
-        'name',
-        'username',
+        'get_colored_name',
+        'get_colored_username',
         'language',
-        'role',
+        'get_role_sortable',
         'is_bot_active',
         'get_django_user_link',
         'created_at',
@@ -417,6 +436,47 @@ class ViewUserAdmin(admin.ModelAdmin):
         'updated_at',
     )
     actions = ['resend_role_message']
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(
+            _role_rank=Case(
+                When(role=UserRole.GUEST, then=Value(1)),
+                When(role=UserRole.VIEWER, then=Value(2)),
+                When(role=UserRole.ADMIN, then=Value(3)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        )
+
+    def _get_role_color(self, role):
+        if role == UserRole.ADMIN:
+            return '#e74c3c'  # Red/Orange
+        elif role == UserRole.VIEWER:
+            return '#2ecc71'  # Green
+        return None
+
+    @admin.display(description='Name', ordering='name')
+    def get_colored_name(self, obj):
+        color = self._get_role_color(obj.role)
+        name = obj.name or '-'
+        if color:
+            return format_html('<span style="color: {}; font_weight: bold;">{}</span>', color, name)
+        return name
+
+    @admin.display(description='Username', ordering='username')
+    def get_colored_username(self, obj):
+        color = self._get_role_color(obj.role)
+        username = obj.username or '-'
+        if color:
+            return format_html(
+                '<span style="color: {}; font_weight: bold;">{}</span>', color, username
+            )
+        return username
+
+    @admin.display(description='Role', ordering='_role_rank')
+    def get_role_sortable(self, obj):
+        return obj.get_role_display()
 
     @admin.display(description='Bot Active', boolean=True)
     def is_bot_active(self, obj):

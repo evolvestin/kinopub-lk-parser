@@ -82,7 +82,6 @@ class ViewUser(BaseModel):
     )
 
     def update_personal_details(self, username, name, language, is_active=None):
-        """Обновляет данные пользователя и возвращает список измененных полей."""
         updated_fields = []
 
         if self.username != username:
@@ -107,7 +106,6 @@ class ViewUser(BaseModel):
         return updated_fields
 
     def delete(self, *args, **kwargs):
-        # Удаляем связанного Django-пользователя, если удаление инициировано со стороны ViewUser
         user = self.django_user
         super().delete(*args, **kwargs)
         if user:
@@ -124,6 +122,7 @@ class ViewUser(BaseModel):
     class Meta:
         verbose_name = 'View User'
         verbose_name_plural = 'View Users'
+        ordering = ['telegram_id']
 
 
 class ViewUserGroup(BaseModel):
