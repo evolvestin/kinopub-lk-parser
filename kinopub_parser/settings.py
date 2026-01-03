@@ -255,8 +255,11 @@ LOGGING = {
 class MultiSchedule(schedule):
     """Позволяет комбинировать несколько расписаний для одной задачи."""
 
-    def __init__(self, *schedules):
+    def __init__(self, *schedules, nowfun=None, app=None):
         self.schedules = schedules
+        # Инициализируем базовый класс с фиктивным интервалом (1 сек), 
+        # чтобы корректно установились атрибуты nowfun, app и др.
+        super().__init__(run_every=1, nowfun=nowfun, app=app)
 
     def is_due(self, last_run_at):
         # Проверяем все расписания
@@ -297,7 +300,8 @@ if ENVIRONMENT == 'PROD':
             'run_history_parser': {
                 'task': 'app.tasks.run_history_parser_task',
                 'schedule': MultiSchedule(
-                    crontab(minute=0, hour='0,4,7,11,14-23'), crontab(minute=30, hour='20-22')
+                    crontab(minute=0, hour='0,4,7,11,14-23'), 
+                    crontab(minute=30, hour='20-22')
                 ),
             },
             'run_daily_sync': {
