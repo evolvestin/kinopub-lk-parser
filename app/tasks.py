@@ -324,7 +324,7 @@ def process_queues_task():
 
         if count_details == 0 and count_durations == 0:
             return
-            
+
     except Exception as e:
         logging.error(f'Error checking Redis queues: {e}')
         return

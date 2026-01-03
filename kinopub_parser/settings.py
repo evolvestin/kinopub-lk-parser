@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from celery.schedules import crontab, schedule
+from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -270,17 +270,13 @@ class MultiSchedule:
         return any(due_results), min(delays)
 
     def remaining_estimate(self, last_run_at):
-        return min(
-            s.remaining_estimate(last_run_at)
-            for s in self.schedules
-            if s is not None
-        )
+        return min(s.remaining_estimate(last_run_at) for s in self.schedules if s is not None)
 
     def now(self):
         return self.schedules[0].now()
 
     def __repr__(self):
-        return " | ".join(repr(s) for s in self.schedules)
+        return ' | '.join(repr(s) for s in self.schedules)
 
 
 CELERY_BEAT_SCHEDULE = {
@@ -308,8 +304,7 @@ if ENVIRONMENT == 'PROD':
             'run_history_parser': {
                 'task': 'app.tasks.run_history_parser_task',
                 'schedule': MultiSchedule(
-                    crontab(minute=0, hour='0,5,7,11,14-23'), 
-                    crontab(minute=30, hour='20-22')
+                    crontab(minute=0, hour='0,5,7,11,14-23'), crontab(minute=30, hour='20-22')
                 ),
             },
             'run_daily_sync': {
