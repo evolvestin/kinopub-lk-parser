@@ -307,35 +307,64 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
 
 
 @shared_task
-@single_instance_task(lock_name='selenium_global_lock', timeout=3600)
+@safe_execution
 def process_queues_task():
     """
     Объединенная задача для последовательной обработки очередей Redis.
-    Сначала обрабатывает детали (aux аккаунт), затем длительности (main аккаунт).
+    Блокировка занимается ТОЛЬКО если в очередях есть задачи.
     """
+    queue_details = 'queue:update_details'
+    queue_durations = 'queue:update_durations'
 
-    # 1. Processing Details (Aux account)
+    # 1. Предварительная проверка наличия задач без захвата блокировки
     try:
-        _process_batch_from_queue(
-            queue_name='queue:update_details',
-            session_type='aux',
-            process_func=history_parser.update_show_details,
-        )
-    except Exception as e:
-        logging.error(f'Error during details processing phase: {e}', exc_info=True)
+        redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
+        count_details = redis_client.scard(queue_details)
+        count_durations = redis_client.scard(queue_durations)
 
-    # Небольшая пауза между сессиями для очистки ресурсов
-    time.sleep(5)
-
-    # 2. Processing Durations (Main account)
-    try:
-        _process_batch_from_queue(
-            queue_name='queue:update_durations',
-            session_type='main',
-            process_func=history_parser.process_show_durations,
-        )
+        if count_details == 0 and count_durations == 0:
+            return
+            
     except Exception as e:
-        logging.error(f'Error during durations processing phase: {e}', exc_info=True)
+        logging.error(f'Error checking Redis queues: {e}')
+        return
+
+    # 2. Если есть задачи, пытаемся захватить глобальный лок Selenium
+    logging.info(
+        f'Found items in queues (Details: {count_details}, Durations: {count_durations}). '
+        'Acquiring Selenium lock...'
+    )
+
+    with _redis_lock('selenium_global_lock', timeout=3600) as acquired:
+        if not acquired:
+            logging.warning('Skipping process_queues_task: selenium_global_lock is busy.')
+            return
+
+        # 3. Processing Details (Aux account)
+        if count_details > 0:
+            try:
+                _process_batch_from_queue(
+                    queue_name=queue_details,
+                    session_type='aux',
+                    process_func=history_parser.update_show_details,
+                )
+            except Exception as e:
+                logging.error(f'Error during details processing phase: {e}', exc_info=True)
+
+        # Небольшая пауза между сессиями для очистки ресурсов
+        if count_details > 0 and count_durations > 0:
+            time.sleep(5)
+
+        # 4. Processing Durations (Main account)
+        if count_durations > 0:
+            try:
+                _process_batch_from_queue(
+                    queue_name=queue_durations,
+                    session_type='main',
+                    process_func=history_parser.process_show_durations,
+                )
+            except Exception as e:
+                logging.error(f'Error during durations processing phase: {e}', exc_info=True)
 
 
 @shared_task

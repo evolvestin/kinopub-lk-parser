@@ -308,7 +308,7 @@ if ENVIRONMENT == 'PROD':
             'run_history_parser': {
                 'task': 'app.tasks.run_history_parser_task',
                 'schedule': MultiSchedule(
-                    crontab(minute=0, hour='0,4,7,11,14-23'), 
+                    crontab(minute=0, hour='0,5,7,11,14-23'), 
                     crontab(minute=30, hour='20-22')
                 ),
             },
