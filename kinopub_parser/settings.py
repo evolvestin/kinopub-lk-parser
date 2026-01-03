@@ -252,27 +252,35 @@ LOGGING = {
 }
 
 
-class MultiSchedule(schedule):
-    """Позволяет комбинировать несколько расписаний для одной задачи."""
-
-    def __init__(self, *schedules, nowfun=None, app=None):
+class MultiSchedule:
+    def __init__(self, *schedules):
         self.schedules = schedules
-        # Инициализируем базовый класс с фиктивным интервалом (1 сек), 
-        # чтобы корректно установились атрибуты nowfun, app и др.
-        super().__init__(run_every=1, nowfun=nowfun, app=app)
 
     def is_due(self, last_run_at):
-        # Проверяем все расписания
-        results = [s.is_due(last_run_at) for s in self.schedules]
-        # Если хотя бы одно готово к запуску - запускаем
-        for is_due, next_run in results:
-            if is_due:
-                return True, next_run
-        # Иначе ждем минимальное время до следующего запуска среди всех
-        return False, min(next_run for _, next_run in results)
+        due_results = []
+        delays = []
+
+        for s in self.schedules:
+            if s is None:
+                continue
+            is_due, delay = s.is_due(last_run_at)
+            due_results.append(is_due)
+            delays.append(delay)
+
+        return any(due_results), min(delays)
+
+    def remaining_estimate(self, last_run_at):
+        return min(
+            s.remaining_estimate(last_run_at)
+            for s in self.schedules
+            if s is not None
+        )
+
+    def now(self):
+        return self.schedules[0].now()
 
     def __repr__(self):
-        return ' | '.join(repr(s) for s in self.schedules)
+        return " | ".join(repr(s) for s in self.schedules)
 
 
 CELERY_BEAT_SCHEDULE = {
