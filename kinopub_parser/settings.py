@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from celery.schedules import crontab
+from celery.schedules import crontab, schedule
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
@@ -251,6 +251,27 @@ LOGGING = {
     },
 }
 
+
+class MultiSchedule(schedule):
+    """Позволяет комбинировать несколько расписаний для одной задачи."""
+
+    def __init__(self, *schedules):
+        self.schedules = schedules
+
+    def is_due(self, last_run_at):
+        # Проверяем все расписания
+        results = [s.is_due(last_run_at) for s in self.schedules]
+        # Если хотя бы одно готово к запуску - запускаем
+        for is_due, next_run in results:
+            if is_due:
+                return True, next_run
+        # Иначе ждем минимальное время до следующего запуска среди всех
+        return False, min(next_run for _, next_run in results)
+
+    def __repr__(self):
+        return ' | '.join(repr(s) for s in self.schedules)
+
+
 CELERY_BEAT_SCHEDULE = {
     'expire_codes': {
         'task': 'app.tasks.expire_codes_task',
@@ -275,10 +296,9 @@ if ENVIRONMENT == 'PROD':
         {
             'run_history_parser': {
                 'task': 'app.tasks.run_history_parser_task',
-                'schedule': [
-                    crontab(minute=0, hour='0,4,7,11,14-23'),
-                    crontab(minute=30, hour='20-22'),
-                ],
+                'schedule': MultiSchedule(
+                    crontab(minute=0, hour='0,4,7,11,14-23'), crontab(minute=30, hour='20-22')
+                ),
             },
             'run_daily_sync': {
                 'task': 'app.tasks.run_daily_sync_task',
