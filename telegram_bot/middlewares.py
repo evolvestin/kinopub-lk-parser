@@ -1,4 +1,3 @@
-import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -52,9 +51,9 @@ class LoggingMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         try:
-            event_json = event.model_dump_json(exclude_none=True)
-            event_dict = json.loads(event_json)
-            await client.log_telegram_event(event_dict)
+            await client.log_telegram_event(
+                raw_data=event.model_dump(mode='json', exclude_none=True, exclude_unset=True)
+            )
         except Exception as e:
             logging.error(f'LoggingMiddleware (DB) error: {e}')
 

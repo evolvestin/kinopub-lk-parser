@@ -313,7 +313,6 @@ def process_queues_task():
     Объединенная задача для последовательной обработки очередей Redis.
     Сначала обрабатывает детали (aux аккаунт), затем длительности (main аккаунт).
     """
-    logging.info('Starting Unified Queue Processing Task.')
 
     # 1. Processing Details (Aux account)
     try:
@@ -338,12 +337,10 @@ def process_queues_task():
     except Exception as e:
         logging.error(f'Error during durations processing phase: {e}', exc_info=True)
 
-    logging.info('Unified Queue Processing Task Finished.')
-
 
 @shared_task
 @safe_execution
-def process_error_queue_task():
+def process_errors_task():
     """
     Периодическая задача для отправки накопленных ошибок в Telegram.
     Срабатывает раз в N минут (настраивается в агрегаторе), но запускается

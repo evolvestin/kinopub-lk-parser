@@ -1,4 +1,3 @@
-import json
 import logging
 
 import client
@@ -38,11 +37,10 @@ async def handle_send_message(request):
             reply_markup=reply_markup,
             disable_web_page_preview=disable_web_page_preview,
         )
-
-        # Логируем исходящее сообщение (результат отправки)
         try:
-            msg_dump = json.loads(message.model_dump_json(exclude_none=True))
-            await client.log_telegram_event(msg_dump)
+            await client.log_telegram_event(
+                raw_data=message.model_dump(mode='json', exclude_none=True, exclude_unset=True)
+            )
         except Exception as e:
             logging.error(f'API logging error: {e}')
 

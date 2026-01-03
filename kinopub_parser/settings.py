@@ -189,7 +189,6 @@ SITE_URL = os.getenv('SITE_URL')
 KINOPUB_AUX_LOGIN = os.getenv('KINOPUB_AUX_LOGIN')
 KINOPUB_AUX_PASSWORD = os.getenv('KINOPUB_AUX_PASSWORD')
 SITE_AUX_URL = os.getenv('SITE_AUX_URL')
-HISTORY_PARSER_INTERVAL_HOURS = int(os.getenv('HISTORY_PARSER_INTERVAL_HOURS', 6))
 
 # --- App Core Config ---
 REGEX_CODE = r'\d{6}'
@@ -265,8 +264,8 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.tasks.process_queues_task',
         'schedule': crontab(minute='*/15'),  # Каждые 15 минут
     },
-    'process_error_queue': {
-        'task': 'app.tasks.process_error_queue_task',
+    'process_errors': {
+        'task': 'app.tasks.process_errors_task',
         'schedule': crontab(minute='*/1'),  # Проверяем каждую минуту (отправка раз в 10 мин)
     },
 }
@@ -276,11 +275,14 @@ if ENVIRONMENT == 'PROD':
         {
             'run_history_parser': {
                 'task': 'app.tasks.run_history_parser_task',
-                'schedule': crontab(minute=0, hour=f'*/{HISTORY_PARSER_INTERVAL_HOURS}'),
+                'schedule': [
+                    crontab(minute=0, hour='0,4,7,11,14-23'),
+                    crontab(minute=30, hour='20-22'),
+                ],
             },
             'run_daily_sync': {
                 'task': 'app.tasks.run_daily_sync_task',
-                'schedule': crontab(minute=0, hour=4),  # every 24 hours
+                'schedule': crontab(minute=0, hour=4),
             },
         }
     )
