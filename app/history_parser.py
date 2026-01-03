@@ -8,6 +8,7 @@ import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 import undetected_chromedriver as uc
 from django.conf import settings
@@ -83,6 +84,24 @@ def _extract_int_from_string(text):
 
 
 def update_show_details(driver, show_id):
+    target_path = f'item/view/{show_id}'
+
+    if target_path not in driver.current_url:
+        base_url = settings.SITE_URL
+
+        # Пытаемся сохранить текущий домен сессии (для поддержки зеркал/AUX)
+        if driver.current_url and driver.current_url.startswith('http'):
+            parsed = urlparse(driver.current_url)
+            if parsed.netloc:
+                base_url = f'{parsed.scheme}://{parsed.netloc}/'
+
+        try:
+            driver.get(f'{base_url}{target_path}')
+            time.sleep(2)
+        except Exception as e:
+            logging.error(f'Error navigating to show page {show_id}: {e}')
+            return
+
     try:
         show = Show.objects.get(id=show_id)
         three_months_ago = timezone.now() - timedelta(days=90)

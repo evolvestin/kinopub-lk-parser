@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0023_telegramlog_is_alive'),
     ]
@@ -12,7 +11,11 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name='viewuser',
-            options={'ordering': ['telegram_id'], 'verbose_name': 'View User', 'verbose_name_plural': 'View Users'},
+            options={
+                'ordering': ['telegram_id'],
+                'verbose_name': 'View User',
+                'verbose_name_plural': 'View Users',
+            },
         ),
         migrations.AddField(
             model_name='logentry',

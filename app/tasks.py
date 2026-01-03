@@ -256,15 +256,12 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
     """
     redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
 
-    # Получаем количество элементов
     count = redis_client.scard(queue_name)
     if count == 0:
         return
 
     logging.info(f'Found {count} items in {queue_name}. Starting batch processing...')
 
-    # Забираем ID из множества (batch_size штук)
-    # spop удаляет элементы и возвращает их, это атомарно
     raw_ids = redis_client.spop(queue_name, count=batch_size)
     if not raw_ids:
         return
@@ -274,7 +271,6 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
 
     driver = history_parser.initialize_driver_session(headless=True, session_type=session_type)
     if not driver:
-        # Если драйвер не стартанул, возвращаем ID обратно в очередь, чтобы не потерять
         logging.error('Failed to init driver. Returning items to queue.')
         redis_client.sadd(queue_name, *show_ids)
         return
@@ -283,18 +279,11 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
     try:
         for show_id in show_ids:
             try:
-                # Проверка на зависание сессии перед каждым действием
                 _ = driver.current_url
 
-                # Загружаем страницу шоу для подготовки (необходимо для некоторых функций)
-                driver.get(f'{settings.SITE_URL}item/view/{show_id}')
-                time.sleep(2)  # Небольшая пауза между запросами
-
                 if session_type == 'aux':
-                    # Для update_show_details
                     process_func(driver, show_id)
                 else:
-                    # Для process_show_durations нам нужен объект Show
                     try:
                         show = Show.objects.get(id=show_id)
                         process_func(driver, show)

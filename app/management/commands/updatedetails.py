@@ -1,7 +1,5 @@
 import logging
-import time
 
-from django.conf import settings
 from django.core.management.base import CommandError
 from django.utils import timezone
 
@@ -54,7 +52,6 @@ class Command(LoggableBaseCommand):
 
         if specific_id:
             self.stdout.write(f'Forcing update for specific Show ID: {specific_id}...')
-            # Проверяем существование, но не проверяем year__isnull
             if Show.objects.filter(id=specific_id).exists():
                 show_ids_to_update = [specific_id]
             else:
@@ -87,7 +84,6 @@ class Command(LoggableBaseCommand):
 
         driver = None
         updated_count = 0
-        base_url = settings.SITE_AUX_URL
 
         try:
             for i, show_id in enumerate(show_ids_to_update):
@@ -106,12 +102,6 @@ class Command(LoggableBaseCommand):
                     except Exception as e:
                         raise Exception(f'Driver unresponsive: {e}') from e
 
-                    show_url = f'{base_url}item/view/{show_id}'
-                    driver.get(show_url)
-                    time.sleep(8)
-
-                    # Если это принудительное обновление, очищаем год перед обновлением,
-                    # чтобы update_show_details точно отработала
                     if specific_id:
                         Show.objects.filter(id=show_id).update(year=None, updated_at=timezone.now())
 

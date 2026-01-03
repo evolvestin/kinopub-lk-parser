@@ -106,8 +106,6 @@ class Command(LoggableBaseCommand):
                                 f'Show {show_id} missing details/year. Performing full update...'
                             )
                             try:
-                                show_page_url = f'{settings.SITE_URL}item/view/{show_id}'
-                                driver.get(show_page_url)
                                 update_show_details(driver, show_id)
                                 process_show_durations(driver, show)
                                 delay_needed = True
