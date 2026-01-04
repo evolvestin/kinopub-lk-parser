@@ -322,4 +322,6 @@ class Command(LoggableBaseCommand):
             raise CommandError(
                 f'Invalid type: {target_type}. Choices: {", ".join(SHOW_TYPE_MAPPING.keys())}'
             )
-        return run_full_scan_session(target_type=target_type, process_all_pages=process_all_pages)
+        return str(
+            run_full_scan_session(target_type=target_type, process_all_pages=process_all_pages)
+        )

@@ -13,7 +13,7 @@ class Command(LoggableBaseCommand):
 
         call_command('runnewepisodes')
 
-        new_items_count = call_command('runfullscan') or 0
+        new_items_count = int(call_command('runfullscan') or 0)
         logging.info(f'Full scan finished. New items found: {new_items_count}')
 
         if new_items_count > 0:
