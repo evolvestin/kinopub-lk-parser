@@ -484,12 +484,10 @@ def bot_toggle_view_check(request):
 
         view = ViewHistory.objects.get(id=view_id)
 
-        # Проверка прав доступа
         if telegram_id:
             try:
                 user = ViewUser.objects.get(telegram_id=telegram_id)
                 if user.role == UserRole.VIEWER:
-                    # VIEWER может менять статус только если он сам есть в списке зрителей
                     if not view.users.filter(id=user.id).exists():
                         return JsonResponse(
                             {
@@ -509,6 +507,25 @@ def bot_toggle_view_check(request):
 
         status_text = 'учтен' if view.is_checked else 'не учтен'
         message = f'Просмотр теперь {status_text}.'
+
+        if not view.is_checked:
+            current_user_ids = set(view.users.values_list('id', flat=True))
+            
+            candidates = ViewHistory.objects.filter(
+                show=view.show,
+                season_number=view.season_number,
+                episode_number=view.episode_number,
+                is_checked=False
+            ).exclude(id=view.id).order_by('-view_date', '-id')
+
+            for candidate in candidates:
+                candidate_user_ids = set(candidate.users.values_list('id', flat=True))
+                if candidate_user_ids == current_user_ids:
+                    candidate.is_checked = True
+                    candidate.save(update_fields=['is_checked'])
+                    TelegramSender().update_history_message(candidate)
+                    message += f' Восстановлен статус просмотра от {candidate.view_date}.'
+                    break
 
         return JsonResponse({'status': 'ok', 'message': message, 'is_checked': view.is_checked})
 
