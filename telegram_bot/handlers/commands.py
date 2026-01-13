@@ -38,9 +38,9 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 if result and result.get('status') == 'ok':
                     action = result.get('action')
                     if action == 'added':
-                        await sender.send_message(user.id, '✅ Вы добавлены в список зрителей этого просмотра.')
+                        await sender.send_message(user.id, '✅ Вы добавлены в список зрителей.')
                     else:
-                        await sender.send_message(user.id, '🗑 Вы убраны из списка зрителей этого просмотра.')
+                        await sender.send_message(user.id, '🗑 Вы убраны из списка зрителей.')
                     
                     if show_id:
                         await _send_history_report(sender, user.id, show_id)
@@ -397,7 +397,7 @@ async def _send_ratings_report(sender: MessageSender, chat_id: int, show_id: int
     )
 
     if not blocks:
-        await sender.send_message(chat_id, 'Оценок пока нет.')
+        await sender.send_message(chat_id, text=f'{bold(header)}\nОценок пока нет.')
         return
 
     await sender.send_smart_split_text(
