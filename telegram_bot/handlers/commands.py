@@ -27,6 +27,30 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
     args = command.args if command else None
 
     if args:
+        if args.startswith('toggle_claim_'):
+            try:
+                parts = args.split('_')
+                view_id = int(parts[2])
+                show_id = int(parts[3]) if len(parts) > 3 else None
+
+                result = await client.toggle_view_user(user.id, view_id)
+                
+                if result and result.get('status') == 'ok':
+                    action = result.get('action')
+                    if action == 'added':
+                        await sender.send_message(user.id, '✅ Вы добавлены в список зрителей этого просмотра.')
+                    else:
+                        await sender.send_message(user.id, '🗑 Вы убраны из списка зрителей этого просмотра.')
+                    
+                    if show_id:
+                        await _send_history_report(sender, user.id, show_id)
+                else:
+                    await sender.send_message(user.id, '❌ Ошибка обновления статуса просмотра.')
+
+            except (IndexError, ValueError):
+                await sender.send_message(user.id, '❌ Некорректная ссылка.')
+            return
+
         if args.startswith('claim_') or args.startswith('unclaim_'):
             try:
                 parts = args.split('_')
@@ -73,6 +97,19 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка на оценку.')
             return
 
+        if args.startswith('show_'):
+            try:
+                show_id = int(args.split('_')[1])
+                show_data = await client.get_show_details(show_id, telegram_id=user.id)
+
+                if show_data:
+                    await _send_show_card(sender, user.id, show_data)
+                else:
+                    await sender.send_message(user.id, '❌ Контент не найден.')
+            except (IndexError, ValueError):
+                await sender.send_message(user.id, '❌ Некорректная ссылка на шоу.')
+            return
+
         if args.startswith('ratings_'):
             try:
                 show_id = int(args.split('_')[1])
@@ -105,6 +142,8 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
         text = f'⚠️ {bold("Ошибка регистрации.")}\nПопробуйте позже.'
 
     await sender.send_message(chat_id=user.id, text=text)
+    
+    
 
 
 async def handle_history_command(message: Message, bot: Bot):
@@ -129,10 +168,17 @@ async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int
         return
 
     title = html_secure(show_data.get('title', 'Unknown'))
-    history = show_data.get('view_history', [])
     bot_username = await BotInstance().get_bot_username()
 
-    lines = [f'📜 История просмотров: {bold(title)}', '']
+    if bot_username:
+        url = f'https://t.me/{bot_username}?start=show_{show_id}'
+        title_link = html_link(url, title)
+    else:
+        title_link = title
+
+    history = show_data.get('view_history', [])
+
+    lines = [f'📜 История просмотров: {bold(title_link)}', '']
 
     if not history:
         lines.append('Просмотров нет.')
@@ -338,11 +384,16 @@ async def _send_ratings_report(sender: MessageSender, chat_id: int, show_id: int
     if show_data.get('type') in SERIES_TYPES:
         ratings_details = await client.get_show_ratings_details(show_id)
 
+    bot_username = await BotInstance().get_bot_username()
+
     header, separator, blocks = get_ratings_report_blocks(
-        show_data.get('type'),
-        show_data.get('user_ratings', []),
-        ratings_details,
-        show_data.get('internal_rating'),
+        show_type=show_data.get('type'),
+        user_ratings_summary=show_data.get('user_ratings', []),
+        ratings_details=ratings_details,
+        internal_rating=show_data.get('internal_rating'),
+        title=show_data.get('title'),
+        show_id=show_id,
+        bot_username=bot_username,
     )
 
     if not blocks:

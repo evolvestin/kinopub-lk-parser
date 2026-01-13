@@ -1,4 +1,5 @@
 from shared.constants import SERIES_TYPES
+from shared.formatters import format_se
 from shared.html_helper import bold, html_link, html_secure, italic
 
 RATINGS_TRUNCATE_COUNT = 6
@@ -111,12 +112,27 @@ def get_ratings_report_blocks(
     user_ratings_summary: list[dict],
     ratings_details: list[dict] = None,
     internal_rating: float | None = None,
+    title: str | None = None,
+    show_id: int | None = None,
+    bot_username: str | None = None,
 ) -> tuple[str, str, list[str]]:
-    from shared.formatters import format_se
+    header_parts = ['📋']
+    
+    if title:
+        if show_id and bot_username:
+            url = f'https://t.me/{bot_username}?start=show_{show_id}'
+            header_parts.append(f'Оценки: {html_link(url, html_secure(title))}')
+        else:
+            header_parts.append(f'Оценки: {html_secure(title)}')
+    else:
+        header_parts.append('Все оценки')
 
-    header = '📋 Все оценки'
     if internal_rating:
-        header += f' ({internal_rating:.1f}/10):'
+        header_parts.append(f'({internal_rating:.1f}/10):')
+    else:
+        header_parts[-1] += ':'
+        
+    header = ' '.join(header_parts)
 
     blocks = []
     separator = '\n'

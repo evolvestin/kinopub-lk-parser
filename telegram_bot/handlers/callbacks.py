@@ -354,11 +354,16 @@ async def show_ratings_list_handler(callback: CallbackQuery, bot: Bot):
     if show_data.get('type') in SERIES_TYPES:
         ratings_details = await client.get_show_ratings_details(show_id)
 
+    bot_username = await BotInstance().get_bot_username()
+
     header, separator, blocks = get_ratings_report_blocks(
-        show_data.get('type'),
-        show_data.get('user_ratings', []),
-        ratings_details,
-        show_data.get('internal_rating'),
+        show_type=show_data.get('type'),
+        user_ratings_summary=show_data.get('user_ratings', []),
+        ratings_details=ratings_details,
+        internal_rating=show_data.get('internal_rating'),
+        title=show_data.get('title'),
+        show_id=show_id,
+        bot_username=bot_username,
     )
 
     if not blocks:

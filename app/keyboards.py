@@ -40,7 +40,14 @@ def get_history_notification_keyboard(
                 }
             ]
         )
-        buttons.append([{'text': watch_btn_text, 'callback_data': f'claim_toggle_{view_id}'}])
+        
+        if bot_username:
+            url_watch = (
+                f'https://t.me/{bot_username}?start=toggle_claim_{view_id}_{show_id}'
+            )
+            buttons.append([{'text': watch_btn_text, 'url': url_watch}])
+        else:
+            buttons.append([{'text': watch_btn_text, 'callback_data': f'claim_toggle_{view_id}'}])
 
         if bot_username:
             season_number = season if season else 0
