@@ -181,3 +181,13 @@ async def send_log_entry(level: str, module: str, message: str):
                     print(f'Failed to send log entry to backend. Status: {response.status}')
     except Exception as e:
         print(f'Connection error while sending log entry: {e}')
+
+
+async def get_user_groups(telegram_id: int) -> list:
+    data = await _execute_request('get_user_groups/', params={'telegram_id': telegram_id})
+    return data.get('groups', []) if data else []
+
+
+async def assign_group_view(telegram_id: int, group_id: int, view_id: int) -> dict | None:
+    payload = {'telegram_id': telegram_id, 'group_id': group_id, 'view_id': view_id}
+    return await _execute_request('assign_group_view/', method='POST', payload=payload)

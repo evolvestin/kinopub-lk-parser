@@ -117,7 +117,7 @@ def get_ratings_report_blocks(
     bot_username: str | None = None,
 ) -> tuple[str, str, list[str]]:
     header_parts = ['📋']
-    
+
     if title:
         if show_id and bot_username:
             url = f'https://t.me/{bot_username}?start=show_{show_id}'
@@ -131,7 +131,7 @@ def get_ratings_report_blocks(
         header_parts.append(f'({internal_rating:.1f}/10):')
     else:
         header_parts[-1] += ':'
-        
+
     header = ' '.join(header_parts)
 
     blocks = []

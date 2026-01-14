@@ -104,6 +104,9 @@ def register_router() -> Router:
     router.callback_query.register(
         callbacks.claim_toggle_handler, F.data.startswith('claim_toggle_')
     )
+    router.callback_query.register(callbacks.claim_group_handler, F.data.startswith('claim_group_'))
+    router.callback_query.register(callbacks.claim_self_handler, F.data.startswith('claim_self_'))
+    router.callback_query.register(callbacks.delete_msg_handler, F.data == 'delete_msg')
 
     # Рейтинг (Шоу)
     router.callback_query.register(

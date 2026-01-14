@@ -375,3 +375,46 @@ async def show_ratings_list_handler(callback: CallbackQuery, bot: Bot):
     await MessageSender(bot).send_smart_split_text(
         chat_id=callback.from_user.id, text_blocks=blocks, header=bold(header), separator=separator
     )
+
+
+@safe_callback
+async def claim_group_handler(callback: CallbackQuery, bot: Bot):
+    if await _check_guest_restriction(callback, callback.from_user.id):
+        return
+
+    view_id, group_id = get_args(callback.data, 2, 3)
+    result = await client.assign_group_view(callback.from_user.id, group_id, view_id)
+
+    if result and result.get('status') == 'ok':
+        added = result.get('added_count', 0)
+        gname = result.get('group_name', 'Group')
+        await callback.message.edit_text(
+            f'✅ Группа {bold(gname)} учтена ({added} новых зрителей).', reply_markup=None
+        )
+    else:
+        await callback.answer('Ошибка при добавлении группы', show_alert=True)
+
+
+@safe_callback
+async def claim_self_handler(callback: CallbackQuery, bot: Bot):
+    if await _check_guest_restriction(callback, callback.from_user.id):
+        return
+
+    view_id = get_args(callback.data, -1)
+    # Используем старую логику переключения для себя
+    result = await client.toggle_view_user(callback.from_user.id, view_id)
+
+    if result and result.get('status') == 'ok':
+        text = (
+            '✅ Вы добавлены в список зрителей.'
+            if result.get('action') == 'added'
+            else '🗑 Вы убраны из списка зрителей.'
+        )
+        await callback.message.edit_text(text, reply_markup=None)
+    else:
+        await callback.answer('Ошибка обновления статуса', show_alert=True)
+
+
+@safe_callback
+async def delete_msg_handler(callback: CallbackQuery, bot: Bot):
+    await callback.message.delete()

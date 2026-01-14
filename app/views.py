@@ -14,7 +14,16 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from app.dashboard import dashboard_callback
-from app.models import LogEntry, Show, ShowDuration, TelegramLog, UserRating, ViewHistory, ViewUser
+from app.models import (
+    LogEntry,
+    Show,
+    ShowDuration,
+    TelegramLog,
+    UserRating,
+    ViewHistory,
+    ViewUser,
+    ViewUserGroup,
+)
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
 from shared.formatters import format_se
@@ -510,13 +519,17 @@ def bot_toggle_view_check(request):
 
         if not view.is_checked:
             current_user_ids = set(view.users.values_list('id', flat=True))
-            
-            candidates = ViewHistory.objects.filter(
-                show=view.show,
-                season_number=view.season_number,
-                episode_number=view.episode_number,
-                is_checked=False
-            ).exclude(id=view.id).order_by('-view_date', '-id')
+
+            candidates = (
+                ViewHistory.objects.filter(
+                    show=view.show,
+                    season_number=view.season_number,
+                    episode_number=view.episode_number,
+                    is_checked=False,
+                )
+                .exclude(id=view.id)
+                .order_by('-view_date', '-id')
+            )
 
             for candidate in candidates:
                 candidate_user_ids = set(candidate.users.values_list('id', flat=True))
@@ -737,5 +750,58 @@ def bot_create_log_entry(request):
             TelegramSender().send_dev_log(level, module, message, traceback_str)
 
         return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@protected_bot_api
+@require_http_methods(['GET'])
+def bot_get_user_groups(request):
+    telegram_id = request.GET.get('telegram_id')
+    try:
+        user = ViewUser.objects.get(telegram_id=telegram_id)
+        groups = user.groups.all()
+        results = [{'id': g.id, 'name': g.name} for g in groups]
+        return JsonResponse({'groups': results})
+    except ViewUser.DoesNotExist:
+        return JsonResponse({'groups': []})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@protected_bot_api
+@require_http_methods(['POST'])
+def bot_assign_group_view(request):
+    try:
+        data = json.loads(request.body)
+        telegram_id = data.get('telegram_id')
+        view_id = data.get('view_id')
+        group_id = data.get('group_id')
+
+        # Проверяем права пользователя (должен быть в группе)
+        user = ViewUser.objects.get(telegram_id=telegram_id)
+        group = ViewUserGroup.objects.get(id=group_id)
+
+        if user not in group.users.all():
+            return JsonResponse({'status': 'error', 'error': 'User not in group'}, status=403)
+
+        view_history = ViewHistory.objects.get(id=view_id)
+
+        group_users = group.users.all()
+        added_count = 0
+        for group_member in group_users:
+            if not view_history.users.filter(id=group_member.id).exists():
+                view_history.users.add(group_member)
+                added_count += 1
+
+        if added_count > 0:
+            TelegramSender().update_history_message(view_history)
+
+        return JsonResponse({'status': 'ok', 'added_count': added_count, 'group_name': group.name})
+
+    except (ViewUser.DoesNotExist, ViewUserGroup.DoesNotExist, ViewHistory.DoesNotExist):
+        return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)

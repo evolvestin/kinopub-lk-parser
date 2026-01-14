@@ -214,3 +214,21 @@ def get_episodes_keyboard(
     return _build_grid_keyboard(
         buttons, items_per_row=4, back_callback=f'rate_mode_ep_{show_id}{suffix}'
     )
+
+
+def get_claim_mode_keyboard(view_id: int, groups: list[dict], show_id: int = None):
+    buttons = [[InlineKeyboardButton(text='👤 Только я', callback_data=f'claim_self_{view_id}')]]
+
+    for group in groups:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=f'👥 {group["name"]}',
+                    callback_data=f'claim_group_{view_id}_{group["id"]}',
+                )
+            ]
+        )
+
+    buttons.append([InlineKeyboardButton(text='❌ Отмена', callback_data='delete_msg')])
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
