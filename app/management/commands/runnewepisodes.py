@@ -45,7 +45,6 @@ class Command(LoggableBaseCommand):
                 logging.info(f'Found {total_pages} pages of new episodes for {show_type}.')
 
                 stop_parsing = False
-                category_processed_count = 0
 
                 for page in range(1, total_pages + 1):
                     if stop_parsing:
@@ -63,6 +62,8 @@ class Command(LoggableBaseCommand):
                         logging.warning(f'No items found on page {page}.')
                         continue
 
+                    new_items_on_page = 0
+
                     for item in items:
                         show_id = item['show_id']
                         season = item['season']
@@ -77,12 +78,7 @@ class Command(LoggableBaseCommand):
                         ).exists()
 
                         if show_has_details and duration_exists:
-                            logging.info(
-                                f'Data exists for {item["title"]} {format_se(season, episode)}.'
-                                f' Stopping scan for {show_type}.'
-                            )
-                            stop_parsing = True
-                            break
+                            continue
 
                         logging.info(f'Processing update for: {item["title"]} (ID: {show_id})')
 
@@ -123,12 +119,19 @@ class Command(LoggableBaseCommand):
                             except Exception as e:
                                 logging.error(f'Failed duration update for {show_id}: {e}')
 
-                        category_processed_count += 1
+                        new_items_on_page += 1
                         total_processed_count += 1
 
                         if delay_needed:
                             logging.info('Waiting 60s before next request...')
                             time.sleep(60)
+
+                    if new_items_on_page == 0:
+                        logging.info(
+                            f'Page {page} contains only existing items. '
+                            f'Stopping scan for {show_type}.'
+                        )
+                        stop_parsing = True
 
                 logging.info(f'--- New Episodes Parser Finished ({url_type}) ---')
 
