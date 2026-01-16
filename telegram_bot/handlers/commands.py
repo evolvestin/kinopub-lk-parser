@@ -73,6 +73,15 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 show_id = int(parts[2]) if len(parts) > 2 else None
 
                 if action == 'claim':
+                    groups = await client.get_user_groups(user.id)
+                    if groups:
+                        await sender.send_message(
+                            chat_id=user.id,
+                            text=f'{bold("Выберите режим отметки просмотра:")}',
+                            keyboard=keyboards.get_claim_mode_keyboard(view_id, groups, show_id),
+                        )
+                        return
+
                     result = await client.assign_view(user.id, view_id)
                     if not (result and result.get('status') == 'ok'):
                         await sender.send_message(user.id, '❌ Не удалось добавить просмотр.')
