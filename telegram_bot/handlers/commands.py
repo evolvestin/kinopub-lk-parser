@@ -11,9 +11,8 @@ from services.bot_instance import BotInstance
 
 from shared.card_formatter import get_ratings_report_blocks, get_show_card_text
 from shared.constants import SERIES_TYPES, UserRole
-from shared.html_helper import bold, html_link, html_secure
-
-ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+from shared.formatters import format_se
+from shared.html_helper import bold, html_link, html_secure, italic
 
 
 async def bot_command_start_private(message: Message, bot: Bot, command: CommandObject = None):
@@ -209,6 +208,8 @@ async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int
         for item in history:
             date_str = item['date']
             view_id = item.get('id')
+            season = item.get('season')
+            episode = item.get('episode')
 
             if item.get('message_id') and channel_id:
                 link = None
@@ -217,6 +218,10 @@ async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int
 
                 if link:
                     date_str = html_link(link, date_str)
+
+            se_info = ''
+            if season and season > 0:
+                se_info = f' {italic(format_se(season, episode))}'
 
             cmd_part = ''
             if view_id:
@@ -227,7 +232,7 @@ async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int
                     url = f'https://t.me/{bot_username}?start=claim_{view_id}_{show_id}'
                     cmd_part = f' ({html_link(url, "claim")})'
 
-            line = f'{date_str}{cmd_part}'
+            line = f'{date_str}{se_info}{cmd_part}'
 
             if users := item['users']:
                 line += f': {", ".join(users)}'
