@@ -190,10 +190,11 @@ async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int
 
     history = show_data.get('view_history', [])
 
-    lines = [f'📜 История просмотров: {bold(title_link)}', '']
+    header = f'📜 История просмотров: {bold(title_link)}\n'
+    text_blocks = []
 
     if not history:
-        lines.append('Просмотров нет.')
+        text_blocks.append('Просмотров нет.')
     else:
         channel_id = os.getenv('HISTORY_CHANNEL_ID')
         for item in history:
@@ -222,9 +223,11 @@ async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int
             if users := item['users']:
                 line += f': {", ".join(users)}'
 
-            lines.append(line)
+            text_blocks.append(line)
 
-    await sender.send_message(chat_id, '\n'.join(lines))
+    await sender.send_smart_split_text(
+        chat_id=chat_id, text_blocks=text_blocks, header=header, separator='\n'
+    )
 
 
 async def bot_command_start_group(message: Message, bot: Bot):
