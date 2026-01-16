@@ -79,6 +79,8 @@ def _serialize_show_details(show, user=None):
             {
                 'id': h.id,
                 'date': h.view_date.strftime('%Y-%m-%d'),
+                'season': h.season_number,
+                'episode': h.episode_number,
                 'users': [
                     f'@{u.username}' if u.username else u.name or str(u.telegram_id)
                     for u in h.users.all()
