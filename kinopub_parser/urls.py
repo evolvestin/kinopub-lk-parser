@@ -12,6 +12,10 @@ urlpatterns = [
     path(
         'favicon.ico', RedirectView.as_view(url=settings.STATIC_URL + 'favicon.ico', permanent=True)
     ),
+    # WebApp Endpoints
+    path('webapp/', views.webapp_index, name='webapp_index'),
+    path('api/webapp/stats/', views.webapp_get_stats, name='webapp_get_stats'),
+    # Bot API Endpoints
     path('api/bot/check/<int:telegram_id>/', views.check_bot_user),
     path('api/bot/register/', views.register_bot_user),
     path('api/bot/set_role/', views.set_bot_user_role),

@@ -5,7 +5,7 @@ import client
 import keyboards
 from aiogram import Bot
 from aiogram.filters import CommandObject
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 from sender import MessageSender
 from services.bot_instance import BotInstance
 
@@ -457,3 +457,21 @@ async def handle_history_action_command(message: Message, bot: Bot):
 
     # Обновляем список, присылая новое сообщение
     await _send_history_report(sender, user_id, show_id)
+
+
+async def handle_stats_command(message: Message, bot: Bot):
+    """
+    Отправляет кнопку для открытия WebApp со статистикой.
+    """
+    web_app_url = f'{os.getenv("BACKEND_URL").rstrip("/")}/webapp/'
+
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text='📊 Моя статистика', web_app=WebAppInfo(url=web_app_url))]
+        ]
+    )
+
+    await message.answer(
+        text=f'{bold("Личная статистика")}\nНажмите на кнопку ниже, чтобы открыть приложение.',
+        reply_markup=keyboard,
+    )
