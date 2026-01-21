@@ -328,38 +328,39 @@ class TelegramSender:
         if not settings.DEV_CHANNEL_ID or not logs:
             return
 
-        text_blocks = []
-        bot_username = self.bot_username or 'Bot'
         env_label = settings.ENVIRONMENT or 'unknown'
 
-        header = f'🔥 {bold(f"Error Report ({len(logs)})")} | {env_label} | @{bot_username}'
-
         for log in logs:
-            tb_info = ''
+            # Формируем блоки для ОДНОЙ конкретной ошибки
+            text_blocks = []
+
+            # 1. Заголовок ошибки
+            header = f'{bold(log["level"])} | {env_label} | {code(log["module"])}'
+
+            # 2. Сообщение
+            text_blocks.append(html_secure(log['message']))
+
+            # 3. Трейсбек (если есть)
             if log.get('traceback'):
-                # Обрезаем трейсбек, если он слишком огромный, чтобы влезло больше ошибок
-                tb_preview = log['traceback'][-1000:]
-                if len(log['traceback']) > 1000:
-                    tb_preview = f'...{tb_preview}'
-                tb_info = f'\n{code(tb_preview)}'
+                # Ограничиваем размер трейсбека разумными пределами (на всякий случай),
+                # но оставляем достаточно много, так как send_split_message разобьет его.
+                tb_content = log['traceback']
+                if len(tb_content) > 3000:
+                    tb_content = f'{tb_content[:1000]}\n...[cut]...\n{tb_content[-2000:]}'
 
-            block = (
-                f'{bold(log["level"])} in {code(log["module"])}\n'
-                f'{html_secure(log["message"])}\n'
-                f'{tb_info}'
-            )
-            text_blocks.append(block)
+                text_blocks.append(code(tb_content))
 
-        try:
-            self._request(
-                'send_split_message',
-                payload={
-                    'chat_id': settings.DEV_CHANNEL_ID,
-                    'text_blocks': text_blocks,
-                    'header': header,
-                    'separator': '\n' + ('-' * 20) + '\n',
-                    'parse_mode': 'HTML',
-                },
-            )
-        except Exception as e:
-            logger.error(f'Failed to send batch logs: {e}')
+            try:
+                # Отправляем каждую ошибку отдельным "разбиваемым" сообщением
+                self._request(
+                    'send_split_message',
+                    payload={
+                        'chat_id': settings.DEV_CHANNEL_ID,
+                        'text_blocks': text_blocks,
+                        'header': header,
+                        'separator': '\n\n',
+                        'parse_mode': 'HTML',
+                    },
+                )
+            except Exception as e:
+                logger.error(f'Failed to send individual log entry: {e}')

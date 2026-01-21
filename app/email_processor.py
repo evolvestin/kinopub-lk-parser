@@ -67,7 +67,6 @@ def get_message_body(email_msg) -> str:
 
 
 def process_emails(mail, shutdown_flag):
-    """Searches and processes all unread emails."""
     try:
         status, data = mail.uid('SEARCH', None, 'UNSEEN', 'FROM', f'"{settings.ALLOWED_SENDER}"')
         if status != 'OK':
@@ -90,13 +89,12 @@ def process_emails(mail, shutdown_flag):
             status, msg_data = mail.uid('FETCH', uid, '(BODY.PEEK[HEADER.FIELDS (DATE)])')
             received_at_dt = timezone.now()
 
-            if status == 'OK' and msg_data and msg_data[0]:
+            if status == 'OK' and msg_data and isinstance(msg_data[0], tuple):
                 try:
                     date_header = msg_data[0][1].decode('utf-8').split(':', 1)[1].strip()
-                    # parsedate_to_datetime автоматически обрабатывает смещение часового пояса
                     dt = parsedate_to_datetime(date_header)
                     received_at_dt = dt.astimezone(datetime.UTC)
-                except (ValueError, TypeError, IndexError) as e:
+                except (ValueError, TypeError, IndexError, AttributeError) as e:
                     logging.warning(
                         'Could not parse date for uid=%s (%s). Using current time.', uid, e
                     )
@@ -104,7 +102,7 @@ def process_emails(mail, shutdown_flag):
                 logging.warning('Could not fetch date for uid=%s. Using current time.', uid)
 
             status, msg_data = mail.uid('FETCH', uid, '(RFC822)')
-            if status != 'OK' or not msg_data or not msg_data[0]:
+            if status != 'OK' or not msg_data or not isinstance(msg_data[0], tuple):
                 logging.warning('Could not fetch full message for uid=%s. Skipping.', uid)
                 continue
 
@@ -119,7 +117,6 @@ def process_emails(mail, shutdown_flag):
                 code_str = code_match.group(0)
                 logging.info('Found code %s in email (uid=%s)', code_str, uid)
 
-                # Отправляем код в Telegram с моноширинным форматированием для удобного копирования
                 message_id = TelegramSender().send_message(code(code_str))
                 if message_id:
                     Code.objects.create(
