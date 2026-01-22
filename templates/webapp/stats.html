@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Моя Статистика</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: var(--tg-theme-bg-color, #18181b);
+            color: var(--tg-theme-text-color, #ffffff);
+        }
+        .card-bg {
+            background-color: var(--tg-theme-secondary-bg-color, #27272a);
+        }
+        .hint-color {
+            color: var(--tg-theme-hint-color, #a1a1aa);
+        }
+        .accent-color {
+            color: var(--tg-theme-link-color, #3b82f6);
+        }
+        .button-bg {
+            background-color: var(--tg-theme-button-color, #3b82f6);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 select-none">
+    <div id="loader" class="flex items-center justify-center h-screen">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+    </div>
+
+    <div id="content" class="hidden max-w-md mx-auto space-y-4">
+        <!-- Profile Header -->
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white">
+                <span id="user-avatar-text">?</span>
+            </div>
+            <div>
+                <h1 id="user-name" class="text-lg font-bold leading-tight">Загрузка...</h1>
+                <p id="user-role" class="text-xs hint-color uppercase tracking-wider">GUEST</p>
+            </div>
+        </div>
+
+        <!-- Main Stats Grid -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="card-bg p-4 rounded-xl flex flex-col items-center justify-center text-center">
+                <span class="text-3xl font-bold mb-1" id="stat-episodes">0</span>
+                <span class="text-xs hint-color uppercase">Эпизодов</span>
+            </div>
+            <div class="card-bg p-4 rounded-xl flex flex-col items-center justify-center text-center">
+                <span class="text-3xl font-bold mb-1" id="stat-movies">0</span>
+                <span class="text-xs hint-color uppercase">Фильмов</span>
+            </div>
+        </div>
+
+        <!-- Total Time Card -->
+        <div class="card-bg p-5 rounded-xl">
+            <h2 class="text-sm hint-color uppercase mb-2">Общее время просмотра</h2>
+            <p id="stat-duration" class="text-2xl font-mono font-bold tracking-tight text-green-400">0д 0ч 0м</p>
+            <p class="text-xs hint-color mt-1">Сериалов просмотрено: <span id="stat-series" class="text-white">0</span></p>
+        </div>
+
+        <!-- History List -->
+        <div class="mt-6">
+            <h2 class="text-sm hint-color uppercase mb-3 pl-1">Последние просмотры</h2>
+            <div id="history-list" class="space-y-2">
+                <!-- Items injected here -->
+            </div>
+        </div>
+    </div>
+
+    <div id="error-screen" class="hidden flex flex-col items-center justify-center h-screen text-center p-4">
+        <div class="text-red-500 text-5xl mb-4">⚠️</div>
+        <h2 class="text-xl font-bold mb-2">Ошибка доступа</h2>
+        <p id="error-msg" class="hint-color text-sm">Не удалось загрузить данные.</p>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/webapp/stats/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ init_data: tg.initData })
+                });
+
+                if (!response.ok) {
+                    throw new Error((await response.json()).error || 'Network error');
+                }
+
+                const data = await response.json();
+                renderData(data);
+            } catch (e) {
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('error-screen').classList.remove('hidden');
+                document.getElementById('error-msg').textContent = e.message;
+            }
+        }
+
+        function renderData(data) {
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('content').classList.remove('hidden');
+
+            // User Info
+            document.getElementById('user-name').textContent = data.user.name || 'User';
+            document.getElementById('user-role').textContent = data.user.role;
+            const initials = (data.user.name || 'U').charAt(0).toUpperCase();
+            document.getElementById('user-avatar-text').textContent = initials;
+
+            // Stats
+            document.getElementById('stat-episodes').textContent = data.stats.episodes;
+            document.getElementById('stat-movies').textContent = data.stats.movies;
+            document.getElementById('stat-series').textContent = data.stats.series;
+            document.getElementById('stat-duration').textContent = data.stats.duration_text;
+
+            // History
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            
+            if (data.history.length === 0) {
+                list.innerHTML = '<p class="text-center hint-color text-sm py-4">История пуста</p>';
+            }
+
+            data.history.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'card-bg p-3 rounded-lg flex justify-between items-center';
+                
+                const icon = item.type === 'Movie' ? '🎬' : '📺';
+                
+                div.innerHTML = `
+                    <div class="flex items-center space-x-3 overflow-hidden">
+                        <span class="text-lg">${icon}</span>
+                        <div class="flex flex-col overflow-hidden">
+                            <span class="text-sm font-medium truncate w-full">${item.label}</span>
+                        </div>
+                    </div>
+                    <span class="text-xs hint-color whitespace-nowrap ml-2">${item.date}</span>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        loadStats();
+    </script>
+</body>
+</html>
