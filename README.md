@@ -90,3 +90,4 @@ The service is configured entirely through environment variables defined in the 
 
 *   **Secrets**: All sensitive credentials are kept in the `.env` file, which is included in `.gitignore` to prevent it from being committed to version control.
 *   **Non-Root Container**: The Docker container runs under a dedicated, unprivileged `app` user for improved security.
+test
