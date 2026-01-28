@@ -1,3 +1,4 @@
+import os
 import logging
 
 import client
@@ -170,6 +171,9 @@ async def start_api_server(bot: Bot):
 
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8081)
+
+    port = int(os.getenv('BOT_API_PORT', 8081))
+    
+    site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    logging.info('Internal Bot API server started on port 8081')
+    logging.info(f'Internal Bot API server started on port {port}')

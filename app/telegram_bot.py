@@ -20,7 +20,9 @@ class TelegramSender:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.service_url = 'http://telegram-bot:8081/api'
+            cls._instance.service_url = (
+                f'http://{settings.BOT_API_HOST}:{settings.BOT_API_PORT}/api'
+            )
             cls._instance._bot_username = None
         return cls._instance
 

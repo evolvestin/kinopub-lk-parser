@@ -169,6 +169,8 @@ MARK_AS_SEEN = True
 ENVIRONMENT = os.getenv('ENVIRONMENT')
 
 # --- Bot Integration Config ---
+BOT_API_HOST = os.getenv('BOT_API_HOST', 'telegram-bot')
+BOT_API_PORT = int(os.getenv('BOT_API_PORT', 8081))
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CODES_CHANNEL_ID = os.getenv('CODES_CHANNEL_ID')
 USER_MANAGEMENT_CHANNEL_ID = os.getenv('USER_MANAGEMENT_CHANNEL_ID')
