@@ -6,7 +6,7 @@ import uuid
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
+from django.db.models import Case, Count, OuterRef, Q, Subquery, Sum, When
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -24,6 +24,7 @@ from app.models import (
     ViewUser,
     ViewUserGroup,
 )
+from app.services.telegram_auth import validate_telegram_init_data
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
 from shared.formatters import format_se
@@ -807,3 +808,98 @@ def bot_assign_group_view(request):
         return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+
+def webapp_index(request):
+    return render(request, 'webapp/stats.html')
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_get_stats(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Invalid authentication data'}, status=403)
+
+        telegram_id = tg_user.get('id')
+        try:
+            view_user = ViewUser.objects.get(telegram_id=telegram_id)
+        except ViewUser.DoesNotExist:
+            return JsonResponse({'error': 'User not found in database'}, status=404)
+
+        # Stats calculation logic specific to user
+        episode_duration_query = ShowDuration.objects.filter(
+            show_id=OuterRef('show_id'),
+            season_number=OuterRef('season_number'),
+            episode_number=OuterRef('episode_number'),
+        )
+        movie_duration_query = ShowDuration.objects.filter(
+            show_id=OuterRef('show_id'),
+            season_number__isnull=True,
+            episode_number__isnull=True,
+        )
+
+        user_history = ViewHistory.objects.filter(users=view_user)
+
+        total_seconds_result = user_history.annotate(
+            duration=Case(
+                When(
+                    season_number=0,
+                    then=Subquery(movie_duration_query.values('duration_seconds')[:1]),
+                ),
+                default=Subquery(episode_duration_query.values('duration_seconds')[:1]),
+            )
+        ).aggregate(total_duration=Sum('duration'))
+
+        total_seconds = total_seconds_result.get('total_duration') or 0
+        total_minutes = total_seconds // 60
+        hours = total_minutes // 60
+        days = hours // 24
+        hours_rem = hours % 24
+        minutes_rem = total_minutes % 60
+
+        stats_agg = user_history.aggregate(
+            episodes=Count('id', filter=Q(season_number__gt=0)),
+            movies=Count('id', filter=Q(season_number=0)),
+            series=Count('show_id', distinct=True, filter=Q(show__type='Series')),
+        )
+
+        last_views_qs = user_history.select_related('show').order_by('-view_date', '-created_at')[
+            :10
+        ]
+
+        last_views = []
+        for v in last_views_qs:
+            title = v.show.title or v.show.original_title
+            label = title
+            if v.season_number:
+                label = f'{title} ({format_se(v.season_number, v.episode_number)})'
+
+            last_views.append(
+                {'label': label, 'date': v.view_date.strftime('%d.%m.%Y'), 'type': v.show.type}
+            )
+
+        return JsonResponse(
+            {
+                'user': {
+                    'name': view_user.name,
+                    'username': view_user.username,
+                    'role': view_user.get_role_display(),
+                },
+                'stats': {
+                    'duration_text': f'{days}д {hours_rem}ч {minutes_rem}м',
+                    'episodes': stats_agg['episodes'],
+                    'movies': stats_agg['movies'],
+                    'series': stats_agg['series'],
+                },
+                'history': last_views,
+            }
+        )
+
+    except Exception as e:
+        logging.error(f'WebApp Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Internal server error'}, status=500)
