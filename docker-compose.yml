@@ -1,19 +1,16 @@
 services:
-  # Service for setting permissions on the data folder before launching the application
   init:
     image: busybox
-    container_name: kinopub-parser-init
     command: sh -c "mkdir -p /data && chown -R 1000:1000 /data"
     volumes:
       - ./data:/data
 
   web:
     build: .
-    container_name: kinopub-parser-web
     restart: unless-stopped
     env_file: .env
     ports:
-      - "8012:8000"
+      - "${WEB_PORT:-8012}:8000"
     volumes:
       - .:/app:delegated
       - ./data:/data
@@ -51,11 +48,10 @@ services:
 
   asgi:
     build: .
-    container_name: kinopub-parser-asgi
     restart: unless-stopped
     env_file: .env
     ports:
-      - "8013:8001"
+      - "${ASGI_PORT:-8013}:8001"
     volumes:
       - .:/app:delegated
     command: daphne -b 0.0.0.0 -p 8001 kinopub_parser.asgi:application
@@ -74,7 +70,6 @@ services:
 
   db:
     image: postgres:16-alpine
-    container_name: kinopub-parser-db
     restart: unless-stopped
     env_file: .env
     volumes:
@@ -89,14 +84,12 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: kinopub-parser-redis
     restart: unless-stopped
     networks:
       - kinopub-net
 
   celery:
     build: .
-    container_name: kinopub-parser-celery
     command: celery -A kinopub_parser worker -l INFO
     restart: unless-stopped
     env_file: .env
@@ -121,7 +114,6 @@ services:
 
   celery-beat:
       build: .
-      container_name: kinopub-parser-celery-beat
       command: celery -A kinopub_parser beat -l INFO --schedule=/data/celerybeat-schedule
       restart: unless-stopped
       env_file: .env
@@ -145,7 +137,6 @@ services:
 
   email-listener:
     build: .
-    container_name: kinopub-parser-email-listener
     command: python manage.py runemail_listener
     restart: unless-stopped
     env_file: .env
@@ -160,7 +151,6 @@ services:
   telegram-bot:
     build:
       context: ./telegram_bot
-    container_name: kinopub-parser-bot
     restart: unless-stopped
     env_file: .env
     environment:
@@ -176,7 +166,7 @@ services:
 
 volumes:
   pgdata:
-    name: kinopub_parser_pgdata
+    name: ${PG_VOLUME_NAME:-kinopub_parser_pgdata}
 
 networks:
   kinopub-net:
