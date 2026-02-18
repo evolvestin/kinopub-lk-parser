@@ -4,15 +4,16 @@ import os
 import client
 from aiogram import Router
 from aiogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
     InlineQuery,
     InlineQueryResultArticle,
     InputTextMessageContent,
+    LinkPreviewOptions,
 )
 from services.bot_instance import BotInstance
 
 from shared.card_formatter import get_show_card_text
+from shared.constants import UserRole
+from shared.html_helper import bold
 
 router = Router()
 
@@ -20,11 +21,42 @@ router = Router()
 @router.inline_query()
 async def inline_search_handler(query: InlineQuery):
     text = query.query.strip()
+    user_id = query.from_user.id
+
+    role = await client.check_user_role(user_id)
+    show_history_flag = role != UserRole.GUEST
+
+    if not text:
+        help_article = InlineQueryResultArticle(
+            id='help',
+            title='Поиск сериалов и фильмов',
+            description='Введите название для поиска...',
+            thumbnail_url='https://img.icons8.com/ios/50/search--v1.png',
+            input_message_content=InputTextMessageContent(
+                message_text='Введите название фильма или сериала после имени бота для поиска.',
+                parse_mode='HTML',
+            ),
+        )
+        await query.answer([help_article], cache_time=1, is_personal=True)
+        return
+
     if len(text) < 2:
         return
 
     results_data = await client.search_shows(text)
+
     if not results_data:
+        not_found_article = InlineQueryResultArticle(
+            id='not_found',
+            title='Ничего не найдено',
+            description=f'По запросу "{text}" ничего не найдено',
+            thumbnail_url='https://img.icons8.com/ios/50/nothing-found.png',
+            input_message_content=InputTextMessageContent(
+                message_text=f'😔 По запросу {bold(text)} ничего не найдено.',
+                parse_mode='HTML',
+            ),
+        )
+        await query.answer([not_found_article], cache_time=5, is_personal=False)
         return
 
     bot_username = await BotInstance().get_bot_username()
@@ -37,8 +69,6 @@ async def inline_search_handler(query: InlineQuery):
         year = item.get('year')
         poster = item.get('poster_url')
 
-        # Генерируем текст карточки используя общую функцию
-        # Передаем базовые данные, так как персональные рейтинги в инлайне недоступны
         card_text = get_show_card_text(
             show_id=show_id,
             title=title,
@@ -53,28 +83,16 @@ async def inline_search_handler(query: InlineQuery):
             imdb_url=item.get('imdb_url'),
             kinopoisk_rating=item.get('kinopoisk_rating'),
             kinopoisk_url=item.get('kinopoisk_url'),
-            internal_rating=None,  # Нет данных в поиске
-            user_ratings=None,  # Нет данных в поиске
+            internal_rating=None,
+            user_ratings=None,
             bot_username=bot_username,
-            show_history=False,  # Скрываем историю в общем виде
-        )
-
-        # Клавиатура с переходом в бота для действий
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text='🔗 Открыть / Действия',
-                        url=f'https://t.me/{bot_username}?start=show_{show_id}',
-                    )
-                ]
-            ]
+            show_history=show_history_flag,
         )
 
         input_content = InputTextMessageContent(
             message_text=card_text,
             parse_mode='HTML',
-            disable_web_page_preview=True,
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
         )
 
         description = f'{year} | {item.get("type", "Show")}'
@@ -91,8 +109,8 @@ async def inline_search_handler(query: InlineQuery):
             thumbnail_width=50,
             thumbnail_height=75,
             input_message_content=input_content,
-            reply_markup=keyboard,
+            reply_markup=None,
         )
         articles.append(article)
 
-    await query.answer(articles, cache_time=300, is_personal=False)
+    await query.answer(articles, cache_time=300, is_personal=True)

@@ -177,6 +177,7 @@ async def main():
         'callback_query',
         'my_chat_member',
         'chat_member',
+        'inline_query',
     ]
 
     await dispatcher.start_polling(bot, allowed_updates=allowed_updates)
