@@ -74,8 +74,11 @@ async def update_user_data(
     return bool(data)
 
 
-async def search_shows(query: str) -> list:
-    data = await _execute_request('search/', params={'q': query})
+async def search_shows(query: str, telegram_id: int = None) -> list:
+    params = {'q': query}
+    if telegram_id:
+        params['telegram_id'] = telegram_id
+    data = await _execute_request('search/', params=params)
     return data.get('results', []) if data else []
 
 

@@ -43,7 +43,7 @@ async def inline_search_handler(query: InlineQuery):
     if len(text) < 2:
         return
 
-    results_data = await client.search_shows(text)
+    results_data = await client.search_shows(text, telegram_id=user_id)
 
     if not results_data:
         not_found_article = InlineQueryResultArticle(
@@ -83,8 +83,8 @@ async def inline_search_handler(query: InlineQuery):
             imdb_url=item.get('imdb_url'),
             kinopoisk_rating=item.get('kinopoisk_rating'),
             kinopoisk_url=item.get('kinopoisk_url'),
-            internal_rating=None,
-            user_ratings=None,
+            internal_rating=item.get('internal_rating'),
+            user_ratings=item.get('user_ratings'),
             bot_username=bot_username,
             show_history=show_history_flag,
         )

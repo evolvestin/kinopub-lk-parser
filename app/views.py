@@ -368,10 +368,9 @@ def bot_search_shows(request):
     if not query:
         return JsonResponse({'results': []})
 
-    # Поиск по названию, лимит 20 для инлайна
     shows = (
         Show.objects.filter(Q(title__icontains=query) | Q(original_title__icontains=query))
-        .prefetch_related('countries', 'genres')
+        .prefetch_related('countries', 'genres', 'ratings__user')
         .distinct()[:20]
     )
 
@@ -379,8 +378,9 @@ def bot_search_shows(request):
     poster_base = settings.POSTER_BASE_URL.rstrip('/')
 
     for show in shows:
-        # Формируем URL постера
         poster_url = f'{poster_base}/small/{show.id}.jpg'
+
+        internal_rating, user_ratings = show.get_internal_rating_data()
 
         results.append(
             {
@@ -397,6 +397,8 @@ def bot_search_shows(request):
                 'kinopoisk_url': show.kinopoisk_url,
                 'countries': [str(c) for c in show.countries.all()[:3]],
                 'genres': [g.name for g in show.genres.all()[:3]],
+                'internal_rating': internal_rating,
+                'user_ratings': user_ratings,
             }
         )
 
