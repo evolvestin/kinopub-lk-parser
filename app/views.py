@@ -368,13 +368,20 @@ def bot_search_shows(request):
     if not query:
         return JsonResponse({'results': []})
 
-    # Поиск по названию или оригинальному названию (макс 10 результатов)
-    shows = Show.objects.filter(
-        Q(title__icontains=query) | Q(original_title__icontains=query)
-    ).distinct()[:10]
+    # Поиск по названию, лимит 20 для инлайна
+    shows = (
+        Show.objects.filter(Q(title__icontains=query) | Q(original_title__icontains=query))
+        .prefetch_related('countries', 'genres')
+        .distinct()[:20]
+    )
 
     results = []
+    poster_base = settings.POSTER_BASE_URL.rstrip('/')
+
     for show in shows:
+        # Формируем URL постера
+        poster_url = f'{poster_base}/small/{show.id}.jpg'
+
         results.append(
             {
                 'id': show.id,
@@ -382,6 +389,14 @@ def bot_search_shows(request):
                 'original_title': show.original_title,
                 'year': show.year,
                 'type': show.type,
+                'status': show.status,
+                'poster_url': poster_url,
+                'imdb_rating': show.imdb_rating,
+                'kinopoisk_rating': show.kinopoisk_rating,
+                'imdb_url': show.imdb_url,
+                'kinopoisk_url': show.kinopoisk_url,
+                'countries': [str(c) for c in show.countries.all()[:3]],
+                'genres': [g.name for g in show.genres.all()[:3]],
             }
         )
 
@@ -873,14 +888,24 @@ def webapp_get_stats(request):
         ]
 
         last_views = []
+        poster_base = settings.POSTER_BASE_URL.rstrip('/')
+
         for v in last_views_qs:
             title = v.show.title or v.show.original_title
             label = title
             if v.season_number:
                 label = f'{title} ({format_se(v.season_number, v.episode_number)})'
 
+            # Формируем URL постера: BASE_URL + size + ID.jpg
+            poster_url = f'{poster_base}/small/{v.show.id}.jpg'
+
             last_views.append(
-                {'label': label, 'date': v.view_date.strftime('%d.%m.%Y'), 'type': v.show.type}
+                {
+                    'label': label,
+                    'date': v.view_date.strftime('%d.%m.%Y'),
+                    'type': v.show.type,
+                    'poster': poster_url,
+                }
             )
 
         return JsonResponse(

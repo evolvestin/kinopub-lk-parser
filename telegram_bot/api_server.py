@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 
 import client
 from aiogram import Bot
@@ -7,6 +7,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineKeyboardMarkup
 from aiohttp import web
 from sender import MessageSender
+from services.url_store import URLStore
 
 
 def _get_validated_markup(markup_data):
@@ -160,6 +161,25 @@ async def handle_send_split_message(request):
         return web.json_response({'ok': False, 'description': str(e)}, status=500)
 
 
+async def handle_internal_set_url(request):
+    expected_token = os.getenv('BOT_TOKEN')
+    if request.headers.get('X-Bot-Token') != expected_token:
+        return web.json_response({'ok': False, 'error': 'Unauthorized'}, status=403)
+
+    try:
+        data = await request.json()
+        url = data.get('url')
+        if not url:
+            return web.json_response({'ok': False, 'error': 'No URL provided'}, status=400)
+
+        URLStore().set_url(url)
+        logging.info(f'WebApp URL updated via Internal API: {url}')
+        return web.json_response({'ok': True})
+    except Exception as e:
+        logging.error(f'Error setting URL via API: {e}')
+        return web.json_response({'ok': False, 'error': str(e)}, status=500)
+
+
 async def start_api_server(bot: Bot):
     app = web.Application()
     app['bot'] = bot
@@ -168,12 +188,13 @@ async def start_api_server(bot: Bot):
     app.router.add_post('/api/send_split_message', handle_send_split_message)
     app.router.add_post('/api/edit_message', handle_edit_message)
     app.router.add_post('/api/delete_message', handle_delete_message)
+    app.router.add_post('/api/internal/set_url', handle_internal_set_url)
 
     runner = web.AppRunner(app)
     await runner.setup()
 
     port = int(os.getenv('BOT_API_PORT', 8081))
-    
+
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
     logging.info(f'Internal Bot API server started on port {port}')

@@ -7,7 +7,7 @@ from aiogram import Dispatcher, F, Router
 from aiogram.enums import ChatType
 from aiogram.filters import CommandStart
 from api_server import start_api_server
-from handlers import callbacks, commands, member
+from handlers import callbacks, commands, inline, member
 from middlewares import (
     LoggingMiddleware,
     UserSyncMiddleware,
@@ -70,9 +70,13 @@ def register_router() -> Router:
     # --- Middlewares ---
     router.message.middleware(UserSyncMiddleware())
     router.callback_query.middleware(UserSyncMiddleware())
+    router.inline_query.middleware(UserSyncMiddleware())
 
     # --- Member Status Updates (Block/Unblock) ---
     router.include_router(member.router)
+
+    # --- Inline Mode ---
+    router.include_router(inline.router)
 
     # --- Commands ---
     router.message.register(

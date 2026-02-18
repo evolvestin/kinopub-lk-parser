@@ -8,6 +8,7 @@ from aiogram.filters import CommandObject
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 from sender import MessageSender
 from services.bot_instance import BotInstance
+from services.url_store import URLStore
 
 from shared.card_formatter import get_ratings_report_blocks, get_show_card_text
 from shared.constants import SERIES_TYPES, UserRole
@@ -463,7 +464,18 @@ async def handle_stats_command(message: Message, bot: Bot):
     """
     Отправляет кнопку для открытия WebApp со статистикой.
     """
-    web_app_url = f'{os.getenv("BACKEND_URL").rstrip("/")}/webapp/'
+    dynamic_url = URLStore().get_url()
+
+    # Приоритет: Динамическая ссылка -> ENV переменная -> Бэкенд
+    base_url = (
+        dynamic_url
+        or os.getenv('WEBAPP_PUBLIC_URL')
+        or os.getenv('BACKEND_URL')
+        or 'http://localhost:8000'
+    )
+
+    base_url = base_url.rstrip('/')
+    web_app_url = f'{base_url}/webapp/'
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -471,7 +483,16 @@ async def handle_stats_command(message: Message, bot: Bot):
         ]
     )
 
+    debug_info = ''
+    user_id = message.from_user.id
+    role = await client.check_user_role(user_id)
+    if role == UserRole.ADMIN:
+        debug_info = f'\n\n🔧 {italic(f"URL: {base_url}")}'
+
     await message.answer(
-        text=f'{bold("Личная статистика")}\nНажмите на кнопку ниже, чтобы открыть приложение.',
+        text=(
+            f'{bold("Личная статистика")}\n'
+            f'Нажмите на кнопку ниже, чтобы открыть приложение.{debug_info}'
+        ),
         reply_markup=keyboard,
     )

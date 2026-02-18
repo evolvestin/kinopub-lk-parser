@@ -163,6 +163,35 @@ services:
       - ./telegram_bot:/app
     networks:
       - kinopub-net
+  
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --url http://web:8000 --protocol http2
+    profiles:
+      - dev 
+    networks:
+      - kinopub-net
+    depends_on:
+      web:
+        condition: service_started
+  
+  tunnel-monitor:
+    build:
+      context: ./tunnel_monitor
+    profiles:
+      - dev
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - kinopub-net
+    depends_on:
+      telegram-bot:
+        condition: service_started
+      tunnel:
+        condition: service_started
 
 volumes:
   pgdata:

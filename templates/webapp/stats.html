@@ -1,150 +1,316 @@
 <!DOCTYPE html>
-<html lang="ru" class="dark">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Моя Статистика</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Статистика</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        bg: 'var(--bg-color)',
+                        card: 'var(--card-bg)',
+                        txt: 'var(--text-primary)',
+                        hint: 'var(--text-secondary)',
+                        accent: 'var(--accent-color)',
+                        'accent-fg': 'var(--accent-text)',
+                        separator: 'var(--separator)',
+                    },
+                    animation: {
+                        'slide-up': 'slideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards',
+                    },
+                    keyframes: {
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
     <style>
+        :root {
+            /* Light Theme Defaults */
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --accent-color: #3b82f6;
+            --accent-text: #ffffff;
+            --separator: #e5e7eb;
+        }
+
+        html.dark {
+            /* Exact match with Admin Panel (base_site.html) */
+            --bg-color: #14181f;
+            --card-bg: #1b1f26;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --accent-color: #2ecc71;
+            --accent-text: #ffffff;
+            --separator: #2d333b;
+        }
+
         body {
-            background-color: var(--tg-theme-bg-color, #18181b);
-            color: var(--tg-theme-text-color, #ffffff);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            -webkit-font-smoothing: antialiased;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
-        .card-bg {
-            background-color: var(--tg-theme-secondary-bg-color, #27272a);
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+        .tap-effect {
+            transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .hint-color {
-            color: var(--tg-theme-hint-color, #a1a1aa);
+        .tap-effect:active {
+            transform: scale(0.97);
         }
-        .accent-color {
-            color: var(--tg-theme-link-color, #3b82f6);
+
+        .card-shadow {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         }
-        .button-bg {
-            background-color: var(--tg-theme-button-color, #3b82f6);
-            color: var(--tg-theme-button-text-color, #ffffff);
+        html.dark .card-shadow {
+            box-shadow: none;
+            border: 1px solid var(--separator);
         }
+
+        .delay-100 { animation-delay: 100ms; }
+        .delay-200 { animation-delay: 200ms; }
+        .delay-300 { animation-delay: 300ms; }
+        .delay-400 { animation-delay: 400ms; }
     </style>
 </head>
-<body class="min-h-screen p-4 select-none">
-    <div id="loader" class="flex items-center justify-center h-screen">
-        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+<body class="min-h-screen p-5 select-none overflow-x-hidden">
+
+    <div class="fixed top-5 right-5 z-50">
+        <button id="theme-toggle" class="w-10 h-10 rounded-full bg-card shadow-lg flex items-center justify-center text-txt tap-effect transition-colors duration-300 border border-separator">
+        </button>
     </div>
 
-    <div id="content" class="hidden max-w-md mx-auto space-y-4">
-        <!-- Profile Header -->
-        <div class="flex items-center space-x-3 mb-6">
-            <div class="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white">
-                <span id="user-avatar-text">?</span>
+    <div id="loader" class="flex flex-col items-center justify-center h-[80vh] space-y-4 transition-opacity duration-300">
+        <div class="relative w-12 h-12">
+            <div class="absolute inset-0 border-4 border-accent/20 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-accent rounded-full border-t-transparent animate-spin"></div>
+        </div>
+    </div>
+
+    <div id="content" class="hidden max-w-md mx-auto space-y-6 pb-12">
+        
+        <header class="flex items-center space-x-4 opacity-0 animate-slide-up">
+            <div class="relative">
+                <div id="avatar-container" class="w-16 h-16 rounded-2xl bg-card border border-separator flex items-center justify-center overflow-hidden shadow-sm">
+                    <span id="avatar-initials" class="text-xl font-bold text-accent">?</span>
+                </div>
+                <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-card rounded-full flex items-center justify-center">
+                    <div class="w-2.5 h-2.5 bg-accent rounded-full animate-pulse"></div>
+                </div>
             </div>
             <div>
-                <h1 id="user-name" class="text-lg font-bold leading-tight">Загрузка...</h1>
-                <p id="user-role" class="text-xs hint-color uppercase tracking-wider">GUEST</p>
+                <h1 id="user-name" class="text-xl font-bold leading-tight text-txt">Загрузка...</h1>
+                <p id="user-role" class="text-[10px] font-bold text-accent uppercase tracking-wider bg-accent/10 px-2 py-0.5 rounded mt-1 inline-block">GUEST</p>
             </div>
-        </div>
+        </header>
 
-        <!-- Main Stats Grid -->
-        <div class="grid grid-cols-2 gap-3">
-            <div class="card-bg p-4 rounded-xl flex flex-col items-center justify-center text-center">
-                <span class="text-3xl font-bold mb-1" id="stat-episodes">0</span>
-                <span class="text-xs hint-color uppercase">Эпизодов</span>
+        <section class="grid grid-cols-2 gap-4">
+            <div class="bg-card p-5 rounded-md card-shadow tap-effect opacity-0 animate-slide-up delay-100 flex flex-col justify-between h-28">
+                <span class="text-[10px] font-bold text-hint uppercase tracking-widest">Эпизодов</span>
+                <span class="text-4xl font-black text-txt counter" id="stat-episodes" data-target="0">0</span>
             </div>
-            <div class="card-bg p-4 rounded-xl flex flex-col items-center justify-center text-center">
-                <span class="text-3xl font-bold mb-1" id="stat-movies">0</span>
-                <span class="text-xs hint-color uppercase">Фильмов</span>
+            <div class="bg-card p-5 rounded-md card-shadow tap-effect opacity-0 animate-slide-up delay-200 flex flex-col justify-between h-28">
+                <span class="text-[10px] font-bold text-hint uppercase tracking-widest">Фильмов</span>
+                <span class="text-4xl font-black text-txt counter" id="stat-movies" data-target="0">0</span>
             </div>
-        </div>
+        </section>
 
-        <!-- Total Time Card -->
-        <div class="card-bg p-5 rounded-xl">
-            <h2 class="text-sm hint-color uppercase mb-2">Общее время просмотра</h2>
-            <p id="stat-duration" class="text-2xl font-mono font-bold tracking-tight text-green-400">0д 0ч 0м</p>
-            <p class="text-xs hint-color mt-1">Сериалов просмотрено: <span id="stat-series" class="text-white">0</span></p>
-        </div>
-
-        <!-- History List -->
-        <div class="mt-6">
-            <h2 class="text-sm hint-color uppercase mb-3 pl-1">Последние просмотры</h2>
-            <div id="history-list" class="space-y-2">
-                <!-- Items injected here -->
+        <section class="bg-card p-6 rounded-md card-shadow opacity-0 animate-slide-up delay-300 relative overflow-hidden">
+            <div class="flex justify-between items-end relative z-10">
+                <div>
+                    <h2 class="text-[10px] font-bold text-hint uppercase mb-1 tracking-widest">Всего времени</h2>
+                    <p id="stat-duration" class="text-xl font-mono font-bold tracking-tight text-accent">0д 0ч 0м</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] text-hint mb-1 uppercase tracking-widest">Сериалов</p>
+                    <p id="stat-series" class="text-xl font-bold text-txt">0</p>
+                </div>
             </div>
-        </div>
+            <div class="absolute bottom-0 left-0 w-full h-1 bg-accent/10">
+                <div class="h-full bg-accent w-3/4 rounded-r-full opacity-50"></div>
+            </div>
+        </section>
+
+        <section class="opacity-0 animate-slide-up delay-400">
+            <div class="flex items-center justify-between mb-4 px-1">
+                <h2 class="text-lg font-bold text-txt">История</h2>
+                <span class="text-[10px] font-bold text-hint bg-card px-2 py-1 rounded border border-separator">ПОСЛЕДНИЕ 10</span>
+            </div>
+            
+            <div id="history-list" class="space-y-3">
+            </div>
+        </section>
     </div>
 
-    <div id="error-screen" class="hidden flex flex-col items-center justify-center h-screen text-center p-4">
-        <div class="text-red-500 text-5xl mb-4">⚠️</div>
-        <h2 class="text-xl font-bold mb-2">Ошибка доступа</h2>
-        <p id="error-msg" class="hint-color text-sm">Не удалось загрузить данные.</p>
+    <div id="error-screen" class="hidden flex flex-col items-center justify-center h-screen text-center p-6 fixed inset-0 bg-bg z-50">
+        <h2 class="text-lg font-bold mb-2 text-txt">Ошибка доступа</h2>
+        <p id="error-msg" class="text-hint text-sm mb-6 max-w-[200px]">Не удалось загрузить данные.</p>
+        <button onclick="location.reload()" class="px-6 py-2 bg-accent text-accent-fg font-bold rounded-lg tap-effect">Повторить</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        tg.enableClosingConfirmation();
+
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+        
+        const moonIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`;
+        const sunIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`;
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const defaultTheme = tg.colorScheme === 'dark' ? 'dark' : 'light';
+            const currentTheme = savedTheme || defaultTheme;
+            applyTheme(currentTheme);
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                html.classList.add('dark');
+                themeToggleBtn.innerHTML = sunIcon;
+                tg.setHeaderColor('#1b1f26'); 
+                tg.setBackgroundColor('#14181f');
+            } else {
+                html.classList.remove('dark');
+                themeToggleBtn.innerHTML = moonIcon;
+                tg.setHeaderColor('#ffffff');
+                tg.setBackgroundColor('#f3f4f6');
+            }
+            localStorage.setItem('theme', theme);
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            const isDark = html.classList.contains('dark');
+            applyTheme(isDark ? 'light' : 'dark');
+        });
+
+        initTheme();
+
+        function animateValue(obj, start, end, duration) {
+            if (!obj) return;
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                obj.innerHTML = Math.floor(easeOut * (end - start) + start);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        function setAvatar(user) {
+            const container = document.getElementById('avatar-container');
+            const initialsEl = document.getElementById('avatar-initials');
+            
+            const tgUser = tg.initDataUnsafe?.user;
+
+            if (tgUser && tgUser.photo_url) {
+                container.innerHTML = `<img src="${tgUser.photo_url}" alt="Avatar" class="w-full h-full object-cover">`;
+            } else {
+                const name = user.name || 'User';
+                const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                initialsEl.textContent = initials;
+            }
+        }
+
+        function createHistoryItem(item, index) {
+            const delay = 500 + (index * 70); 
+
+            // Используем постер, если он есть, иначе плейсхолдер (цветной фон)
+            // Но так как мы генерируем URL на бэкенде, item.poster всегда будет строкой
+            const posterHtml = `<img src="${item.poster}" alt="" class="w-full h-full object-cover" loading="lazy">`;
+            
+            return `
+                <div class="bg-card p-4 rounded-md flex items-center justify-between card-shadow tap-effect opacity-0 border border-separator" 
+                     style="animation: slideUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; animation-delay: ${delay}ms;">
+                    <div class="flex items-center space-x-3 overflow-hidden">
+                        <div class="w-10 h-10 rounded-md bg-bg border border-separator overflow-hidden flex-shrink-0">
+                            ${posterHtml}
+                        </div>
+                        <div class="flex flex-col overflow-hidden">
+                            <span class="text-sm font-bold text-txt truncate leading-tight">${item.label}</span>
+                            <span class="text-[10px] font-bold text-hint uppercase tracking-wide mt-0.5">${item.type}</span>
+                        </div>
+                    </div>
+                    <span class="text-xs font-mono font-medium text-hint whitespace-nowrap pl-2 bg-bg px-1.5 py-0.5 rounded">${item.date}</span>
+                </div>
+            `;
+        }
 
         async function loadStats() {
             try {
                 const response = await fetch('/api/webapp/stats/', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ init_data: tg.initData })
                 });
 
-                if (!response.ok) {
-                    throw new Error((await response.json()).error || 'Network error');
-                }
-
+                if (!response.ok) throw new Error('Network error');
                 const data = await response.json();
                 renderData(data);
             } catch (e) {
+                console.error(e);
                 document.getElementById('loader').classList.add('hidden');
                 document.getElementById('error-screen').classList.remove('hidden');
-                document.getElementById('error-msg').textContent = e.message;
             }
         }
 
         function renderData(data) {
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('content').classList.remove('hidden');
+            const loader = document.getElementById('loader');
+            const content = document.getElementById('content');
 
-            // User Info
-            document.getElementById('user-name').textContent = data.user.name || 'User';
-            document.getElementById('user-role').textContent = data.user.role;
-            const initials = (data.user.name || 'U').charAt(0).toUpperCase();
-            document.getElementById('user-avatar-text').textContent = initials;
-
-            // Stats
-            document.getElementById('stat-episodes').textContent = data.stats.episodes;
-            document.getElementById('stat-movies').textContent = data.stats.movies;
-            document.getElementById('stat-series').textContent = data.stats.series;
-            document.getElementById('stat-duration').textContent = data.stats.duration_text;
-
-            // History
-            const list = document.getElementById('history-list');
-            list.innerHTML = '';
-            
-            if (data.history.length === 0) {
-                list.innerHTML = '<p class="text-center hint-color text-sm py-4">История пуста</p>';
-            }
-
-            data.history.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'card-bg p-3 rounded-lg flex justify-between items-center';
+            loader.style.opacity = '0';
+            setTimeout(() => {
+                loader.classList.add('hidden');
+                content.classList.remove('hidden');
                 
-                const icon = item.type === 'Movie' ? '🎬' : '📺';
-                
-                div.innerHTML = `
-                    <div class="flex items-center space-x-3 overflow-hidden">
-                        <span class="text-lg">${icon}</span>
-                        <div class="flex flex-col overflow-hidden">
-                            <span class="text-sm font-medium truncate w-full">${item.label}</span>
-                        </div>
-                    </div>
-                    <span class="text-xs hint-color whitespace-nowrap ml-2">${item.date}</span>
-                `;
-                list.appendChild(div);
-            });
+                document.getElementById('user-name').textContent = data.user.name || 'User';
+                document.getElementById('user-role').textContent = data.user.role;
+                setAvatar(data.user);
+
+                animateValue(document.getElementById('stat-episodes'), 0, data.stats.episodes, 2000);
+                animateValue(document.getElementById('stat-movies'), 0, data.stats.movies, 2000);
+                document.getElementById('stat-series').textContent = data.stats.series;
+                document.getElementById('stat-duration').textContent = data.stats.duration_text;
+
+                const list = document.getElementById('history-list');
+                list.innerHTML = '';
+                if (!data.history || data.history.length === 0) {
+                    list.innerHTML = `
+                        <div class="text-center py-8 opacity-50">
+                            <p class="text-sm text-hint">История пуста</p>
+                        </div>`;
+                } else {
+                    data.history.forEach((item, index) => {
+                        list.innerHTML += createHistoryItem(item, index);
+                    });
+                }
+            }, 300);
         }
 
         loadStats();

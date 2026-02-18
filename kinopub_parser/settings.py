@@ -33,6 +33,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8012',
     'http://127.0.0.1:8012',
     'https://kinopub.webredirect.org',
+    'https://*.trycloudflare.com',
 ]
 
 TIME_ZONE = 'UTC'
@@ -191,6 +192,8 @@ SITE_URL = os.getenv('SITE_URL')
 KINOPUB_AUX_LOGIN = os.getenv('KINOPUB_AUX_LOGIN')
 KINOPUB_AUX_PASSWORD = os.getenv('KINOPUB_AUX_PASSWORD')
 SITE_AUX_URL = os.getenv('SITE_AUX_URL')
+
+POSTER_BASE_URL = os.getenv('POSTER_BASE_URL', 'https://google.com/')
 
 # --- App Core Config ---
 REGEX_CODE = r'\d{6}'
