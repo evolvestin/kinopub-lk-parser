@@ -32,9 +32,11 @@ ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8012',
     'http://127.0.0.1:8012',
-    'https://kinopub.webredirect.org',
     'https://*.trycloudflare.com',
 ]
+
+if WEBAPP_PUBLIC_URL := os.getenv('WEBAPP_PUBLIC_URL'):
+    CSRF_TRUSTED_ORIGINS.append(WEBAPP_PUBLIC_URL)
 
 TIME_ZONE = 'UTC'
 USE_TZ = True
