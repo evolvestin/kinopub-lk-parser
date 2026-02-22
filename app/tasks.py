@@ -16,8 +16,9 @@ from redis import Redis
 
 from app import history_parser
 from app.gdrive_backup import BackupManager
-from app.models import Code, LogEntry, Show, TaskRun
+from app.models import Code, LogEntry, Show, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
+from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
 
 
@@ -382,3 +383,23 @@ def process_errors_task():
     if batch:
         logging.info(f'Sending batch of {len(batch)} errors to Telegram.')
         TelegramSender().send_batch_logs(batch)
+
+
+@shared_task
+@safe_execution
+def precalculate_user_stats(user_id, year=None):
+    try:
+        user = ViewUser.objects.get(id=user_id)
+        generate_user_stats(user, year=year)
+    except ViewUser.DoesNotExist:
+        pass
+
+
+@shared_task
+@safe_execution
+def precalculate_all_stats():
+    current_year = timezone.now().year
+    active_users = ViewUser.objects.filter(role__in=['viewer', 'admin'], is_bot_active=True)
+    for user in active_users:
+        precalculate_user_stats.delay(user.id, year=current_year)
+        precalculate_user_stats.delay(user.id, year=None)

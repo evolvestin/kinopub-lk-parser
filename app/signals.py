@@ -6,11 +6,11 @@ from celery.signals import task_postrun, task_prerun
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import Signal, receiver
 from django.utils import timezone
 
-from app.models import TaskRun, ViewUser
+from app.models import TaskRun, ViewHistory, ViewUser
 from app.telegram_bot import TelegramSender
 from shared.constants import DATETIME_FORMAT
 
@@ -122,3 +122,32 @@ def record_task_start(sender, **kwargs):
     except Exception as e:
         # Логируем ошибку, чтобы она была видна в docker logs kinopub-parser-celery
         logging.error(f'Error in task_prerun signal: {e}')
+
+
+@receiver(m2m_changed, sender=ViewHistory.users.through)
+def invalidate_stats_on_user_change(sender, instance, action, pk_set, **kwargs):
+    if action in ('post_add', 'post_remove', 'post_clear'):
+        year = instance.view_date.year
+        user_ids = set(pk_set) if pk_set else set()
+        user_ids.update(instance.users.values_list('id', flat=True))
+
+        for uid in user_ids:
+            cache.delete(f'user_stats:{uid}:{year}')
+            cache.delete(f'user_stats:{uid}:all')
+
+
+@receiver(post_save, sender=ViewHistory)
+def invalidate_stats_on_history_change(sender, instance, created, **kwargs):
+    year = instance.view_date.year
+    # Очищаем кэш для всех пользователей, привязанных к этой записи
+    for user in instance.users.all():
+        cache.delete(f'user_stats:{user.id}:{year}')
+        cache.delete(f'user_stats:{user.id}:all')
+
+
+@receiver(post_delete, sender=ViewHistory)
+def invalidate_stats_on_history_delete(sender, instance, **kwargs):
+    year = instance.view_date.year
+    for user in instance.users.all():
+        cache.delete(f'user_stats:{user.id}:{year}')
+        cache.delete(f'user_stats:{user.id}:all')

@@ -6,7 +6,7 @@ import uuid
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Case, Count, OuterRef, Q, Subquery, Sum, When
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -24,6 +24,7 @@ from app.models import (
     ViewUser,
     ViewUserGroup,
 )
+from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
@@ -848,85 +849,48 @@ def webapp_get_stats(request):
         except ViewUser.DoesNotExist:
             return JsonResponse({'error': 'User not found in database'}, status=404)
 
-        # Stats calculation logic specific to user
-        episode_duration_query = ShowDuration.objects.filter(
-            show_id=OuterRef('show_id'),
-            season_number=OuterRef('season_number'),
-            episode_number=OuterRef('episode_number'),
-        )
-        movie_duration_query = ShowDuration.objects.filter(
-            show_id=OuterRef('show_id'),
-            season_number__isnull=True,
-            episode_number__isnull=True,
-        )
+        current_year = timezone.now().year
+        stats = generate_user_stats(view_user, year=current_year)
 
-        user_history = ViewHistory.objects.filter(users=view_user)
-
-        total_seconds_result = user_history.annotate(
-            duration=Case(
-                When(
-                    season_number=0,
-                    then=Subquery(movie_duration_query.values('duration_seconds')[:1]),
-                ),
-                default=Subquery(episode_duration_query.values('duration_seconds')[:1]),
-            )
-        ).aggregate(total_duration=Sum('duration'))
-
-        total_seconds = total_seconds_result.get('total_duration') or 0
-        total_minutes = total_seconds // 60
-        hours = total_minutes // 60
-        days = hours // 24
-        hours_rem = hours % 24
-        minutes_rem = total_minutes % 60
-
-        stats_agg = user_history.aggregate(
-            episodes=Count('id', filter=Q(season_number__gt=0)),
-            movies=Count('id', filter=Q(season_number=0)),
-            series=Count('show_id', distinct=True, filter=Q(show__type='Series')),
-        )
-
-        last_views_qs = user_history.select_related('show').order_by('-view_date', '-created_at')[
-            :10
-        ]
-
-        last_views = []
-        poster_base = settings.POSTER_BASE_URL.rstrip('/')
-
-        for v in last_views_qs:
-            title = v.show.title or v.show.original_title
-            label = title
-            if v.season_number:
-                label = f'{title} ({format_se(v.season_number, v.episode_number)})'
-
-            # Формируем URL постера: BASE_URL + size + ID.jpg
-            poster_url = f'{poster_base}/small/{v.show.id}.jpg'
-
-            last_views.append(
-                {
-                    'label': label,
-                    'date': v.view_date.strftime('%d.%m.%Y'),
-                    'type': v.show.type,
-                    'poster': poster_url,
-                }
-            )
-
-        return JsonResponse(
-            {
-                'user': {
-                    'name': view_user.name,
-                    'username': view_user.username,
-                    'role': view_user.get_role_display(),
-                },
-                'stats': {
-                    'duration_text': f'{days}д {hours_rem}ч {minutes_rem}м',
-                    'episodes': stats_agg['episodes'],
-                    'movies': stats_agg['movies'],
-                    'series': stats_agg['series'],
-                },
-                'history': last_views,
-            }
-        )
+        return JsonResponse(stats)
 
     except Exception as e:
         logging.error(f'WebApp Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Internal server error'}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_get_detailed_stats(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+
+        period_value = body.get('period_value') or body.get('year')
+
+        if period_value in (0, '0', 'all', None):
+            year = None
+        else:
+            year = str(period_value).split('-')[0]
+
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        try:
+            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        except ViewUser.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        stats = generate_user_stats(view_user, year=year)
+
+        # Add group stats for comparison
+        group_stats = generate_group_stats(view_user, year=year)
+        if group_stats:
+            stats['group'] = group_stats
+
+        return JsonResponse(stats)
+
+    except Exception as e:
+        logging.error(f'WebApp Stats Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)

@@ -35,6 +35,11 @@ urlpatterns = [
     path('api/bot/rate/', views.bot_rate_show),
     path('api/bot/log/', views.bot_log_message),
     path('api/bot/log_entry/', views.bot_create_log_entry),
+    path(
+        'api/webapp/detailed_stats/',
+        views.webapp_get_detailed_stats,
+        name='webapp_get_detailed_stats',
+    ),
 ]
 
 if not settings.DEBUG:
