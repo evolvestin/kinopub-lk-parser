@@ -29,6 +29,7 @@ from app.services.telegram_auth import validate_telegram_init_data
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
 from shared.formatters import format_se
+from shared.media import get_poster_url
 
 
 def _toggle_user_in_view(user, view_id):
@@ -376,10 +377,9 @@ def bot_search_shows(request):
     )
 
     results = []
-    poster_base = settings.POSTER_BASE_URL.rstrip('/')
 
     for show in shows:
-        poster_url = f'{poster_base}/small/{show.id}.jpg'
+        poster_url = get_poster_url(show.id)
 
         internal_rating, user_ratings = show.get_internal_rating_data()
 
