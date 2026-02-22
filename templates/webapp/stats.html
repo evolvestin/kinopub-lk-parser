@@ -127,7 +127,6 @@
             transform: scale(0.97);
             background-color: var(--bg-input);
         }
-        /* Индикатор кликабельности (шеврон) */
         .stat.clickable::after {
             content: '›';
             position: absolute;
@@ -154,19 +153,20 @@
         .li-name .icon { font-size: 14px; line-height: 1; }
         .li-sub  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
+        /* ОБНОВЛЕННЫЕ СТИЛИ ХИТМАПА - БЕЗ СКРОЛЛА */
         .hm { 
             display: grid; 
-            /* 7 рядов, высота которых зависит от ширины экрана */
-            grid-template-rows: repeat(7, clamp(6px, 1.8vw, 10px)); 
+            grid-template-rows: repeat(7, 1fr); 
             grid-auto-flow: column; 
-            gap: clamp(1px, 0.4vw, 3px); 
-            margin: 0 auto;
-            padding: 0 2px;
+            gap: 2px; 
+            width: 100%;
+            margin: 0;
+            padding: 0;
         }
         .hc { 
-            /* Квадратные ячейки с адаптивным размером */
-            width: clamp(6px, 1.8vw, 10px); 
-            height: clamp(6px, 1.8vw, 10px); 
+            width: 100%;
+            /* Заставляем ячейки быть квадратными */
+            aspect-ratio: 1 / 1;
             border-radius: 20%; 
             background: var(--bg-input); 
             transition: transform 0.2s ease;
@@ -177,6 +177,7 @@
         .h2 { background: rgba(46, 204, 113, 0.5); } 
         .h3 { background: rgba(46, 204, 113, 0.8); } 
         .h4 { background: var(--accent); }
+        
         .hm-leg { 
             display: flex; 
             align-items: center; 
@@ -188,20 +189,13 @@
             text-transform: uppercase;
             font-weight: 700;
         }
+        .hm-leg .hc { width: 10px; height: 10px; border-radius: 2px; }
 
         .hm-container {
             width: 100%;
-            min-width: 0;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            padding-bottom: 8px;
-            display: flex;
-            justify-content: flex-start;
-            scrollbar-width: thin;
-            scrollbar-color: var(--border) transparent;
+            /* Скролл отключен намеренно */
+            overflow: hidden; 
         }
-        .hm-container::-webkit-scrollbar { height: 3px; }
-        .hm-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
         .chart-box { position: relative; width: 100%; height: 200px; }
 
@@ -258,8 +252,6 @@
         .rating-badge { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-weight: 700; font-size: 11px; }
         .rating-badge.show-lvl { color: var(--text-muted); font-weight: 500; }
         .rating-badge svg { font-size: 12px; }
-
-
     </style>
 </head>
 <body>
@@ -339,6 +331,7 @@
                 <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:16px;display:flex;align-items:center;gap:6px">
                     <div class="icon" style="font-size:14px;line-height:1" id="ic-flame"></div>Интенсивность
                 </div>
+                <!-- Контейнер хитмапа без скролла -->
                 <div class="hm-container">
                     <div class="hm" id="heatmap"></div>
                 </div>
@@ -381,6 +374,7 @@
     </div>
 
 <script>
+// (Иконки остаются без изменений - для краткости пропущены, так как не меняются)
 const Icons = {
     moon: '<svg viewBox="0 0 512 512"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
     sun: '<svg viewBox="0 0 512 512"><path d="M256 118a22 22 0 01-22-22V48a22 22 0 0144 0v48a22 22 0 01-22 22zM256 486a22 22 0 01-22-22v-48a22 22 0 0144 0v48a22 22 0 01-22 22zM369.14 164.86a22 22 0 01-15.56-37.55l33.94-33.94a22 22 0 0131.11 31.11l-33.94 33.94a21.93 21.93 0 01-15.55 6.44zM108.92 425.08a22 22 0 01-15.55-37.56l33.94-33.94a22 22 0 1131.11 31.11l-33.94 33.94a21.94 21.94 0 01-15.56 6.45zM464 278h-48a22 22 0 010-44h48a22 22 0 010 44zM96 278H48a22 22 0 010-44h48a22 22 0 010 44zM403.08 425.08a21.94 21.94 0 01-15.56-6.45l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.55 37.56zM142.86 164.86a21.93 21.93 0 01-15.55-6.44l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.56 37.55zM256 358a102 102 0 11102-102 102.12 102.12 0 01-102 102z"/></svg>',
@@ -507,7 +501,6 @@ window.pickYear = y => { curYear = y; markYear(); load(y === 'all' ? 'all' : y);
 
 function renderHeatmap() {
     const el = document.getElementById('heatmap'); 
-    const container = el.parentElement;
     el.innerHTML = '';
     
     if (!D.heatmap?.length) { 
@@ -515,17 +508,30 @@ function renderHeatmap() {
         return; 
     }
     
+    // Рассчитываем смещение (offset) для начала года
     const yr = curYear && curYear !== 'all' ? curYear : new Date().getFullYear();
     const offset = (new Date(yr, 0, 1).getDay() + 6) % 7;
     
+    // Полное количество ячеек (смещение + данные)
+    const totalCells = offset + D.heatmap.length;
+    // Рассчитываем количество недель (столбцов)
+    const totalColumns = Math.ceil(totalCells / 7);
+    
+    // Применяем количество столбцов к CSS Grid
+    // Это заставит сетку автоматически рассчитать ширину ячеек, 
+    // чтобы они поместились в родительский контейнер
+    el.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
+    
     const fragment = document.createDocumentFragment();
+    // Добавляем пустые ячейки смещения
     for (let i = 0; i < offset; i++) { 
         const d = document.createElement('div'); 
         d.className = 'hc'; 
-        d.style.opacity = '0'; 
+        d.style.opacity = '0'; // Скрытые ячейки
         fragment.appendChild(d); 
     }
     
+    // Добавляем данные
     D.heatmap.forEach(v => { 
         const d = document.createElement('div'); 
         d.className = 'hc' + (v ? ' h' + v : ''); 
@@ -533,14 +539,6 @@ function renderHeatmap() {
     });
     
     el.appendChild(fragment);
-
-    // Автоматическая прокрутка к последним данным (сегодняшний день)
-    setTimeout(() => {
-        container.scrollTo({
-            left: container.scrollWidth,
-            behavior: 'smooth'
-        });
-    }, 100);
 }
 
 function renderGenres() {
@@ -678,7 +676,6 @@ window.openHistory = function(type) {
     
     let data;
     if (type === 'all') {
-        // Объединяем и сортируем по дате DESC, затем по ID DESC
         data = [...D.history_movies, ...D.history_episodes].sort((a, b) => {
             if (b.view_date !== a.view_date) return b.view_date.localeCompare(a.view_date);
             return (b.show_id + (b.episode_number || 0)) - (a.show_id + (a.episode_number || 0));
@@ -701,7 +698,6 @@ window.openHistory = function(type) {
         const delay = Math.min((idx + 1) * 0.02, 0.5); 
         
         let metaHtml = '';
-        // Проверяем наличие номера сезона, чтобы определить эпизод это или фильм в общем списке
         if (item.season_number !== undefined && item.season_number > 0) {
             const s = item.season_number;
             const e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
