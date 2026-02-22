@@ -19,6 +19,7 @@ from django.db.models.functions import Coalesce, ExtractWeekDay, ExtractYear, Tr
 from django.utils import timezone
 
 from app.models import ShowDuration, UserRating, ViewHistory, ViewUserGroup
+from django.db.models.functions import Coalesce, ExtractMonth, ExtractWeekDay, ExtractYear, TruncMonth
 from shared.media import get_poster_url
 
 logger = logging.getLogger(__name__)
@@ -230,22 +231,22 @@ def _get_monthly_chart(base_qs, dur_qs):
     ]
 
     monthly_counts = (
-        base_qs.annotate(m=TruncMonth('view_date'))
-        .values('m')
+        base_qs.annotate(m_num=ExtractMonth('view_date'))
+        .values('m_num')
         .annotate(
             views=Count('id'),
             episodes=Count('id', filter=Q(season_number__gt=0)),
             movies=Count('id', filter=Q(season_number=0)),
         )
     )
-    count_map = {mc['m'].month: mc for mc in monthly_counts if mc['m']}
+    count_map = {mc['m_num']: mc for mc in monthly_counts if mc['m_num']}
 
     monthly_hours = (
-        dur_qs.annotate(m=TruncMonth('view_date'))
-        .values('m')
+        dur_qs.annotate(m_num=ExtractMonth('view_date'))
+        .values('m_num')
         .annotate(hours=Sum('final_duration') / 3600)
     )
-    hours_map = {mh['m'].month: mh['hours'] for mh in monthly_hours if mh['m']}
+    hours_map = {mh['m_num']: mh['hours'] for mh in monthly_hours if mh['m_num']}
 
     labels = []
     views_data = []
