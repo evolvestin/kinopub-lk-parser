@@ -8,32 +8,30 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         :root {
-            --bg-main: #1c202b;
-            --bg-card: #232836;
-            --bg-input: rgba(255,255,255,0.08);
-            --border: rgba(120,130,140,0.13);
-            --text-primary: rgba(255,255,255,0.87);
-            --text-secondary: rgba(255,255,255,0.65);
-            --text-muted: rgba(120,130,140,1);
-            --accent: #02b875;
-            --accent-dim: rgba(2,184,117,0.15);
-            --success: #6cc788;
-            --info: #6887ff;
-            --warning: #f77a99;
-            --danger: #ef1960;
+            --bg-main: #14181f;
+            --bg-card: #1b1f26;
+            --bg-input: #232830;
+            --border: #2d333b;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --accent: #2ecc71;
+            --accent-dim: rgba(46, 204, 113, 0.15);
+            --info: #60a5fa;
+            --danger: #e74c3c;
             --radius: 12px;
             --radius-lg: 16px;
-            --shadow: 0 2px 8px rgba(0,0,0,0.18);
+            --shadow: 0 4px 12px rgba(0,0,0,0.25);
         }
         .light {
-            --bg-main: #f5f5f7;
+            --bg-main: #f3f4f6;
             --bg-card: #ffffff;
-            --bg-input: rgba(0,0,0,0.04);
-            --border: rgba(0,0,0,0.07);
-            --text-primary: rgba(0,0,0,0.87);
-            --text-secondary: rgba(0,0,0,0.6);
-            --text-muted: rgba(0,0,0,0.38);
-            --shadow: 0 1px 4px rgba(0,0,0,0.06);
+            --bg-input: #e5e7eb;
+            --border: #d1d5db;
+            --text-primary: #111827;
+            --text-secondary: #4b5563;
+            --text-muted: #9ca3af;
+            --shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -45,10 +43,9 @@
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
             padding-bottom: 28px;
-            transition: background .25s, color .25s;
+            transition: background .3s ease, color .3s ease;
         }
 
-        /* ===== CARD ===== */
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -56,197 +53,194 @@
             padding: 16px;
             margin: 0 16px 12px;
             box-shadow: var(--shadow);
-            transition: background .25s, border-color .25s;
+            transition: background .3s ease, border-color .3s ease;
         }
 
-        /* ===== HEADER ===== */
         .header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 6px; }
         .header-left { display: flex; align-items: center; gap: 12px; }
         .avatar {
             width: 44px; height: 44px; border-radius: 50%;
-            background: var(--accent); display: flex; align-items: center; justify-content: center;
-            font-size: 20px; font-weight: 700; color: #fff; flex-shrink: 0;
+            background: var(--bg-input); display: flex; align-items: center; justify-content: center;
+            font-size: 18px; font-weight: 700; color: var(--text-primary); flex-shrink: 0;
+            overflow: hidden; border: 1px solid var(--border);
         }
+        .avatar img { width: 100%; height: 100%; object-fit: cover; }
         .header-name { font-size: 18px; font-weight: 700; color: var(--text-primary); }
         .header-sub  { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
         .theme-btn {
             width: 36px; height: 36px; border-radius: 50%;
             background: var(--bg-input); border: 1px solid var(--border);
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 18px; transition: background .2s;
+            cursor: pointer; color: var(--text-primary); transition: transform .2s ease;
         }
-        .theme-btn:active { transform: scale(.92); }
+        .theme-btn:active { transform: scale(.9); }
+        .theme-btn .icon { font-size: 20px; line-height: 1; }
 
-        /* ===== PILL TABS ===== */
-        .tabs { display: flex; gap: 6px; padding: 8px 16px 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tabs { display: flex; gap: 8px; padding: 8px 16px 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .tabs::-webkit-scrollbar { display: none; }
         .tab {
-            flex-shrink: 0; padding: 8px 16px; border-radius: 10px;
+            display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 8px 14px; border-radius: 10px;
             font-size: 13px; font-weight: 600; white-space: nowrap;
             border: 1px solid var(--border); background: var(--bg-card);
-            color: var(--text-muted); cursor: pointer; transition: all .2s;
+            color: var(--text-muted); cursor: pointer; transition: all .2s ease;
         }
+        .tab .icon { font-size: 16px; line-height: 1; }
         .tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .tab:not(.on):active { background: var(--accent-dim); }
+        .tab:not(.on):active { transform: scale(.96); }
 
-        /* ===== YEAR PILLS ===== */
-        .years { display: flex; gap: 4px; padding: 4px 16px 8px; overflow-x: auto; }
+        .years { display: flex; gap: 6px; padding: 4px 16px 8px; overflow-x: auto; }
         .years::-webkit-scrollbar { display: none; }
         .yr {
-            flex-shrink: 0; padding: 5px 13px; border-radius: 8px;
+            flex-shrink: 0; padding: 6px 14px; border-radius: 8px;
             font-size: 12px; font-weight: 600;
             border: 1px solid var(--border); background: transparent;
-            color: var(--text-muted); cursor: pointer; transition: all .2s;
+            color: var(--text-muted); cursor: pointer; transition: all .2s ease;
         }
         .yr.on { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
 
-        /* ===== SECTION LABEL ===== */
         .label {
+            display: flex; align-items: center; gap: 6px;
             font-size: 11px; font-weight: 700; text-transform: uppercase;
-            letter-spacing: .5px; color: var(--text-muted); padding: 12px 16px 4px;
+            letter-spacing: .5px; color: var(--text-muted); padding: 12px 16px 6px;
         }
+        .label .icon { font-size: 14px; line-height: 1; }
 
-        /* ===== STAT GRID ===== */
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px 12px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px 12px; }
         .stat {
             background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); transition: background .25s;
+            border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow);
+            transition: background .3s ease; display: flex; flex-direction: column;
         }
-        .stat-icon  { font-size: 20px; margin-bottom: 4px; }
+        .stat-icon  { font-size: 24px; line-height: 1; margin-bottom: 8px; }
         .stat-val   { font-size: 22px; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
-        .stat-lbl   { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: .3px; margin-top: 2px; }
+        .stat-lbl   { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: .3px; margin-top: 4px; }
         .stat-sub   { font-size: 11px; color: var(--accent); margin-top: 4px; font-weight: 500; }
 
-        /* ===== GENRE BARS ===== */
-        .g-row { margin-bottom: 10px; }
-        .g-hdr { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        .g-row { margin-bottom: 12px; }
+        .g-hdr { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
         .g-name { color: var(--text-primary); }
         .g-time { color: var(--text-muted); }
         .g-track { height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
-        .g-fill  { height: 100%; border-radius: 3px; background: linear-gradient(90deg,var(--accent),var(--success)); transition: width .5s ease; }
+        .g-fill  { height: 100%; border-radius: 3px; background: var(--accent); transition: width .6s cubic-bezier(0.16, 1, 0.3, 1); }
 
-        /* ===== LIST ROWS ===== */
-        .li { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .li { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
         .li:last-child { border: none; }
-        .li-l { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-        .li-r { font-size: 13px; font-weight: 700; color: var(--accent); flex-shrink: 0; margin-left: 8px; }
-        .li-rank { font-size: 11px; font-weight: 700; color: var(--text-muted); width: 20px; text-align: center; flex-shrink: 0; }
-        .li-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .li-sub  { font-size: 10px; color: var(--text-muted); }
+        .li-l { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+        .li-r { font-size: 13px; font-weight: 700; color: var(--text-primary); flex-shrink: 0; margin-left: 8px; text-align: right; }
+        .li-rank { font-size: 12px; font-weight: 700; color: var(--text-muted); width: 24px; text-align: center; flex-shrink: 0; }
+        .li-name { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .li-name .icon { font-size: 14px; line-height: 1; }
+        .li-sub  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-        /* ===== HEATMAP ===== */
-        .hm { display: grid; grid-template-rows: repeat(7, 9px); grid-auto-flow: column; gap: 2px; overflow-x: auto; justify-content: center; }
-        .hc { width: 9px; height: 9px; border-radius: 2px; background: var(--bg-input); }
-        .h1 { background: #0e4429; } .h2 { background: #006d32; } .h3 { background: #26a641; } .h4 { background: #39d353; }
-        .light .h1 { background: #9be9a8; } .light .h2 { background: #40c463; } .light .h3 { background: #30a14e; } .light .h4 { background: #216e39; }
-        .hm-leg { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 8px; font-size: 10px; color: var(--text-muted); }
-        .hm-leg .hc { width: 10px; height: 10px; }
+        .hm { display: grid; grid-template-rows: repeat(7, 10px); grid-auto-flow: column; gap: 3px; overflow-x: auto; justify-content: center; }
+        .hc { width: 10px; height: 10px; border-radius: 3px; background: var(--bg-input); }
+        .h1 { background: rgba(46, 204, 113, 0.3); } .h2 { background: rgba(46, 204, 113, 0.5); } .h3 { background: rgba(46, 204, 113, 0.8); } .h4 { background: var(--accent); }
+        .hm-leg { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 10px; font-size: 10px; color: var(--text-muted); }
 
-        /* ===== CHART ===== */
         .chart-box { position: relative; width: 100%; height: 200px; }
 
-        /* ===== GROUP COMPARE ===== */
-        .cmp { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .cmp { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
         .cmp:last-child { border: none; }
-        .cmp-lb { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+        .cmp-lb { font-size: 12px; color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+        .cmp-lb .icon { font-size: 14px; line-height: 1; }
         .cmp-vs { display: flex; gap: 12px; align-items: center; }
         .cmp-v  { font-size: 13px; font-weight: 700; text-align: right; min-width: 44px; }
         .cmp-you { color: var(--accent); }
         .cmp-grp { color: var(--info); }
-        .cmp-d  { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
-        .d-up   { background: rgba(2,184,117,.15); color: var(--accent); }
-        .d-dn   { background: rgba(239,25,96,.15); color: var(--danger); }
-        .d-eq   { background: var(--accent-dim); color: var(--accent); }
+        .cmp-d  { font-size: 10px; font-weight: 600; padding: 3px 6px; border-radius: 4px; }
+        .d-up   { background: var(--accent-dim); color: var(--accent); }
+        .d-dn   { background: rgba(231, 76, 60, 0.15); color: var(--danger); }
+        .d-eq   { background: var(--bg-input); color: var(--text-muted); }
 
-        /* ===== MEMBER BAR ===== */
-        .mb { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .mb { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .mb-n { font-size: 12px; font-weight: 600; color: var(--text-primary); width: 80px; text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .mb-t { flex: 1; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
-        .mb-f { height: 100%; border-radius: 4px; background: var(--accent); transition: width .4s ease; }
+        .mb-f { height: 100%; border-radius: 4px; background: var(--info); transition: width .6s cubic-bezier(0.16, 1, 0.3, 1); }
         .mb-c { font-size: 11px; font-weight: 700; color: var(--text-muted); width: 36px; flex-shrink: 0; }
 
-        /* ===== EMPTY ===== */
-        .empty { text-align: center; padding: 24px; color: var(--text-muted); font-size: 13px; }
-        .empty-ico { font-size: 32px; margin-bottom: 8px; }
+        .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; color: var(--text-muted); font-size: 13px; }
+        .empty .icon { font-size: 32px; line-height: 1; margin-bottom: 12px; opacity: 0.5; display: inline-flex; align-items: center; justify-content: center; }
 
-        /* ===== LOADER ===== */
-        .loader { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: var(--bg-main); }
-        .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+        .loader { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: var(--bg-main); transition: opacity .3s; }
+        .spinner { width: 28px; height: 28px; border: 3px solid var(--bg-input); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ===== VISIBILITY ===== */
         .sec { display: none; }
         .sec.vis { display: block; }
-        .hidden { display: none !important; }
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
 
-        /* ===== ANIM ===== */
-        @keyframes up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .fu { animation: up .35s ease forwards; }
-        .d1 { animation-delay: .04s; opacity: 0; }
-        .d2 { animation-delay: .08s; opacity: 0; }
-        .d3 { animation-delay: .12s; opacity: 0; }
-        .d4 { animation-delay: .16s; opacity: 0; }
+        @keyframes springUp {
+            0% { opacity: 0; transform: translateY(16px) scale(0.98); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .anim-item { animation: springUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1) both; }
+        .d1 { animation-delay: 0.05s; }
+        .d2 { animation-delay: 0.1s; }
+        .d3 { animation-delay: 0.15s; }
+        .d4 { animation-delay: 0.2s; }
+        .d5 { animation-delay: 0.25s; }
     </style>
 </head>
 <body>
     <div class="loader" id="loader"><div class="spinner"></div></div>
 
     <div id="app" class="hidden">
-        <!-- Header -->
         <div class="header">
             <div class="header-left">
-                <div class="avatar" id="avatar">?</div>
+                <div class="avatar" id="avatar"></div>
                 <div>
                     <div class="header-name" id="user-name">Загрузка…</div>
                     <div class="header-sub" id="period-label"></div>
                 </div>
             </div>
-            <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">🌙</button>
+            <button class="theme-btn" id="theme-btn" onclick="toggleTheme()"></button>
         </div>
 
-        <!-- Main tabs -->
         <div class="tabs" id="main-tabs">
-            <button class="tab on" data-tab="personal" onclick="mainTab('personal')">👤 Личная</button>
-            <button class="tab" data-tab="group" onclick="mainTab('group')">👥 Группа</button>
+            <button class="tab on" data-tab="personal" onclick="mainTab('personal')">
+                <div class="icon" id="ic-user"></div>Личная
+            </button>
+            <button class="tab" data-tab="group" onclick="mainTab('group')">
+                <div class="icon" id="ic-users"></div>Группа
+            </button>
         </div>
 
-        <!-- Year pills -->
         <div class="years" id="years"></div>
 
-        <!-- ======== PERSONAL ======== -->
         <div class="sec vis" id="sec-personal">
-            <div class="label">📊 Обзор</div>
+            <div class="label"><div class="icon" id="ic-dash"></div>Обзор</div>
             <div class="grid">
-                <div class="stat fu d1">
-                    <div class="stat-icon">🎬</div>
+                <div class="stat anim-item d1">
+                    <div class="stat-icon" id="ic-time"></div>
                     <div class="stat-val" id="s-time">—</div>
                     <div class="stat-lbl">Время просмотра</div>
                     <div class="stat-sub" id="s-views"></div>
                 </div>
-                <div class="stat fu d2">
-                    <div class="stat-icon">📅</div>
+                <div class="stat anim-item d2">
+                    <div class="stat-icon" id="ic-cal"></div>
                     <div class="stat-val" id="s-act">0%</div>
                     <div class="stat-lbl">Активность</div>
                     <div class="stat-sub" id="s-daily"></div>
                 </div>
-                <div class="stat fu d3">
-                    <div class="stat-icon">📺</div>
+                <div class="stat anim-item d3">
+                    <div class="stat-icon" id="ic-tv"></div>
                     <div class="stat-val" id="s-ep">0</div>
                     <div class="stat-lbl">Эпизодов</div>
                     <div class="stat-sub" id="s-ser"></div>
                 </div>
-                <div class="stat fu d4">
-                    <div class="stat-icon">🎞️</div>
+                <div class="stat anim-item d4">
+                    <div class="stat-icon" id="ic-film"></div>
                     <div class="stat-val" id="s-mov">0</div>
                     <div class="stat-lbl">Фильмов</div>
                     <div class="stat-sub" id="s-uni"></div>
                 </div>
             </div>
 
-            <!-- Monthly chart -->
-            <div class="card fu d2">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                    <span style="font-size:13px;font-weight:700;color:var(--text-primary)">📈 Динамика</span>
+            <div class="card anim-item d2">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                    <span style="font-size:13px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:6px">
+                        <div class="icon" style="font-size:14px;line-height:1" id="ic-chart"></div>Динамика
+                    </span>
                     <div style="display:flex;gap:4px">
                         <button class="yr on" id="cb-views" onclick="chartMode('views')" style="padding:4px 10px;font-size:11px">Просмотры</button>
                         <button class="yr" id="cb-hours" onclick="chartMode('hours')" style="padding:4px 10px;font-size:11px">Часы</button>
@@ -255,15 +249,15 @@
                 <div class="chart-box"><canvas id="c-monthly"></canvas></div>
             </div>
 
-            <!-- Weekday chart -->
-            <div class="card fu d3">
-                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:12px">📅 Дни недели</div>
+            <div class="card anim-item d3">
+                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:16px">Дни недели</div>
                 <div class="chart-box" style="height:160px"><canvas id="c-weekday"></canvas></div>
             </div>
 
-            <!-- Heatmap -->
-            <div class="card fu d3">
-                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px">🔥 Интенсивность</div>
+            <div class="card anim-item d3">
+                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+                    <div class="icon" style="font-size:14px;line-height:1" id="ic-flame"></div>Интенсивность
+                </div>
                 <div class="hm" id="heatmap"></div>
                 <div class="hm-leg">
                     <span>Меньше</span>
@@ -272,12 +266,11 @@
                 </div>
             </div>
 
-            <!-- Detail tabs -->
             <div class="tabs" id="detail-tabs">
-                <button class="tab on" data-d="genres"    onclick="dTab('genres')">🎭 Жанры</button>
-                <button class="tab"    data-d="actors"    onclick="dTab('actors')">⭐ Актёры</button>
-                <button class="tab"    data-d="countries" onclick="dTab('countries')">🌍 Страны</button>
-                <button class="tab"    data-d="binges"    onclick="dTab('binges')">🏃 Марафоны</button>
+                <button class="tab on" data-d="genres" onclick="dTab('genres')"><div class="icon" id="it-gen"></div>Жанры</button>
+                <button class="tab" data-d="actors" onclick="dTab('actors')"><div class="icon" id="it-act"></div>Актёры</button>
+                <button class="tab" data-d="countries" onclick="dTab('countries')"><div class="icon" id="it-cou"></div>Страны</button>
+                <button class="tab" data-d="binges" onclick="dTab('binges')"><div class="icon" id="it-bin"></div>Марафоны</button>
             </div>
 
             <div class="sec vis" id="ds-genres"><div class="card" id="genres-box"></div></div>
@@ -285,43 +278,67 @@
             <div class="sec" id="ds-countries"><div class="card" id="countries-box"></div></div>
             <div class="sec" id="ds-binges"><div class="card" id="binges-box"></div></div>
 
-            <!-- Genre donut -->
-            <div class="card fu d4">
-                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:12px">🎭 Жанры — доля</div>
+            <div class="card anim-item d5">
+                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:12px">Жанры — доля</div>
                 <div class="chart-box" style="height:220px"><canvas id="c-genre"></canvas></div>
             </div>
         </div>
 
-        <!-- ======== GROUP ======== -->
         <div class="sec" id="sec-group"><div id="group-root"></div></div>
     </div>
 
 <script>
+const Icons = {
+    moon: '🌙',
+    sun: '☀️',
+    user: '👤',
+    users: '👥',
+    dash: '📊',
+    time: '⏱️',
+    cal: '📅',
+    tv: '📺',
+    film: '🎬',
+    chart: '📈',
+    masks: '🎭',
+    star: '⭐',
+    globe: '🌍',
+    bolt: '⚡',
+    flame: '🔥',
+    check: '✅'
+};
+
+function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
+document.addEventListener("DOMContentLoaded", () => {
+    i('ic-user', 'user'); i('ic-users', 'users'); i('ic-dash', 'dash');
+    i('ic-time', 'time'); i('ic-cal', 'cal'); i('ic-tv', 'tv'); i('ic-film', 'film');
+    i('ic-chart', 'chart'); i('ic-flame', 'flame');
+    i('it-gen', 'masks'); i('it-act', 'star'); i('it-cou', 'globe'); i('it-bin', 'bolt');
+});
+
 const tg = window.Telegram?.WebApp;
 if (tg) tg.expand();
 
 let D = null, curYear = null, cMode = 'views', isDark = true;
 let chM = null, chW = null, chG = null;
 
-/* ── theme ── */
 function toggleTheme() {
     isDark = !isDark;
     document.body.classList.toggle('light', !isDark);
-    document.getElementById('theme-btn').textContent = isDark ? '🌙' : '☀️';
+    document.getElementById('theme-btn').innerHTML = isDark ? Icons.moon : Icons.sun;
     localStorage.setItem('kt', isDark ? 'd' : 'l');
     if (D) renderCharts();
 }
 (function initTheme() {
-    if (localStorage.getItem('kt') === 'l') { isDark = false; document.body.classList.add('light'); document.getElementById('theme-btn').textContent = '☀️'; }
+    if (localStorage.getItem('kt') === 'l') { isDark = false; document.body.classList.add('light'); }
+    document.addEventListener("DOMContentLoaded", () => document.getElementById('theme-btn').innerHTML = isDark ? Icons.moon : Icons.sun);
 })();
 
 function cc() {
     const t = isDark ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.35)';
     const g = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
-    return { t, g, a: '#02b875', ab: isDark?'rgba(2,184,117,.2)':'rgba(2,184,117,.12)', i: '#6887ff', ib: isDark?'rgba(104,135,255,.2)':'rgba(104,135,255,.12)' };
+    return { t, g, a: '#2ecc71', ab: isDark?'rgba(46,204,113,.2)':'rgba(46,204,113,.12)', i: '#60a5fa', ib: isDark?'rgba(96,165,250,.2)':'rgba(96,165,250,.12)' };
 }
 
-/* ── load ── */
 async function load(year) {
     if (year === undefined || year === null) year = curYear;
     curYear = year;
@@ -334,15 +351,26 @@ async function load(year) {
         D = j;
         render();
     } catch(e) { console.error('Load error:', e); alert('Ошибка сети'); }
-    finally { document.getElementById('loader').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); }
+    finally { 
+        document.getElementById('loader').style.opacity = '0';
+        setTimeout(() => document.getElementById('loader').classList.add('hidden'), 300);
+        document.getElementById('app').classList.remove('hidden'); 
+    }
 }
 
-/* ── render ── */
 function render() {
     if (!D?.meta) return;
     const n = D.meta.name || 'Пользователь';
     document.getElementById('user-name').textContent = n;
-    document.getElementById('avatar').textContent = n.charAt(0).toUpperCase();
+    
+    const u = tg?.initDataUnsafe?.user;
+    const avEl = document.getElementById('avatar');
+    if (u && u.photo_url) {
+        avEl.innerHTML = `<img src="${u.photo_url}" alt="A">`;
+    } else {
+        avEl.textContent = n.charAt(0).toUpperCase();
+    }
+
     document.getElementById('period-label').textContent = D.summary?.period_label || '';
 
     renderYears();
@@ -364,11 +392,9 @@ function render() {
     renderGroup();
 }
 
-/* ── years ── */
 function renderYears() {
     const c = document.getElementById('years');
     const yrs = D.meta?.years || [];
-    // If current year not in list, fall back to first available or 'all'
     if (curYear && curYear !== 'all' && yrs.length && !yrs.includes(curYear)) {
         curYear = yrs[0];
     }
@@ -386,55 +412,68 @@ function markYear() {
 }
 window.pickYear = y => { curYear = y; markYear(); load(y === 'all' ? 'all' : y); };
 
-/* ── heatmap ── */
 function renderHeatmap() {
     const el = document.getElementById('heatmap'); el.innerHTML = '';
-    if (!D.heatmap?.length) { el.innerHTML = '<div class="empty"><div class="empty-ico">📅</div>Выберите год для карты активности</div>'; return; }
+    if (!D.heatmap?.length) { el.innerHTML = `<div class="empty"><div class="icon">${Icons.cal}</div>Выберите год для карты активности</div>`; return; }
     const yr = curYear && curYear !== 'all' ? curYear : new Date().getFullYear();
-    const offset = (new Date(yr, 0, 1).getDay() + 6) % 7; // Mon=0
+    const offset = (new Date(yr, 0, 1).getDay() + 6) % 7;
     for (let i = 0; i < offset; i++) { const d = document.createElement('div'); d.className = 'hc'; d.style.visibility = 'hidden'; el.appendChild(d); }
     D.heatmap.forEach(v => { const d = document.createElement('div'); d.className = 'hc'+(v?' h'+v:''); el.appendChild(d); });
 }
 
-/* ── genres ── */
 function renderGenres() {
     const el = document.getElementById('genres-box'); el.innerHTML = '';
-    if (!D.genres?.length) { el.innerHTML = '<div class="empty"><div class="empty-ico">🎭</div>Нет данных</div>'; return; }
+    if (!D.genres?.length) { el.innerHTML = `<div class="empty"><div class="icon">${Icons.masks}</div>Нет данных</div>`; return; }
     const mx = Math.max(...D.genres.map(g=>g.minutes),1);
-    D.genres.slice(0,7).forEach(g => {
+    
+    let html = '';
+    D.genres.slice(0,7).forEach((g, i) => {
         const w = (g.minutes/mx)*100, h = Math.floor(g.minutes/60), m = g.minutes%60;
-        el.innerHTML += `<div class="g-row"><div class="g-hdr"><span class="g-name">${g.name}</span><span class="g-time">${h}ч ${m}м</span></div><div class="g-track"><div class="g-fill" style="width:${w}%"></div></div></div>`;
+        const delay = (i + 1) * 0.05;
+        html += `<div class="g-row anim-item" style="animation-delay:${delay}s"><div class="g-hdr"><span class="g-name">${g.name}</span><span class="g-time">${h}ч ${m}м</span></div><div class="g-track"><div class="g-fill" style="width:${w}%"></div></div></div>`;
     });
+    el.innerHTML = html;
 }
 
-/* ── detail tabs ── */
 window.dTab = function(t) {
     document.querySelectorAll('#detail-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.d===t));
     ['genres','actors','countries','binges'].forEach(s=>document.getElementById('ds-'+s).classList.toggle('vis',s===t));
-    if (t==='actors') fillList('actors-box', D.actors, '⭐', 'просм.');
-    if (t==='countries') fillList('countries-box', D.countries, '', 'просм.');
+    if (t==='actors') fillList('actors-box', D.actors, Icons.star, 'просм.');
+    if (t==='countries') fillList('countries-box', D.countries, Icons.globe, 'просм.');
     if (t==='binges') fillBinges();
 };
-function fillList(id, items, emo, unit) {
+
+function fillList(id, items, ico, unit) {
     const el = document.getElementById(id);
-    if (!items?.length) { el.innerHTML = '<div class="empty"><div class="empty-ico">🔍</div>Нет данных</div>'; return; }
-    el.innerHTML = items.map((it,i) => {
+    if (!items?.length) { el.innerHTML = `<div class="empty"><div class="icon">${ico}</div>Нет данных</div>`; return; }
+    
+    let html = '';
+    items.forEach((it, i) => {
         const cnt = it.count || it.views || '';
         const sub = it.shows ? `${it.shows} шоу` : (it.sub || '');
         const lbl = unit ? `${cnt} ${unit}` : cnt;
-        return `<div class="li"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${it.emoji||emo} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r">${lbl}</span></div>`;
-    }).join('');
-}
-function fillBinges() {
-    const el = document.getElementById('binges-box');
-    if (!D.binges?.length) { el.innerHTML = '<div class="empty"><div class="empty-ico">🏃</div>Нет марафонов</div>'; return; }
-    el.innerHTML = D.binges.map(b => {
-        const e = b.tier==='marathon'?'🏆':b.tier==='binge'?'🔥':'⚡';
-        return `<div class="li"><div class="li-l"><span class="li-rank">${e}</span><div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r">${b.count} эп.</span></div>`;
-    }).join('');
+        const delay = (i + 1) * 0.05;
+        
+        let visual = it.emoji ? `<span style="font-size:16px;line-height:1;margin-right:4px">${it.emoji}</span>` : `<div class="icon">${ico}</div>`;
+        
+        html += `<div class="li anim-item" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r">${lbl}</span></div>`;
+    });
+    el.innerHTML = html;
 }
 
-/* ── charts ── */
+function fillBinges() {
+    const el = document.getElementById('binges-box');
+    if (!D.binges?.length) { el.innerHTML = `<div class="empty"><div class="icon">${Icons.bolt}</div>Нет марафонов</div>`; return; }
+    
+    let html = '';
+    D.binges.forEach((b, i) => {
+        const delay = (i + 1) * 0.05;
+        const ico = b.tier==='marathon' ? Icons.flame : Icons.bolt;
+        html += `<div class="li anim-item" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank"><div class="icon" style="font-size:16px;line-height:1">${ico}</div></span><div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r">${b.count} эп.</span></div>`;
+    });
+    el.innerHTML = html;
+}
+
 function renderCharts() { renderMonthly(); renderWeekday(); renderDonut(); }
 
 function renderMonthly() {
@@ -444,8 +483,8 @@ function renderMonthly() {
     const c = cc(), isV = cMode==='views', ds = isV?ch.views:ch.hours;
     chM = new Chart(ctx, { type:'bar', data:{ labels:ch.labels, datasets:[{ data:ds, backgroundColor:c.ab, borderColor:c.a, borderWidth:1.5, borderRadius:4, borderSkipped:false }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-            scales:{ x:{ title:{display:true,text:'Месяц',color:c.t,font:{size:11,weight:'600'}}, ticks:{color:c.t,font:{size:10}}, grid:{display:false} },
-                     y:{ title:{display:true,text:isV?'Просмотры':'Часы',color:c.t,font:{size:11,weight:'600'}}, ticks:{color:c.t,font:{size:10}}, grid:{color:c.g}, beginAtZero:true } } } });
+            scales:{ x:{ title:{display:true,text:'Месяц',color:c.t,font:{size:11,weight:'600',family:'-apple-system'}}, ticks:{color:c.t,font:{size:10}}, grid:{display:false} },
+                     y:{ title:{display:true,text:isV?'Просмотры':'Часы',color:c.t,font:{size:11,weight:'600',family:'-apple-system'}}, ticks:{color:c.t,font:{size:10}}, grid:{color:c.g}, beginAtZero:true } } } });
 }
 function renderWeekday() {
     const ctx = document.getElementById('c-weekday');
@@ -455,73 +494,70 @@ function renderWeekday() {
     chW = new Chart(ctx, { type:'bar', data:{ labels:ch.labels, datasets:[{ data:ch.data,
         backgroundColor:ch.data.map((_,i)=>i>=5?c.ib:c.ab), borderColor:ch.data.map((_,i)=>i>=5?c.i:c.a), borderWidth:1.5, borderRadius:4, borderSkipped:false }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-            scales:{ x:{ title:{display:true,text:'День недели',color:c.t,font:{size:11,weight:'600'}}, ticks:{color:c.t,font:{size:10}}, grid:{display:false} },
-                     y:{ title:{display:true,text:'Просмотры',color:c.t,font:{size:11,weight:'600'}}, ticks:{color:c.t,font:{size:10}}, grid:{color:c.g}, beginAtZero:true } } } });
+            scales:{ x:{ title:{display:true,text:'День недели',color:c.t,font:{size:11,weight:'600',family:'-apple-system'}}, ticks:{color:c.t,font:{size:10}}, grid:{display:false} },
+                     y:{ title:{display:true,text:'Просмотры',color:c.t,font:{size:11,weight:'600',family:'-apple-system'}}, ticks:{color:c.t,font:{size:10}}, grid:{color:c.g}, beginAtZero:true } } } });
 }
 function renderDonut() {
     const ctx = document.getElementById('c-genre');
     if (chG) chG.destroy();
     if (!D.genres?.length) return;
-    const c = cc(), pal = ['#02b875','#6887ff','#f77a99','#6cc788','#f0ad4e','#5bc0de','#ef1960','#9b59b6'], top = D.genres.slice(0,6);
-    chG = new Chart(ctx, { type:'doughnut', data:{ labels:top.map(g=>g.name), datasets:[{ data:top.map(g=>g.count), backgroundColor:top.map((_,i)=>pal[i%pal.length]), borderWidth:0, spacing:2 }] },
-        options:{ responsive:true, maintainAspectRatio:false, cutout:'55%', plugins:{ legend:{ position:'right', labels:{ color:c.t, font:{size:11}, padding:8, usePointStyle:true, pointStyleWidth:10 } } } } });
+    const c = cc(), pal = ['#2ecc71','#3498db','#e74c3c','#1abc9c','#f39c12','#9b59b6','#e67e22','#ecf0f1'], top = D.genres.slice(0,6);
+    chG = new Chart(ctx, { type:'doughnut', data:{ labels:top.map(g=>g.name), datasets:[{ data:top.map(g=>g.count), backgroundColor:top.map((_,i)=>pal[i%pal.length]), borderWidth:0, spacing:3 }] },
+        options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{ position:'right', labels:{ color:c.t, font:{size:11,family:'-apple-system'}, padding:8, usePointStyle:true, pointStyleWidth:10 } } } } });
 }
 window.chartMode = m => { cMode = m; document.getElementById('cb-views').classList.toggle('on',m==='views'); document.getElementById('cb-hours').classList.toggle('on',m==='hours'); renderMonthly(); };
 
-/* ── main tabs ── */
 window.mainTab = function(t) {
     document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
     document.getElementById('sec-personal').classList.toggle('vis', t==='personal');
     document.getElementById('sec-group').classList.toggle('vis', t==='group');
 };
 
-/* ── group ── */
 function renderGroup() {
     const el = document.getElementById('group-root');
-    if (!D.group) { el.innerHTML = '<div class="card"><div class="empty"><div class="empty-ico">👥</div>Вы не состоите в группе</div></div>'; return; }
+    if (!D.group) { el.innerHTML = `<div class="card"><div class="empty"><div class="icon" style="font-size:32px;line-height:1">${Icons.users}</div>Вы не состоите в группе</div></div>`; return; }
     const g = D.group, p = D.summary;
 
     const rows = [
-        { lb:'🎬 Просмотры', y:p.total_views, gv:g.total_views },
-        { lb:'📺 Эпизоды',   y:p.total_episodes, gv:g.total_episodes },
-        { lb:'🎞️ Фильмы',   y:p.total_movies, gv:g.total_movies },
-        { lb:'🎯 Уникальных',y:p.unique_shows, gv:g.unique_shows },
+        { lb:'Просмотры', i:Icons.tv, y:p.total_views, gv:g.total_views },
+        { lb:'Эпизоды', i:Icons.film, y:p.total_episodes, gv:g.total_episodes },
+        { lb:'Фильмы', i:Icons.time, y:p.total_movies, gv:g.total_movies },
+        { lb:'Уникальных', i:Icons.star, y:p.unique_shows, gv:g.unique_shows },
     ];
     let hasDiff = false;
-    const cmpH = rows.map(r => {
+    const cmpH = rows.map((r, idx) => {
         const d = r.y - r.gv;
         let dh;
-        if (d===0) dh = '<span class="cmp-d d-eq">✅ Мэтч</span>';
+        if (d===0) dh = `<span class="cmp-d d-eq"><div class="icon" style="font-size:12px;display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>`;
         else { hasDiff = true; dh = `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`; }
-        return `<div class="cmp"><span class="cmp-lb">${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:10px">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`;
+        return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:14px;line-height:1">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:10px">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`;
     }).join('');
 
     const mx = Math.max(...g.members.map(m=>m.views),1);
-    const mbH = g.members.map(m => `<div class="mb"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
+    const mbH = g.members.map((m, idx) => `<div class="mb anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
 
     let gGenH = '';
     if (g.genres?.length) {
         const gm = Math.max(...g.genres.map(x=>x.minutes),1);
-        gGenH = '<div class="label">🎭 Жанры группы</div><div class="card fu d3">' + g.genres.slice(0,5).map(x => {
+        gGenH = `<div class="label"><div class="icon" style="font-size:14px;line-height:1">${Icons.masks}</div>Жанры группы</div><div class="card anim-item d3">` + g.genres.slice(0,5).map((x, idx) => {
             const w=(x.minutes/gm)*100, h=Math.floor(x.minutes/60), m=x.minutes%60;
-            return `<div class="g-row"><div class="g-hdr"><span class="g-name">${x.name}</span><span class="g-time">${h}ч ${m}м</span></div><div class="g-track"><div class="g-fill" style="width:${w}%;background:linear-gradient(90deg,#6887ff,#5bc0de)"></div></div></div>`;
+            return `<div class="g-row anim-item" style="animation-delay:${(idx+1)*0.05}s"><div class="g-hdr"><span class="g-name">${x.name}</span><span class="g-time">${h}ч ${m}м</span></div><div class="g-track"><div class="g-fill" style="width:${w}%;background:var(--info)"></div></div></div>`;
         }).join('') + '</div>';
     }
 
     el.innerHTML = `
-        <div class="card fu"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">👥</span><div><div style="font-size:15px;font-weight:700;color:var(--text-primary)">${g.group_name}</div><div style="font-size:11px;color:var(--text-muted)">${g.members_count} участников · ${g.duration_display}</div></div></div></div>
-        <div class="label">📊 Вы vs Группа</div>
-        <div class="card fu d1">
-            <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:11px;font-weight:700;color:var(--accent)">👤 Вы</span><span style="font-size:11px;font-weight:700;color:var(--info)">👥 Группа</span></div>
-            ${!hasDiff?'<div style="text-align:center;padding:8px 0;font-size:13px;color:var(--accent);font-weight:600">✅ Полный мэтч! Показатели совпадают</div>':''}
+        <div class="card anim-item"><div style="display:flex;align-items:center;gap:12px"><div class="icon" style="font-size:24px;line-height:1">${Icons.users}</div><div><div style="font-size:16px;font-weight:700;color:var(--text-primary)">${g.group_name}</div><div style="font-size:11px;color:var(--text-muted)">${g.members_count} участников · ${g.duration_display}</div></div></div></div>
+        <div class="label"><div class="icon" style="font-size:14px;line-height:1">${Icons.chart}</div>Вы vs Группа</div>
+        <div class="card anim-item d1">
+            <div style="display:flex;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-weight:700;color:var(--accent)">👤 Вы</span><span style="font-size:11px;font-weight:700;color:var(--info)">👥 Группа</span></div>
+            ${!hasDiff?`<div style="text-align:center;padding:12px 0;font-size:13px;color:var(--accent);font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px"><div class="icon" style="font-size:16px;line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
             ${cmpH}
         </div>
-        <div class="label">🏆 Участники</div>
-        <div class="card fu d2">${mbH}</div>
+        <div class="label"><div class="icon" style="font-size:14px;line-height:1">${Icons.user}</div>Участники</div>
+        <div class="card anim-item d2">${mbH}</div>
         ${gGenH}`;
 }
 
-/* ── init ── */
 load();
 </script>
 </body>
