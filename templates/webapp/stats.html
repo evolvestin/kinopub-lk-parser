@@ -38,11 +38,11 @@
         body {
             background: var(--bg-main);
             color: var(--text-secondary);
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
-            font-size: 14px;
+            font-family: var(--tg-theme-font-family, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+            font-size: clamp(14px, 4vw, 16px);
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
-            padding-bottom: 28px;
+            padding-bottom: clamp(20px, 6vw, 28px);
             transition: background .3s ease, color .3s ease;
         }
 
@@ -50,8 +50,8 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: 16px;
-            margin: 0 16px 12px;
+            padding: clamp(12px, 3.5vw, 16px);
+            margin: 0 clamp(12px, 3.5vw, 16px) clamp(10px, 3vw, 12px);
             box-shadow: var(--shadow);
             transition: background .3s ease, border-color .3s ease;
         }
@@ -59,65 +59,65 @@
         .clickable { cursor: pointer; transition: transform .2s ease, background .3s ease; }
         .clickable:active { transform: scale(.96); background: var(--bg-input); }
 
-        .header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 6px; }
-        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header { display: flex; align-items: center; justify-content: space-between; padding: clamp(12px, 4vw, 16px) clamp(12px, 4vw, 16px) clamp(4px, 1.5vw, 6px); }
+        .header-left { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 12px); }
         .avatar {
-            width: 44px; height: 44px; border-radius: 50%;
+            width: clamp(40px, 11vw, 48px); height: clamp(40px, 11vw, 48px); border-radius: 50%;
             background: var(--bg-input); display: flex; align-items: center; justify-content: center;
-            font-size: 18px; font-weight: 700; color: var(--text-primary); flex-shrink: 0;
+            font-size: clamp(18px, 5vw, 22px); font-weight: 700; color: var(--text-primary); flex-shrink: 0;
             overflow: hidden; border: 1px solid var(--border);
         }
         .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .header-name { font-size: 18px; font-weight: 700; color: var(--text-primary); }
-        .header-sub  { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+        .header-name { font-size: clamp(16px, 5vw, 20px); font-weight: 700; color: var(--text-primary); }
+        .header-sub  { font-size: clamp(11px, 3vw, 14px); color: var(--text-muted); margin-top: 1px; }
         .theme-btn {
-            width: 36px; height: 36px; border-radius: 50%;
+            width: clamp(32px, 9vw, 40px); height: clamp(32px, 9vw, 40px); border-radius: 50%;
             background: var(--bg-input); border: 1px solid var(--border);
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; color: var(--text-primary); transition: transform .2s ease;
         }
         .theme-btn:active { transform: scale(.9); }
-        .theme-btn .icon { font-size: 20px; line-height: 1; }
+        .theme-btn .icon { font-size: clamp(18px, 5vw, 22px); line-height: 1; }
 
-        .tabs { display: flex; gap: 8px; padding: 8px 16px 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tabs { display: flex; gap: clamp(6px, 2vw, 8px); padding: clamp(6px, 2vw, 8px) clamp(12px, 4vw, 16px) clamp(4px, 1vw, 4px); overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .tabs::-webkit-scrollbar { display: none; }
         .tab {
-            display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 8px 14px; border-radius: 10px;
-            font-size: 13px; font-weight: 600; white-space: nowrap;
+            display: flex; align-items: center; gap: clamp(4px, 1.5vw, 6px); flex-shrink: 0; padding: clamp(6px, 2vw, 8px) clamp(12px, 3.5vw, 16px); border-radius: 10px;
+            font-size: clamp(13px, 3.5vw, 15px); font-weight: 600; white-space: nowrap;
             border: 1px solid var(--border); background: var(--bg-card);
             color: var(--text-muted); cursor: pointer; transition: all .2s ease;
         }
-        .tab .icon { font-size: 16px; line-height: 1; }
+        .tab .icon { font-size: clamp(15px, 4vw, 18px); line-height: 1; }
         .tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
         .tab:not(.on):active { transform: scale(.96); }
 
-        .years { display: flex; gap: 6px; padding: 4px 16px 8px; overflow-x: auto; }
+        .years { display: flex; gap: clamp(4px, 1.5vw, 6px); padding: clamp(4px, 1vw, 4px) clamp(12px, 4vw, 16px) clamp(6px, 2vw, 8px); overflow-x: auto; }
         .years::-webkit-scrollbar { display: none; }
         .yr {
-            flex-shrink: 0; padding: 6px 14px; border-radius: 8px;
-            font-size: 12px; font-weight: 600;
+            flex-shrink: 0; padding: clamp(4px, 1.5vw, 6px) clamp(10px, 3vw, 14px); border-radius: 8px;
+            font-size: clamp(12px, 3.2vw, 14px); font-weight: 600;
             border: 1px solid var(--border); background: transparent;
             color: var(--text-muted); cursor: pointer; transition: all .2s ease;
         }
         .yr.on { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
 
         .label {
-            display: flex; align-items: center; gap: 6px;
-            font-size: 11px; font-weight: 700; text-transform: uppercase;
-            letter-spacing: .5px; color: var(--text-muted); padding: 12px 16px 6px;
+            display: flex; align-items: center; gap: clamp(4px, 1.5vw, 6px);
+            font-size: clamp(11px, 3vw, 13px); font-weight: 700; text-transform: uppercase;
+            letter-spacing: .5px; color: var(--text-muted); padding: clamp(10px, 3vw, 12px) clamp(12px, 4vw, 16px) clamp(4px, 1.5vw, 6px);
         }
-        .label .icon { font-size: 14px; line-height: 1; }
+        .label .icon { font-size: clamp(13px, 3.5vw, 16px); line-height: 1; }
 
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px 12px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(8px, 2.5vw, 12px); padding: 0 clamp(12px, 4vw, 16px) clamp(10px, 3vw, 12px); }
         .stat {
             background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow);
+            border-radius: var(--radius); padding: clamp(10px, 3vw, 14px); box-shadow: var(--shadow);
             transition: background .3s ease; display: flex; flex-direction: column;
         }
-        .stat-icon  { font-size: 24px; line-height: 1; margin-bottom: 8px; }
-        .stat-val   { font-size: 22px; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
-        .stat-lbl   { font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: .3px; margin-top: 4px; }
-        .stat-sub   { font-size: 11px; color: var(--accent); margin-top: 4px; font-weight: 500; }
+        .stat-icon  { font-size: clamp(22px, 6vw, 26px); line-height: 1; margin-bottom: clamp(6px, 2vw, 8px); }
+        .stat-val   { font-size: clamp(20px, 5.5vw, 24px); font-weight: 800; color: var(--text-primary); line-height: 1.1; }
+        .stat-lbl   { font-size: clamp(10px, 2.8vw, 12px); color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: .3px; margin-top: clamp(2px, 1vw, 4px); }
+        .stat-sub   { font-size: clamp(11px, 3vw, 13px); color: var(--accent); margin-top: clamp(2px, 1vw, 4px); font-weight: 500; }
         .stat.clickable {
             position: relative;
             cursor: pointer;
@@ -127,45 +127,47 @@
             transform: scale(0.97);
             background-color: var(--bg-input);
         }
+        
         .stat.clickable::after {
-            content: '›';
+            content: '';
             position: absolute;
-            top: 8px;
-            right: 12px;
-            font-size: 18px;
-            color: var(--text-muted);
-            opacity: 0.5;
+            top: 50%;
+            right: clamp(12px, 3.5vw, 16px);
+            transform: translateY(-50%) rotate(45deg);
+            width: clamp(7px, 2vw, 10px);
+            height: clamp(7px, 2vw, 10px);
+            border-top: 2px solid var(--accent);
+            border-right: 2px solid var(--accent);
+            opacity: 0.9;
         }
 
-        .g-row { margin-bottom: 12px; }
-        .g-hdr { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+        .g-row { margin-bottom: clamp(10px, 3vw, 12px); }
+        .g-hdr { display: flex; justify-content: space-between; font-size: clamp(12px, 3.2vw, 14px); font-weight: 600; margin-bottom: clamp(4px, 1.5vw, 6px); }
         .g-name { color: var(--text-primary); }
         .g-time { color: var(--text-muted); }
-        .g-track { height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
+        .g-track { height: clamp(5px, 1.5vw, 7px); background: var(--bg-input); border-radius: 3px; overflow: hidden; }
         .g-fill  { height: 100%; border-radius: 3px; background: var(--accent); transition: width .6s cubic-bezier(0.16, 1, 0.3, 1); }
 
-        .li { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .li { display: flex; align-items: center; justify-content: space-between; padding: clamp(10px, 3vw, 12px) 0; border-bottom: 1px solid var(--border); }
         .li:last-child { border: none; }
-        .li-l { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
-        .li-r { font-size: 13px; font-weight: 700; color: var(--text-primary); flex-shrink: 0; margin-left: 8px; text-align: right; }
-        .li-rank { font-size: 12px; font-weight: 700; color: var(--text-muted); width: 24px; text-align: center; flex-shrink: 0; }
-        .li-name { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .li-name .icon { font-size: 14px; line-height: 1; }
-        .li-sub  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .li-l { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 12px); min-width: 0; flex: 1; }
+        .li-r { font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; color: var(--text-primary); flex-shrink: 0; margin-left: 8px; text-align: right; }
+        .li-rank { font-size: clamp(12px, 3.2vw, 14px); font-weight: 700; color: var(--text-muted); width: clamp(20px, 5vw, 24px); text-align: center; flex-shrink: 0; }
+        .li-name { display: flex; align-items: center; gap: clamp(4px, 1.5vw, 6px); font-size: clamp(13px, 3.5vw, 15px); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .li-name .icon { font-size: clamp(14px, 4vw, 16px); line-height: 1; }
+        .li-sub  { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); margin-top: 2px; }
 
-        /* ОБНОВЛЕННЫЕ СТИЛИ ХИТМАПА - БЕЗ СКРОЛЛА */
         .hm { 
             display: grid; 
             grid-template-rows: repeat(7, 1fr); 
             grid-auto-flow: column; 
-            gap: 2px; 
+            gap: clamp(1px, 0.5vw, 2px); 
             width: 100%;
             margin: 0;
             padding: 0;
         }
         .hc { 
             width: 100%;
-            /* Заставляем ячейки быть квадратными */
             aspect-ratio: 1 / 1;
             border-radius: 20%; 
             background: var(--bg-input); 
@@ -183,46 +185,45 @@
             align-items: center; 
             gap: 4px; 
             justify-content: flex-end; 
-            margin-top: 8px; 
-            font-size: 9px; 
+            margin-top: clamp(6px, 2vw, 8px); 
+            font-size: clamp(9px, 2.5vw, 11px); 
             color: var(--text-muted); 
             text-transform: uppercase;
             font-weight: 700;
         }
-        .hm-leg .hc { width: 10px; height: 10px; border-radius: 2px; }
+        .hm-leg .hc { width: clamp(8px, 2.5vw, 12px); height: clamp(8px, 2.5vw, 12px); border-radius: 2px; }
 
         .hm-container {
             width: 100%;
-            /* Скролл отключен намеренно */
             overflow: hidden; 
         }
 
         .chart-box { position: relative; width: 100%; height: 200px; }
 
-        .cmp { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .cmp { display: flex; justify-content: space-between; align-items: center; padding: clamp(8px, 2.5vw, 10px) 0; border-bottom: 1px solid var(--border); }
         .cmp:last-child { border: none; }
-        .cmp-lb { font-size: 12px; color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: 6px; }
-        .cmp-lb .icon { font-size: 14px; line-height: 1; }
-        .cmp-vs { display: flex; gap: 12px; align-items: center; }
-        .cmp-v  { font-size: 13px; font-weight: 700; text-align: right; min-width: 44px; }
+        .cmp-lb { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: clamp(4px, 1.5vw, 6px); }
+        .cmp-lb .icon { font-size: clamp(14px, 3.8vw, 16px); line-height: 1; }
+        .cmp-vs { display: flex; gap: clamp(8px, 2.5vw, 12px); align-items: center; }
+        .cmp-v  { font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; text-align: right; min-width: clamp(36px, 10vw, 44px); }
         .cmp-you { color: var(--accent); }
         .cmp-grp { color: var(--info); }
-        .cmp-d  { font-size: 10px; font-weight: 600; padding: 3px 6px; border-radius: 4px; }
+        .cmp-d  { font-size: clamp(10px, 2.8vw, 12px); font-weight: 600; padding: clamp(2px, 0.8vw, 3px) clamp(4px, 1.5vw, 6px); border-radius: 4px; }
         .d-up   { background: var(--accent-dim); color: var(--accent); }
         .d-dn   { background: rgba(231, 76, 60, 0.15); color: var(--danger); }
         .d-eq   { background: var(--bg-input); color: var(--text-muted); }
 
-        .mb { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-        .mb-n { font-size: 12px; font-weight: 600; color: var(--text-primary); width: 80px; text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .mb-t { flex: 1; height: 8px; background: var(--bg-input); border-radius: 4px; overflow: hidden; }
+        .mb { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 10px); margin-bottom: clamp(8px, 2.5vw, 10px); }
+        .mb-n { font-size: clamp(12px, 3.2vw, 14px); font-weight: 600; color: var(--text-primary); width: clamp(60px, 18vw, 80px); text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .mb-t { flex: 1; height: clamp(6px, 2vw, 8px); background: var(--bg-input); border-radius: 4px; overflow: hidden; }
         .mb-f { height: 100%; border-radius: 4px; background: var(--info); transition: width .6s cubic-bezier(0.16, 1, 0.3, 1); }
-        .mb-c { font-size: 11px; font-weight: 700; color: var(--text-muted); width: 36px; flex-shrink: 0; }
+        .mb-c { font-size: clamp(11px, 3vw, 13px); font-weight: 700; color: var(--text-muted); width: clamp(28px, 8vw, 36px); flex-shrink: 0; }
 
-        .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; color: var(--text-muted); font-size: 13px; text-align: center; }
-        .empty .icon { font-size: 32px; line-height: 1; margin-bottom: 12px; opacity: 0.5; display: inline-flex; align-items: center; justify-content: center; }
+        .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(24px, 7vw, 32px) clamp(12px, 3.5vw, 16px); color: var(--text-muted); font-size: clamp(13px, 3.5vw, 15px); text-align: center; }
+        .empty .icon { font-size: clamp(28px, 8vw, 36px); line-height: 1; margin-bottom: clamp(8px, 2.5vw, 12px); opacity: 0.5; display: inline-flex; align-items: center; justify-content: center; }
 
         .loader { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: var(--bg-main); transition: opacity .3s; }
-        .spinner { width: 28px; height: 28px; border: 3px solid var(--bg-input); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite; }
+        .spinner { width: clamp(24px, 7vw, 32px); height: clamp(24px, 7vw, 32px); border: 3px solid var(--bg-input); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         .sec { display: none; }
@@ -241,17 +242,17 @@
         .d5 { animation-delay: 0.25s; }
 
         svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; flex-shrink: 0; fill: currentColor; }
-        .hist-item { display: flex; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+        .hist-item { display: flex; gap: clamp(10px, 3vw, 14px); padding: clamp(10px, 3vw, 14px) clamp(12px, 3.5vw, 16px); border-bottom: 1px solid var(--border); }
         .hist-item:last-child { border: none; }
-        .hist-poster { width: 44px; height: 66px; border-radius: 6px; object-fit: cover; background: var(--bg-input); flex-shrink: 0; border: 1px solid var(--border); }
+        .hist-poster { width: clamp(40px, 12vw, 48px); height: clamp(60px, 18vw, 72px); border-radius: 6px; object-fit: cover; background: var(--bg-input); flex-shrink: 0; border: 1px solid var(--border); }
         .hist-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-        .hist-title { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-bottom: 2px; }
-        .hist-orig { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
-        .hist-meta { font-size: 11px; color: var(--text-secondary); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .hist-badge { background: var(--bg-input); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; color: var(--text-primary); border: 1px solid var(--border); }
-        .rating-badge { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-weight: 700; font-size: 11px; }
+        .hist-title { font-size: clamp(14px, 4vw, 16px); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-bottom: 2px; }
+        .hist-orig { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+        .hist-meta { font-size: clamp(11px, 3vw, 13px); color: var(--text-secondary); display: flex; gap: clamp(6px, 2vw, 8px); align-items: center; flex-wrap: wrap; }
+        .hist-badge { background: var(--bg-input); padding: clamp(2px, 0.5vw, 3px) clamp(4px, 1.5vw, 6px); border-radius: 4px; font-size: clamp(10px, 2.8vw, 12px); font-weight: 700; color: var(--text-primary); border: 1px solid var(--border); }
+        .rating-badge { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-weight: 700; font-size: clamp(11px, 3vw, 13px); }
         .rating-badge.show-lvl { color: var(--text-muted); font-weight: 500; }
-        .rating-badge svg { font-size: 12px; }
+        .rating-badge svg { font-size: clamp(12px, 3.2vw, 14px); }
     </style>
 </head>
 <body>
@@ -310,28 +311,27 @@
             </div>
 
             <div class="card anim-item d2">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                    <span style="font-size:13px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:6px">
-                        <div class="icon" style="font-size:14px;line-height:1" id="ic-chart"></div>Динамика
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:clamp(12px, 3.5vw, 16px)">
+                    <span style="font-size:clamp(13px, 3.5vw, 15px);font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:6px">
+                        <div class="icon" style="font-size:clamp(14px, 4vw, 16px);line-height:1" id="ic-chart"></div>Динамика
                     </span>
                     <div style="display:flex;gap:4px">
-                        <button class="yr on" id="cb-views" onclick="chartMode('views')" style="padding:4px 10px;font-size:11px">Просмотры</button>
-                        <button class="yr" id="cb-hours" onclick="chartMode('hours')" style="padding:4px 10px;font-size:11px">Часы</button>
+                        <button class="yr on" id="cb-views" onclick="chartMode('views')" style="padding:clamp(3px, 1vw, 4px) clamp(8px, 2.5vw, 10px);font-size:clamp(10px, 2.8vw, 12px)">Просмотры</button>
+                        <button class="yr" id="cb-hours" onclick="chartMode('hours')" style="padding:clamp(3px, 1vw, 4px) clamp(8px, 2.5vw, 10px);font-size:clamp(10px, 2.8vw, 12px)">Часы</button>
                     </div>
                 </div>
                 <div class="chart-box"><canvas id="c-monthly"></canvas></div>
             </div>
 
             <div class="card anim-item d3">
-                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:16px">Дни недели</div>
+                <div style="font-size:clamp(13px, 3.5vw, 15px);font-weight:700;color:var(--text-primary);margin-bottom:clamp(12px, 3.5vw, 16px)">Дни недели</div>
                 <div class="chart-box" style="height:160px"><canvas id="c-weekday"></canvas></div>
             </div>
 
             <div class="card anim-item d3">
-                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:16px;display:flex;align-items:center;gap:6px">
-                    <div class="icon" style="font-size:14px;line-height:1" id="ic-flame"></div>Интенсивность
+                <div style="font-size:clamp(13px, 3.5vw, 15px);font-weight:700;color:var(--text-primary);margin-bottom:clamp(12px, 3.5vw, 16px);display:flex;align-items:center;gap:6px">
+                    <div class="icon" style="font-size:clamp(14px, 4vw, 16px);line-height:1" id="ic-flame"></div>Интенсивность
                 </div>
-                <!-- Контейнер хитмапа без скролла -->
                 <div class="hm-container">
                     <div class="hm" id="heatmap"></div>
                 </div>
@@ -349,32 +349,32 @@
                 <button class="tab" data-d="binges" onclick="dTab('binges')"><div class="icon" id="it-bin"></div>Марафоны</button>
             </div>
 
-            <div class="sec vis" id="ds-genres"><div class="card" id="genres-box"></div></div>
+            <div class="sec vis" id="ds-genres">
+                <div class="card anim-item d1" style="margin-bottom: clamp(10px, 3vw, 12px);">
+                    <div class="chart-box" style="height:220px"><canvas id="c-genre"></canvas></div>
+                </div>
+                <div class="card anim-item d2" id="genres-box"></div>
+            </div>
             <div class="sec" id="ds-actors"><div class="card" id="actors-box"></div></div>
             <div class="sec" id="ds-countries"><div class="card" id="countries-box"></div></div>
             <div class="sec" id="ds-binges"><div class="card" id="binges-box"></div></div>
-
-            <div class="card anim-item d5">
-                <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:12px">Жанры — доля</div>
-                <div class="chart-box" style="height:220px"><canvas id="c-genre"></canvas></div>
-            </div>
+        </div>
         </div>
 
         <div class="sec" id="sec-group"><div id="group-root"></div></div>
 
         <div class="sec" id="sec-history">
             <div class="header" style="padding-bottom: 0;">
-                <button onclick="closeHistory()" class="tab" style="background:var(--bg-input); color:var(--text-primary); margin-bottom:12px; display:inline-flex;">
+                <button onclick="closeHistory()" class="tab" style="background:var(--bg-input); color:var(--text-primary); margin-bottom:clamp(10px, 3vw, 12px); display:inline-flex;">
                     <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right:4px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg> Назад
                 </button>
             </div>
             <div class="label" style="padding-top:0;"><div class="icon" id="ic-hist-type"></div><span id="hist-title"></span></div>
-            <div id="hist-list" style="padding: 0 16px 20px;"></div>
+            <div id="hist-list" style="padding: 0 clamp(12px, 3.5vw, 16px) clamp(16px, 4.5vw, 20px);"></div>
         </div>
     </div>
 
 <script>
-// (Иконки остаются без изменений - для краткости пропущены, так как не меняются)
 const Icons = {
     moon: '<svg viewBox="0 0 512 512"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
     sun: '<svg viewBox="0 0 512 512"><path d="M256 118a22 22 0 01-22-22V48a22 22 0 0144 0v48a22 22 0 01-22 22zM256 486a22 22 0 01-22-22v-48a22 22 0 0144 0v48a22 22 0 01-22 22zM369.14 164.86a22 22 0 01-15.56-37.55l33.94-33.94a22 22 0 0131.11 31.11l-33.94 33.94a21.93 21.93 0 01-15.55 6.44zM108.92 425.08a22 22 0 01-15.55-37.56l33.94-33.94a22 22 0 1131.11 31.11l-33.94 33.94a21.94 21.94 0 01-15.56 6.45zM464 278h-48a22 22 0 010-44h48a22 22 0 010 44zM96 278H48a22 22 0 010-44h48a22 22 0 010 44zM403.08 425.08a21.94 21.94 0 01-15.56-6.45l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.55 37.56zM142.86 164.86a21.93 21.93 0 01-15.55-6.44l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.56 37.55zM256 358a102 102 0 11102-102 102.12 102.12 0 01-102 102z"/></svg>',
@@ -508,30 +508,22 @@ function renderHeatmap() {
         return; 
     }
     
-    // Рассчитываем смещение (offset) для начала года
     const yr = curYear && curYear !== 'all' ? curYear : new Date().getFullYear();
     const offset = (new Date(yr, 0, 1).getDay() + 6) % 7;
     
-    // Полное количество ячеек (смещение + данные)
     const totalCells = offset + D.heatmap.length;
-    // Рассчитываем количество недель (столбцов)
     const totalColumns = Math.ceil(totalCells / 7);
     
-    // Применяем количество столбцов к CSS Grid
-    // Это заставит сетку автоматически рассчитать ширину ячеек, 
-    // чтобы они поместились в родительский контейнер
     el.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
     
     const fragment = document.createDocumentFragment();
-    // Добавляем пустые ячейки смещения
     for (let i = 0; i < offset; i++) { 
         const d = document.createElement('div'); 
         d.className = 'hc'; 
-        d.style.opacity = '0'; // Скрытые ячейки
+        d.style.opacity = '0'; 
         fragment.appendChild(d); 
     }
     
-    // Добавляем данные
     D.heatmap.forEach(v => { 
         const d = document.createElement('div'); 
         d.className = 'hc' + (v ? ' h' + v : ''); 
@@ -574,7 +566,7 @@ function fillList(id, items, ico, unit) {
         const lbl = unit ? `${cnt} ${unit}` : cnt;
         const delay = (i + 1) * 0.05;
         
-        let visual = it.emoji ? `<span style="font-size:16px;line-height:1;margin-right:4px">${it.emoji}</span>` : `<div class="icon">${ico}</div>`;
+        let visual = it.emoji ? `<span style="font-size:clamp(16px,4.5vw,20px);line-height:1;margin-right:4px">${it.emoji}</span>` : `<div class="icon">${ico}</div>`;
         
         html += `<div class="li anim-item" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r">${lbl}</span></div>`;
     });
@@ -589,22 +581,49 @@ function fillBinges() {
     D.binges.forEach((b, i) => {
         const delay = (i + 1) * 0.05;
         const ico = b.tier==='marathon' ? Icons.flame : Icons.bolt;
-        html += `<div class="li anim-item" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank"><div class="icon" style="font-size:16px;line-height:1">${ico}</div></span><div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r">${b.count} эп.</span></div>`;
+        html += `<div class="li anim-item" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank"><div class="icon" style="font-size:clamp(16px,4.5vw,20px);line-height:1">${ico}</div></span><div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r">${b.count} эп.</span></div>`;
     });
     el.innerHTML = html;
 }
 
 function renderCharts() { renderMonthly(); renderWeekday(); renderDonut(); }
 
+const fSizeAx = Math.max(10, Math.min(14, window.innerWidth * 0.03));
+const fSizeTi = Math.max(11, Math.min(16, window.innerWidth * 0.035));
+
 function renderMonthly() {
     const ctx = document.getElementById('c-monthly');
     if (chM) chM.destroy();
     const ch = D.monthly_chart; if (!ch?.labels?.length) return;
     const c = cc(), isV = cMode==='views', ds = isV?ch.views:ch.hours;
-    chM = new Chart(ctx, { type:'bar', data:{ labels:ch.labels, datasets:[{ data:ds, backgroundColor:c.ab, borderColor:c.a, borderWidth:1.5, borderRadius:4, borderSkipped:false }] },
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-            scales:{ x:{ title:{display:true,text:'Месяц',color:c.t,font:{size:11,weight:'600',family:'-apple-system'}}, ticks:{color:c.t,font:{size:10}}, grid:{display:false} },
-                     y:{ title:{display:true,text:isV?'Просмотры':'Часы',color:c.t,font:{size:11,weight:'600',family:'-apple-system'}}, ticks:{color:c.t,font:{size:10}}, grid:{color:c.g}, beginAtZero:true } } } });
+    chM = new Chart(ctx, { 
+        type:'line', 
+        data:{ 
+            labels:ch.labels, 
+            datasets:[{ 
+                data:ds, 
+                backgroundColor:c.ab, 
+                borderColor:c.a, 
+                borderWidth:2, 
+                tension:0.4, 
+                fill:true,
+                pointBackgroundColor: isDark ? '#1b1f26' : '#ffffff',
+                pointBorderColor: c.a,
+                pointRadius: 3,
+                pointHoverRadius: 5
+            }] 
+        },
+        options:{ 
+            responsive:true, 
+            maintainAspectRatio:false, 
+            plugins:{ legend:{display:false} },
+            interaction: { mode: 'index', intersect: false },
+            scales:{ 
+                x:{ title:{display:true,text:'Месяц',color:c.t,font:{size:fSizeTi,weight:'600',family:'inherit'}}, ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
+                y:{ title:{display:true,text:isV?'Просмотры':'Часы',color:c.t,font:{size:fSizeTi,weight:'600',family:'inherit'}}, ticks:{color:c.t,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true } 
+            } 
+        } 
+    });
 }
 function renderWeekday() {
     const ctx = document.getElementById('c-weekday');
@@ -614,8 +633,8 @@ function renderWeekday() {
     chW = new Chart(ctx, { type:'bar', data:{ labels:ch.labels, datasets:[{ data:ch.data,
         backgroundColor:ch.data.map((_,i)=>i>=5?c.ib:c.ab), borderColor:ch.data.map((_,i)=>i>=5?c.i:c.a), borderWidth:1.5, borderRadius:4, borderSkipped:false }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-            scales:{ x:{ title:{display:true,text:'День недели',color:c.t,font:{size:11,weight:'600',family:'-apple-system'}}, ticks:{color:c.t,font:{size:10}}, grid:{display:false} },
-                     y:{ title:{display:true,text:'Просмотры',color:c.t,font:{size:11,weight:'600',family:'-apple-system'}}, ticks:{color:c.t,font:{size:10}}, grid:{color:c.g}, beginAtZero:true } } } });
+            scales:{ x:{ title:{display:true,text:'День недели',color:c.t,font:{size:fSizeTi,weight:'600',family:'inherit'}}, ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
+                     y:{ title:{display:true,text:'Просмотры',color:c.t,font:{size:fSizeTi,weight:'600',family:'inherit'}}, ticks:{color:c.t,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true } } } });
 }
 function renderDonut() {
     const ctx = document.getElementById('c-genre');
@@ -625,9 +644,13 @@ function renderDonut() {
     chG = new Chart(ctx, { 
         type:'doughnut', 
         data:{ 
-            labels:top.map(g=>`${g.name} (${g.percentage}%)`), 
+            labels:top.map(g => {
+                const h = Math.floor(g.minutes / 60);
+                const m = g.minutes % 60;
+                return `${g.name} (${h}ч ${m}м)`;
+            }), 
             datasets:[{ 
-                data:top.map(g=>g.percentage), 
+                data:top.map(g => g.minutes), 
                 backgroundColor:top.map((_,i)=>pal[i%pal.length]), 
                 borderWidth:0, spacing:3 
             }] 
@@ -640,11 +663,14 @@ function renderDonut() {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return ' ' + context.parsed + '%';
+                            const mins = context.parsed;
+                            const h = Math.floor(mins / 60);
+                            const m = mins % 60;
+                            return ` ${h}ч ${m}м`;
                         }
                     }
                 },
-                legend:{ position:'right', labels:{ color:c.t, font:{size:11,family:'-apple-system'}, padding:8, usePointStyle:true, pointStyleWidth:10 } } 
+                legend:{ position:'right', labels:{ color:c.t, font:{size:fSizeTi,family:'inherit'}, padding:8, usePointStyle:true, pointStyleWidth:10 } } 
             } 
         } 
     });
@@ -758,7 +784,7 @@ window.closeHistory = function() {
 
 function renderGroup() {
     const el = document.getElementById('group-root');
-    if (!D.group) { el.innerHTML = `<div class="card"><div class="empty"><div class="icon" style="font-size:32px;line-height:1">${Icons.users}</div>Вы не состоите в группе</div></div>`; return; }
+    if (!D.group) { el.innerHTML = `<div class="card"><div class="empty"><div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1">${Icons.users}</div>Вы не состоите в группе</div></div>`; return; }
     const g = D.group, p = D.summary;
 
     const rows = [
@@ -771,9 +797,9 @@ function renderGroup() {
     const cmpH = rows.map((r, idx) => {
         const d = r.y - r.gv;
         let dh;
-        if (d===0) dh = `<span class="cmp-d d-eq"><div class="icon" style="font-size:12px;display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>`;
+        if (d===0) dh = `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(10px, 2.8vw, 13px);display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>`;
         else { hasDiff = true; dh = `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`; }
-        return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:14px;line-height:1">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:10px">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`;
+        return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(14px, 4vw, 18px);line-height:1">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(10px, 2.8vw, 12px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`;
     }).join('');
 
     const mx = Math.max(...g.members.map(m=>m.views),1);
@@ -782,21 +808,21 @@ function renderGroup() {
     let gGenH = '';
     if (g.genres?.length) {
         const gm = Math.max(...g.genres.map(x=>x.minutes),1);
-        gGenH = `<div class="label"><div class="icon" style="font-size:14px;line-height:1">${Icons.masks}</div>Жанры группы</div><div class="card anim-item d3">` + g.genres.slice(0,5).map((x, idx) => {
+        gGenH = `<div class="label"><div class="icon" style="font-size:clamp(13px, 3.5vw, 16px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="card anim-item d3">` + g.genres.slice(0,5).map((x, idx) => {
             const w=(x.minutes/gm)*100, h=Math.floor(x.minutes/60), m=x.minutes%60;
             return `<div class="g-row anim-item" style="animation-delay:${(idx+1)*0.05}s"><div class="g-hdr"><span class="g-name">${x.name}</span><span class="g-time">${h}ч ${m}м</span></div><div class="g-track"><div class="g-fill" style="width:${w}%;background:var(--info)"></div></div></div>`;
         }).join('') + '</div>';
     }
 
     el.innerHTML = `
-        <div class="card anim-item"><div style="display:flex;align-items:center;gap:12px"><div class="icon" style="font-size:24px;line-height:1">${Icons.users}</div><div><div style="font-size:16px;font-weight:700;color:var(--text-primary)">${g.group_name}</div><div style="font-size:11px;color:var(--text-muted)">${g.members_count} участников · ${g.duration_display}</div></div></div></div>
-        <div class="label"><div class="icon" style="font-size:14px;line-height:1">${Icons.chart}</div>Вы vs Группа</div>
+        <div class="card anim-item"><div style="display:flex;align-items:center;gap:12px"><div class="icon" style="font-size:clamp(22px, 6vw, 26px);line-height:1">${Icons.users}</div><div><div style="font-size:clamp(15px, 4vw, 18px);font-weight:700;color:var(--text-primary)">${g.group_name}</div><div style="font-size:clamp(11px, 3vw, 14px);color:var(--text-muted)">${g.members_count} участников · ${g.duration_display}</div></div></div></div>
+        <div class="label"><div class="icon" style="font-size:clamp(13px, 3.5vw, 16px);line-height:1">${Icons.chart}</div>Вы vs Группа</div>
         <div class="card anim-item d1">
-            <div style="display:flex;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-weight:700;color:var(--accent)">👤 Вы</span><span style="font-size:11px;font-weight:700;color:var(--info)">👥 Группа</span></div>
-            ${!hasDiff?`<div style="text-align:center;padding:12px 0;font-size:13px;color:var(--accent);font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px"><div class="icon" style="font-size:16px;line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
+            <div style="display:flex;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><span style="font-size:clamp(11px, 3vw, 14px);font-weight:700;color:var(--accent)">👤 Вы</span><span style="font-size:clamp(11px, 3vw, 14px);font-weight:700;color:var(--info)">👥 Группа</span></div>
+            ${!hasDiff?`<div style="text-align:center;padding:12px 0;font-size:clamp(13px, 3.5vw, 16px);color:var(--accent);font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
             ${cmpH}
         </div>
-        <div class="label"><div class="icon" style="font-size:14px;line-height:1">${Icons.user}</div>Участники</div>
+        <div class="label"><div class="icon" style="font-size:clamp(13px, 3.5vw, 16px);line-height:1">${Icons.user}</div>Участники</div>
         <div class="card anim-item d2">${mbH}</div>
         ${gGenH}`;
 }
