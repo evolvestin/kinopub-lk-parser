@@ -29,10 +29,10 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
     counts = base_qs.aggregate(
         total_views=Count('id'),
         total_episodes=Count('id', filter=Q(season_number__gt=0)),
-        total_movies=Count('id', filter=Q(season_number=0)),
+        total_movies=Count('id', filter=Q(season_number=0) | Q(season_number__isnull=True)),
         unique_shows=Count('show_id', distinct=True),
-        unique_series=Count('show_id', distinct=True, filter=Q(show__type='Series')),
-        unique_movies=Count('show_id', distinct=True, filter=Q(season_number=0)),
+        unique_series=Count('show_id', distinct=True, filter=Q(season_number__gt=0)),
+        unique_movies=Count('show_id', distinct=True, filter=Q(season_number=0) | Q(season_number__isnull=True)),
         first_view=Min('view_date'),
         last_view=Max('view_date'),
         active_days=Count('view_date', distinct=True),
@@ -472,7 +472,7 @@ def generate_group_stats(user, year=None):
     counts = base_qs.aggregate(
         total_views=Count('id'),
         total_episodes=Count('id', filter=Q(season_number__gt=0)),
-        total_movies=Count('id', filter=Q(season_number=0)),
+        total_movies=Count('id', filter=Q(season_number=0) | Q(season_number__isnull=True)),
         unique_shows=Count('show_id', distinct=True),
         active_days=Count('view_date', distinct=True),
     )

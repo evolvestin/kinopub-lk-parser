@@ -6,6 +6,7 @@
     <title>KinoStats</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <style>
         :root {
             --bg-main: #14181f;
@@ -315,10 +316,6 @@
                     <span style="font-size:clamp(13px, 3.5vw, 15px);font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:6px">
                         <div class="icon" style="font-size:clamp(14px, 4vw, 16px);line-height:1" id="ic-chart"></div>Динамика
                     </span>
-                    <div style="display:flex;gap:4px">
-                        <button class="yr on" id="cb-views" onclick="chartMode('views')" style="padding:clamp(3px, 1vw, 4px) clamp(8px, 2.5vw, 10px);font-size:clamp(10px, 2.8vw, 12px)">Просмотры</button>
-                        <button class="yr" id="cb-hours" onclick="chartMode('hours')" style="padding:clamp(3px, 1vw, 4px) clamp(8px, 2.5vw, 10px);font-size:clamp(10px, 2.8vw, 12px)">Часы</button>
-                    </div>
                 </div>
                 <div class="chart-box"><canvas id="c-monthly"></canvas></div>
             </div>
@@ -353,12 +350,10 @@
                 <div class="card anim-item d1" style="margin-bottom: clamp(10px, 3vw, 12px);">
                     <div class="chart-box" style="height:220px"><canvas id="c-genre"></canvas></div>
                 </div>
-                <div class="card anim-item d2" id="genres-box"></div>
             </div>
             <div class="sec" id="ds-actors"><div class="card" id="actors-box"></div></div>
             <div class="sec" id="ds-countries"><div class="card" id="countries-box"></div></div>
             <div class="sec" id="ds-binges"><div class="card" id="binges-box"></div></div>
-        </div>
         </div>
 
         <div class="sec" id="sec-group"><div id="group-root"></div></div>
@@ -405,7 +400,7 @@ document.addEventListener("DOMContentLoaded", () => {
 const tg = window.Telegram?.WebApp;
 if (tg) tg.expand();
 
-let D = null, curYear = null, cMode = 'views', isDark = true;
+let D = null, curYear = null, isDark = true;
 let chM = null, chW = null, chG = null;
 
 function toggleTheme() {
@@ -470,10 +465,9 @@ function render() {
     document.getElementById('s-ep').textContent    = s.total_episodes || 0;
     document.getElementById('s-ser').textContent   = (s.unique_series||0) + ' сериалов';
     document.getElementById('s-mov').textContent   = s.total_movies || 0;
-    document.getElementById('s-uni').textContent   = (s.unique_shows||0) + ' уникальных';
+    document.getElementById('s-uni').textContent   = (s.unique_movies||0) + ' уникальных';
 
     renderHeatmap();
-    renderGenres();
     dTab('genres');
     renderCharts();
     renderGroup();
@@ -533,20 +527,6 @@ function renderHeatmap() {
     el.appendChild(fragment);
 }
 
-function renderGenres() {
-    const el = document.getElementById('genres-box'); el.innerHTML = '';
-    if (!D.genres?.length) { el.innerHTML = `<div class="empty"><div class="icon">${Icons.masks}</div>Нет данных</div>`; return; }
-    const mx = Math.max(...D.genres.map(g=>g.minutes),1);
-    
-    let html = '';
-    D.genres.slice(0,7).forEach((g, i) => {
-        const w = (g.minutes/mx)*100, h = Math.floor(g.minutes/60), m = g.minutes%60;
-        const delay = (i + 1) * 0.05;
-        html += `<div class="g-row anim-item" style="animation-delay:${delay}s"><div class="g-hdr"><span class="g-name">${g.name}</span><span class="g-time">${h}ч ${m}м</span></div><div class="g-track"><div class="g-fill" style="width:${w}%"></div></div></div>`;
-    });
-    el.innerHTML = html;
-}
-
 window.dTab = function(t) {
     document.querySelectorAll('#detail-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.d===t));
     ['genres','actors','countries','binges'].forEach(s=>document.getElementById('ds-'+s).classList.toggle('vis',s===t));
@@ -595,32 +575,63 @@ function renderMonthly() {
     const ctx = document.getElementById('c-monthly');
     if (chM) chM.destroy();
     const ch = D.monthly_chart; if (!ch?.labels?.length) return;
-    const c = cc(), isV = cMode==='views', ds = isV?ch.views:ch.hours;
+    const c = cc();
     chM = new Chart(ctx, { 
         type:'line', 
         data:{ 
             labels:ch.labels, 
-            datasets:[{ 
-                data:ds, 
-                backgroundColor:c.ab, 
-                borderColor:c.a, 
-                borderWidth:2, 
-                tension:0.4, 
-                fill:true,
-                pointBackgroundColor: isDark ? '#1b1f26' : '#ffffff',
-                pointBorderColor: c.a,
-                pointRadius: 3,
-                pointHoverRadius: 5
-            }] 
+            datasets:[
+                { 
+                    label: 'Просмотры',
+                    data: ch.views, 
+                    backgroundColor: c.ab, 
+                    borderColor: c.a, 
+                    borderWidth: 2, 
+                    tension: 0.4, 
+                    fill: true,
+                    yAxisID: 'y',
+                    pointBackgroundColor: isDark ? '#1b1f26' : '#ffffff',
+                    pointBorderColor: c.a,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Часы',
+                    data: ch.hours, 
+                    backgroundColor: c.ib, 
+                    borderColor: c.i, 
+                    borderWidth: 2, 
+                    tension: 0.4, 
+                    fill: false,
+                    yAxisID: 'y1',
+                    pointBackgroundColor: isDark ? '#1b1f26' : '#ffffff',
+                    pointBorderColor: c.i,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                }
+            ] 
         },
         options:{ 
             responsive:true, 
             maintainAspectRatio:false, 
-            plugins:{ legend:{display:false} },
+            plugins:{ 
+                legend: { 
+                    display: true, 
+                    position: 'top', 
+                    labels: { color: c.t, usePointStyle: true, boxWidth: 8, font: { size: fSizeAx, family: 'inherit' } } 
+                } 
+            },
             interaction: { mode: 'index', intersect: false },
             scales:{ 
-                x:{ title:{display:true,text:'Месяц',color:c.t,font:{size:fSizeTi,weight:'600',family:'inherit'}}, ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
-                y:{ title:{display:true,text:isV?'Просмотры':'Часы',color:c.t,font:{size:fSizeTi,weight:'600',family:'inherit'}}, ticks:{color:c.t,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true } 
+                x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
+                y:{ 
+                    type: 'linear', display: true, position: 'left',
+                    ticks:{color:c.a,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true 
+                },
+                y1: {
+                    type: 'linear', display: true, position: 'right',
+                    ticks:{color:c.i,font:{size:fSizeAx}}, grid:{drawOnChartArea: false}, beginAtZero:true
+                }
             } 
         } 
     });
@@ -641,14 +652,13 @@ function renderDonut() {
     if (chG) chG.destroy();
     if (!D.genres?.length) return;
     const c = cc(), pal = ['#2ecc71','#3498db','#e74c3c','#1abc9c','#f39c12','#9b59b6','#e67e22','#ecf0f1'], top = D.genres.slice(0,6);
+    const totalMins = top.reduce((acc, g) => acc + g.minutes, 0);
+    
     chG = new Chart(ctx, { 
         type:'doughnut', 
+        plugins: [ChartDataLabels],
         data:{ 
-            labels:top.map(g => {
-                const h = Math.floor(g.minutes / 60);
-                const m = g.minutes % 60;
-                return `${g.name} (${h}ч ${m}м)`;
-            }), 
+            labels:top.map(g => g.name), 
             datasets:[{ 
                 data:top.map(g => g.minutes), 
                 backgroundColor:top.map((_,i)=>pal[i%pal.length]), 
@@ -658,15 +668,26 @@ function renderDonut() {
         options:{ 
             responsive:true, 
             maintainAspectRatio:false, 
-            cutout:'65%', 
+            cutout:'55%', 
+            animation: {
+                animateScale: true,
+                animateRotate: true
+            },
             plugins:{ 
+                datalabels: {
+                    color: '#ffffff',
+                    font: { weight: 'bold', size: 11 },
+                    formatter: (value) => {
+                        let pct = Math.round((value / totalMins) * 100);
+                        return pct > 3 ? pct + '%' : '';
+                    }
+                },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
                             const mins = context.parsed;
-                            const h = Math.floor(mins / 60);
-                            const m = mins % 60;
-                            return ` ${h}ч ${m}м`;
+                            const pct = Math.round((mins / totalMins) * 100);
+                            return ` ${pct}%`;
                         }
                     }
                 },
@@ -675,7 +696,6 @@ function renderDonut() {
         } 
     });
 }
-window.chartMode = m => { cMode = m; document.getElementById('cb-views').classList.toggle('on',m==='views'); document.getElementById('cb-hours').classList.toggle('on',m==='hours'); renderMonthly(); };
 
 window.mainTab = function(t) {
     document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
