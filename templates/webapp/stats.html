@@ -151,6 +151,12 @@
 
         .li { display: flex; align-items: center; justify-content: space-between; padding: clamp(10px, 3vw, 12px) 0; border-bottom: 1px solid var(--border); }
         .li:last-child { border: none; }
+        .li-clickable {
+            padding: clamp(8px, 2.5vw, 10px) clamp(10px, 3vw, 12px);
+            margin: 2px calc(-1 * clamp(10px, 3vw, 12px)) 0;
+            border-radius: 8px;
+            border-bottom: none !important;
+        }
         .li-l { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 12px); min-width: 0; flex: 1; }
         .li-r { font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; color: var(--text-primary); flex-shrink: 0; margin-left: 8px; text-align: right; }
         .li-rank { font-size: clamp(12px, 3.2vw, 14px); font-weight: 700; color: var(--text-muted); width: clamp(20px, 5vw, 24px); text-align: center; flex-shrink: 0; }
@@ -562,7 +568,8 @@ function fillBinges() {
     D.binges.forEach((b, i) => {
         const delay = (i + 1) * 0.05;
         const ico = b.tier==='marathon' ? Icons.flame : Icons.bolt;
-        html += `<div class="li anim-item" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank"><div class="icon" style="font-size:clamp(16px,4.5vw,20px);line-height:1">${ico}</div></span><div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r">${b.count} эп.</span></div>`;
+        const safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        html += `<div class="li li-clickable anim-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')"><div class="li-l"><span class="li-rank"><div class="icon" style="font-size:clamp(16px,4.5vw,20px);line-height:1">${ico}</div></span><div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r">${b.count} эп.</span></div>`;
     });
     el.innerHTML = html;
 }
@@ -727,7 +734,7 @@ window.mainTab = function(t) {
     document.getElementById('sec-group').classList.toggle('vis', t==='group');
 };
 
-window.openHistory = function(type) {
+window.openHistory = function(type, extraId, extraDate, extraTitle) {
     document.getElementById('main-tabs').classList.add('hidden');
     document.getElementById('years').classList.add('hidden');
     document.getElementById('sec-personal').classList.remove('vis');
@@ -752,6 +759,14 @@ window.openHistory = function(type) {
         });
         document.getElementById('hist-title').textContent = 'Вся история просмотров';
         document.getElementById('ic-hist-type').innerHTML = Icons.dash;
+    } else if (type === 'binge') {
+        data = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate)
+            .sort((a, b) => {
+                if (a.season_number !== b.season_number) return a.season_number - b.season_number;
+                return a.episode_number - b.episode_number;
+            });
+        document.getElementById('hist-title').textContent = extraTitle;
+        document.getElementById('ic-hist-type').innerHTML = Icons.bolt;
     } else {
         data = type === 'movies' ? D.history_movies : D.history_episodes;
         document.getElementById('hist-title').textContent = type === 'movies' ? 'Просмотренные фильмы' : 'Просмотренные эпизоды';
@@ -759,7 +774,8 @@ window.openHistory = function(type) {
     }
     
     if (!data || !data.length) {
-        el.innerHTML = `<div class="empty"><div class="icon">${type === 'movies' ? Icons.film : Icons.tv}</div>Нет просмотров</div>`;
+        let emptyIco = type === 'movies' ? Icons.film : (type === 'binge' ? Icons.bolt : Icons.tv);
+        el.innerHTML = `<div class="empty"><div class="icon">${emptyIco}</div>Нет просмотров</div>`;
         return;
     }
     
