@@ -416,9 +416,10 @@ function toggleTheme() {
 })();
 
 function cc() {
-    const t = isDark ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.35)';
+    const t = isDark ? 'rgba(255,255,255,.65)' : 'rgba(0,0,0,.65)';
     const g = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
-    return { t, g, a: '#2ecc71', ab: isDark?'rgba(46,204,113,.2)':'rgba(46,204,113,.12)', i: '#60a5fa', ib: isDark?'rgba(96,165,250,.2)':'rgba(96,165,250,.12)' };
+    const b = isDark ? '#2d333b' : '#d1d5db';
+    return { t, g, b, a: '#2ecc71', ab: isDark?'rgba(46,204,113,.2)':'rgba(46,204,113,.12)', i: '#60a5fa', ib: isDark?'rgba(96,165,250,.2)':'rgba(96,165,250,.12)' };
 }
 
 async function load(year) {
@@ -618,19 +619,19 @@ function renderMonthly() {
                 legend: { 
                     display: true, 
                     position: 'top', 
-                    labels: { color: c.t, usePointStyle: true, boxWidth: 8, font: { size: fSizeAx, family: 'inherit' } } 
+                    labels: { color: c.t, usePointStyle: true, boxWidth: 8, font: { size: fSizeAx, family: 'Inter, sans-serif' } } 
                 } 
             },
             interaction: { mode: 'index', intersect: false },
             scales:{ 
-                x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
+                x:{ ticks:{color:c.t,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{display:false} },
                 y:{ 
                     type: 'linear', display: true, position: 'left',
-                    ticks:{color:c.a,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true 
+                    ticks:{color:c.a,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{color:c.g}, beginAtZero:true 
                 },
                 y1: {
                     type: 'linear', display: true, position: 'right',
-                    ticks:{color:c.i,font:{size:fSizeAx}}, grid:{drawOnChartArea: false}, beginAtZero:true
+                    ticks:{color:c.i,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{drawOnChartArea: false}, beginAtZero:true
                 }
             } 
         } 
@@ -644,45 +645,65 @@ function renderWeekday() {
     chW = new Chart(ctx, { type:'bar', data:{ labels:ch.labels, datasets:[{ data:ch.data,
         backgroundColor:ch.data.map((_,i)=>i>=5?c.ib:c.ab), borderColor:ch.data.map((_,i)=>i>=5?c.i:c.a), borderWidth:1.5, borderRadius:4, borderSkipped:false }] },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-            scales:{ x:{ title:{display:true,text:'День недели',color:c.t,font:{size:fSizeTi,weight:'600',family:'inherit'}}, ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
-                     y:{ title:{display:true,text:'Просмотры',color:c.t,font:{size:fSizeTi,weight:'600',family:'inherit'}}, ticks:{color:c.t,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true } } } });
+            scales:{ x:{ title:{display:true,text:'День недели',color:c.t,font:{size:fSizeTi,weight:'600',family:'Inter, sans-serif'}}, ticks:{color:c.t,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{display:false} },
+                     y:{ title:{display:true,text:'Просмотры',color:c.t,font:{size:fSizeTi,weight:'600',family:'Inter, sans-serif'}}, ticks:{color:c.t,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{color:c.g}, beginAtZero:true } } } });
 }
 function renderDonut() {
     const ctx = document.getElementById('c-genre');
     if (chG) chG.destroy();
     if (!D.genres?.length) return;
-    const c = cc(), pal = ['#2ecc71','#3498db','#e74c3c','#1abc9c','#f39c12','#9b59b6','#e67e22','#ecf0f1'], top = D.genres.slice(0,6);
-    const totalMins = top.reduce((acc, g) => acc + g.minutes, 0);
+    const c = cc();
+    const pal = ['#2ecc71','#3498db','#e74c3c','#1abc9c','#f39c12','#9b59b6','#e67e22','#ecf0f1'];
+    const top = D.genres.slice(0,6);
+    const totalMins = Math.max(top.reduce((acc, g) => acc + g.minutes, 0), 1);
     
+    const labelsWithTime = top.map(g => {
+        const h = Math.floor(g.minutes / 60);
+        const m = g.minutes % 60;
+        return `${g.name} (${h}ч ${m}м)`;
+    });
+
     chG = new Chart(ctx, { 
         type:'doughnut', 
         plugins: [ChartDataLabels],
         data:{ 
-            labels:top.map(g => g.name), 
+            labels: labelsWithTime, 
             datasets:[{ 
-                data:top.map(g => g.minutes), 
-                backgroundColor:top.map((_,i)=>pal[i%pal.length]), 
-                borderWidth:0, spacing:3 
+                data: top.map(g => g.minutes), 
+                backgroundColor: top.map((_,i)=>pal[i%pal.length]), 
+                borderWidth: isDark ? 2 : 1,
+                borderColor: isDark ? '#1b1f26' : '#ffffff',
+                hoverOffset: 6
             }] 
         },
         options:{ 
             responsive:true, 
             maintainAspectRatio:false, 
             cutout:'55%', 
-            animation: {
-                animateScale: true,
-                animateRotate: true
-            },
+            layout: { padding: { right: 10, left: 10 } },
+            animation: { animateScale: true, animateRotate: true },
             plugins:{ 
                 datalabels: {
                     color: '#ffffff',
-                    font: { weight: 'bold', size: 11 },
+                    font: { weight: 'bold', size: 12, family: 'Inter, sans-serif' },
+                    textShadowBlur: 4,
+                    textShadowColor: 'rgba(0,0,0,0.8)',
                     formatter: (value) => {
                         let pct = Math.round((value / totalMins) * 100);
-                        return pct > 3 ? pct + '%' : '';
+                        return pct > 4 ? pct + '%' : '';
                     }
                 },
                 tooltip: {
+                    backgroundColor: isDark ? 'rgba(30,35,45,0.95)' : 'rgba(255,255,255,0.95)',
+                    titleColor: isDark ? '#fff' : '#000',
+                    bodyColor: isDark ? '#ccc' : '#333',
+                    borderColor: c.b,
+                    borderWidth: 1,
+                    padding: 12,
+                    boxPadding: 6,
+                    cornerRadius: 8,
+                    titleFont: { size: 14, family: 'Inter, sans-serif' },
+                    bodyFont: { size: 13, family: 'Inter, sans-serif' },
                     callbacks: {
                         label: function(context) {
                             const mins = context.parsed;
@@ -691,7 +712,10 @@ function renderDonut() {
                         }
                     }
                 },
-                legend:{ position:'right', labels:{ color:c.t, font:{size:fSizeTi,family:'inherit'}, padding:8, usePointStyle:true, pointStyleWidth:10 } } 
+                legend:{ 
+                    position:'right', 
+                    labels:{ color:c.t, font:{size:12, family:'Inter, sans-serif', weight: '500'}, padding:12, usePointStyle:true, pointStyleWidth:10 } 
+                } 
             } 
         } 
     });
