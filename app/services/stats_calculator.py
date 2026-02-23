@@ -104,22 +104,31 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
 
 
 def _get_favorites(base_qs, dur_qs):
+    # Genres
     genres_qs = (
-        base_qs.values(name=F('show__genres__name'))
-        .filter(name__isnull=False)
+        base_qs.values(tid=F('show__genres__id'), name=F('show__genres__name'))
+        .filter(tid__isnull=False)
         .annotate(count=Count('id'))
         .order_by('-count')
     )
     total_mentions = sum(g['count'] for g in genres_qs)
-    genres = [
-        {
+    
+    # Take top 10 and fetch show_ids for client-side filtering
+    genres = []
+    for g in genres_qs[:10]:
+        # Получаем ID всех шоу, которые смотрел пользователь в этом жанре (в рамках base_qs)
+        show_ids = list(
+            base_qs.filter(show__genres__id=g['tid'])
+            .values_list('show_id', flat=True)
+            .distinct()
+        )
+        genres.append({
             'name': g['name'],
             'count': g['count'],
             'minutes': 0,
             'percentage': round((g['count'] / total_mentions * 100), 1) if total_mentions else 0,
-        }
-        for g in genres_qs[:10]
-    ]
+            'show_ids': show_ids
+        })
 
     genre_mins = dur_qs.values(name=F('show__genres__name')).annotate(m=Sum('final_duration') / 60)
     mins_map = {gm['name']: int(gm['m'] or 0) for gm in genre_mins if gm['name']}
@@ -127,24 +136,54 @@ def _get_favorites(base_qs, dur_qs):
         g['minutes'] = mins_map.get(g['name'], 0)
 
     def get_person_top(field, limit=5):
-        return [
-            {'name': p['name'], 'shows': p['shows'], 'views': p['views'], 'count': p['views']}
-            for p in base_qs.values(name=F(f'show__{field}__name'))
-            .filter(name__isnull=False)
+        # Аналогично для персон
+        qs = (
+            base_qs.values(tid=F(f'show__{field}__id'), name=F(f'show__{field}__name'))
+            .filter(tid__isnull=False)
             .annotate(views=Count('id'), shows=Count('show_id', distinct=True))
             .order_by('-views')[:limit]
-        ]
+        )
+        result = []
+        for p in qs:
+            show_ids = list(
+                base_qs.filter(**{f'show__{field}__id': p['tid']})
+                .values_list('show_id', flat=True)
+                .distinct()
+            )
+            result.append({
+                'name': p['name'], 
+                'shows': p['shows'], 
+                'views': p['views'], 
+                'count': p['views'],
+                'show_ids': show_ids
+            })
+        return result
 
+    # Countries
     countries_qs = (
-        base_qs.values(name=F('show__countries__name'), emoji=F('show__countries__emoji_flag'))
-        .filter(name__isnull=False)
+        base_qs.values(
+            tid=F('show__countries__id'),
+            name=F('show__countries__name'), 
+            emoji=F('show__countries__emoji_flag')
+        )
+        .filter(tid__isnull=False)
         .annotate(count=Count('id'))
-        .order_by('-count')
+        .order_by('-count')[:5]
     )
-    countries = [
-        {'name': c['name'], 'emoji': c['emoji'] or '', 'count': c['count']}
-        for c in countries_qs[:5]
-    ]
+    
+    countries = []
+    for c in countries_qs:
+        show_ids = list(
+            base_qs.filter(show__countries__id=c['tid'])
+            .values_list('show_id', flat=True)
+            .distinct()
+        )
+        countries.append({
+            'name': c['name'], 
+            'emoji': c['emoji'] or '', 
+            'count': c['count'],
+            'show_ids': show_ids
+        })
 
     return {
         'genres': genres,
@@ -186,33 +225,41 @@ def _get_binge_records(base_qs):
     return result
 
 
-def _get_heatmap(dur_qs, year):
-    if not year:
+def _get_heatmap(dur_qs, year, all_years):
+    if not all_years:
         return []
+
+    years_to_process = [int(year)] if year else [int(y) for y in all_years if y]
+    result = []
+
     data = {
         d['view_date']: d['mins']
         for d in dur_qs.values('view_date').annotate(mins=Sum('final_duration') / 60)
         if d['view_date']
     }
-    start = date(int(year), 1, 1)
-    end = date(int(year), 12, 31)
-    res = []
-    curr = start
-    while curr <= end:
-        m = data.get(curr, 0)
-        val = 0
-        if m > 0:
-            if m < 45:
-                val = 1
-            elif m < 90:
-                val = 2
-            elif m < 180:
-                val = 3
-            else:
-                val = 4
-        res.append(val)
-        curr += timedelta(days=1)
-    return res
+
+    for y in sorted(years_to_process, reverse=True):
+        start = date(y, 1, 1)
+        end = date(y, 12, 31)
+        res = []
+        curr = start
+        while curr <= end:
+            m = data.get(curr, 0)
+            val = 0
+            if m > 0:
+                if m < 45:
+                    val = 1
+                elif m < 90:
+                    val = 2
+                elif m < 180:
+                    val = 3
+                else:
+                    val = 4
+            res.append(val)
+            curr += timedelta(days=1)
+        result.append({'year': y, 'data': res})
+
+    return result
 
 
 def _get_monthly_chart(base_qs, dur_qs):
@@ -412,7 +459,7 @@ def generate_user_stats(user, year=None):
             'years': all_years,
         },
         'summary': summary,
-        'heatmap': _get_heatmap(dur_qs, year),
+        'heatmap': _get_heatmap(dur_qs, year, all_years),
         'genres': favs['genres'],
         'actors': favs['actors'],
         'countries': favs['countries'],

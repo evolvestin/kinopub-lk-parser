@@ -335,9 +335,7 @@
                 <div style="font-size:clamp(13px, 3.5vw, 15px);font-weight:700;color:var(--text-primary);margin-bottom:clamp(12px, 3.5vw, 16px);display:flex;align-items:center;gap:6px">
                     <div class="icon" style="font-size:clamp(14px, 4vw, 16px);line-height:1" id="ic-flame"></div>Интенсивность
                 </div>
-                <div class="hm-container">
-                    <div class="hm" id="heatmap"></div>
-                </div>
+                <div id="heatmaps-wrapper"></div>
                 <div class="hm-leg">
                     <span>Меньше</span>
                     <div class="hc"></div><div class="hc h1"></div><div class="hc h2"></div><div class="hc h3"></div><div class="hc h4"></div>
@@ -501,7 +499,7 @@ function markYear() {
 window.pickYear = y => { curYear = y; markYear(); load(y === 'all' ? 'all' : y); };
 
 function renderHeatmap() {
-    const el = document.getElementById('heatmap'); 
+    const el = document.getElementById('heatmaps-wrapper'); 
     el.innerHTML = '';
     
     if (!D.heatmap?.length) { 
@@ -509,26 +507,52 @@ function renderHeatmap() {
         return; 
     }
     
-    const yr = curYear && curYear !== 'all' ? curYear : new Date().getFullYear();
-    const offset = (new Date(yr, 0, 1).getDay() + 6) % 7;
-    
-    const totalCells = offset + D.heatmap.length;
-    const totalColumns = Math.ceil(totalCells / 7);
-    
-    el.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
-    
     const fragment = document.createDocumentFragment();
-    for (let i = 0; i < offset; i++) { 
-        const d = document.createElement('div'); 
-        d.className = 'hc'; 
-        d.style.opacity = '0'; 
-        fragment.appendChild(d); 
-    }
     
-    D.heatmap.forEach(v => { 
-        const d = document.createElement('div'); 
-        d.className = 'hc' + (v ? ' h' + v : ''); 
-        fragment.appendChild(d); 
+    D.heatmap.forEach((hItem, index) => {
+        const yr = hItem.year;
+        const data = hItem.data;
+        const offset = (new Date(yr, 0, 1).getDay() + 6) % 7;
+        
+        const totalCells = offset + data.length;
+        const totalColumns = Math.ceil(totalCells / 7);
+        
+        const block = document.createElement('div');
+        if (index > 0) block.style.marginTop = 'clamp(12px, 3.5vw, 16px)';
+        
+        if (D.heatmap.length > 1) {
+            const title = document.createElement('div');
+            title.style.fontSize = 'clamp(12px, 3.2vw, 14px)';
+            title.style.fontWeight = '700';
+            title.style.color = 'var(--text-muted)';
+            title.style.marginBottom = 'clamp(4px, 1.5vw, 6px)';
+            title.textContent = yr;
+            block.appendChild(title);
+        }
+        
+        const container = document.createElement('div');
+        container.className = 'hm-container';
+        
+        const hm = document.createElement('div');
+        hm.className = 'hm';
+        hm.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
+        
+        for (let i = 0; i < offset; i++) { 
+            const d = document.createElement('div'); 
+            d.className = 'hc'; 
+            d.style.opacity = '0'; 
+            hm.appendChild(d); 
+        }
+        
+        data.forEach(v => { 
+            const d = document.createElement('div'); 
+            d.className = 'hc' + (v ? ' h' + v : ''); 
+            hm.appendChild(d); 
+        });
+        
+        container.appendChild(hm);
+        block.appendChild(container);
+        fragment.appendChild(block);
     });
     
     el.appendChild(fragment);
@@ -537,12 +561,14 @@ function renderHeatmap() {
 window.dTab = function(t) {
     document.querySelectorAll('#detail-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.d===t));
     ['genres','actors','countries','binges'].forEach(s=>document.getElementById('ds-'+s).classList.toggle('vis',s===t));
-    if (t==='actors') fillList('actors-box', D.actors, Icons.star, 'просм.');
-    if (t==='countries') fillList('countries-box', D.countries, Icons.globe, 'просм.');
+    // Передаем название категории (genres, actors, countries) как второй аргумент
+    if (t==='genres') renderDonut(); // График жанров отдельный, список не рендерим здесь явно, но если нужно — можно добавить
+    if (t==='actors') fillList('actors-box', D.actors, Icons.star, 'просм.', 'actors');
+    if (t==='countries') fillList('countries-box', D.countries, Icons.globe, 'просм.', 'countries');
     if (t==='binges') fillBinges();
 };
 
-function fillList(id, items, ico, unit) {
+function fillList(id, items, ico, unit, categoryKey) {
     const el = document.getElementById(id);
     if (!items?.length) { el.innerHTML = `<div class="empty"><div class="icon">${ico}</div>Нет данных</div>`; return; }
     
@@ -555,7 +581,21 @@ function fillList(id, items, ico, unit) {
         
         let visual = it.emoji ? `<span style="font-size:clamp(16px,4.5vw,20px);line-height:1;margin-right:4px">${it.emoji}</span>` : `<div class="icon">${ico}</div>`;
         
-        html += `<div class="li anim-item" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r">${lbl}</span></div>`;
+        // Формируем вызов openHistory для фильтрации
+        // Передаем: mode='filter', extraId=null, extraDate=null, extraTitle=Имя, extraKey=КлючКатегории, extraIndex=Индекс
+        const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const onclick = `onclick="openHistory('filter', null, null, '${safeName}', '${categoryKey}', ${i})"`;
+        
+        html += `<div class="li li-clickable anim-item clickable" ${onclick} style="animation-delay:${delay}s">
+            <div class="li-l">
+                <span class="li-rank">${i+1}</span>
+                <div>
+                    <div class="li-name">${visual} ${it.name}</div>
+                    ${sub?`<div class="li-sub">${sub}</div>`:''}
+                </div>
+            </div>
+            <span class="li-r">${lbl}</span>
+        </div>`;
     });
     el.innerHTML = html;
 }
@@ -734,7 +774,7 @@ window.mainTab = function(t) {
     document.getElementById('sec-group').classList.toggle('vis', t==='group');
 };
 
-window.openHistory = function(type, extraId, extraDate, extraTitle) {
+window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, extraIndex) {
     document.getElementById('main-tabs').classList.add('hidden');
     document.getElementById('years').classList.add('hidden');
     document.getElementById('sec-personal').classList.remove('vis');
@@ -767,6 +807,23 @@ window.openHistory = function(type, extraId, extraDate, extraTitle) {
             });
         document.getElementById('hist-title').textContent = extraTitle;
         document.getElementById('ic-hist-type').innerHTML = Icons.bolt;
+    } else if (type === 'filter') {
+        // Логика фильтрации по жанрам/странам/актерам
+        const filterItem = D[extraKey][extraIndex];
+        const allowedIds = filterItem.show_ids || [];
+        
+        // Объединяем фильмы и эпизоды, затем фильтруем
+        data = [...D.history_movies, ...D.history_episodes].filter(i => allowedIds.includes(i.show_id))
+            .sort((a, b) => b.view_date.localeCompare(a.view_date));
+            
+        document.getElementById('hist-title').textContent = extraTitle;
+        
+        // Выбираем иконку
+        let iconHtml = Icons.star;
+        if (extraKey === 'genres') iconHtml = Icons.masks;
+        else if (extraKey === 'countries') iconHtml = Icons.globe;
+        document.getElementById('ic-hist-type').innerHTML = iconHtml;
+        
     } else {
         data = type === 'movies' ? D.history_movies : D.history_episodes;
         document.getElementById('hist-title').textContent = type === 'movies' ? 'Просмотренные фильмы' : 'Просмотренные эпизоды';
@@ -774,7 +831,12 @@ window.openHistory = function(type, extraId, extraDate, extraTitle) {
     }
     
     if (!data || !data.length) {
-        let emptyIco = type === 'movies' ? Icons.film : (type === 'binge' ? Icons.bolt : Icons.tv);
+        let emptyIco = Icons.dash;
+        if (type === 'movies') emptyIco = Icons.film;
+        else if (type === 'binge') emptyIco = Icons.bolt;
+        else if (type === 'filter') emptyIco = document.getElementById('ic-hist-type').innerHTML;
+        else emptyIco = Icons.tv;
+        
         el.innerHTML = `<div class="empty"><div class="icon">${emptyIco}</div>Нет просмотров</div>`;
         return;
     }
