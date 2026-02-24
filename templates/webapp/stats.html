@@ -9,23 +9,23 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <style>
         :root {
-            --bg-main: #0d1117;
-            --bg-card: #161b22;
-            --bg-input: #21262d;
-            --border: #30363d;
-            --text-primary: #f0f6fc;
-            --text-secondary: #8b949e;
+            --bg-main: #14181f;
+            --bg-card: #1b1f26;
+            --bg-input: #232830;
+            --border: #2d333b;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
             --text-muted: #6e7681;
-            --accent: #238636;
-            --accent-hover: #2ea043;
-            --accent-dim: rgba(35, 134, 54, 0.15);
-            --info: #388bfd;
-            --info-dim: rgba(56, 139, 253, 0.15);
-            --danger: #f85149;
+            --accent: #2ecc71;
+            --accent-hover: #27ae60;
+            --accent-dim: rgba(46, 204, 113, 0.15);
+            --info: #60a5fa;
+            --info-dim: rgba(96, 165, 250, 0.15);
+            --danger: #e74c3c;
             --radius: 16px;
             --radius-lg: 24px;
-            --shadow-sm: 0 4px 12px rgba(0,0,0,0.1);
-            --shadow-glow: 0 8px 24px rgba(35, 134, 54, 0.15);
+            --shadow-sm: 0 4px 12px rgba(0,0,0,0.2);
+            --shadow-glow: 0 8px 24px rgba(46, 204, 113, 0.15);
             --transition-bounce: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             --transition-smooth: 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
@@ -182,7 +182,15 @@
         }
         .li-l { display: flex; align-items: center; gap: clamp(12px, 3vw, 16px); min-width: 0; flex: 1; }
         .li-r { font-size: clamp(14px, 4vw, 16px); font-weight: 800; color: var(--text-primary); flex-shrink: 0; margin-left: 12px; text-align: right; font-variant-numeric: tabular-nums; }
-        .li-rank { font-size: clamp(14px, 4vw, 16px); font-weight: 900; color: var(--border); width: clamp(24px, 6vw, 28px); text-align: center; flex-shrink: 0; text-shadow: 1px 1px 0px rgba(255,255,255,0.05); }
+        .li-rank { 
+            font-size: clamp(14px, 4vw, 16px); 
+            font-weight: 800; 
+            color: var(--text-secondary); 
+            width: clamp(24px, 6vw, 28px); 
+            text-align: center; 
+            flex-shrink: 0; 
+            opacity: 0.8;
+        }
         .li-name { display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); font-size: clamp(14px, 4vw, 16px); font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .li-sub  { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); margin-top: 4px; font-weight: 500; }
 
@@ -202,6 +210,27 @@
         
         .hm-leg { display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin-top: clamp(12px, 3.5vw, 16px); font-size: clamp(10px, 2.8vw, 12px); color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
         .hm-leg .hc { width: clamp(10px, 3vw, 12px); height: clamp(10px, 3vw, 12px); border-radius: 15%; cursor: default; }
+        .hm-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+        .hm-days {
+            display: grid;
+            grid-template-rows: repeat(7, 1fr);
+            gap: clamp(1px, 0.3vw, 2px);
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            padding-top: 2px;
+        }
+
+        .hm-days span {
+            height: 100%;
+            display: flex;
+            align-items: center;
+        }
 
         .chart-box { position: relative; width: 100%; height: 220px; }
 
@@ -420,10 +449,18 @@ function toggleTheme() {
 })();
 
 function cc() {
-    const t = isDark ? 'rgba(255,255,255,.7)' : 'rgba(31,35,40,.8)';
-    const g = isDark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.05)';
-    const b = isDark ? '#30363d' : '#d0d7de';
-    return { t, g, b, a: '#238636', ab: isDark?'rgba(35,134,54,.2)':'rgba(46,160,67,.15)', i: '#388bfd', ib: isDark?'rgba(56,139,253,.2)':'rgba(9,105,218,.15)' };
+    const t = isDark ? 'rgba(229, 231, 235, .8)' : 'rgba(31, 35, 40, .8)';
+    const g = isDark ? 'rgba(255, 255, 255, .05)' : 'rgba(0, 0, 0, .05)';
+    const b = isDark ? '#2d333b' : '#d0d7de';
+    return { 
+        t, 
+        g, 
+        b, 
+        a: '#2ecc71', 
+        ab: isDark ? 'rgba(46, 204, 113, .2)' : 'rgba(46, 204, 113, .15)', 
+        i: '#60a5fa', 
+        ib: isDark ? 'rgba(96, 165, 250, .2)' : 'rgba(96, 165, 250, .15)' 
+    };
 }
 
 async function load(year) {
@@ -537,6 +574,7 @@ function renderHeatmap() {
     }
     
     const fragment = document.createDocumentFragment();
+    const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
     
     D.heatmap.forEach((hItem, index) => {
         const yr = hItem.year;
@@ -558,6 +596,18 @@ function renderHeatmap() {
             title.textContent = yr;
             block.appendChild(title);
         }
+        
+        const wrapper = document.createElement('div');
+        wrapper.className = 'hm-wrapper';
+
+        const daysCol = document.createElement('div');
+        daysCol.className = 'hm-days';
+        dayLabels.forEach(lbl => {
+            const s = document.createElement('span');
+            s.textContent = lbl;
+            daysCol.appendChild(s);
+        });
+        wrapper.appendChild(daysCol);
         
         const container = document.createElement('div');
         container.style.width = '100%';
@@ -582,7 +632,8 @@ function renderHeatmap() {
         });
         
         container.appendChild(hm);
-        block.appendChild(container);
+        wrapper.appendChild(container);
+        block.appendChild(wrapper);
         fragment.appendChild(block);
     });
     
@@ -814,15 +865,23 @@ function renderDonut() {
                 backgroundColor: top.map((_,i)=>pal[i%pal.length]), 
                 borderWidth: 2,
                 borderColor: isDark ? '#161b22' : '#ffffff',
-                hoverOffset: 8
+                hoverOffset: 25,
+                hoverBorderWidth: 4,
+                spacing: 4,
+                borderRadius: 4
             }] 
         },
         options:{ 
             responsive:true, 
             maintainAspectRatio:false, 
-            cutout:'60%', 
-            layout: { padding: { right: 10, left: 10 } },
-            animation: { animateScale: true, animateRotate: true, duration: 1500, easing: 'easeOutQuart' },
+            cutout:'65%', 
+            layout: { padding: 30 },
+            animation: { 
+                animateScale: true, 
+                animateRotate: true, 
+                duration: 2000, 
+                easing: 'easeOutElastic' 
+            },
             onClick: (event, elements) => {
                 if (elements && elements.length > 0) {
                     const idx = elements[0].index;
@@ -836,12 +895,12 @@ function renderDonut() {
             plugins:{ 
                 datalabels: {
                     color: '#ffffff',
-                    font: { weight: '800', size: 12, family: 'system-ui' },
-                    textShadowBlur: 6,
-                    textShadowColor: 'rgba(0,0,0,0.8)',
+                    font: { weight: '800', size: 11, family: 'system-ui' },
+                    textShadowBlur: 4,
+                    textShadowColor: 'rgba(0,0,0,0.5)',
                     formatter: (value) => {
                         let pct = Math.round((value / totalMins) * 100);
-                        return pct > 4 ? pct + '%' : '';
+                        return pct > 5 ? pct + '%' : '';
                     }
                 },
                 tooltip: {
@@ -851,28 +910,14 @@ function renderDonut() {
                     borderColor: c.b,
                     borderWidth: 1,
                     padding: 12,
-                    boxPadding: 6,
                     cornerRadius: 10,
-                    titleFont: { size: 14, family: 'system-ui' },
-                    bodyFont: { size: 13, family: 'system-ui', weight: 'bold' },
                     callbacks: {
-                        label: function(context) {
-                            const mins = context.parsed;
-                            const pct = Math.round((mins / totalMins) * 100);
-                            return ` ${pct}%`;
-                        }
+                        label: (context) => ` ${Math.round((context.parsed / totalMins) * 100)}%`
                     }
                 },
                 legend:{ 
                     position:'right', 
-                    labels:{ color:c.t, font:{size:12, family:'system-ui', weight: '600'}, padding:12, usePointStyle:true, pointStyleWidth:10 },
-                    onClick: (e, legendItem) => {
-                        const idx = legendItem.index;
-                        const genre = top[idx];
-                        openHistory('filter', null, null, genre.name, 'genres', idx);
-                    },
-                    onHover: (e) => { e.native.target.style.cursor = 'pointer'; },
-                    onLeave: (e) => { e.native.target.style.cursor = 'default'; }
+                    labels:{ color:c.t, font:{size:11, weight: '600'}, padding:10, usePointStyle:true, pointStyleWidth:8 }
                 } 
             } 
         } 
