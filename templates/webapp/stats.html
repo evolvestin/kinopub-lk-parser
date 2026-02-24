@@ -343,21 +343,19 @@
                 </div>
             </div>
 
-            <div class="tabs" id="detail-tabs">
-                <button class="tab on" data-d="genres" onclick="dTab('genres')"><div class="icon" id="it-gen"></div>Жанры</button>
-                <button class="tab" data-d="actors" onclick="dTab('actors')"><div class="icon" id="it-act"></div>Актёры</button>
-                <button class="tab" data-d="countries" onclick="dTab('countries')"><div class="icon" id="it-cou"></div>Страны</button>
-                <button class="tab" data-d="binges" onclick="dTab('binges')"><div class="icon" id="it-bin"></div>Марафоны</button>
+            <div class="label"><div class="icon" id="it-gen"></div>Жанры</div>
+            <div class="card anim-item d1" style="margin-bottom: clamp(10px, 3vw, 12px);">
+                <div class="chart-box" style="height:220px;"><canvas id="c-genre"></canvas></div>
             </div>
 
-            <div class="sec vis" id="ds-genres">
-                <div class="card anim-item d1" style="margin-bottom: clamp(10px, 3vw, 12px);">
-                    <div class="chart-box" style="height:220px"><canvas id="c-genre"></canvas></div>
-                </div>
-            </div>
-            <div class="sec" id="ds-actors"><div class="card" id="actors-box"></div></div>
-            <div class="sec" id="ds-countries"><div class="card" id="countries-box"></div></div>
-            <div class="sec" id="ds-binges"><div class="card" id="binges-box"></div></div>
+            <div class="label"><div class="icon" id="it-act"></div>Актёры</div>
+            <div class="card anim-item d2" id="actors-box"></div>
+
+            <div class="label"><div class="icon" id="it-cou"></div>Страны</div>
+            <div class="card anim-item d3" id="countries-box"></div>
+
+            <div class="label"><div class="icon" id="it-bin"></div>Марафоны</div>
+            <div class="card anim-item d4" id="binges-box"></div>
         </div>
 
         <div class="sec" id="sec-group"><div id="group-root"></div></div>
@@ -445,6 +443,15 @@ async function load(year) {
     }
 }
 
+function plural(n, forms) {
+    let n10 = Math.abs(n) % 10;
+    let n100 = Math.abs(n) % 100;
+    if (n100 >= 11 && n100 <= 14) return forms[2];
+    if (n10 === 1) return forms[0];
+    if (n10 >= 2 && n10 <= 4) return forms[1];
+    return forms[2];
+}
+
 function render() {
     if (!D?.meta) return;
     const n = D.meta.name || 'Пользователь';
@@ -463,18 +470,38 @@ function render() {
     renderYears();
 
     const s = D.summary || {};
+    const vViews = s.total_views || 0;
+    const vEp = s.total_episodes || 0;
+    const vMov = s.total_movies || 0;
+    const vSer = s.unique_series || 0;
+    const vUni = s.unique_movies || 0;
+
     document.getElementById('s-time').textContent  = s.duration_display || '0';
-    document.getElementById('s-views').textContent = (s.total_views||0) + ' просмотров';
+    document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
     document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
     document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
-    document.getElementById('s-ep').textContent    = s.total_episodes || 0;
-    document.getElementById('s-ser').textContent   = (s.unique_series||0) + ' сериалов';
-    document.getElementById('s-mov').textContent   = s.total_movies || 0;
-    document.getElementById('s-uni').textContent   = (s.unique_movies||0) + ' уникальных';
+    
+    document.getElementById('s-ep').textContent = vEp;
+    document.getElementById('s-ep').nextElementSibling.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+    
+    document.getElementById('s-ser').textContent = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
+    
+    document.getElementById('s-mov').textContent = vMov;
+    document.getElementById('s-mov').nextElementSibling.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
+
+    if ((s.total_movies || 0) === (s.unique_movies || 0)) {
+        document.getElementById('s-uni').innerHTML = '&nbsp;';
+    } else {
+        document.getElementById('s-uni').textContent = vUni + ' ' + plural(vUni, ['уникальный', 'уникальных', 'уникальных']);
+    }
 
     renderHeatmap();
-    dTab('genres');
     renderCharts();
+    
+    fillList('actors-box', D.actors, Icons.star, ['просмотр', 'просмотра', 'просмотров'], 'actors');
+    fillList('countries-box', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+    fillBinges();
+    
     renderGroup();
 }
 
@@ -558,15 +585,7 @@ function renderHeatmap() {
     el.appendChild(fragment);
 }
 
-window.dTab = function(t) {
-    document.querySelectorAll('#detail-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.d===t));
-    ['genres','actors','countries','binges'].forEach(s=>document.getElementById('ds-'+s).classList.toggle('vis',s===t));
-    // Передаем название категории (genres, actors, countries) как второй аргумент
-    if (t==='genres') renderDonut(); // График жанров отдельный, список не рендерим здесь явно, но если нужно — можно добавить
-    if (t==='actors') fillList('actors-box', D.actors, Icons.star, 'просм.', 'actors');
-    if (t==='countries') fillList('countries-box', D.countries, Icons.globe, 'просм.', 'countries');
-    if (t==='binges') fillBinges();
-};
+window.dTab = undefined;
 
 function fillList(id, items, ico, unit, categoryKey) {
     const el = document.getElementById(id);
@@ -574,15 +593,13 @@ function fillList(id, items, ico, unit, categoryKey) {
     
     let html = '';
     items.forEach((it, i) => {
-        const cnt = it.count || it.views || '';
-        const sub = it.shows ? `${it.shows} шоу` : (it.sub || '');
-        const lbl = unit ? `${cnt} ${unit}` : cnt;
+        const cnt = it.count || it.views || 0;
+        const sub = it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : (it.sub || '');
+        const lbl = Array.isArray(unit) ? `${cnt} ${plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
         const delay = (i + 1) * 0.05;
         
         let visual = it.emoji ? `<span style="font-size:clamp(16px,4.5vw,20px);line-height:1;margin-right:4px">${it.emoji}</span>` : `<div class="icon">${ico}</div>`;
         
-        // Формируем вызов openHistory для фильтрации
-        // Передаем: mode='filter', extraId=null, extraDate=null, extraTitle=Имя, extraKey=КлючКатегории, extraIndex=Индекс
         const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         const onclick = `onclick="openHistory('filter', null, null, '${safeName}', '${categoryKey}', ${i})"`;
         
@@ -607,9 +624,22 @@ function fillBinges() {
     let html = '';
     D.binges.forEach((b, i) => {
         const delay = (i + 1) * 0.05;
-        const ico = b.tier==='marathon' ? Icons.flame : Icons.bolt;
         const safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-        html += `<div class="li li-clickable anim-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')"><div class="li-l"><span class="li-rank"><div class="icon" style="font-size:clamp(16px,4.5vw,20px);line-height:1">${ico}</div></span><div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r">${b.count} эп.</span></div>`;
+        
+        const posterHtml = b.poster_url 
+            ? `<img src="${b.poster_url}" style="width:32px;height:48px;border-radius:4px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);" onerror="this.style.display='none'">`
+            : `<div style="width:32px;height:48px;border-radius:4px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
+            
+        html += `<div class="li li-clickable anim-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')">
+            <div class="li-l">
+                ${posterHtml}
+                <div>
+                    <div class="li-name">${b.show_title}</div>
+                    <div class="li-sub">${b.date}</div>
+                </div>
+            </div>
+            <span class="li-r">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span>
+        </div>`;
     });
     el.innerHTML = html;
 }
@@ -699,6 +729,7 @@ function renderDonut() {
     const ctx = document.getElementById('c-genre');
     if (chG) chG.destroy();
     if (!D.genres?.length) return;
+    
     const c = cc();
     const pal = ['#2ecc71','#3498db','#e74c3c','#1abc9c','#f39c12','#9b59b6','#e67e22','#ecf0f1'];
     const top = D.genres.slice(0,6);
@@ -729,6 +760,16 @@ function renderDonut() {
             cutout:'55%', 
             layout: { padding: { right: 10, left: 10 } },
             animation: { animateScale: true, animateRotate: true },
+            onClick: (event, elements) => {
+                if (elements && elements.length > 0) {
+                    const idx = elements[0].index;
+                    const genre = top[idx];
+                    openHistory('filter', null, null, genre.name, 'genres', idx);
+                }
+            },
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements && elements.length ? 'pointer' : 'default';
+            },
             plugins:{ 
                 datalabels: {
                     color: '#ffffff',
@@ -761,7 +802,14 @@ function renderDonut() {
                 },
                 legend:{ 
                     position:'right', 
-                    labels:{ color:c.t, font:{size:12, family:'Inter, sans-serif', weight: '500'}, padding:12, usePointStyle:true, pointStyleWidth:10 } 
+                    labels:{ color:c.t, font:{size:12, family:'Inter, sans-serif', weight: '500'}, padding:12, usePointStyle:true, pointStyleWidth:10 },
+                    onClick: (e, legendItem) => {
+                        const idx = legendItem.index;
+                        const genre = top[idx];
+                        openHistory('filter', null, null, genre.name, 'genres', idx);
+                    },
+                    onHover: (e) => { e.native.target.style.cursor = 'pointer'; },
+                    onLeave: (e) => { e.native.target.style.cursor = 'default'; }
                 } 
             } 
         } 
@@ -936,8 +984,10 @@ function renderGroup() {
         }).join('') + '</div>';
     }
 
+    const membersLabel = `${g.members_count} ${plural(g.members_count, ['участник', 'участника', 'участников'])}`;
+
     el.innerHTML = `
-        <div class="card anim-item"><div style="display:flex;align-items:center;gap:12px"><div class="icon" style="font-size:clamp(22px, 6vw, 26px);line-height:1">${Icons.users}</div><div><div style="font-size:clamp(15px, 4vw, 18px);font-weight:700;color:var(--text-primary)">${g.group_name}</div><div style="font-size:clamp(11px, 3vw, 14px);color:var(--text-muted)">${g.members_count} участников · ${g.duration_display}</div></div></div></div>
+        <div class="card anim-item"><div style="display:flex;align-items:center;gap:12px"><div class="icon" style="font-size:clamp(22px, 6vw, 26px);line-height:1">${Icons.users}</div><div><div style="font-size:clamp(15px, 4vw, 18px);font-weight:700;color:var(--text-primary)">${g.group_name}</div><div style="font-size:clamp(11px, 3vw, 14px);color:var(--text-muted)">${membersLabel} · ${g.duration_display}</div></div></div></div>
         <div class="label"><div class="icon" style="font-size:clamp(13px, 3.5vw, 16px);line-height:1">${Icons.chart}</div>Вы vs Группа</div>
         <div class="card anim-item d1">
             <div style="display:flex;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><span style="font-size:clamp(11px, 3vw, 14px);font-weight:700;color:var(--accent)">👤 Вы</span><span style="font-size:clamp(11px, 3vw, 14px);font-weight:700;color:var(--info)">👥 Группа</span></div>

@@ -27,7 +27,6 @@ class DatabaseLogHandler(logging.Handler):
 
             tb_str = None
             if record.exc_info:
-                # Формируем полный трейсбек в строку
                 tb_str = ''.join(traceback.format_exception(*record.exc_info))
 
             self.log_entry_model.objects.create(
@@ -39,22 +38,23 @@ class DatabaseLogHandler(logging.Handler):
                 updated_at=now,
             )
 
-            # Отправка в WebSocket
             channel_layer = get_channel_layer()
             if channel_layer:
-                async_to_sync(channel_layer.group_send)(
-                    'logs',
-                    {
-                        'type': 'log_message',
-                        'created_at': now.strftime('%H:%M:%S'),
-                        'level': record.levelname,
-                        'module': record.module,
-                        'message': msg,
-                    },
-                )
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        'logs',
+                        {
+                            'type': 'log_message',
+                            'created_at': now.strftime('%H:%M:%S'),
+                            'level': record.levelname,
+                            'module': record.module,
+                            'message': msg,
+                        },
+                    )
+                except RuntimeError:
+                    pass
 
             if record.levelno >= logging.ERROR:
-                # Передаем также трейсбек
                 TelegramSender().send_dev_log(
                     record.levelname, record.module, msg, traceback_str=tb_str
                 )
