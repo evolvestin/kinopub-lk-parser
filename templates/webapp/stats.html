@@ -2,40 +2,47 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>KinoStats</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <style>
         :root {
-            --bg-main: #14181f;
-            --bg-card: #1b1f26;
-            --bg-input: #232830;
-            --border: #2d333b;
-            --text-primary: #e5e7eb;
-            --text-secondary: #9ca3af;
-            --text-muted: #6b7280;
-            --accent: #2ecc71;
-            --accent-dim: rgba(46, 204, 113, 0.15);
-            --info: #60a5fa;
-            --danger: #e74c3c;
-            --radius: 12px;
-            --radius-lg: 16px;
-            --shadow: 0 4px 12px rgba(0,0,0,0.25);
+            --bg-main: #0d1117;
+            --bg-card: #161b22;
+            --bg-input: #21262d;
+            --border: #30363d;
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent: #238636;
+            --accent-hover: #2ea043;
+            --accent-dim: rgba(35, 134, 54, 0.15);
+            --info: #388bfd;
+            --info-dim: rgba(56, 139, 253, 0.15);
+            --danger: #f85149;
+            --radius: 16px;
+            --radius-lg: 24px;
+            --shadow-sm: 0 4px 12px rgba(0,0,0,0.1);
+            --shadow-glow: 0 8px 24px rgba(35, 134, 54, 0.15);
+            --transition-bounce: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            --transition-smooth: 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
         .light {
-            --bg-main: #f3f4f6;
+            --bg-main: #f6f8fa;
             --bg-card: #ffffff;
-            --bg-input: #e5e7eb;
-            --border: #d1d5db;
-            --text-primary: #111827;
-            --text-secondary: #4b5563;
-            --text-muted: #9ca3af;
-            --shadow: 0 2px 8px rgba(0,0,0,0.08);
+            --bg-input: #f0f6fc;
+            --border: #d0d7de;
+            --text-primary: #1f2328;
+            --text-secondary: #59636e;
+            --text-muted: #8c959f;
+            --shadow-sm: 0 4px 12px rgba(0,0,0,0.05);
+            --shadow-glow: 0 8px 24px rgba(35, 134, 54, 0.2);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         body {
             background: var(--bg-main);
             color: var(--text-secondary);
@@ -43,223 +50,218 @@
             font-size: clamp(14px, 4vw, 16px);
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
-            padding-bottom: clamp(20px, 6vw, 28px);
-            transition: background .3s ease, color .3s ease;
+            padding-bottom: clamp(24px, 8vw, 36px);
+            transition: background var(--transition-smooth), color var(--transition-smooth);
+            overflow-x: hidden;
         }
 
         .card {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
-            padding: clamp(12px, 3.5vw, 16px);
-            margin: 0 clamp(12px, 3.5vw, 16px) clamp(10px, 3vw, 12px);
-            box-shadow: var(--shadow);
-            transition: background .3s ease, border-color .3s ease;
+            padding: clamp(16px, 4vw, 20px);
+            margin: 0 clamp(12px, 3.5vw, 16px) clamp(12px, 3vw, 16px);
+            box-shadow: var(--shadow-sm);
+            transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), background var(--transition-smooth), border-color var(--transition-smooth);
         }
 
-        .clickable { cursor: pointer; transition: transform .2s ease, background .3s ease; }
-        .clickable:active { transform: scale(.96); background: var(--bg-input); }
+        @media (hover: hover) {
+            .card.hoverable:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+                border-color: var(--accent);
+            }
+            .clickable:hover { background: var(--bg-input); }
+            .li-clickable:hover { transform: translateX(6px); background: var(--bg-input); }
+            .tab:not(.on):hover { background: var(--bg-input); color: var(--text-primary); }
+            .yr:not(.on):hover { background: var(--bg-input); color: var(--text-primary); }
+            .stat.clickable:hover { transform: translateY(-3px); box-shadow: var(--shadow-glow); border-color: var(--accent); }
+            .hist-item.clickable:hover .hist-poster { transform: scale(1.05) rotate(2deg); }
+        }
 
-        .header { display: flex; align-items: center; justify-content: space-between; padding: clamp(12px, 4vw, 16px) clamp(12px, 4vw, 16px) clamp(4px, 1.5vw, 6px); }
-        .header-left { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 12px); }
+        .clickable { cursor: pointer; transition: transform var(--transition-bounce), background var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth); }
+        .clickable:active { transform: scale(0.95); background: var(--bg-input) !important; }
+
+        .header { display: flex; align-items: center; justify-content: space-between; padding: clamp(16px, 5vw, 24px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px); }
+        .header-left { display: flex; align-items: center; gap: clamp(12px, 3vw, 16px); }
         .avatar {
-            width: clamp(40px, 11vw, 48px); height: clamp(40px, 11vw, 48px); border-radius: 50%;
-            background: var(--bg-input); display: flex; align-items: center; justify-content: center;
-            font-size: clamp(18px, 5vw, 22px); font-weight: 700; color: var(--text-primary); flex-shrink: 0;
-            overflow: hidden; border: 1px solid var(--border);
+            width: clamp(48px, 13vw, 56px); height: clamp(48px, 13vw, 56px); border-radius: 50%;
+            background: linear-gradient(135deg, var(--bg-input), var(--border));
+            display: flex; align-items: center; justify-content: center;
+            font-size: clamp(20px, 6vw, 24px); font-weight: 800; color: var(--text-primary); flex-shrink: 0;
+            overflow: hidden; border: 2px solid var(--bg-card); box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: transform var(--transition-bounce);
         }
+        .avatar:active { transform: scale(0.9) rotate(-10deg); }
         .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .header-name { font-size: clamp(16px, 5vw, 20px); font-weight: 700; color: var(--text-primary); }
-        .header-sub  { font-size: clamp(11px, 3vw, 14px); color: var(--text-muted); margin-top: 1px; }
+        
+        .header-name { font-size: clamp(20px, 6vw, 24px); font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; line-height: 1.2; }
+        .header-sub  { font-size: clamp(12px, 3.5vw, 14px); color: var(--accent); font-weight: 600; margin-top: 2px; }
+        
         .theme-btn {
-            width: clamp(32px, 9vw, 40px); height: clamp(32px, 9vw, 40px); border-radius: 50%;
+            width: clamp(36px, 10vw, 44px); height: clamp(36px, 10vw, 44px); border-radius: 50%;
             background: var(--bg-input); border: 1px solid var(--border);
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; color: var(--text-primary); transition: transform .2s ease;
+            cursor: pointer; color: var(--text-primary); transition: transform var(--transition-bounce), background var(--transition-smooth);
+            box-shadow: var(--shadow-sm);
         }
-        .theme-btn:active { transform: scale(.9); }
+        .theme-btn:active { transform: scale(0.85) rotate(45deg); }
         .theme-btn .icon { font-size: clamp(18px, 5vw, 22px); line-height: 1; }
 
-        .tabs { display: flex; gap: clamp(6px, 2vw, 8px); padding: clamp(6px, 2vw, 8px) clamp(12px, 4vw, 16px) clamp(4px, 1vw, 4px); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tabs { display: flex; gap: clamp(8px, 2vw, 12px); padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .tabs::-webkit-scrollbar { display: none; }
         .tab {
-            display: flex; align-items: center; gap: clamp(4px, 1.5vw, 6px); flex-shrink: 0; padding: clamp(6px, 2vw, 8px) clamp(12px, 3.5vw, 16px); border-radius: 10px;
-            font-size: clamp(13px, 3.5vw, 15px); font-weight: 600; white-space: nowrap;
+            display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); flex-shrink: 0; padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 20px); border-radius: 12px;
+            font-size: clamp(14px, 3.8vw, 16px); font-weight: 700; white-space: nowrap;
             border: 1px solid var(--border); background: var(--bg-card);
-            color: var(--text-muted); cursor: pointer; transition: all .2s ease;
+            color: var(--text-muted); cursor: pointer; transition: all var(--transition-bounce);
         }
-        .tab .icon { font-size: clamp(15px, 4vw, 18px); line-height: 1; }
-        .tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .tab:not(.on):active { transform: scale(.96); }
+        .tab .icon { font-size: clamp(16px, 4.5vw, 20px); line-height: 1; }
+        .tab.on { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: var(--shadow-glow); transform: translateY(-2px); }
+        .tab:not(.on):active { transform: scale(0.92); }
 
-        .years { display: flex; gap: clamp(4px, 1.5vw, 6px); padding: clamp(4px, 1vw, 4px) clamp(12px, 4vw, 16px) clamp(6px, 2vw, 8px); overflow-x: auto; }
+        .years { display: flex; gap: clamp(6px, 1.5vw, 8px); padding: clamp(4px, 1vw, 8px) clamp(16px, 4vw, 20px) clamp(12px, 3vw, 16px); overflow-x: auto; scrollbar-width: none; }
         .years::-webkit-scrollbar { display: none; }
         .yr {
-            flex-shrink: 0; padding: clamp(4px, 1.5vw, 6px) clamp(10px, 3vw, 14px); border-radius: 8px;
-            font-size: clamp(12px, 3.2vw, 14px); font-weight: 600;
-            border: 1px solid var(--border); background: transparent;
-            color: var(--text-muted); cursor: pointer; transition: all .2s ease;
+            flex-shrink: 0; padding: clamp(6px, 2vw, 8px) clamp(12px, 3.5vw, 16px); border-radius: 10px;
+            font-size: clamp(13px, 3.5vw, 15px); font-weight: 700;
+            border: 1px solid var(--border); background: var(--bg-card);
+            color: var(--text-muted); cursor: pointer; transition: all var(--transition-bounce);
         }
-        .yr.on { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+        .yr.on { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); transform: scale(1.05); }
+        .yr:not(.on):active { transform: scale(0.92); }
 
         .label {
-            display: flex; align-items: center; gap: clamp(4px, 1.5vw, 6px);
-            font-size: clamp(11px, 3vw, 13px); font-weight: 700; text-transform: uppercase;
-            letter-spacing: .5px; color: var(--text-muted); padding: clamp(10px, 3vw, 12px) clamp(12px, 4vw, 16px) clamp(4px, 1.5vw, 6px);
+            display: flex; align-items: center; gap: clamp(6px, 2vw, 8px);
+            font-size: clamp(12px, 3.5vw, 14px); font-weight: 800; text-transform: uppercase;
+            letter-spacing: 1px; color: var(--text-secondary); padding: clamp(16px, 4vw, 20px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px);
         }
-        .label .icon { font-size: clamp(13px, 3.5vw, 16px); line-height: 1; }
+        .label .icon { font-size: clamp(16px, 4.5vw, 18px); line-height: 1; color: var(--accent); }
 
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(8px, 2.5vw, 12px); padding: 0 clamp(12px, 4vw, 16px) clamp(10px, 3vw, 12px); }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 3vw, 16px); padding: 0 clamp(16px, 4vw, 20px) clamp(16px, 4vw, 20px); }
         .stat {
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: clamp(10px, 3vw, 14px); box-shadow: var(--shadow);
-            transition: background .3s ease; display: flex; flex-direction: column;
+            background: linear-gradient(145deg, var(--bg-card), var(--bg-input)); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: clamp(16px, 4vw, 20px); box-shadow: var(--shadow-sm);
+            display: flex; flex-direction: column; position: relative; overflow: hidden;
         }
-        .stat-icon  { font-size: clamp(22px, 6vw, 26px); line-height: 1; margin-bottom: clamp(6px, 2vw, 8px); }
-        .stat-val   { font-size: clamp(20px, 5.5vw, 24px); font-weight: 800; color: var(--text-primary); line-height: 1.1; }
-        .stat-lbl   { font-size: clamp(10px, 2.8vw, 12px); color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: .3px; margin-top: clamp(2px, 1vw, 4px); }
-        .stat-sub   { font-size: clamp(11px, 3vw, 13px); color: var(--accent); margin-top: clamp(2px, 1vw, 4px); font-weight: 500; }
-        .stat.clickable {
-            position: relative;
-            cursor: pointer;
-            transition: transform 0.1s ease, background-color 0.2s ease;
-        }
-        .stat.clickable:active {
-            transform: scale(0.97);
-            background-color: var(--bg-input);
-        }
+        .stat::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--accent); opacity: 0; transition: opacity var(--transition-smooth); }
+        .stat.clickable:hover::before { opacity: 1; }
+        
+        .stat-icon  { font-size: clamp(24px, 7vw, 28px); line-height: 1; margin-bottom: clamp(10px, 3vw, 12px); color: var(--text-primary); transition: transform var(--transition-bounce); }
+        .stat.clickable:hover .stat-icon { transform: scale(1.1) rotate(5deg); color: var(--accent); }
+        
+        .stat-val   { font-size: clamp(24px, 6.5vw, 32px); font-weight: 900; color: var(--text-primary); line-height: 1.1; letter-spacing: -0.5px; }
+        .stat-lbl   { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); font-weight: 600; margin-top: clamp(4px, 1.5vw, 6px); }
+        .stat-sub   { font-size: clamp(12px, 3.2vw, 14px); color: var(--accent); margin-top: clamp(4px, 1.5vw, 6px); font-weight: 700; display: inline-flex; align-items: center; gap: 4px; background: var(--accent-dim); padding: 2px 8px; border-radius: 10px; width: fit-content; }
         
         .stat.clickable::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            right: clamp(12px, 3.5vw, 16px);
-            transform: translateY(-50%) rotate(45deg);
-            width: clamp(7px, 2vw, 10px);
-            height: clamp(7px, 2vw, 10px);
-            border-top: 2px solid var(--accent);
-            border-right: 2px solid var(--accent);
-            opacity: 0.9;
+            content: ''; position: absolute; top: clamp(16px, 4vw, 20px); right: clamp(16px, 4vw, 20px);
+            width: clamp(8px, 2.5vw, 12px); height: clamp(8px, 2.5vw, 12px);
+            border-top: 2.5px solid var(--text-muted); border-right: 2.5px solid var(--text-muted);
+            transform: rotate(45deg); opacity: 0.5; transition: border-color var(--transition-smooth), transform var(--transition-bounce);
         }
+        .stat.clickable:hover::after { border-color: var(--accent); transform: rotate(45deg) translate(2px, -2px); opacity: 1; }
 
-        .g-row { margin-bottom: clamp(10px, 3vw, 12px); }
-        .g-hdr { display: flex; justify-content: space-between; font-size: clamp(12px, 3.2vw, 14px); font-weight: 600; margin-bottom: clamp(4px, 1.5vw, 6px); }
+        .g-row { margin-bottom: clamp(12px, 3.5vw, 16px); }
+        .g-hdr { display: flex; justify-content: space-between; font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; margin-bottom: clamp(6px, 2vw, 8px); }
         .g-name { color: var(--text-primary); }
-        .g-time { color: var(--text-muted); }
-        .g-track { height: clamp(5px, 1.5vw, 7px); background: var(--bg-input); border-radius: 3px; overflow: hidden; }
-        .g-fill  { height: 100%; border-radius: 3px; background: var(--accent); transition: width .6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .g-time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .g-track { height: clamp(6px, 2vw, 8px); background: var(--bg-input); border-radius: 4px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
+        .g-fill  { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--info)); transition: width 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative; overflow: hidden; }
+        .g-fill::after { content:''; position: absolute; top:0; left:0; right:0; bottom:0; background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%); animation: shimmer 2s infinite; }
+        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-        .li { display: flex; align-items: center; justify-content: space-between; padding: clamp(10px, 3vw, 12px) 0; border-bottom: 1px solid var(--border); }
+        .li { display: flex; align-items: center; justify-content: space-between; padding: clamp(12px, 3.5vw, 16px) 0; border-bottom: 1px dashed var(--border); }
         .li:last-child { border: none; }
         .li-clickable {
-            padding: clamp(8px, 2.5vw, 10px) clamp(10px, 3vw, 12px);
-            margin: 2px calc(-1 * clamp(10px, 3vw, 12px)) 0;
-            border-radius: 8px;
+            padding: clamp(10px, 3vw, 14px) clamp(12px, 3.5vw, 16px);
+            margin: 4px calc(-1 * clamp(12px, 3.5vw, 16px)) 0;
+            border-radius: 12px;
             border-bottom: none !important;
+            transition: all var(--transition-smooth);
         }
-        .li-l { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 12px); min-width: 0; flex: 1; }
-        .li-r { font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; color: var(--text-primary); flex-shrink: 0; margin-left: 8px; text-align: right; }
-        .li-rank { font-size: clamp(12px, 3.2vw, 14px); font-weight: 700; color: var(--text-muted); width: clamp(20px, 5vw, 24px); text-align: center; flex-shrink: 0; }
-        .li-name { display: flex; align-items: center; gap: clamp(4px, 1.5vw, 6px); font-size: clamp(13px, 3.5vw, 15px); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .li-name .icon { font-size: clamp(14px, 4vw, 16px); line-height: 1; }
-        .li-sub  { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); margin-top: 2px; }
+        .li-l { display: flex; align-items: center; gap: clamp(12px, 3vw, 16px); min-width: 0; flex: 1; }
+        .li-r { font-size: clamp(14px, 4vw, 16px); font-weight: 800; color: var(--text-primary); flex-shrink: 0; margin-left: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+        .li-rank { font-size: clamp(14px, 4vw, 16px); font-weight: 900; color: var(--border); width: clamp(24px, 6vw, 28px); text-align: center; flex-shrink: 0; text-shadow: 1px 1px 0px rgba(255,255,255,0.05); }
+        .li-name { display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); font-size: clamp(14px, 4vw, 16px); font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .li-sub  { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); margin-top: 4px; font-weight: 500; }
 
-        .hm { 
-            display: grid; 
-            grid-template-rows: repeat(7, 1fr); 
-            grid-auto-flow: column; 
-            gap: clamp(1px, 0.5vw, 2px); 
-            width: 100%;
-            margin: 0;
-            padding: 0;
-        }
+        .hm { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; gap: clamp(1px, 0.3vw, 2px); width: 100%; }
         .hc { 
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            border-radius: 20%; 
-            background: var(--bg-input); 
-            transition: transform 0.2s ease;
+            width: 100%; aspect-ratio: 1 / 1; border-radius: 15%; background: var(--bg-input); 
+            transition: transform var(--transition-bounce), background var(--transition-smooth), box-shadow var(--transition-smooth);
+            cursor: crosshair; position: relative;
         }
+        @media (hover: hover) { .hc:hover { transform: scale(1.6); z-index: 10; box-shadow: 0 4px 8px rgba(0,0,0,0.3); border-radius: 10%; } }
+        .hc:active { transform: scale(1.6); z-index: 10; border-radius: 10%; }
         
-        .hc:active { transform: scale(1.3); z-index: 10; }
-        .h1 { background: rgba(46, 204, 113, 0.3); } 
-        .h2 { background: rgba(46, 204, 113, 0.5); } 
-        .h3 { background: rgba(46, 204, 113, 0.8); } 
-        .h4 { background: var(--accent); }
+        .h1 { background: rgba(35, 134, 54, 0.3); } 
+        .h2 { background: rgba(35, 134, 54, 0.6); } 
+        .h3 { background: rgba(35, 134, 54, 0.85); } 
+        .h4 { background: #39d353; box-shadow: 0 0 6px rgba(57, 211, 83, 0.3); }
         
-        .hm-leg { 
-            display: flex; 
-            align-items: center; 
-            gap: 4px; 
-            justify-content: flex-end; 
-            margin-top: clamp(6px, 2vw, 8px); 
-            font-size: clamp(9px, 2.5vw, 11px); 
-            color: var(--text-muted); 
-            text-transform: uppercase;
-            font-weight: 700;
-        }
-        .hm-leg .hc { width: clamp(8px, 2.5vw, 12px); height: clamp(8px, 2.5vw, 12px); border-radius: 2px; }
+        .hm-leg { display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin-top: clamp(12px, 3.5vw, 16px); font-size: clamp(10px, 2.8vw, 12px); color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .hm-leg .hc { width: clamp(10px, 3vw, 12px); height: clamp(10px, 3vw, 12px); border-radius: 15%; cursor: default; }
 
-        .hm-container {
-            width: 100%;
-            overflow: hidden; 
-        }
+        .chart-box { position: relative; width: 100%; height: 220px; }
 
-        .chart-box { position: relative; width: 100%; height: 200px; }
-
-        .cmp { display: flex; justify-content: space-between; align-items: center; padding: clamp(8px, 2.5vw, 10px) 0; border-bottom: 1px solid var(--border); }
+        .cmp { display: flex; justify-content: space-between; align-items: center; padding: clamp(10px, 3vw, 12px) 0; border-bottom: 1px dashed var(--border); }
         .cmp:last-child { border: none; }
-        .cmp-lb { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); font-weight: 500; display: flex; align-items: center; gap: clamp(4px, 1.5vw, 6px); }
-        .cmp-lb .icon { font-size: clamp(14px, 3.8vw, 16px); line-height: 1; }
-        .cmp-vs { display: flex; gap: clamp(8px, 2.5vw, 12px); align-items: center; }
-        .cmp-v  { font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; text-align: right; min-width: clamp(36px, 10vw, 44px); }
+        .cmp-lb { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-secondary); font-weight: 700; display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); }
+        .cmp-vs { display: flex; gap: clamp(12px, 3vw, 16px); align-items: center; }
+        .cmp-v  { font-size: clamp(14px, 4vw, 16px); font-weight: 800; text-align: right; min-width: clamp(40px, 11vw, 48px); font-variant-numeric: tabular-nums; }
         .cmp-you { color: var(--accent); }
         .cmp-grp { color: var(--info); }
-        .cmp-d  { font-size: clamp(10px, 2.8vw, 12px); font-weight: 600; padding: clamp(2px, 0.8vw, 3px) clamp(4px, 1.5vw, 6px); border-radius: 4px; }
-        .d-up   { background: var(--accent-dim); color: var(--accent); }
-        .d-dn   { background: rgba(231, 76, 60, 0.15); color: var(--danger); }
+        .cmp-d  { font-size: clamp(11px, 3vw, 13px); font-weight: 800; padding: clamp(4px, 1vw, 6px) clamp(8px, 2vw, 10px); border-radius: 8px; min-width: 50px; text-align: center; }
+        .d-up   { background: var(--accent-dim); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+        .d-dn   { background: rgba(248, 81, 73, 0.15); color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
         .d-eq   { background: var(--bg-input); color: var(--text-muted); }
 
-        .mb { display: flex; align-items: center; gap: clamp(8px, 2.5vw, 10px); margin-bottom: clamp(8px, 2.5vw, 10px); }
-        .mb-n { font-size: clamp(12px, 3.2vw, 14px); font-weight: 600; color: var(--text-primary); width: clamp(60px, 18vw, 80px); text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .mb-t { flex: 1; height: clamp(6px, 2vw, 8px); background: var(--bg-input); border-radius: 4px; overflow: hidden; }
-        .mb-f { height: 100%; border-radius: 4px; background: var(--info); transition: width .6s cubic-bezier(0.16, 1, 0.3, 1); }
-        .mb-c { font-size: clamp(11px, 3vw, 13px); font-weight: 700; color: var(--text-muted); width: clamp(28px, 8vw, 36px); flex-shrink: 0; }
+        .mb { display: flex; align-items: center; gap: clamp(10px, 3vw, 12px); margin-bottom: clamp(12px, 3.5vw, 16px); }
+        .mb-n { font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; color: var(--text-primary); width: clamp(70px, 20vw, 90px); text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .mb-t { flex: 1; height: clamp(8px, 2.5vw, 10px); background: var(--bg-input); border-radius: 5px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
+        .mb-f { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--info), #a371f7); transition: width 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .mb-c { font-size: clamp(12px, 3.2vw, 14px); font-weight: 800; color: var(--text-muted); width: clamp(32px, 9vw, 40px); flex-shrink: 0; text-align: right; }
 
-        .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(24px, 7vw, 32px) clamp(12px, 3.5vw, 16px); color: var(--text-muted); font-size: clamp(13px, 3.5vw, 15px); text-align: center; }
-        .empty .icon { font-size: clamp(28px, 8vw, 36px); line-height: 1; margin-bottom: clamp(8px, 2.5vw, 12px); opacity: 0.5; display: inline-flex; align-items: center; justify-content: center; }
+        .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(32px, 9vw, 48px) clamp(16px, 4vw, 20px); color: var(--text-muted); font-size: clamp(14px, 4vw, 16px); font-weight: 600; text-align: center; }
+        .empty .icon { font-size: clamp(36px, 10vw, 48px); line-height: 1; margin-bottom: clamp(12px, 3.5vw, 16px); opacity: 0.3; }
 
-        .loader { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: var(--bg-main); transition: opacity .3s; }
-        .spinner { width: clamp(24px, 7vw, 32px); height: clamp(24px, 7vw, 32px); border: 3px solid var(--bg-input); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite; }
+        .loader { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: opacity 0.4s ease; }
+        .light .loader { background: rgba(246, 248, 250, 0.8); }
+        .spinner { width: clamp(32px, 9vw, 48px); height: clamp(32px, 9vw, 48px); border: 4px solid var(--bg-input); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .sec { display: none; }
-        .sec.vis { display: block; }
+        .sec { display: none; opacity: 0; transition: opacity var(--transition-smooth); }
+        .sec.vis { display: block; opacity: 1; }
         .hidden { display: none !important; opacity: 0; pointer-events: none; }
 
-        @keyframes springUp {
-            0% { opacity: 0; transform: translateY(16px) scale(0.98); }
+        @keyframes slideInUp {
+            0% { opacity: 0; transform: translateY(20px) scale(0.97); }
             100% { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .anim-item { animation: springUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1) both; }
-        .d1 { animation-delay: 0.05s; }
-        .d2 { animation-delay: 0.1s; }
-        .d3 { animation-delay: 0.15s; }
-        .d4 { animation-delay: 0.2s; }
-        .d5 { animation-delay: 0.25s; }
+        @keyframes slideInRight {
+            0% { opacity: 0; transform: translateX(-15px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        .anim-item { animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .anim-list-item { animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
         svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; flex-shrink: 0; fill: currentColor; }
-        .hist-item { display: flex; gap: clamp(10px, 3vw, 14px); padding: clamp(10px, 3vw, 14px) clamp(12px, 3.5vw, 16px); border-bottom: 1px solid var(--border); }
+        
+        .hist-item { display: flex; gap: clamp(12px, 3.5vw, 16px); padding: clamp(12px, 3.5vw, 16px) clamp(16px, 4vw, 20px); border-bottom: 1px solid var(--border); transition: background var(--transition-smooth); }
         .hist-item:last-child { border: none; }
-        .hist-poster { width: clamp(40px, 12vw, 48px); height: clamp(60px, 18vw, 72px); border-radius: 6px; object-fit: cover; background: var(--bg-input); flex-shrink: 0; border: 1px solid var(--border); }
+        .hist-poster { width: clamp(48px, 14vw, 60px); height: clamp(72px, 21vw, 90px); border-radius: 8px; object-fit: cover; background: var(--bg-input); flex-shrink: 0; border: 1px solid var(--border); transition: transform var(--transition-bounce); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         .hist-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-        .hist-title { font-size: clamp(14px, 4vw, 16px); font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-bottom: 2px; }
-        .hist-orig { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
-        .hist-meta { font-size: clamp(11px, 3vw, 13px); color: var(--text-secondary); display: flex; gap: clamp(6px, 2vw, 8px); align-items: center; flex-wrap: wrap; }
-        .hist-badge { background: var(--bg-input); padding: clamp(2px, 0.5vw, 3px) clamp(4px, 1.5vw, 6px); border-radius: 4px; font-size: clamp(10px, 2.8vw, 12px); font-weight: 700; color: var(--text-primary); border: 1px solid var(--border); }
-        .rating-badge { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-weight: 700; font-size: clamp(11px, 3vw, 13px); }
-        .rating-badge.show-lvl { color: var(--text-muted); font-weight: 500; }
-        .rating-badge svg { font-size: clamp(12px, 3.2vw, 14px); }
+        .hist-title { font-size: clamp(15px, 4.2vw, 18px); font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-bottom: 2px; }
+        .hist-orig { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
+        .hist-meta { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-secondary); display: flex; gap: clamp(8px, 2.5vw, 12px); align-items: center; flex-wrap: wrap; font-weight: 600; }
+        .hist-badge { background: var(--bg-input); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; font-size: clamp(11px, 3vw, 13px); font-weight: 800; color: var(--text-primary); border: 1px solid var(--border); letter-spacing: 0.5px; }
+        .rating-badge { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 800; font-size: clamp(12px, 3.2vw, 14px); background: var(--accent-dim); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; }
+        .rating-badge.show-lvl { color: var(--text-primary); background: var(--bg-input); }
+        .rating-badge svg { font-size: clamp(14px, 3.8vw, 16px); margin-top: -2px; }
+        
+        /* Utility for glowing text */
+        .glow-text { text-shadow: 0 0 12px rgba(255,255,255,0.2); }
     </style>
 </head>
 <body>
@@ -270,7 +272,7 @@
             <div class="header-left">
                 <div class="avatar" id="avatar"></div>
                 <div>
-                    <div class="header-name" id="user-name">Загрузка…</div>
+                    <div class="header-name glow-text" id="user-name">Загрузка…</div>
                     <div class="header-sub" id="period-label"></div>
                 </div>
             </div>
@@ -291,49 +293,49 @@
         <div class="sec vis" id="sec-personal">
             <div class="label"><div class="icon" id="ic-dash"></div>Обзор</div>
             <div class="grid">
-                <div class="stat anim-item d1 clickable" onclick="openHistory('all')">
+                <div class="stat anim-item clickable" style="animation-delay: 0.05s" onclick="openHistory('all')">
                     <div class="stat-icon" id="ic-time"></div>
                     <div class="stat-val" id="s-time">—</div>
                     <div class="stat-lbl">Время просмотра</div>
                     <div class="stat-sub" id="s-views"></div>
                 </div>
-                <div class="stat anim-item d2">
+                <div class="stat anim-item" style="animation-delay: 0.1s">
                     <div class="stat-icon" id="ic-cal"></div>
                     <div class="stat-val" id="s-act">0%</div>
                     <div class="stat-lbl">Активность</div>
-                    <div class="stat-sub" id="s-daily"></div>
+                    <div class="stat-sub" id="s-daily" style="background: var(--info-dim); color: var(--info)"></div>
                 </div>
-                <div class="stat anim-item d3 clickable" onclick="openHistory('episodes')">
+                <div class="stat anim-item clickable" style="animation-delay: 0.15s" onclick="openHistory('episodes')">
                     <div class="stat-icon" id="ic-tv"></div>
                     <div class="stat-val" id="s-ep">0</div>
                     <div class="stat-lbl">Эпизодов</div>
-                    <div class="stat-sub" id="s-ser"></div>
+                    <div class="stat-sub" id="s-ser" style="background: rgba(163, 113, 247, 0.15); color: #a371f7"></div>
                 </div>
-                <div class="stat anim-item d4 clickable" onclick="openHistory('movies')">
+                <div class="stat anim-item clickable" style="animation-delay: 0.2s" onclick="openHistory('movies')">
                     <div class="stat-icon" id="ic-film"></div>
                     <div class="stat-val" id="s-mov">0</div>
                     <div class="stat-lbl">Фильмов</div>
-                    <div class="stat-sub" id="s-uni"></div>
+                    <div class="stat-sub" id="s-uni" style="background: rgba(210, 153, 34, 0.15); color: #d29922"></div>
                 </div>
             </div>
 
-            <div class="card anim-item d2">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:clamp(12px, 3.5vw, 16px)">
-                    <span style="font-size:clamp(13px, 3.5vw, 15px);font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:6px">
-                        <div class="icon" style="font-size:clamp(14px, 4vw, 16px);line-height:1" id="ic-chart"></div>Динамика
+            <div class="card hoverable anim-item" style="animation-delay: 0.25s">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:clamp(16px, 4vw, 20px)">
+                    <span style="font-size:clamp(15px, 4vw, 18px);font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:8px">
+                        <div class="icon" style="font-size:clamp(18px, 5vw, 22px);line-height:1;color:var(--info)" id="ic-chart"></div>Динамика
                     </span>
                 </div>
                 <div class="chart-box"><canvas id="c-monthly"></canvas></div>
             </div>
 
-            <div class="card anim-item d3">
-                <div style="font-size:clamp(13px, 3.5vw, 15px);font-weight:700;color:var(--text-primary);margin-bottom:clamp(12px, 3.5vw, 16px)">Дни недели</div>
-                <div class="chart-box" style="height:160px"><canvas id="c-weekday"></canvas></div>
+            <div class="card hoverable anim-item" style="animation-delay: 0.3s">
+                <div style="font-size:clamp(15px, 4vw, 18px);font-weight:800;color:var(--text-primary);margin-bottom:clamp(16px, 4vw, 20px)">Дни недели</div>
+                <div class="chart-box" style="height:180px"><canvas id="c-weekday"></canvas></div>
             </div>
 
-            <div class="card anim-item d3">
-                <div style="font-size:clamp(13px, 3.5vw, 15px);font-weight:700;color:var(--text-primary);margin-bottom:clamp(12px, 3.5vw, 16px);display:flex;align-items:center;gap:6px">
-                    <div class="icon" style="font-size:clamp(14px, 4vw, 16px);line-height:1" id="ic-flame"></div>Интенсивность
+            <div class="card hoverable anim-item" style="animation-delay: 0.35s">
+                <div style="font-size:clamp(15px, 4vw, 18px);font-weight:800;color:var(--text-primary);margin-bottom:clamp(16px, 4vw, 20px);display:flex;align-items:center;gap:8px">
+                    <div class="icon" style="font-size:clamp(18px, 5vw, 22px);line-height:1;color:#f85149" id="ic-flame"></div>Интенсивность
                 </div>
                 <div id="heatmaps-wrapper"></div>
                 <div class="hm-leg">
@@ -344,30 +346,30 @@
             </div>
 
             <div class="label"><div class="icon" id="it-gen"></div>Жанры</div>
-            <div class="card anim-item d1" style="margin-bottom: clamp(10px, 3vw, 12px);">
-                <div class="chart-box" style="height:220px;"><canvas id="c-genre"></canvas></div>
+            <div class="card hoverable anim-item" style="animation-delay: 0.1s; margin-bottom: clamp(12px, 3vw, 16px);">
+                <div class="chart-box" style="height:240px;"><canvas id="c-genre"></canvas></div>
             </div>
 
-            <div class="label"><div class="icon" id="it-act"></div>Актёры</div>
-            <div class="card anim-item d2" id="actors-box"></div>
+            <div class="label"><div class="icon" style="color: #d29922;" id="it-act"></div>Актёры</div>
+            <div class="card hoverable anim-item" style="animation-delay: 0.15s;" id="actors-box"></div>
 
-            <div class="label"><div class="icon" id="it-cou"></div>Страны</div>
-            <div class="card anim-item d3" id="countries-box"></div>
+            <div class="label"><div class="icon" style="color: #388bfd;" id="it-cou"></div>Страны</div>
+            <div class="card hoverable anim-item" style="animation-delay: 0.2s;" id="countries-box"></div>
 
-            <div class="label"><div class="icon" id="it-bin"></div>Марафоны</div>
-            <div class="card anim-item d4" id="binges-box"></div>
+            <div class="label"><div class="icon" style="color: #a371f7;" id="it-bin"></div>Марафоны</div>
+            <div class="card hoverable anim-item" style="animation-delay: 0.25s;" id="binges-box"></div>
         </div>
 
         <div class="sec" id="sec-group"><div id="group-root"></div></div>
 
         <div class="sec" id="sec-history">
             <div class="header" style="padding-bottom: 0;">
-                <button onclick="closeHistory()" class="tab" style="background:var(--bg-input); color:var(--text-primary); margin-bottom:clamp(10px, 3vw, 12px); display:inline-flex;">
-                    <svg viewBox="0 0 24 24" width="16" height="16" style="margin-right:4px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg> Назад
+                <button onclick="closeHistory()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin-bottom:clamp(12px, 3.5vw, 16px); display:inline-flex;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
                 </button>
             </div>
             <div class="label" style="padding-top:0;"><div class="icon" id="ic-hist-type"></div><span id="hist-title"></span></div>
-            <div id="hist-list" style="padding: 0 clamp(12px, 3.5vw, 16px) clamp(16px, 4.5vw, 20px);"></div>
+            <div id="hist-list" style="padding: 0 clamp(12px, 3vw, 16px) clamp(24px, 6vw, 36px);"></div>
         </div>
     </div>
 
@@ -418,10 +420,10 @@ function toggleTheme() {
 })();
 
 function cc() {
-    const t = isDark ? 'rgba(255,255,255,.65)' : 'rgba(0,0,0,.65)';
-    const g = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
-    const b = isDark ? '#2d333b' : '#d1d5db';
-    return { t, g, b, a: '#2ecc71', ab: isDark?'rgba(46,204,113,.2)':'rgba(46,204,113,.12)', i: '#60a5fa', ib: isDark?'rgba(96,165,250,.2)':'rgba(96,165,250,.12)' };
+    const t = isDark ? 'rgba(255,255,255,.7)' : 'rgba(31,35,40,.8)';
+    const g = isDark ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.05)';
+    const b = isDark ? '#30363d' : '#d0d7de';
+    return { t, g, b, a: '#238636', ab: isDark?'rgba(35,134,54,.2)':'rgba(46,160,67,.15)', i: '#388bfd', ib: isDark?'rgba(56,139,253,.2)':'rgba(9,105,218,.15)' };
 }
 
 async function load(year) {
@@ -438,7 +440,7 @@ async function load(year) {
     } catch(e) { console.error('Load error:', e); alert('Ошибка сети'); }
     finally { 
         document.getElementById('loader').style.opacity = '0';
-        setTimeout(() => document.getElementById('loader').classList.add('hidden'), 300);
+        setTimeout(() => document.getElementById('loader').classList.add('hidden'), 400);
         document.getElementById('app').classList.remove('hidden'); 
     }
 }
@@ -511,8 +513,8 @@ function renderYears() {
     if (curYear && curYear !== 'all' && yrs.length && !yrs.includes(curYear)) {
         curYear = yrs[0];
     }
-    let h = '<button class="yr" onclick="pickYear(\'all\')">Всё время</button>';
-    yrs.forEach(y => { h += `<button class="yr" onclick="pickYear(${y})">${y}</button>`; });
+    let h = '<button class="yr clickable" onclick="pickYear(\'all\')">Всё время</button>';
+    yrs.forEach(y => { h += `<button class="yr clickable" onclick="pickYear(${y})">${y}</button>`; });
     c.innerHTML = h;
     markYear();
 }
@@ -545,20 +547,21 @@ function renderHeatmap() {
         const totalColumns = Math.ceil(totalCells / 7);
         
         const block = document.createElement('div');
-        if (index > 0) block.style.marginTop = 'clamp(12px, 3.5vw, 16px)';
+        if (index > 0) block.style.marginTop = 'clamp(16px, 4vw, 20px)';
         
         if (D.heatmap.length > 1) {
             const title = document.createElement('div');
-            title.style.fontSize = 'clamp(12px, 3.2vw, 14px)';
-            title.style.fontWeight = '700';
+            title.style.fontSize = 'clamp(13px, 3.5vw, 15px)';
+            title.style.fontWeight = '800';
             title.style.color = 'var(--text-muted)';
-            title.style.marginBottom = 'clamp(4px, 1.5vw, 6px)';
+            title.style.marginBottom = 'clamp(6px, 2vw, 8px)';
             title.textContent = yr;
             block.appendChild(title);
         }
         
         const container = document.createElement('div');
-        container.className = 'hm-container';
+        container.style.width = '100%';
+        container.style.overflow = 'hidden';
         
         const hm = document.createElement('div');
         hm.className = 'hm';
@@ -567,7 +570,8 @@ function renderHeatmap() {
         for (let i = 0; i < offset; i++) { 
             const d = document.createElement('div'); 
             d.className = 'hc'; 
-            d.style.opacity = '0'; 
+            d.style.opacity = '0';
+            d.style.pointerEvents = 'none';
             hm.appendChild(d); 
         }
         
@@ -585,8 +589,6 @@ function renderHeatmap() {
     el.appendChild(fragment);
 }
 
-window.dTab = undefined;
-
 function fillList(id, items, ico, unit, categoryKey) {
     const el = document.getElementById(id);
     if (!items?.length) { el.innerHTML = `<div class="empty"><div class="icon">${ico}</div>Нет данных</div>`; return; }
@@ -598,12 +600,12 @@ function fillList(id, items, ico, unit, categoryKey) {
         const lbl = Array.isArray(unit) ? `${cnt} ${plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
         const delay = (i + 1) * 0.05;
         
-        let visual = it.emoji ? `<span style="font-size:clamp(16px,4.5vw,20px);line-height:1;margin-right:4px">${it.emoji}</span>` : `<div class="icon">${ico}</div>`;
+        let visual = it.emoji ? `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>` : `<div class="icon" style="color:var(--text-muted)">${ico}</div>`;
         
         const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         const onclick = `onclick="openHistory('filter', null, null, '${safeName}', '${categoryKey}', ${i})"`;
         
-        html += `<div class="li li-clickable anim-item clickable" ${onclick} style="animation-delay:${delay}s">
+        html += `<div class="li li-clickable anim-list-item clickable" ${onclick} style="animation-delay:${delay}s">
             <div class="li-l">
                 <span class="li-rank">${i+1}</span>
                 <div>
@@ -627,10 +629,10 @@ function fillBinges() {
         const safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         
         const posterHtml = b.poster_url 
-            ? `<img src="${b.poster_url}" style="width:32px;height:48px;border-radius:4px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);" onerror="this.style.display='none'">`
-            : `<div style="width:32px;height:48px;border-radius:4px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
+            ? `<img src="${b.poster_url}" style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.1);" onerror="this.style.display='none'">`
+            : `<div style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
             
-        html += `<div class="li li-clickable anim-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')">
+        html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')">
             <div class="li-l">
                 ${posterHtml}
                 <div>
@@ -638,7 +640,7 @@ function fillBinges() {
                     <div class="li-sub">${b.date}</div>
                 </div>
             </div>
-            <span class="li-r">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span>
+            <span class="li-r" style="color:var(--info)">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span>
         </div>`;
     });
     el.innerHTML = html;
@@ -646,14 +648,28 @@ function fillBinges() {
 
 function renderCharts() { renderMonthly(); renderWeekday(); renderDonut(); }
 
-const fSizeAx = Math.max(10, Math.min(14, window.innerWidth * 0.03));
-const fSizeTi = Math.max(11, Math.min(16, window.innerWidth * 0.035));
+const fSizeAx = Math.max(10, Math.min(13, window.innerWidth * 0.03));
+const fSizeTi = Math.max(12, Math.min(15, window.innerWidth * 0.035));
+
+function getCtxGradient(ctx, colorStart, colorEnd) {
+    let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, colorStart);
+    gradient.addColorStop(1, colorEnd);
+    return gradient;
+}
 
 function renderMonthly() {
-    const ctx = document.getElementById('c-monthly');
+    const canvas = document.getElementById('c-monthly');
+    const ctx = canvas.getContext('2d');
     if (chM) chM.destroy();
     const ch = D.monthly_chart; if (!ch?.labels?.length) return;
     const c = cc();
+    
+    let fillGradient = getCtxGradient(ctx, isDark?'rgba(35, 134, 54, 0.4)':'rgba(46, 160, 67, 0.3)', 'rgba(35, 134, 54, 0.0)');
+    let lineGradient = ctx.createLinearGradient(0, 0, canvas.width || 400, 0);
+    lineGradient.addColorStop(0, '#2ea043');
+    lineGradient.addColorStop(1, '#3fb950');
+
     chM = new Chart(ctx, { 
         type:'line', 
         data:{ 
@@ -662,29 +678,31 @@ function renderMonthly() {
                 { 
                     label: 'Просмотры',
                     data: ch.views, 
-                    backgroundColor: c.ab, 
-                    borderColor: c.a, 
-                    borderWidth: 2, 
+                    backgroundColor: fillGradient, 
+                    borderColor: lineGradient, 
+                    borderWidth: 3, 
                     tension: 0.4, 
                     fill: true,
                     yAxisID: 'y',
-                    pointBackgroundColor: isDark ? '#1b1f26' : '#ffffff',
-                    pointBorderColor: c.a,
-                    pointRadius: 3,
-                    pointHoverRadius: 5
+                    pointBackgroundColor: isDark ? '#0d1117' : '#ffffff',
+                    pointBorderColor: '#3fb950',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 },
                 {
                     label: 'Часы',
                     data: ch.hours, 
-                    backgroundColor: c.ib, 
+                    backgroundColor: 'transparent', 
                     borderColor: c.i, 
                     borderWidth: 2, 
+                    borderDash: [5, 5],
                     tension: 0.4, 
                     fill: false,
                     yAxisID: 'y1',
-                    pointBackgroundColor: isDark ? '#1b1f26' : '#ffffff',
+                    pointBackgroundColor: isDark ? '#0d1117' : '#ffffff',
                     pointBorderColor: c.i,
-                    pointRadius: 3,
+                    pointRadius: 0,
                     pointHoverRadius: 5
                 }
             ] 
@@ -692,46 +710,91 @@ function renderMonthly() {
         options:{ 
             responsive:true, 
             maintainAspectRatio:false, 
+            animation: { duration: 1500, easing: 'easeOutQuart' },
             plugins:{ 
                 legend: { 
                     display: true, 
                     position: 'top', 
-                    labels: { color: c.t, usePointStyle: true, boxWidth: 8, font: { size: fSizeAx, family: 'Inter, sans-serif' } } 
-                } 
+                    labels: { color: c.t, usePointStyle: true, boxWidth: 8, font: { size: fSizeAx, family: 'system-ui' } } 
+                },
+                tooltip: {
+                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                    titleColor: isDark ? '#f0f6fc' : '#1f2328',
+                    bodyColor: isDark ? '#8b949e' : '#59636e',
+                    borderColor: c.b,
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    displayColors: true,
+                }
             },
             interaction: { mode: 'index', intersect: false },
             scales:{ 
-                x:{ ticks:{color:c.t,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{display:false} },
+                x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
                 y:{ 
                     type: 'linear', display: true, position: 'left',
-                    ticks:{color:c.a,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{color:c.g}, beginAtZero:true 
+                    ticks:{color:c.a,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true 
                 },
                 y1: {
                     type: 'linear', display: true, position: 'right',
-                    ticks:{color:c.i,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{drawOnChartArea: false}, beginAtZero:true
+                    ticks:{color:c.i,font:{size:fSizeAx}}, grid:{drawOnChartArea: false}, beginAtZero:true
                 }
             } 
         } 
     });
 }
+
 function renderWeekday() {
-    const ctx = document.getElementById('c-weekday');
+    const canvas = document.getElementById('c-weekday');
+    const ctx = canvas.getContext('2d');
     if (chW) chW.destroy();
     const ch = D.weekday_chart; if (!ch?.labels?.length) return;
     const c = cc();
-    chW = new Chart(ctx, { type:'bar', data:{ labels:ch.labels, datasets:[{ data:ch.data,
-        backgroundColor:ch.data.map((_,i)=>i>=5?c.ib:c.ab), borderColor:ch.data.map((_,i)=>i>=5?c.i:c.a), borderWidth:1.5, borderRadius:4, borderSkipped:false }] },
-        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} },
-            scales:{ x:{ title:{display:true,text:'День недели',color:c.t,font:{size:fSizeTi,weight:'600',family:'Inter, sans-serif'}}, ticks:{color:c.t,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{display:false} },
-                     y:{ title:{display:true,text:'Просмотры',color:c.t,font:{size:fSizeTi,weight:'600',family:'Inter, sans-serif'}}, ticks:{color:c.t,font:{size:fSizeAx, family: 'Inter, sans-serif'}}, grid:{color:c.g}, beginAtZero:true } } } });
+    
+    let barGradient = getCtxGradient(ctx, '#2ea043', '#238636');
+    let weGradient = getCtxGradient(ctx, '#388bfd', '#1f6feb');
+
+    chW = new Chart(ctx, { 
+        type:'bar', 
+        data:{ 
+            labels:ch.labels, 
+            datasets:[{ 
+                data:ch.data,
+                backgroundColor:ch.data.map((_,i)=>i>=5?weGradient:barGradient), 
+                borderRadius: 6, 
+                borderSkipped:false 
+            }] 
+        },
+        options:{ 
+            responsive:true, 
+            maintainAspectRatio:false, 
+            animation: { duration: 1200, easing: 'easeOutQuart' },
+            plugins:{ 
+                legend:{display:false},
+                tooltip: {
+                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                    titleColor: isDark ? '#f0f6fc' : '#1f2328',
+                    bodyColor: isDark ? '#8b949e' : '#59636e',
+                    borderColor: c.b,
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                }
+            },
+            scales:{ 
+                x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
+                y:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true, border:{display:false} } 
+            } 
+        } 
+    });
 }
+
 function renderDonut() {
     const ctx = document.getElementById('c-genre');
     if (chG) chG.destroy();
     if (!D.genres?.length) return;
     
     const c = cc();
-    const pal = ['#2ecc71','#3498db','#e74c3c','#1abc9c','#f39c12','#9b59b6','#e67e22','#ecf0f1'];
+    const pal = ['#2ea043','#388bfd','#d29922','#a371f7','#f85149','#1abc9c','#e67e22','#ecf0f1'];
     const top = D.genres.slice(0,6);
     const totalMins = Math.max(top.reduce((acc, g) => acc + g.minutes, 0), 1);
     
@@ -749,17 +812,17 @@ function renderDonut() {
             datasets:[{ 
                 data: top.map(g => g.minutes), 
                 backgroundColor: top.map((_,i)=>pal[i%pal.length]), 
-                borderWidth: isDark ? 2 : 1,
-                borderColor: isDark ? '#1b1f26' : '#ffffff',
-                hoverOffset: 6
+                borderWidth: 2,
+                borderColor: isDark ? '#161b22' : '#ffffff',
+                hoverOffset: 8
             }] 
         },
         options:{ 
             responsive:true, 
             maintainAspectRatio:false, 
-            cutout:'55%', 
+            cutout:'60%', 
             layout: { padding: { right: 10, left: 10 } },
-            animation: { animateScale: true, animateRotate: true },
+            animation: { animateScale: true, animateRotate: true, duration: 1500, easing: 'easeOutQuart' },
             onClick: (event, elements) => {
                 if (elements && elements.length > 0) {
                     const idx = elements[0].index;
@@ -773,8 +836,8 @@ function renderDonut() {
             plugins:{ 
                 datalabels: {
                     color: '#ffffff',
-                    font: { weight: 'bold', size: 12, family: 'Inter, sans-serif' },
-                    textShadowBlur: 4,
+                    font: { weight: '800', size: 12, family: 'system-ui' },
+                    textShadowBlur: 6,
                     textShadowColor: 'rgba(0,0,0,0.8)',
                     formatter: (value) => {
                         let pct = Math.round((value / totalMins) * 100);
@@ -782,16 +845,16 @@ function renderDonut() {
                     }
                 },
                 tooltip: {
-                    backgroundColor: isDark ? 'rgba(30,35,45,0.95)' : 'rgba(255,255,255,0.95)',
-                    titleColor: isDark ? '#fff' : '#000',
-                    bodyColor: isDark ? '#ccc' : '#333',
+                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                    titleColor: isDark ? '#f0f6fc' : '#1f2328',
+                    bodyColor: isDark ? '#8b949e' : '#59636e',
                     borderColor: c.b,
                     borderWidth: 1,
                     padding: 12,
                     boxPadding: 6,
-                    cornerRadius: 8,
-                    titleFont: { size: 14, family: 'Inter, sans-serif' },
-                    bodyFont: { size: 13, family: 'Inter, sans-serif' },
+                    cornerRadius: 10,
+                    titleFont: { size: 14, family: 'system-ui' },
+                    bodyFont: { size: 13, family: 'system-ui', weight: 'bold' },
                     callbacks: {
                         label: function(context) {
                             const mins = context.parsed;
@@ -802,7 +865,7 @@ function renderDonut() {
                 },
                 legend:{ 
                     position:'right', 
-                    labels:{ color:c.t, font:{size:12, family:'Inter, sans-serif', weight: '500'}, padding:12, usePointStyle:true, pointStyleWidth:10 },
+                    labels:{ color:c.t, font:{size:12, family:'system-ui', weight: '600'}, padding:12, usePointStyle:true, pointStyleWidth:10 },
                     onClick: (e, legendItem) => {
                         const idx = legendItem.index;
                         const genre = top[idx];
@@ -856,17 +919,14 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
         document.getElementById('hist-title').textContent = extraTitle;
         document.getElementById('ic-hist-type').innerHTML = Icons.bolt;
     } else if (type === 'filter') {
-        // Логика фильтрации по жанрам/странам/актерам
         const filterItem = D[extraKey][extraIndex];
         const allowedIds = filterItem.show_ids || [];
         
-        // Объединяем фильмы и эпизоды, затем фильтруем
         data = [...D.history_movies, ...D.history_episodes].filter(i => allowedIds.includes(i.show_id))
             .sort((a, b) => b.view_date.localeCompare(a.view_date));
             
         document.getElementById('hist-title').textContent = extraTitle;
         
-        // Выбираем иконку
         let iconHtml = Icons.star;
         if (extraKey === 'genres') iconHtml = Icons.masks;
         else if (extraKey === 'countries') iconHtml = Icons.globe;
@@ -891,7 +951,7 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
     
     let html = '<div class="card" style="margin:0; padding:0; overflow:hidden;">';
     data.forEach((item, idx) => {
-        const delay = Math.min((idx + 1) * 0.02, 0.5); 
+        const delay = Math.min((idx + 1) * 0.03, 0.6); 
         
         let metaHtml = '';
         if (item.season_number !== undefined && item.season_number > 0) {
@@ -919,13 +979,13 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
             ? `<div class="hist-orig">${item.show__original_title}</div>` 
             : '';
             
-        const yearSuffix = item.show__year ? ` <span style="color:var(--text-muted); font-weight:400;">(${item.show__year})</span>` : '';
+        const yearSuffix = item.show__year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.show__year})</span>` : '';
         const poster = item.poster_url 
             ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` 
             : `<div class="hist-poster"></div>`;
 
         html += `
-        <div class="hist-item anim-item" style="animation-delay:${delay}s;">
+        <div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">
             ${poster}
             <div class="hist-info">
                 <div class="hist-title">${item.show__title}${yearSuffix}</div>
@@ -954,7 +1014,7 @@ window.closeHistory = function() {
 
 function renderGroup() {
     const el = document.getElementById('group-root');
-    if (!D.group) { el.innerHTML = `<div class="card"><div class="empty"><div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1">${Icons.users}</div>Вы не состоите в группе</div></div>`; return; }
+    if (!D.group) { el.innerHTML = `<div class="card hoverable"><div class="empty"><div class="icon" style="font-size:clamp(36px, 10vw, 48px);line-height:1;color:var(--text-muted)">${Icons.users}</div>Вы не состоите в группе</div></div>`; return; }
     const g = D.group, p = D.summary;
 
     const rows = [
@@ -967,35 +1027,35 @@ function renderGroup() {
     const cmpH = rows.map((r, idx) => {
         const d = r.y - r.gv;
         let dh;
-        if (d===0) dh = `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(10px, 2.8vw, 13px);display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>`;
+        if (d===0) dh = `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(12px, 3.2vw, 14px);display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>`;
         else { hasDiff = true; dh = `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`; }
-        return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(14px, 4vw, 18px);line-height:1">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(10px, 2.8vw, 12px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`;
+        return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1;color:var(--text-muted)">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(11px, 3vw, 13px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`;
     }).join('');
 
     const mx = Math.max(...g.members.map(m=>m.views),1);
-    const mbH = g.members.map((m, idx) => `<div class="mb anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
+    const mbH = g.members.map((m, idx) => `<div class="mb anim-list-item" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
 
     let gGenH = '';
     if (g.genres?.length) {
         const gm = Math.max(...g.genres.map(x=>x.minutes),1);
-        gGenH = `<div class="label"><div class="icon" style="font-size:clamp(13px, 3.5vw, 16px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="card anim-item d3">` + g.genres.slice(0,5).map((x, idx) => {
+        gGenH = `<div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="card hoverable anim-item" style="animation-delay:0.3s">` + g.genres.slice(0,5).map((x, idx) => {
             const w=(x.minutes/gm)*100, h=Math.floor(x.minutes/60), m=x.minutes%60;
-            return `<div class="g-row anim-item" style="animation-delay:${(idx+1)*0.05}s"><div class="g-hdr"><span class="g-name">${x.name}</span><span class="g-time">${h}ч ${m}м</span></div><div class="g-track"><div class="g-fill" style="width:${w}%;background:var(--info)"></div></div></div>`;
+            return `<div class="g-row anim-list-item" style="animation-delay:${(idx+1)*0.05}s"><div class="g-hdr"><span class="g-name">${x.name}</span><span class="g-time">${h}ч ${m}м</span></div><div class="g-track"><div class="g-fill" style="width:${w}%;background:linear-gradient(90deg, var(--info), #a371f7)"></div></div></div>`;
         }).join('') + '</div>';
     }
 
     const membersLabel = `${g.members_count} ${plural(g.members_count, ['участник', 'участника', 'участников'])}`;
 
     el.innerHTML = `
-        <div class="card anim-item"><div style="display:flex;align-items:center;gap:12px"><div class="icon" style="font-size:clamp(22px, 6vw, 26px);line-height:1">${Icons.users}</div><div><div style="font-size:clamp(15px, 4vw, 18px);font-weight:700;color:var(--text-primary)">${g.group_name}</div><div style="font-size:clamp(11px, 3vw, 14px);color:var(--text-muted)">${membersLabel} · ${g.duration_display}</div></div></div></div>
-        <div class="label"><div class="icon" style="font-size:clamp(13px, 3.5vw, 16px);line-height:1">${Icons.chart}</div>Вы vs Группа</div>
-        <div class="card anim-item d1">
-            <div style="display:flex;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)"><span style="font-size:clamp(11px, 3vw, 14px);font-weight:700;color:var(--accent)">👤 Вы</span><span style="font-size:clamp(11px, 3vw, 14px);font-weight:700;color:var(--info)">👥 Группа</span></div>
-            ${!hasDiff?`<div style="text-align:center;padding:12px 0;font-size:clamp(13px, 3.5vw, 16px);color:var(--accent);font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
+        <div class="card hoverable anim-item"><div style="display:flex;align-items:center;gap:16px"><div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))">${Icons.users}</div><div><div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">${g.group_name}</div><div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">${membersLabel} · ${g.duration_display}</div></div></div></div>
+        <div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.chart}</div>Вы vs Группа</div>
+        <div class="card hoverable anim-item" style="animation-delay:0.1s">
+            <div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)"><span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 Вы</span><span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span></div>
+            ${!hasDiff?`<div style="text-align:center;padding:16px 0;font-size:clamp(15px, 4vw, 18px);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse 2s infinite;"><div class="icon" style="font-size:clamp(20px, 6vw, 24px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
             ${cmpH}
         </div>
-        <div class="label"><div class="icon" style="font-size:clamp(13px, 3.5vw, 16px);line-height:1">${Icons.user}</div>Участники</div>
-        <div class="card anim-item d2">${mbH}</div>
+        <div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.user}</div>Участники</div>
+        <div class="card hoverable anim-item" style="animation-delay:0.2s">${mbH}</div>
         ${gGenH}`;
 }
 
