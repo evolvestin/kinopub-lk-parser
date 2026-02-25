@@ -201,7 +201,6 @@
             /* Фиксированный минимальный зазор, чтобы не съедать полезное пространство */
             gap: 1px;
             width: 100%;
-            /* Предотвращаем любые вылеты за пределы */
             box-sizing: border-box;
         }
         .hc { 
@@ -212,7 +211,6 @@
             transition: transform var(--transition-bounce), background var(--transition-smooth);
             cursor: crosshair; 
             position: relative;
-            /* Позволяет ячейке сжиматься до любого размера */
             min-width: 0;
         }
         .hc-label {
@@ -223,11 +221,7 @@
             line-height: 1;
             font-weight: 800;
             color: var(--text-muted);
-            text-transform: uppercase;
             user-select: none;
-            /* Гарантируем, что текст не переносится и не расширяет колонку */
-            white-space: nowrap;
-            overflow: hidden;
         }
         @media (max-width: 480px) {
             .hc-label { font-size: 7px; }
@@ -250,7 +244,6 @@
         #heatmaps-wrapper {
             width: 100%;
             position: relative;
-            border-radius: var(--radius);
         }
 
         #hm-zoom-content {
@@ -844,7 +837,7 @@ function renderHeatmap() {
         const hm = document.createElement('div');
         hm.className = 'hm';
         // Фиксируем ширину первой колонки, остальные minmax(0, 1fr) для втискивания в 100%
-        hm.style.gridTemplateColumns = `22px repeat(${totalColumns}, minmax(0, 1fr))`;
+        hm.style.gridTemplateColumns = `26px repeat(${totalColumns}, minmax(0, 1fr))`;
         
         // 1. Заполняем первую колонку (строго 7 ячеек)
         dayLabels.forEach(lbl => {
