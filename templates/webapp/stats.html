@@ -346,6 +346,29 @@
             font-weight: 600;
             margin-left: auto;
         }
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            z-index: 1000;
+            transition: transform var(--transition-bounce), opacity var(--transition-smooth);
+            opacity: 0;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -603,6 +626,24 @@ function markYear() {
 }
 window.pickYear = y => { curYear = y; markYear(); load(y === 'all' ? 'all' : y); };
 
+let toastTimer = null;
+function showToast(text) {
+    let el = document.getElementById('toast-msg');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'toast-msg';
+        el.className = 'toast';
+        document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.classList.add('show');
+    
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+        el.classList.remove('show');
+    }, 2000);
+}
+
 function renderHeatmap() {
     const el = document.getElementById('heatmaps-wrapper'); 
     el.innerHTML = '';
@@ -667,9 +708,20 @@ function renderHeatmap() {
         let curr = new Date(yr, 0, 1);
         data.forEach(v => { 
             const d = document.createElement('div'); 
-            const currStr = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, '0')}-${String(curr.getDate()).padStart(2, '0')}`;
+            const y = curr.getFullYear();
+            const m = String(curr.getMonth() + 1).padStart(2, '0');
+            const day = String(curr.getDate()).padStart(2, '0');
+            const currStr = `${y}-${m}-${day}`;
+            const displayDate = `${day}.${m}.${y}`;
+
             d.className = 'hc clickable' + (v ? ' h' + v : ''); 
-            d.setAttribute('onclick', `openHistory('day', null, '${currStr}', '${currStr}')`);
+
+            if (v > 0) {
+                d.setAttribute('onclick', `openHistory('day', null, '${currStr}', '${currStr}')`);
+            } else {
+                d.setAttribute('onclick', `showToast('${displayDate}: просмотров нет')`);
+            }
+
             hm.appendChild(d); 
             curr.setDate(curr.getDate() + 1);
         });
