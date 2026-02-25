@@ -232,7 +232,7 @@
             align-items: center;
         }
 
-        .chart-box { position: relative; width: 100%; height: 220px; }
+        .chart-box { position: relative; width: 100%; height: 320px; margin: 0 auto; }
 
         .cmp { display: flex; justify-content: space-between; align-items: center; padding: clamp(10px, 3vw, 12px) 0; border-bottom: 1px dashed var(--border); }
         .cmp:last-child { border: none; }
@@ -289,8 +289,50 @@
         .rating-badge.show-lvl { color: var(--text-primary); background: var(--bg-input); }
         .rating-badge svg { font-size: clamp(14px, 3.8vw, 16px); margin-top: -2px; }
         
-        /* Utility for glowing text */
         .glow-text { text-shadow: 0 0 12px rgba(255,255,255,0.2); }
+
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 20px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all var(--transition-smooth);
+        }
+        .legend-item:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            background: var(--bg-card);
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .legend-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .legend-val {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-left: auto;
+        }
     </style>
 </head>
 <body>
@@ -376,7 +418,8 @@
 
             <div class="label"><div class="icon" id="it-gen"></div>Жанры</div>
             <div class="card hoverable anim-item" style="animation-delay: 0.1s; margin-bottom: clamp(12px, 3vw, 16px);">
-                <div class="chart-box" style="height:240px;"><canvas id="c-genre"></canvas></div>
+                <div class="chart-box" style="height:320px;"><canvas id="c-genre"></canvas></div>
+                <div id="legend-genre" class="legend-grid"></div>
             </div>
 
             <div class="label"><div class="icon" style="color: #d29922;" id="it-act"></div>Актёры</div>
@@ -513,7 +556,6 @@ function render() {
     const vEp = s.total_episodes || 0;
     const vMov = s.total_movies || 0;
     const vSer = s.unique_series || 0;
-    const vUni = s.unique_movies || 0;
 
     document.getElementById('s-time').textContent  = s.duration_display || '0';
     document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
@@ -523,16 +565,13 @@ function render() {
     document.getElementById('s-ep').textContent = vEp;
     document.getElementById('s-ep').nextElementSibling.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
     
-    document.getElementById('s-ser').textContent = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
+    const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
+    document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
     
     document.getElementById('s-mov').textContent = vMov;
     document.getElementById('s-mov').nextElementSibling.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
 
-    if ((s.total_movies || 0) === (s.unique_movies || 0)) {
-        document.getElementById('s-uni').innerHTML = '&nbsp;';
-    } else {
-        document.getElementById('s-uni').textContent = vUni + ' ' + plural(vUni, ['уникальный', 'уникальных', 'уникальных']);
-    }
+    document.getElementById('s-uni').textContent = s.movies_duration || '0м';
 
     renderHeatmap();
     renderCharts();
@@ -840,89 +879,168 @@ function renderWeekday() {
 }
 
 function renderDonut() {
-    const ctx = document.getElementById('c-genre');
+    const canvas = document.getElementById('c-genre');
+    const ctx = canvas.getContext('2d');
+    const legendEl = document.getElementById('legend-genre');
     if (chG) chG.destroy();
     if (!D.genres?.length) return;
     
     const c = cc();
-    const pal = ['#2ea043','#388bfd','#d29922','#a371f7','#f85149','#1abc9c','#e67e22','#ecf0f1'];
-    const top = D.genres.slice(0,6);
-    const totalMins = Math.max(top.reduce((acc, g) => acc + g.minutes, 0), 1);
     
-    const labelsWithTime = top.map(g => {
-        const h = Math.floor(g.minutes / 60);
-        const m = g.minutes % 60;
-        return `${g.name} (${h}ч ${m}м)`;
-    });
+    let top = D.genres.slice(0, 12);
+    const totalMinutesSum = D.genres.reduce((acc, g) => acc + g.minutes, 0);
+    const topMinutes = top.reduce((acc, g) => acc + g.minutes, 0);
+
+    if (totalMinutesSum > topMinutes) {
+        const others = D.genres.slice(12);
+        const othersIds = [...new Set(others.flatMap(g => g.show_ids || []))];
+        top.push({
+            name: 'Остальные',
+            minutes: totalMinutesSum - topMinutes,
+            count: 0,
+            show_ids: othersIds
+        });
+    }
+
+    const realTotalMinutes = (document.getElementById('sec-group').classList.contains('vis') && D.group) 
+        ? D.group.total_minutes_watched 
+        : D.summary.total_minutes_watched;
+
+    const totalHours = Math.floor(realTotalMinutes / 60);
+    const pal = [
+        '#2ea043', '#388bfd', '#f85149', '#d29922', '#a371f7', 
+        '#1abc9c', '#e67e22', '#9b59b6', '#34495e', '#16a085', 
+        '#27ae60', '#2980b9', '#6e7681'
+    ];
+
+    const values = top.map(g => (g.minutes / totalMinutesSum) * 100);
+    const percents = values.map(v => Math.floor(v));
+    let remainder = 100 - percents.reduce((a, b) => a + b, 0);
+    
+    const diffs = values.map((v, idx) => ({ idx, diff: v - percents[idx] }))
+                        .sort((a, b) => b.diff - a.diff);
+    
+    for (let i = 0; i < remainder; i++) {
+        percents[diffs[i].idx]++;
+    }
+
+    const centerTextPlugin = {
+        id: 'centerText',
+        afterDraw: (chart) => {
+            const { ctx, chartArea: { top, height, left, width } } = chart;
+            ctx.save();
+            const centerX = left + width / 2;
+            const centerY = top + height / 2;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '900 38px system-ui';
+            ctx.fillStyle = c.t;
+            ctx.fillText(totalHours, centerX, centerY - 8);
+            ctx.font = 'bold 11px system-ui';
+            ctx.fillStyle = isDark ? '#6e7681' : '#8c959f';
+            ctx.letterSpacing = '2px';
+            ctx.fillText('ЧАСОВ', centerX, centerY + 24);
+            ctx.restore();
+        }
+    };
 
     chG = new Chart(ctx, { 
-        type:'doughnut', 
-        plugins: [ChartDataLabels],
-        data:{ 
-            labels: labelsWithTime, 
-            datasets:[{ 
+        type: 'doughnut', 
+        plugins: [ChartDataLabels, centerTextPlugin],
+        data: { 
+            labels: top.map(g => g.name), 
+            datasets: [{ 
                 data: top.map(g => g.minutes), 
-                backgroundColor: top.map((_,i)=>pal[i%pal.length]), 
-                borderWidth: 2,
-                borderColor: isDark ? '#161b22' : '#ffffff',
-                hoverOffset: 25,
-                hoverBorderWidth: 4,
-                spacing: 4,
-                borderRadius: 4
+                backgroundColor: top.map((_, i) => pal[i % pal.length]), 
+                borderWidth: 0,
+                hoverOffset: 12, 
+                borderRadius: 4,
+                spacing: 2, 
+                weight: 1
             }] 
         },
-        options:{ 
-            responsive:true, 
-            maintainAspectRatio:false, 
-            cutout:'65%', 
-            layout: { padding: 30 },
-            animation: { 
-                animateScale: true, 
-                animateRotate: true, 
-                duration: 2000, 
-                easing: 'easeOutElastic' 
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            cutout: '50%', 
+            animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' },
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
             },
             onClick: (event, elements) => {
                 if (elements && elements.length > 0) {
                     const idx = elements[0].index;
                     const genre = top[idx];
-                    openHistory('filter', null, null, genre.name, 'genres', idx);
+                    const safeName = genre.name.replace(/'/g, "\\'");
+                    openHistory('filter', null, null, safeName, 'genres_top', idx);
                 }
             },
-            onHover: (event, elements) => {
-                event.native.target.style.cursor = elements && elements.length ? 'pointer' : 'default';
-            },
-            plugins:{ 
+            plugins: { 
                 datalabels: {
-                    color: '#ffffff',
-                    font: { weight: '800', size: 11, family: 'system-ui' },
+                    color: '#fff',
+                    font: { weight: '800', size: 11 },
                     textShadowBlur: 4,
-                    textShadowColor: 'rgba(0,0,0,0.5)',
-                    formatter: (value) => {
-                        let pct = Math.round((value / totalMins) * 100);
-                        return pct > 5 ? pct + '%' : '';
-                    }
+                    textShadowColor: 'rgba(0,0,0,0.8)',
+                    formatter: (value, context) => {
+                        const pct = percents[context.dataIndex];
+                        return pct > 4 ? pct + '%' : '';
+                    },
+                    display: 'auto'
                 },
                 tooltip: {
-                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                    backgroundColor: isDark ? '#161b22' : '#fff',
                     titleColor: isDark ? '#f0f6fc' : '#1f2328',
                     bodyColor: isDark ? '#8b949e' : '#59636e',
                     borderColor: c.b,
                     borderWidth: 1,
                     padding: 12,
-                    cornerRadius: 10,
+                    cornerRadius: 8,
                     callbacks: {
-                        label: (context) => ` ${Math.round((context.parsed / totalMins) * 100)}%`
+                        label: (context) => {
+                            const val = context.parsed;
+                            const pct = percents[context.dataIndex];
+                            return ` ${Math.floor(val/60)}ч ${val%60}м (${pct}%)`;
+                        }
                     }
                 },
-                legend:{ 
-                    position:'right', 
-                    labels:{ color:c.t, font:{size:11, weight: '600'}, padding:10, usePointStyle:true, pointStyleWidth:8 }
-                } 
+                legend: { display: false } 
             } 
         } 
     });
+
+    D.genres_top = top;
+
+    legendEl.innerHTML = top.map((g, i) => {
+        const color = pal[i % pal.length];
+        const pct = percents[i];
+        const h = Math.floor(g.minutes / 60);
+        const m = g.minutes % 60;
+        const timeStr = h > 0 ? `${h}ч ${m}м` : `${m}м`;
+        const safeName = g.name.replace(/'/g, "\\'");
+        
+        return `
+            <div class="legend-item" onclick="openHistory('filter', null, null, '${safeName}', 'genres_top', ${i})" 
+                 onmouseenter="highlightSegment(${i}, true)" 
+                 onmouseleave="highlightSegment(${i}, false)">
+                <div class="legend-dot" style="background:${color}"></div>
+                <div class="legend-name">${g.name}</div>
+                <div class="legend-val">${timeStr} · ${pct}%</div>
+            </div>
+        `;
+    }).join('');
 }
+
+window.highlightSegment = function(index, active) {
+    if (!chG) return;
+    if (active) {
+        chG.setActiveElements([{ datasetIndex: 0, index: index }]);
+        chG.tooltip.setActiveElements([{ datasetIndex: 0, index: index }], { x: 0, y: 0 });
+    } else {
+        chG.setActiveElements([]);
+        chG.tooltip.setActiveElements([], { x: 0, y: 0 });
+    }
+    chG.update();
+};
 
 window.mainTab = function(t) {
     document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));

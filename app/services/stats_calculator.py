@@ -31,6 +31,17 @@ logger = logging.getLogger(__name__)
 
 
 def _get_yearly_summary(base_qs, dur_qs, year=None):
+    def format_dur_short(seconds):
+        if not seconds:
+            return "0м"
+        d, rem = divmod(int(seconds), 86400)
+        h, m = divmod(rem // 60, 60)
+        parts = []
+        if d > 0: parts.append(f"{d}д")
+        if h > 0: parts.append(f"{h}ч")
+        if m > 0 or not parts: parts.append(f"{m}м")
+        return " ".join(parts)
+
     counts = base_qs.aggregate(
         total_views=Count('id'),
         total_episodes=Count('id', filter=Q(season_number__gt=0)),
@@ -45,7 +56,11 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
         active_days=Count('view_date', distinct=True),
     )
 
-    durs = dur_qs.aggregate(total_seconds=Sum('final_duration'))
+    durs = dur_qs.aggregate(
+        total_seconds=Sum('final_duration'),
+        series_seconds=Sum('final_duration', filter=Q(season_number__gt=0)),
+        movies_seconds=Sum('final_duration', filter=Q(season_number=0) | Q(season_number__isnull=True))
+    )
 
     total_seconds = durs['total_seconds'] or 0
     total_minutes = total_seconds // 60
@@ -92,6 +107,8 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
         'total_seconds_watched': total_seconds,
         'total_minutes_watched': total_minutes,
         'duration_display': f'{days}д {hours}ч {minutes}м',
+        'series_duration': format_dur_short(durs['series_seconds']),
+        'movies_duration': format_dur_short(durs['movies_seconds']),
         'continuous_days': round(total_seconds / 86400, 1),
         'total_views': counts['total_views'],
         'total_episodes': counts['total_episodes'],
@@ -111,7 +128,6 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
 
 
 def _get_favorites(base_qs, dur_qs):
-    # Genres
     genres_qs = (
         base_qs.values(tid=F('show__genres__id'), name=F('show__genres__name'))
         .filter(tid__isnull=False)
@@ -120,10 +136,8 @@ def _get_favorites(base_qs, dur_qs):
     )
     total_mentions = sum(g['count'] for g in genres_qs)
 
-    # Take top 10 and fetch show_ids for client-side filtering
     genres = []
-    for g in genres_qs[:10]:
-        # Получаем ID всех шоу, которые смотрел пользователь в этом жанре (в рамках base_qs)
+    for g in genres_qs[:15]:
         show_ids = list(
             base_qs.filter(show__genres__id=g['tid']).values_list('show_id', flat=True).distinct()
         )
@@ -145,7 +159,6 @@ def _get_favorites(base_qs, dur_qs):
         g['minutes'] = mins_map.get(g['name'], 0)
 
     def get_person_top(field, limit=5):
-        # Аналогично для персон
         qs = (
             base_qs.values(tid=F(f'show__{field}__id'), name=F(f'show__{field}__name'))
             .filter(tid__isnull=False)
@@ -170,7 +183,6 @@ def _get_favorites(base_qs, dur_qs):
             )
         return result
 
-    # Countries
     countries_qs = (
         base_qs.values(
             tid=F('show__countries__id'),
@@ -540,6 +552,7 @@ def generate_group_stats(user, year=None):
     durs = dur_qs.aggregate(total_seconds=Sum('final_duration'))
 
     total_seconds = durs['total_seconds'] or 0
+    total_minutes = total_seconds // 60
     days, rem = divmod(total_seconds, 86400)
     hours, minutes = divmod(rem // 60, 60)
 
@@ -576,6 +589,7 @@ def generate_group_stats(user, year=None):
         'total_episodes': counts['total_episodes'],
         'total_movies': counts['total_movies'],
         'unique_shows': counts['unique_shows'],
+        'total_minutes_watched': total_minutes,
         'duration_display': f'{days}д {hours}ч {minutes}м',
         'active_days': counts['active_days'],
         'genres': genres,
