@@ -318,6 +318,10 @@ if ENVIRONMENT == 'PROD':
                 'task': 'app.tasks.run_daily_sync_task',
                 'schedule': crontab(minute=0, hour=4),
             },
+            'run_gap_scanner': {
+                'task': 'app.tasks.run_gap_scanner_task',
+                'schedule': crontab(minute=0, hour=3, day_of_month='1'),
+            },
         }
     )
 

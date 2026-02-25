@@ -83,13 +83,12 @@ def _extract_int_from_string(text):
     return int(digits)
 
 
-def update_show_details(driver, show_id):
+def update_show_details(driver, show_id, force=False):
     target_path = f'item/view/{show_id}'
 
     if target_path not in driver.current_url:
         base_url = settings.SITE_URL
 
-        # Пытаемся сохранить текущий домен сессии (для поддержки зеркал/AUX)
         if driver.current_url and driver.current_url.startswith('http'):
             parsed = urlparse(driver.current_url)
             if parsed.netloc:
@@ -102,13 +101,48 @@ def update_show_details(driver, show_id):
             logging.error(f'Error navigating to show page {show_id}: {e}')
             return
 
+    if 'Not Found' in driver.title or '404' in driver.title:
+        logging.warning(f'Show {show_id} returned 404.')
+        return
+
     try:
-        show = Show.objects.get(id=show_id)
-        three_months_ago = timezone.now() - timedelta(days=90)
-        if show.year is not None and show.updated_at >= three_months_ago:
-            return
+        try:
+            show = Show.objects.get(id=show_id)
+            if not force:
+                three_months_ago = timezone.now() - timedelta(days=90)
+                if show.year is not None and show.updated_at >= three_months_ago:
+                    return
+        except Show.DoesNotExist:
+            show = Show(
+                id=show_id,
+                type='Unknown',
+                title=f'Show {show_id}',
+                original_title=f'Show {show_id}',
+            )
 
         logging.info(f'Fetching extended details for show id={show_id}')
+
+        try:
+            h3_elem = driver.find_element(By.TAG_NAME, 'h3')
+            lines = h3_elem.text.split('\n')
+            if lines[0].strip():
+                show.title = lines[0].strip()
+            try:
+                small_elem = h3_elem.find_element(By.TAG_NAME, 'small')
+                raw_orig = small_elem.text.replace('HD', '').replace('+ AC3', '').strip()
+                show.original_title = raw_orig if raw_orig else show.title
+            except NoSuchElementException:
+                show.original_title = show.title
+        except NoSuchElementException:
+            pass
+
+        try:
+            plot_elem = driver.find_element(By.ID, 'plot')
+            show.plot = plot_elem.text.strip()
+        except NoSuchElementException:
+            pass
+
+        show.save()
 
         wait = WebDriverWait(driver, 10)
         info_table = wait.until(

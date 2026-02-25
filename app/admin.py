@@ -273,13 +273,14 @@ class ShowAdmin(admin.ModelAdmin):
         'updated_at',
     )
     list_filter = ('type', 'status', AverageRatingFilter, 'year')
-    search_fields = ('title', 'original_title')
+    search_fields = ('title', 'original_title', 'plot')
     inlines = [ShowDurationInline, ViewHistoryInline, UserRatingInline]
     readonly_fields = (
         'id',
         'admin_actions',
         'title',
         'original_title',
+        'plot',
         'type',
         'status',
         'year',
@@ -621,11 +622,16 @@ class LogEntryAdmin(admin.ModelAdmin):
             '<span style="color: {}; font_weight: bold;">{}</span>', color, obj.level
         )
 
+    def get_readonly_fields(self, request, obj=None):
+        if request.user.is_superuser:
+            return ('created_at', 'updated_at')
+        return self.readonly_fields
+
     def has_add_permission(self, request):
-        return False
+        return request.user.is_superuser
 
     def has_change_permission(self, request, obj=None):
-        return False
+        return request.user.is_superuser
 
     def has_delete_permission(self, request, obj=None):
         return True

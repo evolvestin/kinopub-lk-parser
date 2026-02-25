@@ -116,9 +116,12 @@ def delete_old_logs_task():
     # 1. Очистка логов по уровням
     # INFO и DEBUG: храним 1 месяц (30 дней)
     cutoff_info = now - timedelta(days=30)
-    LogEntry.objects.filter(created_at__lt=cutoff_info, level__in=['INFO', 'DEBUG']).exclude(
-        message__contains='New Episodes Parser Finished'
-    ).delete()
+    (
+        LogEntry.objects.filter(created_at__lt=cutoff_info, level__in=['INFO', 'DEBUG'])
+        .exclude(message__contains='New Episodes Parser Finished')
+        .exclude(message__contains='Gap scanner finished successfully up to ID')
+        .delete()
+    )
 
     # WARNING: храним 2 месяца (60 дней)
     cutoff_warning = now - timedelta(days=60)
@@ -135,7 +138,6 @@ def delete_old_logs_task():
 
     logging.info('Cleanup completed. Deleted old codes: %d', deleted_codes)
 
-    # Если были удаления, можно запланировать бэкап (опционально)
     if deleted_codes > 0:
         BackupManager().schedule_backup()
 
@@ -403,3 +405,10 @@ def precalculate_all_stats():
     for user in active_users:
         precalculate_user_stats.delay(user.id, year=current_year)
         precalculate_user_stats.delay(user.id, year=None)
+
+
+@shared_task
+@single_instance_task(lock_name='selenium_global_lock', timeout=21600)
+def run_gap_scanner_task():
+    logging.info('Starting monthly gap scanner task.')
+    call_command('rungapscanner')

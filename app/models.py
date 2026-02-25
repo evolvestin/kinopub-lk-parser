@@ -150,6 +150,7 @@ class Show(BaseModel):
     imdb_url = models.URLField(max_length=255, null=True, blank=True)
     imdb_rating = models.FloatField(null=True, blank=True)
     imdb_votes = models.IntegerField(null=True, blank=True)
+    plot = models.TextField(null=True, blank=True)
     countries = models.ManyToManyField(Country, blank=True)
     genres = models.ManyToManyField(Genre, blank=True)
     directors = models.ManyToManyField(Person, related_name='directed_shows', blank=True)
