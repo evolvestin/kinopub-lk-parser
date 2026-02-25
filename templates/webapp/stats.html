@@ -418,7 +418,7 @@
 
             <div class="label"><div class="icon" id="it-gen"></div>Жанры</div>
             <div class="card hoverable anim-item" style="animation-delay: 0.1s; margin-bottom: clamp(12px, 3vw, 16px);">
-                <div class="chart-box" style="height:320px;"><canvas id="c-genre"></canvas></div>
+                <div class="chart-box" style="height:380px;"><canvas id="c-genre"></canvas></div>
                 <div id="legend-genre" class="legend-grid"></div>
             </div>
 
@@ -478,6 +478,8 @@ if (tg) tg.expand();
 
 let D = null, curYear = null, isDark = true;
 let chM = null, chW = null, chG = null;
+let lastScrollPos = 0;
+
 
 function toggleTheme() {
     isDark = !isDark;
@@ -576,7 +578,7 @@ function render() {
     renderHeatmap();
     renderCharts();
     
-    fillList('actors-box', D.actors, Icons.star, ['просмотр', 'просмотра', 'просмотров'], 'actors');
+    fillList('actors-box', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
     fillList('countries-box', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
     fillBinges();
     
@@ -681,16 +683,21 @@ function renderHeatmap() {
 
 function fillList(id, items, ico, unit, categoryKey) {
     const el = document.getElementById(id);
-    if (!items?.length) { el.innerHTML = `<div class="empty"><div class="icon">${ico}</div>Нет данных</div>`; return; }
+    if (!items?.length) { el.innerHTML = `<div class="empty"><div class="icon">${ico || ''}</div>Нет данных</div>`; return; }
     
     let html = '';
     items.forEach((it, i) => {
         const cnt = it.count || it.views || 0;
-        const sub = it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : (it.sub || '');
+        const sub = it.sub || (it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
         const lbl = Array.isArray(unit) ? `${cnt} ${plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
         const delay = (i + 1) * 0.05;
         
-        let visual = it.emoji ? `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>` : `<div class="icon" style="color:var(--text-muted)">${ico}</div>`;
+        let visual = '';
+        if (it.emoji) {
+            visual = `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>`;
+        } else if (ico) {
+            visual = `<div class="icon" style="color:var(--text-muted)">${ico}</div>`;
+        }
         
         const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         const onclick = `onclick="openHistory('filter', null, null, '${safeName}', '${categoryKey}', ${i})"`;
@@ -703,7 +710,7 @@ function fillList(id, items, ico, unit, categoryKey) {
                     ${sub?`<div class="li-sub">${sub}</div>`:''}
                 </div>
             </div>
-            <span class="li-r">${lbl}</span>
+            <span class="li-r" style="color:var(--info)">${lbl}</span>
         </div>`;
     });
     el.innerHTML = html;
@@ -805,10 +812,16 @@ function renderMonthly() {
                 legend: { 
                     display: true, 
                     position: 'top', 
-                    labels: { color: c.t, usePointStyle: true, boxWidth: 8, font: { size: fSizeAx, family: 'system-ui' } } 
+                    labels: { 
+                        color: c.t, 
+                        usePointStyle: true, 
+                        boxWidth: 8, 
+                        padding: 20,
+                        font: { size: fSizeAx, family: 'system-ui' } 
+                    } 
                 },
                 tooltip: {
-                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                     titleColor: isDark ? '#f0f6fc' : '#1f2328',
                     bodyColor: isDark ? '#8b949e' : '#59636e',
                     borderColor: c.b,
@@ -816,6 +829,9 @@ function renderMonthly() {
                     padding: 12,
                     cornerRadius: 8,
                     displayColors: true,
+                    boxPadding: 6,
+                    bodySpacing: 8,
+                    titleSpacing: 10
                 }
             },
             interaction: { mode: 'index', intersect: false },
@@ -841,38 +857,74 @@ function renderWeekday() {
     const ch = D.weekday_chart; if (!ch?.labels?.length) return;
     const c = cc();
     
+    const totalViews = ch.data.reduce((a, b) => a + b, 0);
+    
     let barGradient = getCtxGradient(ctx, '#2ea043', '#238636');
     let weGradient = getCtxGradient(ctx, '#388bfd', '#1f6feb');
 
     chW = new Chart(ctx, { 
-        type:'bar', 
-        data:{ 
-            labels:ch.labels, 
-            datasets:[{ 
-                data:ch.data,
-                backgroundColor:ch.data.map((_,i)=>i>=5?weGradient:barGradient), 
-                borderRadius: 6, 
-                borderSkipped:false 
+        type: 'bar', 
+        data: { 
+            labels: ch.labels, 
+            datasets: [{ 
+                data: ch.data,
+                backgroundColor: ch.data.map((_, i) => i >= 5 ? weGradient : barGradient),
+                hoverBackgroundColor: ch.data.map((_, i) => i >= 5 ? '#60a5fa' : '#39d353'),
+                borderRadius: 8, 
+                borderSkipped: false,
+                borderWidth: 0,
+                hoverBorderWidth: 0
             }] 
         },
-        options:{ 
-            responsive:true, 
-            maintainAspectRatio:false, 
-            animation: { duration: 1200, easing: 'easeOutQuart' },
-            plugins:{ 
-                legend:{display:false},
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            animation: {
+                duration: 1000,
+                easing: 'easeOutBack',
+                delay: (context) => {
+                    let delay = 0;
+                    if (context.type === 'data' && context.mode === 'default' && !context.active) {
+                        delay = context.dataIndex * 100;
+                    }
+                    return delay;
+                }
+            },
+            plugins: { 
+                legend: { display: false },
                 tooltip: {
-                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                     titleColor: isDark ? '#f0f6fc' : '#1f2328',
                     bodyColor: isDark ? '#8b949e' : '#59636e',
                     borderColor: c.b,
                     borderWidth: 1,
-                    cornerRadius: 8,
+                    cornerRadius: 10,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: (context) => {
+                            const val = context.parsed.y;
+                            const pct = totalViews > 0 ? Math.round((val / totalViews) * 100) : 0;
+                            return ` ${val} ${plural(val, ['просмотр', 'просмотра', 'просмотров'])} (${pct}%)`;
+                        }
+                    }
                 }
             },
-            scales:{ 
-                x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
-                y:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true, border:{display:false} } 
+            scales: { 
+                x: { 
+                    ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, 
+                    grid: { display: false } 
+                },
+                y: { 
+                    ticks: { 
+                        color: c.t, 
+                        font: { size: fSizeAx },
+                        precision: 0
+                    }, 
+                    grid: { color: c.g }, 
+                    beginAtZero: true, 
+                    border: { display: false } 
+                } 
             } 
         } 
     });
@@ -963,6 +1015,14 @@ function renderDonut() {
             responsive: true, 
             maintainAspectRatio: false, 
             cutout: '50%', 
+            layout: {
+                padding: {
+                    top: 20,
+                    bottom: 20,
+                    left: 20,
+                    right: 20
+                }
+            },
             animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' },
             onHover: (event, elements) => {
                 event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
@@ -1049,6 +1109,8 @@ window.mainTab = function(t) {
 };
 
 window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, extraIndex) {
+    lastScrollPos = window.scrollY;
+    
     document.getElementById('main-tabs').classList.add('hidden');
     document.getElementById('years').classList.add('hidden');
     document.getElementById('sec-personal').classList.remove('vis');
@@ -1091,7 +1153,7 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
         document.getElementById('hist-title').textContent = extraTitle;
         
         let iconHtml = Icons.star;
-        if (extraKey === 'genres') iconHtml = Icons.masks;
+        if (extraKey === 'genres' || extraKey === 'genres_top') iconHtml = Icons.masks;
         else if (extraKey === 'countries') iconHtml = Icons.globe;
         document.getElementById('ic-hist-type').innerHTML = iconHtml;
         
@@ -1173,6 +1235,8 @@ window.closeHistory = function() {
     
     const curTab = document.querySelector('#main-tabs .tab.on').dataset.tab;
     mainTab(curTab);
+    
+    window.scrollTo(0, lastScrollPos);
 };
 
 function renderGroup() {

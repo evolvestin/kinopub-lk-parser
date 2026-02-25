@@ -162,7 +162,7 @@ def _get_favorites(base_qs, dur_qs):
         qs = (
             base_qs.values(tid=F(f'show__{field}__id'), name=F(f'show__{field}__name'))
             .filter(tid__isnull=False)
-            .annotate(views=Count('id'), shows=Count('show_id', distinct=True))
+            .annotate(views=Count('id'), shows_count=Count('show_id', distinct=True))
             .order_by('-views')[:limit]
         )
         result = []
@@ -172,13 +172,22 @@ def _get_favorites(base_qs, dur_qs):
                 .values_list('show_id', flat=True)
                 .distinct()
             )
+            
+            show_titles = list(
+                base_qs.filter(**{f'show__{field}__id': p['tid']})
+                .order_by('show__original_title')
+                .values_list('show__original_title', flat=True)
+                .distinct()
+            )
+            
             result.append(
                 {
                     'name': p['name'],
-                    'shows': p['shows'],
+                    'shows': p['shows_count'],
                     'views': p['views'],
                     'count': p['views'],
                     'show_ids': show_ids,
+                    'sub': ', '.join(show_titles)
                 }
             )
         return result
