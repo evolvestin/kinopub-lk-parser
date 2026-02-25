@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 from django.core.cache import cache
 from django.db.models import (
+    Avg,
     Case,
     Count,
     F,
@@ -379,7 +380,6 @@ def generate_user_stats(user, year=None):
     if cached:
         return cached
 
-    # Чтобы избежать дублирования при JOINах, сначала получаем ID уникальных записей
     history_ids = ViewHistory.objects.filter(users=user, is_checked=True)
     if year:
         history_ids = history_ids.filter(view_date__year=year)
@@ -420,6 +420,7 @@ def generate_user_stats(user, year=None):
             'summary': summary, 'heatmap': [], 'genres': [], 'actors': [], 'countries': [], 'binges': [],
             'monthly_chart': {'labels': [], 'views': [], 'hours': [], 'episodes': [], 'movies': []},
             'weekday_chart': {'labels': [], 'data': []}, 'history_movies': [], 'history_episodes': [],
+            'ratings': {'total': 0, 'avg': 0, 'distribution': [], 'history': []}
         }
 
     favs = _get_favorites(base_qs, dur_qs)
@@ -457,6 +458,34 @@ def generate_user_stats(user, year=None):
         e['view_date'] = e['view_date'].strftime('%Y-%m-%d')
         e['poster_url'] = get_poster_url(e['show_id'])
 
+    ratings_qs = UserRating.objects.filter(user=user)
+    if year:
+        ratings_qs = ratings_qs.filter(updated_at__year=year)
+
+    total_ratings = ratings_qs.count()
+    avg_rating = ratings_qs.aggregate(avg=Avg('rating'))['avg'] or 0.0
+
+    dist_data = {str(i): 0 for i in range(1, 11)}
+    for r in ratings_qs.values('rating').annotate(cnt=Count('id')):
+        bucket = str(int(r['rating'])) if r['rating'] >= 1 else "1"
+        dist_data[bucket] += r['cnt']
+    
+    dist_list = [dist_data[str(i)] for i in range(1, 11)]
+
+    ratings_history = []
+    for r in ratings_qs.select_related('show').order_by('-updated_at'):
+        ratings_history.append({
+            'show_id': r.show_id,
+            'title': r.show.title,
+            'original_title': r.show.original_title,
+            'year': r.show.year,
+            'season': r.season_number,
+            'episode': r.episode_number,
+            'rating': r.rating,
+            'date': r.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'poster_url': get_poster_url(r.show_id)
+        })
+
     result = {
         'meta': {'id': user.id, 'name': user.name or user.username, 'year': year, 'years': all_years},
         'summary': summary,
@@ -464,6 +493,7 @@ def generate_user_stats(user, year=None):
         'genres': favs['genres'], 'actors': favs['actors'], 'countries': favs['countries'],
         'binges': binge, 'monthly_chart': _get_monthly_chart(base_qs, dur_qs),
         'weekday_chart': _get_weekday_chart(base_qs), 'history_movies': movies_history, 'history_episodes': episodes_history,
+        'ratings': {'total': total_ratings, 'avg': round(avg_rating, 1), 'distribution': dist_list, 'history': ratings_history}
     }
     cache.set(cache_key, result, timeout=86400)
     return result

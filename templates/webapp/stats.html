@@ -335,6 +335,17 @@
         
         .glow-text { text-shadow: 0 0 12px rgba(255,255,255,0.2); }
 
+        .critic-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+        .critic-title-box { display: flex; flex-direction: column; }
+        .critic-badge { display: inline-flex; align-items: center; gap: 6px; font-size: clamp(12px, 3.2vw, 14px); font-weight: 800; padding: 4px 10px; border-radius: 8px; width: fit-content; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;}
+        .critic-avg { font-size: clamp(32px, 8vw, 42px); font-weight: 900; line-height: 1; display: flex; align-items: baseline; gap: 4px; }
+        .critic-avg span { font-size: clamp(14px, 4vw, 16px); color: var(--text-muted); font-weight: 700; }
+        .critic-total { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-muted); font-weight: 600; text-align: right; }
+        .rating-time { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); font-weight: 500; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+
+        /* Внутри .hist-meta или просто рядом */
+        .big-rating-badge { display: flex; align-items: center; justify-content: center; width: clamp(40px, 11vw, 48px); height: clamp(40px, 11vw, 48px); border-radius: 12px; font-size: clamp(16px, 4.5vw, 18px); font-weight: 900; color: #fff; flex-shrink: 0; box-shadow: var(--shadow-sm); }
+
         .legend-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -497,6 +508,21 @@
 
             <div class="label"><div class="icon" style="color: #a371f7;" id="it-bin"></div>Марафоны</div>
             <div class="card hoverable anim-item" style="animation-delay: 0.25s;" id="binges-box"></div>
+
+            <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star"></div>Оценки и критика</div>
+            <div class="card hoverable anim-item" style="animation-delay: 0.3s;" id="ratings-box">
+                <div class="critic-header">
+                    <div class="critic-title-box">
+                        <div class="critic-badge" id="cr-badge"></div>
+                        <div class="critic-avg" id="cr-avg">0.0<span>/ 10</span></div>
+                    </div>
+                    <div class="critic-total" id="cr-total"></div>
+                </div>
+                <div class="chart-box" style="height: 180px; margin-bottom: 16px;"><canvas id="c-ratings-dist"></canvas></div>
+                <div class="li li-clickable clickable" style="justify-content: center; padding: 12px; border: 1px solid var(--border);" onclick="openHistory('ratings')">
+                    <span style="font-weight: 800; color: var(--text-primary);">Посмотреть все оценки</span>
+                </div>
+            </div>
         </div>
 
         <div class="sec" id="sec-group"><div id="group-root"></div></div>
@@ -543,6 +569,7 @@ document.addEventListener("DOMContentLoaded", () => {
 const tg = window.Telegram?.WebApp;
 if (tg) tg.expand();
 
+let chR = null;
 let D = null, curYear = null, isDark = true;
 let chM = null, chW = null, chG = {}, lastScrollPos = 0;
 
@@ -628,6 +655,24 @@ function render() {
     document.getElementById('s-mov').nextElementSibling.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
     document.getElementById('s-uni').textContent = s.movies_duration || '0м';
 
+    const rt = D.ratings;
+    if (rt && rt.total > 0) {
+        document.getElementById('ratings-box').style.display = 'block';
+        document.getElementById('cr-avg').innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
+        document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
+        
+        const badge = document.getElementById('cr-badge');
+        if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.background = 'rgba(46, 204, 113, 0.15)'; badge.style.color = '#2ecc71'; }
+        else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.background = 'rgba(56, 139, 253, 0.15)'; badge.style.color = '#60a5fa'; }
+        else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.background = 'rgba(210, 153, 34, 0.15)'; badge.style.color = '#d29922'; }
+        else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
+        
+        renderRatingsDist();
+    } else {
+        document.getElementById('ratings-box').style.display = 'none';
+        document.getElementById('it-star').parentElement.style.display = 'none';
+    }
+
     renderHeatmap();
     renderGroup();
     renderCharts();
@@ -635,6 +680,67 @@ function render() {
     fillList('actors-box', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
     fillList('countries-box', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
     fillBinges();
+}
+
+function renderRatingsDist() {
+    const canvas = document.getElementById('c-ratings-dist');
+    const ctx = canvas.getContext('2d');
+    if (chR) chR.destroy();
+    
+    const dist = D.ratings.distribution;
+    if (!dist || dist.length === 0) return;
+    
+    const c = cc();
+    const colors = [
+        '#e74c3c', '#e74c3c', '#e67e22', '#e67e22', 
+        '#f1c40f', '#f1c40f', '#3498db', '#3498db', 
+        '#2ecc71', '#2ecc71'
+    ];
+
+    chR = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+            datasets: [{
+                data: dist,
+                backgroundColor: colors,
+                borderRadius: 4,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 1000, easing: 'easeOutBack' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                    titleColor: isDark ? '#f0f6fc' : '#1f2328',
+                    bodyColor: isDark ? '#8b949e' : '#59636e',
+                    borderColor: c.b,
+                    borderWidth: 1,
+                    cornerRadius: 8,
+                    displayColors: false,
+                    callbacks: {
+                        title: (ctx) => `Оценка: ${ctx[0].label}`,
+                        label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, ['раз', 'раза', 'раз'])}`
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: c.t, font: { weight: 'bold' } }, grid: { display: false } },
+                y: { display: false, beginAtZero: true }
+            }
+        }
+    });
+}
+
+function getRatingColor(rating) {
+    if (rating >= 8.5) return 'linear-gradient(135deg, #2ecc71, #27ae60)';
+    if (rating >= 7.0) return 'linear-gradient(135deg, #60a5fa, #3b82f6)';
+    if (rating >= 5.5) return 'linear-gradient(135deg, #f1c40f, #d35400)';
+    return 'linear-gradient(135deg, #e74c3c, #c0392b)';
 }
 
 function renderYears() {
@@ -1319,7 +1425,12 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
         });
         document.getElementById('hist-title').textContent = 'Вся история просмотров';
         document.getElementById('ic-hist-type').innerHTML = Icons.dash;
-    } else if (type === 'day') {
+    } else if (type === 'ratings') {
+        data = D.ratings.history;
+        document.getElementById('hist-title').textContent = 'История оценок';
+        document.getElementById('ic-hist-type').innerHTML = Icons.star;
+        document.getElementById('ic-hist-type').style.color = '#f1c40f';
+    }  else if (type === 'day') {
         data = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate);
         document.getElementById('hist-title').textContent = extraDate;
         document.getElementById('ic-hist-type').innerHTML = Icons.cal;
@@ -1367,46 +1478,78 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
     data.forEach((item, idx) => {
         const delay = Math.min((idx + 1) * 0.03, 0.6); 
         
-        let metaHtml = '';
-        if (item.season_number !== undefined && item.season_number > 0) {
-            const s = item.season_number;
-            const e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
-            metaHtml += `<span class="hist-badge">s${s}e${e}</span>`;
+        if (type === 'ratings') {
+            const origTitle = item.original_title && item.original_title !== item.title 
+                ? `<div class="hist-orig">${item.original_title}</div>` : '';
+            const yearSuffix = item.year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.year})</span>` : '';
+            const poster = item.poster_url 
+                ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` 
+                : `<div class="hist-poster"></div>`;
             
-            if (item.user_rating) {
-                const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1);
-                metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`;
+            let seHtml = '';
+            if (item.season && item.episode) {
+                const e = item.episode < 10 ? '0' + item.episode : item.episode;
+                seHtml = `<span class="hist-badge">s${item.season}e${e}</span>`;
+            } else if (item.season !== undefined && item.season !== null && item.episode === null) {
+                seHtml = `<span class="hist-badge">Сериал</span>`;
             }
-            
-            if (item.user_show_rating) {
-                const rsVal = Number.isInteger(item.user_show_rating) ? item.user_show_rating : item.user_show_rating.toFixed(1);
-                metaHtml += `<span class="rating-badge show-lvl">(${rsVal})</span>`;
-            }
+
+            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
+            const rColor = getRatingColor(item.rating);
+
+            html += `
+            <div class="hist-item anim-item clickable" style="animation-delay:${delay}s; display:flex; align-items:center;">
+                ${poster}
+                <div class="hist-info" style="flex:1;">
+                    <div class="hist-title">${item.title}${yearSuffix}</div>
+                    ${origTitle}
+                    <div class="hist-meta" style="margin-bottom:4px;">${seHtml}</div>
+                    <div class="rating-time">${Icons.time} ${item.date}</div>
+                </div>
+                <div class="big-rating-badge" style="background: ${rColor};">${rVal}</div>
+            </div>`;
         } else {
-            if (item.user_rating) {
-                const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1);
-                metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`;
+            // ... (существующий код отрисовки обычной истории)
+            let metaHtml = '';
+            if (item.season_number !== undefined && item.season_number > 0) {
+                const s = item.season_number;
+                const e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
+                metaHtml += `<span class="hist-badge">s${s}e${e}</span>`;
+                
+                if (item.user_rating) {
+                    const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1);
+                    metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`;
+                }
+                
+                if (item.user_show_rating) {
+                    const rsVal = Number.isInteger(item.user_show_rating) ? item.user_show_rating : item.user_show_rating.toFixed(1);
+                    metaHtml += `<span class="rating-badge show-lvl">(${rsVal})</span>`;
+                }
+            } else {
+                if (item.user_rating) {
+                    const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1);
+                    metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`;
+                }
             }
+
+            const origTitle = item.show__original_title && item.show__original_title !== item.show__title 
+                ? `<div class="hist-orig">${item.show__original_title}</div>` : '';
+                
+            const yearSuffix = item.show__year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.show__year})</span>` : '';
+            const poster = item.poster_url 
+                ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` 
+                : `<div class="hist-poster"></div>`;
+
+            html += `
+            <div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">
+                ${poster}
+                <div class="hist-info">
+                    <div class="hist-title">${item.show__title}${yearSuffix}</div>
+                    ${origTitle}
+                    <div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>
+                </div>
+            </div>`;
         }
-
-        const origTitle = item.show__original_title && item.show__original_title !== item.show__title 
-            ? `<div class="hist-orig">${item.show__original_title}</div>` 
-            : '';
-            
-        const yearSuffix = item.show__year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.show__year})</span>` : '';
-        const poster = item.poster_url 
-            ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` 
-            : `<div class="hist-poster"></div>`;
-
-        html += `
-        <div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">
-            ${poster}
-            <div class="hist-info">
-                <div class="hist-title">${item.show__title}${yearSuffix}</div>
-                ${origTitle}
-                <div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>
-            </div>
-        </div>`;
     });
     html += '</div>';
     el.innerHTML = html;
