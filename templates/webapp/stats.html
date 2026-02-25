@@ -225,6 +225,29 @@
             gap: clamp(0px, 1.5vw, 4px);
             align-items: flex-start;
             container-type: inline-size;
+            transform-origin: left top;
+            transition: transform 0.1s ease-out;
+            will-change: transform;
+        }
+
+        #heatmaps-wrapper {
+            width: 100%;
+            overflow: auto;
+            position: relative;
+            border-radius: var(--radius);
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #hm-zoom-content {
+            transform-origin: 0 0;
+            transition: transform 0.1s ease-out;
+            width: 100%;
+            display: block;
+            will-change: transform;
+        }
+
+        .hm-zoom-area {
+            padding-bottom: 10px;
         }
 
         .hm-days {
@@ -644,9 +667,132 @@ function showToast(text) {
     }, 2000);
 }
 
+function initGlobalHeatmapZoom() {
+    const viewport = document.getElementById('heatmaps-wrapper');
+    const content = document.getElementById('hm-zoom-content');
+    if (!viewport || !content) return;
+
+    viewport.style.overflow = 'hidden';
+    viewport.style.touchAction = 'none'; 
+    content.style.transformOrigin = '0 0';
+
+    let scale = 1;
+    let translateX = 0;
+    let translateY = 0;
+
+    let startScale = 1;
+    let startDist = 0;
+    let startMidX = 0;
+    let startMidY = 0;
+    let startTranslateX = 0;
+    let startTranslateY = 0;
+
+    let isZooming = false;
+    let isPanning = false;
+
+    const updateTransform = () => {
+        content.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
+    };
+
+    viewport.addEventListener('touchstart', (e) => {
+        const t = e.touches;
+        if (t.length === 1) {
+            isPanning = true;
+            isZooming = false;
+            startMidX = t[0].clientX;
+            startMidY = t[0].clientY;
+            startTranslateX = translateX;
+            startTranslateY = translateY;
+        } else if (t.length === 2) {
+            isZooming = true;
+            isPanning = false;
+            startDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+            startScale = scale;
+            startMidX = (t[0].clientX + t[1].clientX) / 2;
+            startMidY = (t[0].clientY + t[1].clientY) / 2;
+            startTranslateX = translateX;
+            startTranslateY = translateY;
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchmove', (e) => {
+        const t = e.touches;
+        const rect = viewport.getBoundingClientRect();
+
+        if (isZooming && t.length === 2) {
+            e.preventDefault();
+            const currentDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+            const newScale = Math.min(Math.max(1, (currentDist / startDist) * startScale), 4);
+            
+            const currentMidX = (t[0].clientX + t[1].clientX) / 2;
+            const currentMidY = (t[0].clientY + t[1].clientY) / 2;
+
+            const mouseX = startMidX - rect.left;
+            const mouseY = startMidY - rect.top;
+
+            const scaleRatio = newScale / startScale;
+            translateX = currentMidX - rect.left - (mouseX - startTranslateX) * scaleRatio;
+            translateY = currentMidY - rect.top - (mouseY - startTranslateY) * scaleRatio;
+
+            scale = newScale;
+            updateTransform();
+        } 
+        else if (isPanning && t.length === 1) {
+            e.preventDefault();
+            const deltaX = t[0].clientX - startMidX;
+            const deltaY = t[0].clientY - startMidY;
+
+            translateX = startTranslateX + deltaX;
+            translateY = startTranslateY + deltaY;
+
+            // Ограничение перемещения (не даем уйти за границы контента)
+            if (scale > 1) {
+                const maxX = 0;
+                const minX = rect.width - (content.offsetWidth * scale);
+                const maxY = 0;
+                const minY = rect.height - (content.offsetHeight * scale);
+
+                translateX = Math.min(maxX, Math.max(minX, translateX));
+                translateY = Math.min(maxY, Math.max(minY, translateY));
+            } else {
+                // Если масштаб 1:1, запрещаем любое смещение
+                translateX = 0;
+                translateY = 0;
+            }
+
+            updateTransform();
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+            isZooming = false;
+            isPanning = false;
+            
+            if (scale < 1.01) {
+                scale = 1;
+                translateX = 0;
+                translateY = 0;
+                content.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
+                updateTransform();
+                setTimeout(() => content.style.transition = '', 300);
+            }
+        } else if (e.touches.length === 1) {
+            // Если один палец остался после зума, сбрасываем точку начала для панорамирования
+            isZooming = false;
+            isPanning = true;
+            startMidX = e.touches[0].clientX;
+            startMidY = e.touches[0].clientY;
+            startTranslateX = translateX;
+            startTranslateY = translateY;
+        }
+    }, { passive: true });
+}
+
 function renderHeatmap() {
     const el = document.getElementById('heatmaps-wrapper'); 
-    el.innerHTML = '';
+    el.innerHTML = '<div id="hm-zoom-content"></div>';
+    const zoomContent = document.getElementById('hm-zoom-content');
     
     if (!D.heatmap?.length) { 
         el.innerHTML = `<div class="empty"><div class="icon">${Icons.cal}</div>Выберите год</div>`; 
@@ -660,11 +806,10 @@ function renderHeatmap() {
         const yr = hItem.year;
         const data = hItem.data;
         const offset = (new Date(yr, 0, 1).getDay() + 6) % 7;
-        
-        const totalCells = offset + data.length;
-        const totalColumns = Math.ceil(totalCells / 7);
+        const totalColumns = Math.ceil((offset + data.length) / 7);
         
         const block = document.createElement('div');
+        block.className = 'hm-zoom-area';
         if (index > 0) block.style.marginTop = 'clamp(16px, 4vw, 20px)';
         
         if (D.heatmap.length > 1) {
@@ -732,7 +877,8 @@ function renderHeatmap() {
         fragment.appendChild(block);
     });
     
-    el.appendChild(fragment);
+    zoomContent.appendChild(fragment);
+    initGlobalHeatmapZoom();
 }
 
 function fillList(id, items, ico, unit, categoryKey) {
@@ -1068,6 +1214,16 @@ function renderDonut(canvasId, legendId, sourceData, dataKey, totalMinutesWatche
             cutout: '50%', 
             layout: { padding: 15 },
             animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' },
+            onHover: (event, activeElements) => {
+                event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default';
+            },
+            onClick: (event, activeElements) => {
+                if (activeElements.length > 0) {
+                    const index = activeElements[0].index;
+                    const item = top[index];
+                    openHistory('filter', null, null, item.name, dataKey, index);
+                }
+            },
             plugins: { 
                 datalabels: {
                     color: '#fff',
