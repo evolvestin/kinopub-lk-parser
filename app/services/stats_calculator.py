@@ -128,41 +128,44 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
 
 
 def _get_favorites(base_qs, dur_qs):
+    # Используем первичный ключ жанра для корректной группировки
     genres_qs = (
         base_qs.values(tid=F('show__genres__id'), name=F('show__genres__name'))
         .filter(tid__isnull=False)
-        .annotate(count=Count('id'))
+        .annotate(count=Count('id', distinct=True))
         .order_by('-count')
     )
     total_mentions = sum(g['count'] for g in genres_qs)
 
     genres = []
-    for g in genres_qs[:15]:
+    # Предварительно считаем суммы минут по жанрам отдельно, чтобы избежать JOIN-коллизий
+    # Группируем dur_qs, который уже содержит уникальные записи ViewHistory
+    genre_mins_map = {}
+    genre_durations = dur_qs.values('show__genres__name').annotate(m=Sum('final_duration'))
+    for gd in genre_durations:
+        if gd['show__genres__name']:
+            genre_mins_map[gd['show__genres__name']] = int((gd['m'] or 0) / 60)
+
+    for g in genres_qs[:20]: # Увеличиваем лимит до 20 для полноты картины
+        name = g['name']
         show_ids = list(
             base_qs.filter(show__genres__id=g['tid']).values_list('show_id', flat=True).distinct()
         )
         genres.append(
             {
-                'name': g['name'],
+                'name': name,
                 'count': g['count'],
-                'minutes': 0,
-                'percentage': round((g['count'] / total_mentions * 100), 1)
-                if total_mentions
-                else 0,
+                'minutes': genre_mins_map.get(name, 0),
+                'percentage': round((g['count'] / total_mentions * 100), 1) if total_mentions else 0,
                 'show_ids': show_ids,
             }
         )
-
-    genre_mins = dur_qs.values(name=F('show__genres__name')).annotate(m=Sum('final_duration') / 60)
-    mins_map = {gm['name']: int(gm['m'] or 0) for gm in genre_mins if gm['name']}
-    for g in genres:
-        g['minutes'] = mins_map.get(g['name'], 0)
 
     def get_person_top(field, limit=5):
         qs = (
             base_qs.values(tid=F(f'show__{field}__id'), name=F(f'show__{field}__name'))
             .filter(tid__isnull=False)
-            .annotate(views=Count('id'), shows_count=Count('show_id', distinct=True))
+            .annotate(views=Count('id', distinct=True), shows_count=Count('show_id', distinct=True))
             .order_by('-views')[:limit]
         )
         result = []
@@ -199,7 +202,7 @@ def _get_favorites(base_qs, dur_qs):
             emoji=F('show__countries__emoji_flag'),
         )
         .filter(tid__isnull=False)
-        .annotate(count=Count('id'))
+        .annotate(count=Count('id', distinct=True))
         .order_by('-count')[:5]
     )
 
@@ -371,14 +374,17 @@ def _get_weekday_chart(base_qs):
 
 
 def generate_user_stats(user, year=None):
-    cache_key = f'user_stats_v2:{user.id}:{year or "all"}'
+    cache_key = f'user_stats_v3:{user.id}:{year or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
 
-    base_qs = ViewHistory.objects.filter(users=user, is_checked=True).select_related('show')
+    # Чтобы избежать дублирования при JOINах, сначала получаем ID уникальных записей
+    history_ids = ViewHistory.objects.filter(users=user, is_checked=True)
     if year:
-        base_qs = base_qs.filter(view_date__year=year)
+        history_ids = history_ids.filter(view_date__year=year)
+    
+    base_qs = ViewHistory.objects.filter(id__in=Subquery(history_ids.values('id'))).select_related('show')
 
     episode_dur = ShowDuration.objects.filter(
         show_id=OuterRef('show_id'),
@@ -409,25 +415,12 @@ def generate_user_stats(user, year=None):
     )
 
     if summary['total_views'] == 0:
-        empty_result = {
-            'meta': {
-                'id': user.id,
-                'name': user.name or user.username,
-                'year': year,
-                'years': all_years,
-            },
-            'summary': summary,
-            'heatmap': [],
-            'genres': [],
-            'actors': [],
-            'countries': [],
-            'binges': [],
+        return {
+            'meta': {'id': user.id, 'name': user.name or user.username, 'year': year, 'years': all_years},
+            'summary': summary, 'heatmap': [], 'genres': [], 'actors': [], 'countries': [], 'binges': [],
             'monthly_chart': {'labels': [], 'views': [], 'hours': [], 'episodes': [], 'movies': []},
-            'weekday_chart': {'labels': [], 'data': []},
-            'history_movies': [],
-            'history_episodes': [],
+            'weekday_chart': {'labels': [], 'data': []}, 'history_movies': [], 'history_episodes': [],
         }
-        return empty_result
 
     favs = _get_favorites(base_qs, dur_qs)
     binge = _get_binge_records(base_qs)
@@ -439,28 +432,17 @@ def generate_user_stats(user, year=None):
     movies_history = list(
         base_qs.filter(season_number=0)
         .annotate(user_rating=Subquery(user_movie_rating))
-        .values(
-            'show_id',
-            'show__title',
-            'show__original_title',
-            'show__year',
-            'view_date',
-            'user_rating',
-        )
+        .values('show_id', 'show__title', 'show__original_title', 'show__year', 'view_date', 'user_rating')
         .order_by('-view_date', '-id')
     )
     for m in movies_history:
         m['view_date'] = m['view_date'].strftime('%Y-%m-%d')
-        m['show__title'] = m['show__title'] or m['show__original_title'] or 'Неизвестно'
         m['poster_url'] = get_poster_url(m['show_id'])
 
     user_ep_rating = UserRating.objects.filter(
-        user=user,
-        show_id=OuterRef('show_id'),
-        season_number=OuterRef('season_number'),
-        episode_number=OuterRef('episode_number'),
+        user=user, show_id=OuterRef('show_id'), season_number=OuterRef('season_number'), episode_number=OuterRef('episode_number')
     ).values('rating')[:1]
-
+    
     user_show_rating = UserRating.objects.filter(
         user=user, show_id=OuterRef('show_id'), season_number__isnull=True
     ).values('rating')[:1]
@@ -468,49 +450,27 @@ def generate_user_stats(user, year=None):
     episodes_history = list(
         base_qs.filter(season_number__gt=0)
         .annotate(user_rating=Subquery(user_ep_rating), user_show_rating=Subquery(user_show_rating))
-        .values(
-            'show_id',
-            'show__title',
-            'show__original_title',
-            'show__year',
-            'season_number',
-            'episode_number',
-            'view_date',
-            'user_rating',
-            'user_show_rating',
-        )
+        .values('show_id', 'show__title', 'show__original_title', 'show__year', 'season_number', 'episode_number', 'view_date', 'user_rating', 'user_show_rating')
         .order_by('-view_date', '-id')
     )
     for e in episodes_history:
         e['view_date'] = e['view_date'].strftime('%Y-%m-%d')
-        e['show__title'] = e['show__title'] or e['show__original_title'] or 'Неизвестно'
         e['poster_url'] = get_poster_url(e['show_id'])
 
     result = {
-        'meta': {
-            'id': user.id,
-            'name': user.name or user.username,
-            'year': year,
-            'years': all_years,
-        },
+        'meta': {'id': user.id, 'name': user.name or user.username, 'year': year, 'years': all_years},
         'summary': summary,
         'heatmap': _get_heatmap(dur_qs, year, all_years),
-        'genres': favs['genres'],
-        'actors': favs['actors'],
-        'countries': favs['countries'],
-        'binges': binge,
-        'monthly_chart': _get_monthly_chart(base_qs, dur_qs),
-        'weekday_chart': _get_weekday_chart(base_qs),
-        'history_movies': movies_history,
-        'history_episodes': episodes_history,
+        'genres': favs['genres'], 'actors': favs['actors'], 'countries': favs['countries'],
+        'binges': binge, 'monthly_chart': _get_monthly_chart(base_qs, dur_qs),
+        'weekday_chart': _get_weekday_chart(base_qs), 'history_movies': movies_history, 'history_episodes': episodes_history,
     }
-
     cache.set(cache_key, result, timeout=86400)
     return result
 
 
 def generate_group_stats(user, year=None):
-    cache_key = f'group_stats_v2:{user.id}:{year or "all"}'
+    cache_key = f'group_stats_v3:{user.id}:{year or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -522,17 +482,13 @@ def generate_group_stats(user, year=None):
     group = groups.first()
     group_users = list(group.users.all())
 
-    if len(group_users) <= 1:
-        return None
-
-    base_qs = (
-        ViewHistory.objects.filter(users__in=group_users, is_checked=True)
-        .distinct()
-        .select_related('show')
-    )
-
+    # ГАРАНТИРУЕМ УНИКАЛЬНОСТЬ: получаем ID записей, которые видел ХОТЯ БЫ ОДИН участник группы
+    history_ids = ViewHistory.objects.filter(users__in=group_users, is_checked=True)
     if year:
-        base_qs = base_qs.filter(view_date__year=year)
+        history_ids = history_ids.filter(view_date__year=year)
+    
+    # Строим base_qs строго по этим ID, чтобы исключить дублирование строк из-за M2M связи с пользователями
+    base_qs = ViewHistory.objects.filter(id__in=Subquery(history_ids.values('id'))).select_related('show')
 
     episode_dur = ShowDuration.objects.filter(
         show_id=OuterRef('show_id'),
@@ -565,29 +521,16 @@ def generate_group_stats(user, year=None):
     days, rem = divmod(total_seconds, 86400)
     hours, minutes = divmod(rem // 60, 60)
 
-    genres_qs = (
-        base_qs.values(name=F('show__genres__name'))
-        .filter(name__isnull=False)
-        .annotate(count=Count('id'))
-        .order_by('-count')[:5]
-    )
-    genre_mins = dur_qs.values(name=F('show__genres__name')).annotate(m=Sum('final_duration') / 60)
-    mins_map = {gm['name']: int(gm['m'] or 0) for gm in genre_mins if gm['name']}
-
-    genres = [
-        {'name': g['name'], 'count': g['count'], 'minutes': mins_map.get(g['name'], 0)}
-        for g in genres_qs
-    ]
+    favs = _get_favorites(base_qs, dur_qs)
 
     members = []
     for u in group_users:
-        u_views = base_qs.filter(users=u).count()
-        members.append(
-            {
-                'name': u.name or u.username or str(u.telegram_id),
-                'views': u_views,
-            }
-        )
+        # Для каждого участника считаем его вклад отдельно
+        u_views = history_ids.filter(users=u).count()
+        members.append({
+            'name': u.name or u.username or str(u.telegram_id),
+            'views': u_views,
+        })
     members.sort(key=lambda x: x['views'], reverse=True)
 
     result = {
@@ -601,7 +544,7 @@ def generate_group_stats(user, year=None):
         'total_minutes_watched': total_minutes,
         'duration_display': f'{days}д {hours}ч {minutes}м',
         'active_days': counts['active_days'],
-        'genres': genres,
+        'genres': favs['genres'],
     }
 
     cache.set(cache_key, result, timeout=86400)
