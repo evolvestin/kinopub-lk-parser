@@ -216,12 +216,12 @@
         .hc-label {
             display: flex;
             align-items: center;
-            /* Размер шрифта привязан к ширине контейнера для адаптивности */
             font-size: 1.8cqw;
             line-height: 1;
             font-weight: 800;
             color: var(--text-muted);
             user-select: none;
+            padding-right: 5px;
         }
         @media (max-width: 480px) {
             .hc-label { font-size: 7px; }
@@ -808,7 +808,6 @@ function renderHeatmap() {
     }
     
     const fragment = document.createDocumentFragment();
-    // Массив из 7 элементов для первого столбца
     const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
     
     D.heatmap.forEach((hItem, index) => {
@@ -836,10 +835,8 @@ function renderHeatmap() {
 
         const hm = document.createElement('div');
         hm.className = 'hm';
-        // Фиксируем ширину первой колонки, остальные minmax(0, 1fr) для втискивания в 100%
-        hm.style.gridTemplateColumns = `26px repeat(${totalColumns}, minmax(0, 1fr))`;
+        hm.style.gridTemplateColumns = `max-content repeat(${totalColumns}, minmax(0, 1fr))`;
         
-        // 1. Заполняем первую колонку (строго 7 ячеек)
         dayLabels.forEach(lbl => {
             const l = document.createElement('div');
             l.className = 'hc-label';
@@ -847,7 +844,6 @@ function renderHeatmap() {
             hm.appendChild(l);
         });
 
-        // 2. Заполняем отступ начала года (пустые ячейки) во второй и далее колонках
         for (let i = 0; i < offset; i++) { 
             const d = document.createElement('div'); 
             d.className = 'hc'; 
@@ -856,7 +852,6 @@ function renderHeatmap() {
             hm.appendChild(d); 
         }
         
-        // 3. Рендерим данные
         let curr = new Date(yr, 0, 1);
         data.forEach(v => { 
             const d = document.createElement('div'); 
@@ -878,17 +873,12 @@ function renderHeatmap() {
             curr.setDate(curr.getDate() + 1);
         });
         
-        // Если последний столбец не заполнился до конца (7 ячеек), 
-        // браузер сам разберется благодаря grid-auto-flow: column, 
-        // но для чистоты можно было бы добить пустыми. Однако это не требуется.
-
         wrapper.appendChild(hm);
         block.appendChild(wrapper);
         fragment.appendChild(block);
     });
     
     zoomContent.appendChild(fragment);
-    // Инициализацию зума оставляем, она не мешает, если пользователь захочет рассмотреть детали.
     initGlobalHeatmapZoom();
 }
 
