@@ -198,44 +198,59 @@
             display: grid;
             grid-template-rows: repeat(7, 1fr);
             grid-auto-flow: column;
-            gap: 0.4cqw;
+            /* Фиксированный минимальный зазор, чтобы не съедать полезное пространство */
+            gap: 1px;
             width: 100%;
+            /* Предотвращаем любые вылеты за пределы */
+            box-sizing: border-box;
         }
         .hc { 
             width: 100%; 
             aspect-ratio: 1 / 1; 
             border-radius: 15%; 
             background: var(--bg-input); 
-            transition: transform var(--transition-bounce), background var(--transition-smooth), box-shadow var(--transition-smooth);
+            transition: transform var(--transition-bounce), background var(--transition-smooth);
             cursor: crosshair; 
             position: relative;
+            /* Позволяет ячейке сжиматься до любого размера */
+            min-width: 0;
         }
-        @media (hover: hover) { .hc:hover { transform: scale(1.6); z-index: 10; box-shadow: 0 4px 8px rgba(0,0,0,0.3); border-radius: 10%; } }
-        .hc:active { transform: scale(1.6); z-index: 10; border-radius: 10%; }
+        .hc-label {
+            display: flex;
+            align-items: center;
+            /* Размер шрифта привязан к ширине контейнера для адаптивности */
+            font-size: 1.8cqw;
+            line-height: 1;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            user-select: none;
+            /* Гарантируем, что текст не переносится и не расширяет колонку */
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        @media (max-width: 480px) {
+            .hc-label { font-size: 7px; }
+        }
         
         .h1 { background: rgba(35, 134, 54, 0.3); } 
         .h2 { background: rgba(35, 134, 54, 0.6); } 
         .h3 { background: rgba(35, 134, 54, 0.85); } 
         .h4 { background: #39d353; box-shadow: 0 0 6px rgba(57, 211, 83, 0.3); }
         
-        .hm-leg { display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin-top: clamp(12px, 3.5vw, 16px); font-size: clamp(10px, 2.8vw, 12px); color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-        .hm-leg .hc { width: clamp(10px, 3vw, 12px); height: clamp(10px, 3vw, 12px); border-radius: 15%; cursor: default; }
+        .hm-leg { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 12px; font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+        .hm-leg .hc { width: 10px; height: 10px; border-radius: 15%; cursor: default; }
+        
         .hm-wrapper {
-            display: flex;
-            gap: clamp(0px, 1.5vw, 4px);
-            align-items: flex-start;
+            width: 100%;
             container-type: inline-size;
-            transform-origin: left top;
-            transition: transform 0.1s ease-out;
-            will-change: transform;
+            overflow: hidden;
         }
 
         #heatmaps-wrapper {
             width: 100%;
-            overflow: auto;
             position: relative;
             border-radius: var(--radius);
-            -webkit-overflow-scrolling: touch;
         }
 
         #hm-zoom-content {
@@ -800,6 +815,7 @@ function renderHeatmap() {
     }
     
     const fragment = document.createDocumentFragment();
+    // Массив из 7 элементов для первого столбца
     const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
     
     D.heatmap.forEach((hItem, index) => {
@@ -810,14 +826,14 @@ function renderHeatmap() {
         
         const block = document.createElement('div');
         block.className = 'hm-zoom-area';
-        if (index > 0) block.style.marginTop = 'clamp(16px, 4vw, 20px)';
+        if (index > 0) block.style.marginTop = '20px';
         
         if (D.heatmap.length > 1) {
             const title = document.createElement('div');
-            title.style.fontSize = 'clamp(13px, 3.5vw, 15px)';
+            title.style.fontSize = '13px';
             title.style.fontWeight = '800';
             title.style.color = 'var(--text-muted)';
-            title.style.marginBottom = 'clamp(6px, 2vw, 8px)';
+            title.style.marginBottom = '8px';
             title.textContent = yr;
             block.appendChild(title);
         }
@@ -825,23 +841,20 @@ function renderHeatmap() {
         const wrapper = document.createElement('div');
         wrapper.className = 'hm-wrapper';
 
-        const daysCol = document.createElement('div');
-        daysCol.className = 'hm-days';
-        dayLabels.forEach(lbl => {
-            const s = document.createElement('span');
-            s.textContent = lbl;
-            daysCol.appendChild(s);
-        });
-        wrapper.appendChild(daysCol);
-        
-        const container = document.createElement('div');
-        container.style.width = '100%';
-        container.style.overflow = 'hidden';
-        
         const hm = document.createElement('div');
         hm.className = 'hm';
-        hm.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
+        // Фиксируем ширину первой колонки, остальные minmax(0, 1fr) для втискивания в 100%
+        hm.style.gridTemplateColumns = `22px repeat(${totalColumns}, minmax(0, 1fr))`;
         
+        // 1. Заполняем первую колонку (строго 7 ячеек)
+        dayLabels.forEach(lbl => {
+            const l = document.createElement('div');
+            l.className = 'hc-label';
+            l.textContent = lbl;
+            hm.appendChild(l);
+        });
+
+        // 2. Заполняем отступ начала года (пустые ячейки) во второй и далее колонках
         for (let i = 0; i < offset; i++) { 
             const d = document.createElement('div'); 
             d.className = 'hc'; 
@@ -850,6 +863,7 @@ function renderHeatmap() {
             hm.appendChild(d); 
         }
         
+        // 3. Рендерим данные
         let curr = new Date(yr, 0, 1);
         data.forEach(v => { 
             const d = document.createElement('div'); 
@@ -871,13 +885,17 @@ function renderHeatmap() {
             curr.setDate(curr.getDate() + 1);
         });
         
-        container.appendChild(hm);
-        wrapper.appendChild(container);
+        // Если последний столбец не заполнился до конца (7 ячеек), 
+        // браузер сам разберется благодаря grid-auto-flow: column, 
+        // но для чистоты можно было бы добить пустыми. Однако это не требуется.
+
+        wrapper.appendChild(hm);
         block.appendChild(wrapper);
         fragment.appendChild(block);
     });
     
     zoomContent.appendChild(fragment);
+    // Инициализацию зума оставляем, она не мешает, если пользователь захочет рассмотреть детали.
     initGlobalHeatmapZoom();
 }
 
