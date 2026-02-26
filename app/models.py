@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
-
+import uuid
 from shared.constants import DATETIME_FORMAT, RATING_VALUES, UserRole
 from shared.formatters import format_se
 
@@ -322,3 +322,15 @@ class TelegramLog(BaseModel):
         chat_id = self.raw_data.get('chat_id', '?')
         msg_id = self.raw_data.get('message_id', '?')
         return f'[{direction}] {chat_id}:{msg_id}'
+
+
+class SharedStat(BaseModel):
+    id = models.CharField(max_length=50, primary_key=True, default=uuid.uuid4)
+    data = models.JSONField()
+
+    class Meta:
+        verbose_name = 'Shared Stat'
+        verbose_name_plural = 'Shared Stats'
+
+    def __str__(self):
+        return f"Snapshot {self.id}"

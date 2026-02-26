@@ -2,6 +2,8 @@ import functools
 import json
 import logging
 import uuid
+import uuid
+from app.models import SharedStat
 
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
@@ -893,4 +895,84 @@ def webapp_get_detailed_stats(request):
 
     except Exception as e:
         logging.error(f'WebApp Stats Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_bake_stats(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+        
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        try:
+            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        except ViewUser.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        config = body.get('config', {})
+        years = config.get('years', [])
+        anon_user = config.get('anon_user', False)
+        include_group = config.get('include_group', True)
+        anon_group = config.get('anon_group', False)
+
+        if not years:
+            years = ['all']
+
+        baked_data = {}
+        for yr in years:
+            year_val = None if yr == 'all' else yr
+            
+            stat = generate_user_stats(view_user, year=year_val)
+            stat = json.loads(json.dumps(stat))
+
+            if anon_user:
+                stat['meta']['name'] = 'Аноним'
+                stat['meta']['is_anonymous'] = True
+
+            if include_group:
+                group_stats = generate_group_stats(view_user, year=year_val)
+                if group_stats:
+                    group_stats = json.loads(json.dumps(group_stats))
+                    if anon_group:
+                        group_stats['group_name'] = 'Группа'
+                        for idx, member in enumerate(group_stats['members'], 1):
+                            member['name'] = f'Участник {idx}'
+                    stat['group'] = group_stats
+            elif 'group' in stat:
+                del stat['group']
+
+            baked_data[str(yr)] = stat
+
+        stat_id = uuid.uuid4().hex[:12]
+        
+        SharedStat.objects.create(
+            id=stat_id, 
+            data={
+                "metadata": {"years": years}, 
+                "data": baked_data
+            }
+        )
+
+        return JsonResponse({"id": stat_id})
+
+    except Exception as e:
+        logging.error(f'WebApp Bake Stats Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def webapp_get_shared_stats(request, stat_id):
+    try:
+        shared_stat = SharedStat.objects.get(id=stat_id)
+        return JsonResponse(shared_stat.data)
+    except SharedStat.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)
+    except Exception as e:
+        logging.error(f'WebApp Shared Stats Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)

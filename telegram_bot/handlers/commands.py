@@ -27,6 +27,30 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
     args = command.args if command else None
 
     if args:
+        if args.startswith('stat_'):
+            stat_id = args.replace('stat_', '')
+            dynamic_url = URLStore().get_url()
+            base_url = (
+                dynamic_url
+                or os.getenv('WEBAPP_PUBLIC_URL')
+                or os.getenv('BACKEND_URL')
+                or 'http://localhost:8000'
+            )
+            
+            # Для DEV-режима формируем кнопку WebApp с shared_id в URL
+            web_app_url = f"{base_url.rstrip('/')}/webapp/?shared_id={stat_id}"
+            
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📊 Посмотреть статистику", web_app=WebAppInfo(url=web_app_url))]
+            ])
+            
+            await sender.send_message(
+                chat_id=user.id,
+                text=f"📂 {bold('Получен доступ к общей статистике')}\n\nНажмите на кнопку ниже для просмотра.",
+                keyboard=keyboard
+            )
+            return
+
         if args.startswith('toggle_claim_'):
             try:
                 parts = args.split('_')

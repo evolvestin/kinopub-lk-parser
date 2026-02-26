@@ -2,8 +2,10 @@ import hashlib
 import os
 
 import client
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
     InlineQuery,
     InlineQueryResultArticle,
     InputTextMessageContent,
@@ -18,7 +20,45 @@ from shared.html_helper import bold
 router = Router()
 
 
-@router.inline_query()
+@router.inline_query(F.query.startswith('share_'))
+async def inline_share_handler(query: InlineQuery):
+    stat_id = query.query.replace('share_', '').strip()
+    if not stat_id:
+        return
+
+    bot_username = await BotInstance().get_bot_username()
+    env = os.getenv('ENVIRONMENT', 'DEV')
+    
+    # На проде используем прямой запуск Mini App (требует настройки в BotFather)
+    # Формат: https://t.me/bot_username/app_name?startapp=query
+    if env == 'PROD':
+        app_name = os.getenv('WEBAPP_SHORT_NAME', 'stats')
+        url = f"https://t.me/{bot_username}/{app_name}?startapp=stat_{stat_id}"
+        btn_text = "Открыть статистику"
+    else:
+        # В DEV режиме (туннель) идем через Deep Link бота, чтобы избежать BOT_INVALID
+        url = f"https://t.me/{bot_username}?start=stat_{stat_id}"
+        btn_text = "Перейти к статистике"
+
+    article = InlineQueryResultArticle(
+        id=f"share_{stat_id}",
+        title="Поделиться статистикой",
+        description="Нажмите, чтобы отправить статистику",
+        thumbnail_url="https://img.icons8.com/color/96/combo-chart--v1.png",
+        input_message_content=InputTextMessageContent(
+            message_text=f"📊 {bold('Смотри мою статистику!')}",
+            parse_mode="HTML",
+            link_preview_options=LinkPreviewOptions(is_disabled=True)
+        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=btn_text, url=url)]
+        ])
+    )
+
+    await query.answer([article], cache_time=10, is_personal=False)
+
+
+@router.inline_query(~F.query.startswith('share_'))
 async def inline_search_handler(query: InlineQuery):
     text = query.query.strip()
     user_id = query.from_user.id

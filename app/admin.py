@@ -25,7 +25,6 @@ from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 from redis import Redis
 
-# Импортируем нашу кастомную админку
 from app.admin_site import admin_site
 from app.models import (
     Code,
@@ -40,6 +39,7 @@ from app.models import (
     ViewHistory,
     ViewUser,
     ViewUserGroup,
+    SharedStat,
 )
 from app.telegram_bot import TelegramSender
 from app.views import sync_user_permissions
@@ -1164,3 +1164,13 @@ class TelegramLogAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return True
+
+
+@admin.register(SharedStat, site=admin_site)
+class SharedStatAdmin(admin.ModelAdmin):
+    list_display = ('id', 'created_at')
+    readonly_fields = ('id', 'created_at', 'updated_at', 'formatted_data')
+
+    @admin.display(description='Data')
+    def formatted_data(self, obj):
+        return format_html('<pre>{}</pre>', json.dumps(obj.data, indent=2, ensure_ascii=False))

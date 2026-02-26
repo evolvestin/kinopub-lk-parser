@@ -98,15 +98,17 @@
         .header-name { font-size: clamp(20px, 6vw, 24px); font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; line-height: 1.2; }
         .header-sub  { font-size: clamp(12px, 3.5vw, 14px); color: var(--accent); font-weight: 600; margin-top: 2px; }
         
-        .theme-btn {
+        .top-controls { display: flex; gap: 8px; }
+
+        .theme-btn, .share-btn {
             width: clamp(36px, 10vw, 44px); height: clamp(36px, 10vw, 44px); border-radius: 50%;
             background: var(--bg-input); border: 1px solid var(--border);
             display: flex; align-items: center; justify-content: center;
             cursor: pointer; color: var(--text-primary); transition: transform var(--transition-bounce), background var(--transition-smooth);
             box-shadow: var(--shadow-sm);
         }
-        .theme-btn:active { transform: scale(0.85) rotate(45deg); }
-        .theme-btn .icon { font-size: clamp(18px, 5vw, 22px); line-height: 1; }
+        .theme-btn:active, .share-btn:active { transform: scale(0.85); }
+        .theme-btn .icon, .share-btn .icon { font-size: clamp(18px, 5vw, 22px); line-height: 1; }
 
         .tabs { display: flex; gap: clamp(8px, 2vw, 12px); padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .tabs::-webkit-scrollbar { display: none; }
@@ -132,24 +134,12 @@
         .yr:not(.on):active { transform: scale(0.92); }
 
         .label {
-            display: flex;
-            align-items: center;
-            gap: clamp(6px, 2vw, 8px);
-            font-size: clamp(12px, 3.5vw, 14px);
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-secondary);
-            padding: clamp(12px, 3vw, 16px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px);
+            display: flex; align-items: center; gap: clamp(6px, 2vw, 8px);
+            font-size: clamp(12px, 3.5vw, 14px); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+            color: var(--text-secondary); padding: clamp(12px, 3vw, 16px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px);
         }
-        .card .label {
-            padding: 0;
-            font-size: clamp(14px, 4vw, 16px);
-            color: var(--text-primary);
-        }
-        .card .label.more-pad {
-            padding: 0 0 clamp(4px, 4vw, 8px) 0;
-        }
+        .card .label { padding: 0; font-size: clamp(14px, 4vw, 16px); color: var(--text-primary); }
+        .card .label.more-pad { padding: 0 0 clamp(4px, 4vw, 8px) 0; }
         .label .icon { font-size: clamp(16px, 4.5vw, 18px); line-height: 1; color: var(--accent); }
 
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 3vw, 16px); padding: 0 clamp(16px, 4vw, 20px) clamp(8px, 2.5vw, 12px); }
@@ -176,15 +166,6 @@
         }
         .stat.clickable:hover::after { border-color: var(--accent); transform: rotate(45deg) translate(2px, -2px); opacity: 1; }
 
-        .g-row { margin-bottom: clamp(12px, 3.5vw, 16px); }
-        .g-hdr { display: flex; justify-content: space-between; font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; margin-bottom: clamp(6px, 2vw, 8px); }
-        .g-name { color: var(--text-primary); }
-        .g-time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
-        .g-track { height: clamp(6px, 2vw, 8px); background: var(--bg-input); border-radius: 4px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
-        .g-fill  { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--info)); transition: width 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative; overflow: hidden; }
-        .g-fill::after { content:''; position: absolute; top:0; left:0; right:0; bottom:0; background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%); animation: shimmer 2s infinite; }
-        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
-
         .li { display: flex; align-items: center; justify-content: space-between; padding: clamp(12px, 3.5vw, 16px) 0; border-bottom: 1px dashed var(--border); }
         .li:last-child { border: none; }
         .li-clickable {
@@ -196,102 +177,77 @@
         }
         .li-l { display: flex; align-items: center; gap: clamp(12px, 3vw, 16px); min-width: 0; flex: 1; }
         .li-r { font-size: clamp(14px, 4vw, 16px); font-weight: 800; color: var(--text-primary); flex-shrink: 0; margin-left: 12px; text-align: right; font-variant-numeric: tabular-nums; }
-        .li-rank { 
-            font-size: clamp(14px, 4vw, 16px); 
-            font-weight: 800; 
-            color: var(--text-secondary); 
-            width: clamp(24px, 6vw, 28px); 
-            text-align: center; 
-            flex-shrink: 0; 
-            opacity: 0.8;
-        }
+        .li-rank { font-size: clamp(14px, 4vw, 16px); font-weight: 800; color: var(--text-secondary); width: clamp(24px, 6vw, 28px); text-align: center; flex-shrink: 0; opacity: 0.8; }
         .li-name { display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); font-size: clamp(14px, 4vw, 16px); font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .li-sub  { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); margin-top: 4px; font-weight: 500; }
 
-        .hm {
-            display: grid;
-            grid-template-rows: repeat(7, 1fr);
-            grid-auto-flow: column;
-            /* Фиксированный минимальный зазор, чтобы не съедать полезное пространство */
-            gap: 1px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .hc { 
-            width: 100%; 
-            aspect-ratio: 1 / 1; 
-            border-radius: 15%; 
-            background: var(--bg-input); 
-            transition: transform var(--transition-bounce), background var(--transition-smooth);
-            cursor: crosshair; 
-            position: relative;
-            min-width: 0;
-        }
-        .hc-label {
-            display: flex;
-            align-items: center;
-            font-size: 1.8cqw;
-            line-height: 1;
-            font-weight: 800;
-            color: var(--text-muted);
-            user-select: none;
-            padding-right: 5px;
-        }
-        @media (max-width: 480px) {
-            .hc-label { font-size: 7px; }
-        }
-        
-        .h1 { background: rgba(35, 134, 54, 0.3); } 
-        .h2 { background: rgba(35, 134, 54, 0.6); } 
-        .h3 { background: rgba(35, 134, 54, 0.85); } 
-        .h4 { background: #39d353; box-shadow: 0 0 6px rgba(57, 211, 83, 0.3); }
-        
-        .hm-leg { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 12px; font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
-        .hm-leg .hc { width: 10px; height: 10px; border-radius: 15%; cursor: default; }
-        
-        .hm-wrapper {
-            width: 100%;
-            container-type: inline-size;
-            overflow: hidden;
-        }
-
-        #heatmaps-wrapper {
-            width: 100%;
-            position: relative;
-        }
-
-        #hm-zoom-content {
-            transform-origin: 0 0;
-            transition: transform 0.1s ease-out;
-            width: 100%;
-            display: block;
-            will-change: transform;
-        }
-
-        .hm-zoom-area {
-            padding-bottom: 10px;
-        }
-
-        .hm-days {
-            display: grid;
-            grid-template-rows: repeat(7, 1fr);
-            gap: 0.35cqw;
-            font-size: 1.5cqw;
-            font-weight: 900;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            line-height: 1;
-            flex-shrink: 0;
-        }
-
-        .hm-days span {
-            height: 100%;
-            display: flex;
-            align-items: center;
-        }
-
         .chart-box { position: relative; width: 100%; height: 320px; margin: 0 auto; }
 
+        .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(32px, 9vw, 48px) clamp(16px, 4vw, 20px); color: var(--text-muted); font-size: clamp(14px, 4vw, 16px); font-weight: 600; text-align: center; }
+        .empty .icon { font-size: clamp(36px, 10vw, 48px); line-height: 1; margin-bottom: clamp(12px, 3.5vw, 16px); opacity: 0.3; }
+
+        .loader { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: opacity 0.4s ease; }
+        .light .loader { background: rgba(246, 248, 250, 0.8); }
+        .spinner { width: clamp(32px, 9vw, 48px); height: clamp(32px, 9vw, 48px); border: 4px solid var(--bg-input); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .sec { display: none; opacity: 0; transition: opacity var(--transition-smooth); }
+        .sec.vis { display: block; opacity: 1; }
+        .hidden { display: none !important; opacity: 0; pointer-events: none; }
+
+        @keyframes slideInUp { 0% { opacity: 0; transform: translateY(20px) scale(0.97); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes slideInRight { 0% { opacity: 0; transform: translateX(-15px); } 100% { opacity: 1; transform: translateX(0); } }
+        .anim-item { animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .anim-list-item { animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+        svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; flex-shrink: 0; fill: currentColor; }
+
+        /* HEATMAP CSS */
+        .hm { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; gap: 1px; width: 100%; box-sizing: border-box; }
+        .hc { width: 100%; aspect-ratio: 1 / 1; border-radius: 15%; background: var(--bg-input); transition: transform var(--transition-bounce), background var(--transition-smooth); cursor: crosshair; position: relative; min-width: 0; }
+        .hc-label { display: flex; align-items: center; font-size: 1.8cqw; line-height: 1; font-weight: 800; color: var(--text-muted); user-select: none; padding-right: 5px; }
+        @media (max-width: 480px) { .hc-label { font-size: 7px; } }
+        .h1 { background: rgba(35, 134, 54, 0.3); } .h2 { background: rgba(35, 134, 54, 0.6); } .h3 { background: rgba(35, 134, 54, 0.85); } .h4 { background: #39d353; box-shadow: 0 0 6px rgba(57, 211, 83, 0.3); }
+        .hm-leg { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 12px; font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
+        .hm-leg .hc { width: 10px; height: 10px; border-radius: 15%; cursor: default; }
+        .hm-wrapper { width: 100%; container-type: inline-size; overflow: hidden; }
+        #heatmaps-wrapper { width: 100%; position: relative; }
+        #hm-zoom-content { transform-origin: 0 0; transition: transform 0.1s ease-out; width: 100%; display: block; will-change: transform; }
+        .hm-zoom-area { padding-bottom: 10px; }
+        
+        /* OTHERS */
+        .hist-item { display: flex; gap: clamp(12px, 3.5vw, 16px); padding: clamp(12px, 3.5vw, 16px) clamp(16px, 4vw, 20px); border-bottom: 1px solid var(--border); transition: background var(--transition-smooth); }
+        .hist-item:last-child { border: none; }
+        .hist-poster { width: clamp(48px, 14vw, 60px); height: clamp(72px, 21vw, 90px); border-radius: 8px; object-fit: cover; background: var(--bg-input); flex-shrink: 0; border: 1px solid var(--border); transition: transform var(--transition-bounce); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .hist-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+        .hist-title { font-size: clamp(15px, 4.2vw, 18px); font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-bottom: 2px; }
+        .hist-orig { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
+        .hist-meta { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-secondary); display: flex; gap: clamp(8px, 2.5vw, 12px); align-items: center; flex-wrap: wrap; font-weight: 600; }
+        .hist-badge { background: var(--bg-input); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; font-size: clamp(11px, 3vw, 13px); font-weight: 800; color: var(--text-primary); border: 1px solid var(--border); letter-spacing: 0.5px; }
+        .rating-badge { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 800; font-size: clamp(12px, 3.2vw, 14px); background: var(--accent-dim); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; }
+        .rating-badge.show-lvl { color: var(--text-primary); background: var(--bg-input); }
+        .rating-badge svg { font-size: clamp(14px, 3.8vw, 16px); margin-top: -2px; }
+        .big-rating-badge { display: flex; align-items: center; justify-content: center; width: clamp(40px, 11vw, 48px); height: clamp(40px, 11vw, 48px); border-radius: 12px; font-size: clamp(16px, 4.5vw, 18px); font-weight: 900; color: #fff; flex-shrink: 0; box-shadow: var(--shadow-sm); }
+        .glow-text { text-shadow: 0 0 12px rgba(255,255,255,0.2); }
+        .critic-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; padding-top: 10px;}
+        .critic-title-box { display: flex; flex-direction: column;}
+        .critic-badge { display: inline-flex; align-items: center; gap: 6px; font-size: clamp(12px, 3.2vw, 14px); font-weight: 800; padding: 4px 10px; border-radius: 8px; width: fit-content; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;}
+        .critic-avg { font-size: clamp(32px, 8vw, 42px); font-weight: 900; line-height: 1; display: flex; align-items: baseline; gap: 4px; }
+        .critic-avg span { font-size: clamp(14px, 4vw, 16px); color: var(--text-muted); font-weight: 700; }
+        .critic-total { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-muted); font-weight: 600; text-align: right; }
+        .rating-time { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); font-weight: 500; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+
+        .legend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 20px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: all var(--transition-smooth); }
+        .legend-item:hover { border-color: var(--accent); transform: translateY(-2px); background: var(--bg-card); }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .legend-name { font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .legend-val { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-left: auto; }
+        
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--bg-input); color: var(--text-primary); padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 700; border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 1000; transition: transform var(--transition-bounce), opacity var(--transition-smooth); opacity: 0; pointer-events: none; white-space: nowrap; }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        /* Group Compare styling */
         .cmp { display: flex; justify-content: space-between; align-items: center; padding: clamp(10px, 3vw, 12px) 0; border-bottom: 1px dashed var(--border); }
         .cmp:last-child { border: none; }
         .cmp-lb { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-secondary); font-weight: 700; display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); }
@@ -310,133 +266,87 @@
         .mb-f { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--info), #a371f7); transition: width 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .mb-c { font-size: clamp(12px, 3.2vw, 14px); font-weight: 800; color: var(--text-muted); width: clamp(32px, 9vw, 40px); flex-shrink: 0; text-align: right; }
 
-        .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(32px, 9vw, 48px) clamp(16px, 4vw, 20px); color: var(--text-muted); font-size: clamp(14px, 4vw, 16px); font-weight: 600; text-align: center; }
-        .empty .icon { font-size: clamp(36px, 10vw, 48px); line-height: 1; margin-bottom: clamp(12px, 3.5vw, 16px); opacity: 0.3; }
-
-        .loader { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: opacity 0.4s ease; }
-        .light .loader { background: rgba(246, 248, 250, 0.8); }
-        .spinner { width: clamp(32px, 9vw, 48px); height: clamp(32px, 9vw, 48px); border: 4px solid var(--bg-input); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .sec { display: none; opacity: 0; transition: opacity var(--transition-smooth); }
-        .sec.vis { display: block; opacity: 1; }
-        .hidden { display: none !important; opacity: 0; pointer-events: none; }
-
-        @keyframes slideInUp {
-            0% { opacity: 0; transform: translateY(20px) scale(0.97); }
-            100% { opacity: 1; transform: translateY(0) scale(1); }
+        /* SHARE MODAL STYLES */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+            z-index: 1000; display: flex; align-items: flex-end; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
         }
-        @keyframes slideInRight {
-            0% { opacity: 0; transform: translateX(-15px); }
-            100% { opacity: 1; transform: translateX(0); }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background: var(--bg-card); width: 100%; max-width: 500px;
+            border-radius: 24px 24px 0 0; padding: 24px;
+            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            border-top: 1px solid var(--border); box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+            max-height: 90vh; overflow-y: auto;
         }
-        .anim-item { animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
-        .anim-list-item { animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
-
-        svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; flex-shrink: 0; fill: currentColor; }
+        .modal-overlay.show .modal-content { transform: translateY(0); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 20px; font-weight: 800; color: var(--text-primary); }
+        .modal-close { background: var(--bg-input); border: none; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
+        .modal-close:hover { background: var(--border); color: var(--text-primary); }
+        .share-section-title { font-size: 14px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin: 20px 0 10px; letter-spacing: 0.5px; }
+        .share-opts { display: flex; flex-direction: column; gap: 12px; }
         
-        .hist-item { display: flex; gap: clamp(12px, 3.5vw, 16px); padding: clamp(12px, 3.5vw, 16px) clamp(16px, 4vw, 20px); border-bottom: 1px solid var(--border); transition: background var(--transition-smooth); }
-        .hist-item:last-child { border: none; }
-        .hist-poster { width: clamp(48px, 14vw, 60px); height: clamp(72px, 21vw, 90px); border-radius: 8px; object-fit: cover; background: var(--bg-input); flex-shrink: 0; border: 1px solid var(--border); transition: transform var(--transition-bounce); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        .hist-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-        .hist-title { font-size: clamp(15px, 4.2vw, 18px); font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-bottom: 2px; }
-        .hist-orig { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
-        .hist-meta { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-secondary); display: flex; gap: clamp(8px, 2.5vw, 12px); align-items: center; flex-wrap: wrap; font-weight: 600; }
-        .hist-badge { background: var(--bg-input); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; font-size: clamp(11px, 3vw, 13px); font-weight: 800; color: var(--text-primary); border: 1px solid var(--border); letter-spacing: 0.5px; }
-        .rating-badge { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 800; font-size: clamp(12px, 3.2vw, 14px); background: var(--accent-dim); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; }
-        .rating-badge.show-lvl { color: var(--text-primary); background: var(--bg-input); }
-        .rating-badge svg { font-size: clamp(14px, 3.8vw, 16px); margin-top: -2px; }
+        .chk-row { display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
+        .chk-box {
+            width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--border);
+            display: flex; justify-content: center; align-items: center; background: var(--bg-input);
+            transition: all 0.2s; flex-shrink: 0;
+        }
+        .chk-row input:checked + .chk-box { background: var(--accent); border-color: var(--accent); }
+        .chk-row input:checked + .chk-box::after { content: ''; width: 6px; height: 10px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -2px; }
+        .chk-row input { display: none; }
+        .chk-text { font-size: 15px; font-weight: 600; color: var(--text-primary); }
         
-        .glow-text { text-shadow: 0 0 12px rgba(255,255,255,0.2); }
-
-        .critic-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; padding-top: 10px;}
-        .critic-title-box { display: flex; flex-direction: column;}
-        .critic-badge { display: inline-flex; align-items: center; gap: 6px; font-size: clamp(12px, 3.2vw, 14px); font-weight: 800; padding: 4px 10px; border-radius: 8px; width: fit-content; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;}
-        .critic-avg { 
-            font-size: clamp(32px, 8vw, 42px); 
-            font-weight: 900; 
-            line-height: 1; 
-            display: flex; 
-            align-items: baseline; 
-            gap: 4px; 
+        .years-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; }
+        .yr-chk-btn {
+            background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted);
+            border-radius: 10px; padding: 8px 0; text-align: center; font-weight: 700; font-size: 14px;
+            cursor: pointer; transition: all 0.2s; user-select: none;
         }
-        .critic-avg span { font-size: clamp(14px, 4vw, 16px); color: var(--text-muted); font-weight: 700; }
-        .critic-total { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-muted); font-weight: 600; text-align: right; }
-        .rating-time { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); font-weight: 500; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+        .yr-chk-input { display: none; }
+        .yr-chk-input:checked + .yr-chk-btn { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
-        /* Внутри .hist-meta или просто рядом */
-        .big-rating-badge { display: flex; align-items: center; justify-content: center; width: clamp(40px, 11vw, 48px); height: clamp(40px, 11vw, 48px); border-radius: 12px; font-size: clamp(16px, 4.5vw, 18px); font-weight: 900; color: #fff; flex-shrink: 0; box-shadow: var(--shadow-sm); }
+        .btn-primary {
+            width: 100%; background: var(--accent); color: #fff; border: none; padding: 16px; border-radius: 16px;
+            font-size: 16px; font-weight: 800; margin-top: 30px; cursor: pointer; box-shadow: var(--shadow-glow);
+            transition: transform 0.2s, background 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px;
+        }
+        .btn-primary:active { transform: scale(0.96); background: var(--accent-hover); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
-        .legend-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            margin-top: 20px;
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 10px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all var(--transition-smooth);
-        }
-        .legend-item:hover {
-            border-color: var(--accent);
-            transform: translateY(-2px);
+        /* Shared mode banner */
+        .shared-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
             background: var(--bg-card);
-        }
-        .legend-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .legend-name {
+            background-image: linear-gradient(var(--info-dim), var(--info-dim));
+            color: var(--info);
+            padding: 12px 16px;
             font-size: 13px;
             font-weight: 700;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
-        .legend-val {
-            font-size: 11px;
-            color: var(--text-muted);
-            font-weight: 600;
-            margin-left: auto;
-        }
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: var(--bg-input);
-            color: var(--text-primary);
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 700;
-            border: 1px solid var(--border);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-            z-index: 1000;
-            transition: transform var(--transition-bounce), opacity var(--transition-smooth);
-            opacity: 0;
-            pointer-events: none;
-            white-space: nowrap;
-        }
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
+
+        body.has-banner #app {
+            margin-top: 50px;
         }
     </style>
 </head>
-<body class="min-h-screen">
+<body>
     <div class="loader" id="loader"><div class="spinner"></div></div>
-
+    <div id="shared-banner-container"></div>
     <div id="app" class="hidden">
         <div class="header">
             <div class="header-left">
@@ -446,7 +356,12 @@
                     <div class="header-sub" id="period-label"></div>
                 </div>
             </div>
-            <button class="theme-btn" id="theme-btn" onclick="toggleTheme()"></button>
+            <div class="top-controls">
+                <button class="share-btn" id="share-btn" onclick="openShareModal()">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                </button>
+                <button class="theme-btn" id="theme-btn" onclick="toggleTheme()"></button>
+            </div>
         </div>
 
         <div class="tabs" id="main-tabs">
@@ -559,6 +474,43 @@
         </div>
     </div>
 
+    <!-- SHARE MODAL -->
+    <div class="modal-overlay" id="share-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Поделиться статистикой</div>
+                <button class="modal-close" onclick="closeShareModal()">×</button>
+            </div>
+            
+            <div class="share-section-title">Годы для экспорта</div>
+            <div class="years-grid" id="share-years-grid"></div>
+
+            <div class="share-section-title">Конфиденциальность</div>
+            <div class="share-opts">
+                <label class="chk-row">
+                    <input type="checkbox" id="sh-anon-user">
+                    <div class="chk-box"></div>
+                    <span class="chk-text">Скрыть мой профиль (Аноним)</span>
+                </label>
+                <label class="chk-row" id="sh-group-wrap">
+                    <input type="checkbox" id="sh-inc-group" checked onchange="toggleGroupOpts()">
+                    <div class="chk-box"></div>
+                    <span class="chk-text">Включить вкладку "Группа"</span>
+                </label>
+                <label class="chk-row" id="sh-anon-group-wrap" style="padding-left:34px;">
+                    <input type="checkbox" id="sh-anon-group">
+                    <div class="chk-box"></div>
+                    <span class="chk-text">Скрыть имена участников группы</span>
+                </label>
+            </div>
+
+            <button class="btn-primary" id="btn-do-share" onclick="submitShare()">
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                Создать ссылку
+            </button>
+        </div>
+    </div>
+
 <script>
 const Icons = {
     moon: '<svg viewBox="0 0 512 512"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
@@ -591,12 +543,17 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 const tg = window.Telegram?.WebApp;
-if (tg) tg.expand();
+if (tg) {
+    tg.expand();
+}
 
 let chR = null;
 let D = null, curYear = null, isDark = true;
 let chM = null, chW = null, chG = {}, lastScrollPos = 0;
 
+let isSharedMode = false;
+let SharedDataMap = {};
+let availableYears = [];
 
 function toggleTheme() {
     isDark = !isDark;
@@ -606,7 +563,12 @@ function toggleTheme() {
     if (D) renderCharts();
 }
 (function initTheme() {
-    if (localStorage.getItem('kt') === 'l') { isDark = false; document.body.classList.add('light'); }
+    if (tg && tg.colorScheme === 'light') isDark = false;
+    const stored = localStorage.getItem('kt');
+    if (stored === 'l') isDark = false;
+    if (stored === 'd') isDark = true;
+    
+    if (!isDark) document.body.classList.add('light');
     document.addEventListener("DOMContentLoaded", () => document.getElementById('theme-btn').innerHTML = isDark ? Icons.moon : Icons.sun);
 })();
 
@@ -614,15 +576,51 @@ function cc() {
     const t = isDark ? 'rgba(229, 231, 235, .8)' : 'rgba(31, 35, 40, .8)';
     const g = isDark ? 'rgba(255, 255, 255, .05)' : 'rgba(0, 0, 0, .05)';
     const b = isDark ? '#2d333b' : '#d0d7de';
-    return { 
-        t, 
-        g, 
-        b, 
-        a: '#2ecc71', 
-        ab: isDark ? 'rgba(46, 204, 113, .2)' : 'rgba(46, 204, 113, .15)', 
-        i: '#60a5fa', 
-        ib: isDark ? 'rgba(96, 165, 250, .2)' : 'rgba(96, 165, 250, .15)' 
-    };
+    return { t, g, b, a: '#2ecc71', ab: isDark ? 'rgba(46, 204, 113, .2)' : 'rgba(46, 204, 113, .15)', i: '#60a5fa', ib: isDark ? 'rgba(96, 165, 250, .2)' : 'rgba(96, 165, 250, .15)' };
+}
+
+async function init() {
+    const startParam = tg?.initDataUnsafe?.start_param || '';
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedIdFromUrl = urlParams.get('shared_id');
+
+        if (sharedIdFromUrl || startParam.startsWith('stat_')) {
+        isSharedMode = true;
+        document.body.classList.add('has-banner');
+        
+        document.getElementById('share-btn').classList.add('hidden');
+        const bannerContainer = document.getElementById('shared-banner-container');
+        bannerContainer.innerHTML = `<div class="shared-banner"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Вы просматриваете чужую статистику</div>`;
+        
+        const sid = sharedIdFromUrl || startParam.replace('stat_', '');
+        await loadShared(sid);
+    } else {
+        await load();
+    }
+}
+
+async function loadShared(statId) {
+    document.getElementById('loader').classList.remove('hidden');
+    try {
+        const r = await fetch(`/api/webapp/shared_stats/${statId}/`);
+        const j = await r.json();
+        if (!r.ok || j.error) { 
+            document.body.innerHTML = `<div style="padding: 40px; text-align:center; font-size: 18px; color: var(--text-primary);">❌ Слепок не найден или удален.</div>`;
+            return; 
+        }
+        
+        SharedDataMap = j.data;
+        availableYears = j.metadata.years;
+        curYear = availableYears[0];
+        D = SharedDataMap[curYear];
+        
+        render();
+    } catch(e) { 
+        console.error(e); 
+        document.body.innerHTML = `<div style="padding: 40px; text-align:center; font-size: 18px; color: var(--text-primary);">❌ Ошибка загрузки.</div>`;
+    } finally {
+        hideLoader();
+    }
 }
 
 async function load(year) {
@@ -635,13 +633,20 @@ async function load(year) {
         const j = await r.json();
         if (!r.ok || j.error) { console.error('API error:', j); alert('Ошибка: '+(j.error||'Неизвестная')); return; }
         D = j;
+        if (!availableYears.length && D.meta?.years) {
+            availableYears = [...D.meta.years];
+        }
         render();
     } catch(e) { console.error('Load error:', e); alert('Ошибка сети'); }
     finally { 
-        document.getElementById('loader').style.opacity = '0';
-        setTimeout(() => document.getElementById('loader').classList.add('hidden'), 400);
-        document.getElementById('app').classList.remove('hidden'); 
+        hideLoader();
     }
+}
+
+function hideLoader() {
+    document.getElementById('loader').style.opacity = '0';
+    setTimeout(() => document.getElementById('loader').classList.add('hidden'), 400);
+    document.getElementById('app').classList.remove('hidden'); 
 }
 
 function plural(n, forms) {
@@ -657,10 +662,15 @@ function render() {
     if (!D?.meta) return;
     const n = D.meta.name || 'Пользователь';
     document.getElementById('user-name').textContent = n;
-    const u = tg?.initDataUnsafe?.user;
+    
     const avEl = document.getElementById('avatar');
-    if (u && u.photo_url) avEl.innerHTML = `<img src="${u.photo_url}" alt="A">`;
-    else avEl.textContent = n.charAt(0).toUpperCase();
+    if (D.meta.is_anonymous) {
+        avEl.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><line x1="4" y1="4" x2="20" y2="20" stroke="rgba(255,255,255,0.3)"></line></svg>`;
+    } else {
+        const u = tg?.initDataUnsafe?.user;
+        if (!isSharedMode && u && u.photo_url) avEl.innerHTML = `<img src="${u.photo_url}" alt="A">`;
+        else avEl.textContent = n.charAt(0).toUpperCase();
+    }
 
     document.getElementById('period-label').textContent = D.summary?.period_label || '';
     renderYears();
@@ -686,17 +696,13 @@ function render() {
         document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
         document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
         document.getElementById('s-ep').textContent = vEp;
-        
         const epLbl = document.getElementById('s-ep').nextElementSibling;
         if (epLbl) epLbl.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
-        
         const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
         document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
         document.getElementById('s-mov').textContent = vMov;
-        
         const movLbl = document.getElementById('s-mov').nextElementSibling;
         if (movLbl) movLbl.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
-        
         document.getElementById('s-uni').textContent = s.movies_duration || '0м';
     }
 
@@ -741,25 +747,18 @@ function render() {
     toggle('ratings-box', hasRatings);
 
     if (hasRatings) {
-        const ratingPalette = [
-            '#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', 
-            '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'
-        ];
+        const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
         const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
         const scoreColor = ratingPalette[colorIdx];
-
         const avgEl = document.getElementById('cr-avg');
         avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
         avgEl.style.color = scoreColor;
-
         document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
-        
         const badge = document.getElementById('cr-badge');
         if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.background = 'rgba(46, 204, 113, 0.15)'; badge.style.color = '#2ecc71'; }
         else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.background = 'rgba(56, 139, 253, 0.15)'; badge.style.color = '#60a5fa'; }
         else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.background = 'rgba(210, 153, 34, 0.15)'; badge.style.color = '#d29922'; }
         else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
-        
         renderRatingsDist();
     }
 
@@ -776,78 +775,24 @@ function renderRatingsDist() {
     const canvas = document.getElementById('c-ratings-dist');
     const ctx = canvas.getContext('2d');
     if (chR) chR.destroy();
-    
     const dist = D.ratings.distribution;
     if (!dist || dist.length === 0) return;
-    
     const c = cc();
-    
-    const ratingPalette = [
-        '#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', 
-        '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'
-    ];
+    const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
 
     chR = new Chart(ctx, {
         type: 'bar',
-        data: {
-            labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
-            datasets: [{
-                data: dist,
-                backgroundColor: ratingPalette,
-                hoverBackgroundColor: ratingPalette,
-                borderRadius: 6,
-                borderSkipped: false,
-                borderWidth: 0
-            }]
-        },
+        data: { labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], datasets: [{ data: dist, backgroundColor: ratingPalette, hoverBackgroundColor: ratingPalette, borderRadius: 6, borderSkipped: false, borderWidth: 0 }] },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: {
-                duration: 1000,
-                easing: 'easeOutBack',
-                delay: (context) => {
-                    let delay = 0;
-                    if (context.type === 'data' && context.mode === 'default' && !context.active) {
-                        delay = context.dataIndex * 80;
-                    }
-                    return delay;
-                }
-            },
-            onHover: (event, activeElements) => {
-                event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default';
-            },
-            onClick: (event, activeElements) => {
-                if (activeElements.length > 0) {
-                    const index = activeElements[0].index;
-                    const ratingBucket = index + 1;
-                    openHistory('rating_filter', null, null, null, null, ratingBucket);
-                }
-            },
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: 1000, easing: 'easeOutBack', delay: (context) => context.type === 'data' && context.mode === 'default' && !context.active ? context.dataIndex * 80 : 0 },
+            onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; },
+            onClick: (event, activeElements) => { if (activeElements.length > 0) openHistory('rating_filter', null, null, null, null, activeElements[0].index + 1); },
             plugins: {
                 legend: { display: false },
-                tooltip: {
-                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                    titleColor: isDark ? '#f0f6fc' : '#1f2328',
-                    bodyColor: isDark ? '#8b949e' : '#59636e',
-                    borderColor: c.b,
-                    borderWidth: 1,
-                    cornerRadius: 10,
-                    padding: 12,
-                    displayColors: false,
-                    callbacks: {
-                        title: (ctx) => `Оценка: ${ctx[0].label}`,
-                        label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, ['оценка', 'оценки', 'оценок'])}`
-                    }
-                }
+                tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { title: (ctx) => `Оценка: ${ctx[0].label}`, label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, ['оценка', 'оценки', 'оценок'])}` } }
             },
-            scales: {
-                x: { 
-                    ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, 
-                    grid: { display: false } 
-                },
-                y: { display: false, beginAtZero: true }
-            }
+            scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { display: false, beginAtZero: true } }
         }
     });
 }
@@ -861,48 +806,53 @@ function getRatingColor(rating) {
 
 function renderYears() {
     const c = document.getElementById('years');
-    const yrs = D.meta?.years || [];
+    const yrs = isSharedMode ? availableYears : (D.meta?.years || []);
     
-    if (yrs.length === 0) {
+    if (yrs.length <= 1) {
         c.classList.add('hidden');
         return;
     }
-    
     c.classList.remove('hidden');
 
-    if (curYear && curYear !== 'all' && yrs.length && !yrs.includes(curYear)) {
-        curYear = yrs[0];
+    let h = '';
+    if (!isSharedMode || yrs.includes('all')) {
+        h += '<button class="yr clickable" onclick="pickYear(\'all\')">Всё время</button>';
     }
-    let h = '<button class="yr clickable" onclick="pickYear(\'all\')">Всё время</button>';
-    yrs.forEach(y => { h += `<button class="yr clickable" onclick="pickYear(${y})">${y}</button>`; });
+    
+    yrs.filter(y => y !== 'all').forEach(y => { 
+        h += `<button class="yr clickable" onclick="pickYear('${y}')">${y}</button>`; 
+    });
     c.innerHTML = h;
     markYear();
 }
+
 function markYear() {
     document.querySelectorAll('#years .yr').forEach(b => {
         const v = b.textContent.trim();
-        const isAll = !curYear || curYear === 'all';
-        b.classList.toggle('on', isAll ? v === 'Всё время' : String(curYear) === v);
+        const isAllTime = curYear === 'all' || !curYear;
+        const targetStr = isAllTime ? 'Всё время' : String(curYear);
+        b.classList.toggle('on', v === targetStr);
     });
 }
-window.pickYear = y => { curYear = y; markYear(); load(y === 'all' ? 'all' : y); };
+
+window.pickYear = y => { 
+    curYear = y; 
+    markYear(); 
+    if (isSharedMode) {
+        D = SharedDataMap[y];
+        render();
+    } else {
+        load(y); 
+    }
+};
 
 let toastTimer = null;
 function showToast(text) {
     let el = document.getElementById('toast-msg');
-    if (!el) {
-        el = document.createElement('div');
-        el.id = 'toast-msg';
-        el.className = 'toast';
-        document.body.appendChild(el);
-    }
-    el.textContent = text;
-    el.classList.add('show');
-    
+    if (!el) { el = document.createElement('div'); el.id = 'toast-msg'; el.className = 'toast'; document.body.appendChild(el); }
+    el.textContent = text; el.classList.add('show');
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-        el.classList.remove('show');
-    }, 2000);
+    toastTimer = setTimeout(() => { el.classList.remove('show'); }, 2000);
 }
 
 function initGlobalHeatmapZoom() {
@@ -914,115 +864,48 @@ function initGlobalHeatmapZoom() {
     viewport.style.touchAction = 'none'; 
     content.style.transformOrigin = '0 0';
 
-    let scale = 1;
-    let translateX = 0;
-    let translateY = 0;
+    let scale = 1, translateX = 0, translateY = 0;
+    let startScale = 1, startDist = 0, startMidX = 0, startMidY = 0, startTranslateX = 0, startTranslateY = 0;
+    let isZooming = false, isPanning = false;
 
-    let startScale = 1;
-    let startDist = 0;
-    let startMidX = 0;
-    let startMidY = 0;
-    let startTranslateX = 0;
-    let startTranslateY = 0;
-
-    let isZooming = false;
-    let isPanning = false;
-
-    const updateTransform = () => {
-        content.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`;
-    };
+    const updateTransform = () => { content.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`; };
 
     viewport.addEventListener('touchstart', (e) => {
         const t = e.touches;
-        if (t.length === 1) {
-            isPanning = true;
-            isZooming = false;
-            startMidX = t[0].clientX;
-            startMidY = t[0].clientY;
-            startTranslateX = translateX;
-            startTranslateY = translateY;
-        } else if (t.length === 2) {
-            isZooming = true;
-            isPanning = false;
-            startDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
-            startScale = scale;
-            startMidX = (t[0].clientX + t[1].clientX) / 2;
-            startMidY = (t[0].clientY + t[1].clientY) / 2;
-            startTranslateX = translateX;
-            startTranslateY = translateY;
-        }
+        if (t.length === 1) { isPanning = true; isZooming = false; startMidX = t[0].clientX; startMidY = t[0].clientY; startTranslateX = translateX; startTranslateY = translateY; } 
+        else if (t.length === 2) { isZooming = true; isPanning = false; startDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY); startScale = scale; startMidX = (t[0].clientX + t[1].clientX) / 2; startMidY = (t[0].clientY + t[1].clientY) / 2; startTranslateX = translateX; startTranslateY = translateY; }
     }, { passive: false });
 
     viewport.addEventListener('touchmove', (e) => {
-        const t = e.touches;
-        const rect = viewport.getBoundingClientRect();
-
+        const t = e.touches; const rect = viewport.getBoundingClientRect();
         if (isZooming && t.length === 2) {
             e.preventDefault();
             const currentDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
             const newScale = Math.min(Math.max(1, (currentDist / startDist) * startScale), 4);
-            
-            const currentMidX = (t[0].clientX + t[1].clientX) / 2;
-            const currentMidY = (t[0].clientY + t[1].clientY) / 2;
-
-            const mouseX = startMidX - rect.left;
-            const mouseY = startMidY - rect.top;
-
+            const currentMidX = (t[0].clientX + t[1].clientX) / 2, currentMidY = (t[0].clientY + t[1].clientY) / 2;
+            const mouseX = startMidX - rect.left, mouseY = startMidY - rect.top;
             const scaleRatio = newScale / startScale;
             translateX = currentMidX - rect.left - (mouseX - startTranslateX) * scaleRatio;
             translateY = currentMidY - rect.top - (mouseY - startTranslateY) * scaleRatio;
-
-            scale = newScale;
-            updateTransform();
-        } 
-        else if (isPanning && t.length === 1) {
+            scale = newScale; updateTransform();
+        } else if (isPanning && t.length === 1) {
             e.preventDefault();
-            const deltaX = t[0].clientX - startMidX;
-            const deltaY = t[0].clientY - startMidY;
-
-            translateX = startTranslateX + deltaX;
-            translateY = startTranslateY + deltaY;
-
-            // Ограничение перемещения (не даем уйти за границы контента)
+            const deltaX = t[0].clientX - startMidX, deltaY = t[0].clientY - startMidY;
+            translateX = startTranslateX + deltaX; translateY = startTranslateY + deltaY;
             if (scale > 1) {
-                const maxX = 0;
-                const minX = rect.width - (content.offsetWidth * scale);
-                const maxY = 0;
-                const minY = rect.height - (content.offsetHeight * scale);
-
-                translateX = Math.min(maxX, Math.max(minX, translateX));
-                translateY = Math.min(maxY, Math.max(minY, translateY));
-            } else {
-                // Если масштаб 1:1, запрещаем любое смещение
-                translateX = 0;
-                translateY = 0;
-            }
-
+                const minX = rect.width - (content.offsetWidth * scale), minY = rect.height - (content.offsetHeight * scale);
+                translateX = Math.min(0, Math.max(minX, translateX)); translateY = Math.min(0, Math.max(minY, translateY));
+            } else { translateX = 0; translateY = 0; }
             updateTransform();
         }
     }, { passive: false });
 
     viewport.addEventListener('touchend', (e) => {
         if (e.touches.length === 0) {
-            isZooming = false;
-            isPanning = false;
-            
-            if (scale < 1.01) {
-                scale = 1;
-                translateX = 0;
-                translateY = 0;
-                content.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)';
-                updateTransform();
-                setTimeout(() => content.style.transition = '', 300);
-            }
+            isZooming = false; isPanning = false;
+            if (scale < 1.01) { scale = 1; translateX = 0; translateY = 0; content.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)'; updateTransform(); setTimeout(() => content.style.transition = '', 300); }
         } else if (e.touches.length === 1) {
-            // Если один палец остался после зума, сбрасываем точку начала для панорамирования
-            isZooming = false;
-            isPanning = true;
-            startMidX = e.touches[0].clientX;
-            startMidY = e.touches[0].clientY;
-            startTranslateX = translateX;
-            startTranslateY = translateY;
+            isZooming = false; isPanning = true; startMidX = e.touches[0].clientX; startMidY = e.touches[0].clientY; startTranslateX = translateX; startTranslateY = translateY;
         }
     }, { passive: true });
 }
@@ -1031,118 +914,48 @@ function renderHeatmap() {
     const el = document.getElementById('heatmaps-wrapper'); 
     el.innerHTML = '<div id="hm-zoom-content"></div>';
     const zoomContent = document.getElementById('hm-zoom-content');
-    
-    if (!D.heatmap?.length) { 
-        el.innerHTML = `<div class="empty"><div class="icon">${Icons.cal}</div>Нет данных</div>`; 
-        return; 
-    }
+    if (!D.heatmap?.length) { el.innerHTML = `<div class="empty"><div class="icon">${Icons.cal}</div>Нет данных</div>`; return; }
     
     const fragment = document.createDocumentFragment();
     const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
     
     D.heatmap.forEach((hItem, index) => {
-        const yr = hItem.year;
-        const data = hItem.data;
-        const offset = (new Date(yr, 0, 1).getDay() + 6) % 7;
-        const totalColumns = Math.ceil((offset + data.length) / 7);
-        
-        const block = document.createElement('div');
-        block.className = 'hm-zoom-area';
-        if (index > 0) block.style.marginTop = '20px';
-        
+        const yr = hItem.year; const data = hItem.data; const offset = (new Date(yr, 0, 1).getDay() + 6) % 7; const totalColumns = Math.ceil((offset + data.length) / 7);
+        const block = document.createElement('div'); block.className = 'hm-zoom-area'; if (index > 0) block.style.marginTop = '20px';
         if (D.heatmap.length > 1) {
-            const title = document.createElement('div');
-            title.style.fontSize = '13px';
-            title.style.fontWeight = '800';
-            title.style.color = 'var(--text-muted)';
-            title.style.marginBottom = '8px';
-            title.textContent = yr;
-            block.appendChild(title);
+            const title = document.createElement('div'); title.style.fontSize = '13px'; title.style.fontWeight = '800'; title.style.color = 'var(--text-muted)'; title.style.marginBottom = '8px'; title.textContent = yr; block.appendChild(title);
         }
+        const wrapper = document.createElement('div'); wrapper.className = 'hm-wrapper';
+        const hm = document.createElement('div'); hm.className = 'hm'; hm.style.gridTemplateColumns = `max-content repeat(${totalColumns}, minmax(0, 1fr))`;
         
-        const wrapper = document.createElement('div');
-        wrapper.className = 'hm-wrapper';
-
-        const hm = document.createElement('div');
-        hm.className = 'hm';
-        hm.style.gridTemplateColumns = `max-content repeat(${totalColumns}, minmax(0, 1fr))`;
-        
-        dayLabels.forEach(lbl => {
-            const l = document.createElement('div');
-            l.className = 'hc-label';
-            l.textContent = lbl;
-            hm.appendChild(l);
-        });
-
-        for (let i = 0; i < offset; i++) { 
-            const d = document.createElement('div'); 
-            d.className = 'hc'; 
-            d.style.opacity = '0';
-            d.style.pointerEvents = 'none';
-            hm.appendChild(d); 
-        }
+        dayLabels.forEach(lbl => { const l = document.createElement('div'); l.className = 'hc-label'; l.textContent = lbl; hm.appendChild(l); });
+        for (let i = 0; i < offset; i++) { const d = document.createElement('div'); d.className = 'hc'; d.style.opacity = '0'; d.style.pointerEvents = 'none'; hm.appendChild(d); }
         
         let curr = new Date(yr, 0, 1);
         data.forEach(v => { 
             const d = document.createElement('div'); 
-            const y = curr.getFullYear();
-            const m = String(curr.getMonth() + 1).padStart(2, '0');
-            const day = String(curr.getDate()).padStart(2, '0');
-            const currStr = `${y}-${m}-${day}`;
-            const displayDate = `${day}.${m}.${y}`;
-
+            const y = curr.getFullYear(), m = String(curr.getMonth() + 1).padStart(2, '0'), day = String(curr.getDate()).padStart(2, '0');
+            const currStr = `${y}-${m}-${day}`, displayDate = `${day}.${m}.${y}`;
             d.className = 'hc clickable' + (v ? ' h' + v : ''); 
-
-            if (v > 0) {
-                d.setAttribute('onclick', `openHistory('day', null, '${currStr}', '${currStr}')`);
-            } else {
-                d.setAttribute('onclick', `showToast('${displayDate}: просмотров нет')`);
-            }
-
-            hm.appendChild(d); 
-            curr.setDate(curr.getDate() + 1);
+            if (v > 0) { d.setAttribute('onclick', `openHistory('day', null, '${currStr}', '${currStr}')`); } else { d.setAttribute('onclick', `showToast('${displayDate}: просмотров нет')`); }
+            hm.appendChild(d); curr.setDate(curr.getDate() + 1);
         });
-        
-        wrapper.appendChild(hm);
-        block.appendChild(wrapper);
-        fragment.appendChild(block);
+        wrapper.appendChild(hm); block.appendChild(wrapper); fragment.appendChild(block);
     });
-    
-    zoomContent.appendChild(fragment);
-    initGlobalHeatmapZoom();
+    zoomContent.appendChild(fragment); initGlobalHeatmapZoom();
 }
 
 function fillList(id, items, ico, unit, categoryKey) {
     const el = document.getElementById(id);
     if (!items?.length) return;
-    
     let html = '';
     items.forEach((it, i) => {
-        const cnt = it.count || it.views || 0;
-        const sub = it.sub || (it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
+        const cnt = it.count || it.views || 0, sub = it.sub || (it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
         const lbl = Array.isArray(unit) ? `${cnt} ${plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
         const delay = (i + 1) * 0.05;
-        
-        let visual = '';
-        if (it.emoji) {
-            visual = `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>`;
-        } else if (ico) {
-            visual = `<div class="icon" style="color:var(--text-muted)">${ico}</div>`;
-        }
-        
+        let visual = it.emoji ? `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>` : (ico ? `<div class="icon" style="color:var(--text-muted)">${ico}</div>` : '');
         const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-        const onclick = `onclick="openHistory('filter', null, null, '${safeName}', '${categoryKey}', ${i})"`;
-        
-        html += `<div class="li li-clickable anim-list-item clickable" ${onclick} style="animation-delay:${delay}s">
-            <div class="li-l">
-                <span class="li-rank">${i+1}</span>
-                <div>
-                    <div class="li-name">${visual} ${it.name}</div>
-                    ${sub?`<div class="li-sub">${sub}</div>`:''}
-                </div>
-            </div>
-            <span class="li-r" style="color:var(--info)">${lbl}</span>
-        </div>`;
+        html += `<div class="li li-clickable anim-list-item clickable" onclick="openHistory('filter', null, null, '${safeName}', '${categoryKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
     });
     el.innerHTML = html;
 }
@@ -1150,381 +963,76 @@ function fillList(id, items, ico, unit, categoryKey) {
 function fillBinges() {
     const el = document.getElementById('binges-list');
     if (!D.binges?.length) return;
-    
     let html = '';
     D.binges.forEach((b, i) => {
-        const delay = (i + 1) * 0.05;
-        const safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-        
-        const posterHtml = b.poster_url 
-            ? `<img src="${b.poster_url}" style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.1);" onerror="this.style.display='none'">`
-            : `<div style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
-            
-        html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')">
-            <div class="li-l">
-                ${posterHtml}
-                <div>
-                    <div class="li-name">${b.show_title}</div>
-                    <div class="li-sub">${b.date}</div>
-                </div>
-            </div>
-            <span class="li-r" style="color:var(--info)">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span>
-        </div>`;
+        const delay = (i + 1) * 0.05, safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const posterHtml = b.poster_url ? `<img src="${b.poster_url}" style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.1);" onerror="this.style.display='none'">` : `<div style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
+        html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')"><div class="li-l">${posterHtml}<div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r" style="color:var(--info)">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span></div>`;
     });
     el.innerHTML = html;
 }
 
 function renderCharts() { 
-    renderMonthly(); 
-    renderWeekday(); 
+    renderMonthly(); renderWeekday(); 
     renderDonut('c-genre', 'legend-genre', D.genres, 'genres_top', D.summary.total_minutes_watched);
-    if (D.group) {
-        renderDonut('c-group-genre', 'legend-group-genre', D.group.genres, 'group_genres_top', D.group.total_minutes_watched);
-    }
+    if (D.group) renderDonut('c-group-genre', 'legend-group-genre', D.group.genres, 'group_genres_top', D.group.total_minutes_watched);
 }
 
 const fSizeAx = Math.max(10, Math.min(13, window.innerWidth * 0.03));
-const fSizeTi = Math.max(12, Math.min(15, window.innerWidth * 0.035));
-
-function getCtxGradient(ctx, colorStart, colorEnd) {
-    let gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, colorStart);
-    gradient.addColorStop(1, colorEnd);
-    return gradient;
-}
+function getCtxGradient(ctx, colorStart, colorEnd) { let gradient = ctx.createLinearGradient(0, 0, 0, 400); gradient.addColorStop(0, colorStart); gradient.addColorStop(1, colorEnd); return gradient; }
 
 function renderMonthly() {
-    const canvas = document.getElementById('c-monthly');
-    const ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('c-monthly'), ctx = canvas.getContext('2d');
     if (chM) chM.destroy();
     const ch = D.monthly_chart; if (!ch?.labels?.length) return;
     const c = cc();
-    
-    let fillGradient = getCtxGradient(ctx, isDark?'rgba(35, 134, 54, 0.4)':'rgba(46, 160, 67, 0.3)', 'rgba(35, 134, 54, 0.0)');
-    let lineGradient = ctx.createLinearGradient(0, 0, canvas.width || 400, 0);
-    lineGradient.addColorStop(0, '#2ea043');
-    lineGradient.addColorStop(1, '#3fb950');
-
+    let fillGradient = getCtxGradient(ctx, isDark?'rgba(35, 134, 54, 0.4)':'rgba(46, 160, 67, 0.3)', 'rgba(35, 134, 54, 0.0)'), lineGradient = ctx.createLinearGradient(0, 0, canvas.width || 400, 0);
+    lineGradient.addColorStop(0, '#2ea043'); lineGradient.addColorStop(1, '#3fb950');
     chM = new Chart(ctx, { 
         type:'line', 
-        data:{ 
-            labels:ch.labels, 
-            datasets:[
-                { 
-                    label: ' Просмотры',
-                    data: ch.views, 
-                    backgroundColor: fillGradient, 
-                    borderColor: lineGradient, 
-                    borderWidth: 3, 
-                    tension: 0.4, 
-                    fill: true,
-                    yAxisID: 'y',
-                    pointBackgroundColor: isDark ? '#0d1117' : '#ffffff',
-                    pointBorderColor: '#3fb950',
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                },
-                {
-                    label: ' Часы',
-                    data: ch.hours, 
-                    backgroundColor: 'transparent', 
-                    borderColor: c.i, 
-                    borderWidth: 2, 
-                    borderDash: [5, 5],
-                    tension: 0.4, 
-                    fill: false,
-                    yAxisID: 'y1',
-                    pointBackgroundColor: isDark ? '#0d1117' : '#ffffff',
-                    pointBorderColor: c.i,
-                    pointRadius: 0,
-                    pointHoverRadius: 5
-                }
-            ] 
-        },
-        options:{ 
-            responsive:true, 
-            maintainAspectRatio:false, 
-            animation: { duration: 1500, easing: 'easeOutQuart' },
-            plugins:{ 
-                legend: { 
-                    display: true, 
-                    position: 'top', 
-                    labels: { 
-                        color: c.t, 
-                        usePointStyle: true, 
-                        boxWidth: 8, 
-                        padding: 15,
-                        font: { size: fSizeAx, family: 'system-ui' } 
-                    } 
-                },
-                tooltip: {
-                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                    titleColor: isDark ? '#f0f6fc' : '#1f2328',
-                    bodyColor: isDark ? '#8b949e' : '#59636e',
-                    borderColor: c.b,
-                    borderWidth: 1,
-                    padding: 12,
-                    cornerRadius: 8,
-                    displayColors: true,
-                    boxPadding: 6,
-                    bodySpacing: 8,
-                    titleSpacing: 10
-                }
-            },
-            interaction: { mode: 'index', intersect: false },
-            scales:{ 
-                x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} },
-                y:{ 
-                    type: 'linear', display: true, position: 'left',
-                    ticks:{color:c.a,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true 
-                },
-                y1: {
-                    type: 'linear', display: true, position: 'right',
-                    ticks:{color:c.i,font:{size:fSizeAx}}, grid:{drawOnChartArea: false}, beginAtZero:true
-                }
-            } 
-        } 
+        data:{ labels:ch.labels, datasets:[{ label: ' Просмотры', data: ch.views, backgroundColor: fillGradient, borderColor: lineGradient, borderWidth: 3, tension: 0.4, fill: true, yAxisID: 'y', pointBackgroundColor: isDark ? '#0d1117' : '#ffffff', pointBorderColor: '#3fb950', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6 }, { label: ' Часы', data: ch.hours, backgroundColor: 'transparent', borderColor: c.i, borderWidth: 2, borderDash: [5, 5], tension: 0.4, fill: false, yAxisID: 'y1', pointBackgroundColor: isDark ? '#0d1117' : '#ffffff', pointBorderColor: c.i, pointRadius: 0, pointHoverRadius: 5 }] },
+        options:{ responsive:true, maintainAspectRatio:false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins:{ legend: { display: true, position: 'top', labels: { color: c.t, usePointStyle: true, boxWidth: 8, padding: 15, font: { size: fSizeAx, family: 'system-ui' } } }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, padding: 12, cornerRadius: 8, displayColors: true, boxPadding: 6, bodySpacing: 8, titleSpacing: 10 } }, interaction: { mode: 'index', intersect: false }, scales:{ x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} }, y:{ type: 'linear', display: true, position: 'left', ticks:{color:c.a,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true }, y1: { type: 'linear', display: true, position: 'right', ticks:{color:c.i,font:{size:fSizeAx}}, grid:{drawOnChartArea: false}, beginAtZero:true } } } 
     });
 }
 
 function renderWeekday() {
-    const canvas = document.getElementById('c-weekday');
-    const ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('c-weekday'), ctx = canvas.getContext('2d');
     if (chW) chW.destroy();
     const ch = D.weekday_chart; if (!ch?.labels?.length) return;
-    const c = cc();
-    
-    const totalViews = ch.data.reduce((a, b) => a + b, 0);
-    
-    let barGradient = getCtxGradient(ctx, '#2ea043', '#238636');
-    let weGradient = getCtxGradient(ctx, '#388bfd', '#1f6feb');
-
+    const c = cc(), totalViews = ch.data.reduce((a, b) => a + b, 0);
+    let barGradient = getCtxGradient(ctx, '#2ea043', '#238636'), weGradient = getCtxGradient(ctx, '#388bfd', '#1f6feb');
     chW = new Chart(ctx, { 
         type: 'bar', 
-        data: { 
-            labels: ch.labels, 
-            datasets: [{ 
-                data: ch.data,
-                backgroundColor: ch.data.map((_, i) => i >= 5 ? weGradient : barGradient),
-                hoverBackgroundColor: ch.data.map((_, i) => i >= 5 ? '#60a5fa' : '#39d353'),
-                borderRadius: 8, 
-                borderSkipped: false,
-                borderWidth: 0,
-                hoverBorderWidth: 0
-            }] 
-        },
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            animation: {
-                duration: 1000,
-                easing: 'easeOutBack',
-                delay: (context) => {
-                    let delay = 0;
-                    if (context.type === 'data' && context.mode === 'default' && !context.active) {
-                        delay = context.dataIndex * 100;
-                    }
-                    return delay;
-                }
-            },
-            plugins: { 
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                    titleColor: isDark ? '#f0f6fc' : '#1f2328',
-                    bodyColor: isDark ? '#8b949e' : '#59636e',
-                    borderColor: c.b,
-                    borderWidth: 1,
-                    cornerRadius: 10,
-                    padding: 12,
-                    displayColors: false,
-                    callbacks: {
-                        label: (context) => {
-                            const val = context.parsed.y;
-                            const pct = totalViews > 0 ? Math.round((val / totalViews) * 100) : 0;
-                            return ` ${val} ${plural(val, ['просмотр', 'просмотра', 'просмотров'])} (${pct}%)`;
-                        }
-                    }
-                }
-            },
-            scales: { 
-                x: { 
-                    ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, 
-                    grid: { display: false } 
-                },
-                y: { 
-                    ticks: { 
-                        color: c.t, 
-                        font: { size: fSizeAx },
-                        precision: 0
-                    }, 
-                    grid: { color: c.g }, 
-                    beginAtZero: true, 
-                    border: { display: false } 
-                } 
-            } 
-        } 
+        data: { labels: ch.labels, datasets: [{ data: ch.data, backgroundColor: ch.data.map((_, i) => i >= 5 ? weGradient : barGradient), hoverBackgroundColor: ch.data.map((_, i) => i >= 5 ? '#60a5fa' : '#39d353'), borderRadius: 8, borderSkipped: false, borderWidth: 0, hoverBorderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1000, easing: 'easeOutBack', delay: (context) => context.type === 'data' && context.mode === 'default' && !context.active ? context.dataIndex * 100 : 0 }, plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { label: (context) => { const val = context.parsed.y; const pct = totalViews > 0 ? Math.round((val / totalViews) * 100) : 0; return ` ${val} ${plural(val, ['просмотр', 'просмотра', 'просмотров'])} (${pct}%)`; } } } }, scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { ticks: { color: c.t, font: { size: fSizeAx }, precision: 0 }, grid: { color: c.g }, beginAtZero: true, border: { display: false } } } } 
     });
 }
 
 function renderDonut(canvasId, legendId, sourceData, dataKey, totalMinutesWatched) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const legendEl = document.getElementById(legendId);
-    
-    if (chG[canvasId]) chG[canvasId].destroy();
-    if (!sourceData?.length) return;
-    
+    const canvas = document.getElementById(canvasId); if (!canvas) return;
+    const ctx = canvas.getContext('2d'), legendEl = document.getElementById(legendId);
+    if (chG[canvasId]) chG[canvasId].destroy(); if (!sourceData?.length) return;
     const c = cc();
-    
     let top = JSON.parse(JSON.stringify(sourceData)).slice(0, 10);
-    const totalMinutesSum = sourceData.reduce((acc, g) => acc + g.minutes, 0);
-    const topMinutes = top.reduce((acc, g) => acc + g.minutes, 0);
-
-    if (totalMinutesSum > topMinutes) {
-        const others = sourceData.slice(10);
-        const othersIds = [...new Set(others.flatMap(g => g.show_ids || []))];
-        top.push({
-            name: 'Другие',
-            minutes: totalMinutesSum - topMinutes,
-            count: 0,
-            show_ids: othersIds
-        });
-    }
-
+    const totalMinutesSum = sourceData.reduce((acc, g) => acc + g.minutes, 0), topMinutes = top.reduce((acc, g) => acc + g.minutes, 0);
+    if (totalMinutesSum > topMinutes) { const others = sourceData.slice(10); top.push({ name: 'Другие', minutes: totalMinutesSum - topMinutes, count: 0, show_ids: [...new Set(others.flatMap(g => g.show_ids || []))] }); }
     const totalHours = Math.floor(totalMinutesWatched / 60);
-    const pal = [
-        '#2ea043', '#388bfd', '#f85149', '#d29922', '#a371f7', 
-        '#1abc9c', '#e67e22', '#9b59b6', '#00d2ff', '#16a085', 
-        '#27ae60', '#2980b9'
-    ];
-
-    const values = top.map(g => (g.minutes / totalMinutesSum) * 100);
-    const percents = values.map(v => Math.round(v));
-
-    const centerTextPlugin = {
-        id: 'centerText',
-        afterDraw: (chart) => {
-            const { ctx, chartArea: { top, height, left, width } } = chart;
-            ctx.save();
-            const centerX = left + width / 2;
-            const centerY = top + height / 2;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.font = '900 34px system-ui';
-            ctx.fillStyle = c.t;
-            ctx.fillText(totalHours, centerX, centerY - 8);
-            ctx.font = 'bold 10px system-ui';
-            ctx.fillStyle = isDark ? '#6e7681' : '#8c959f';
-            ctx.letterSpacing = '1px';
-            ctx.fillText('ЧАСОВ ВСЕГО', centerX, centerY + 22);
-            ctx.restore();
-        }
-    };
-
+    const pal = ['#2ea043', '#388bfd', '#f85149', '#d29922', '#a371f7', '#1abc9c', '#e67e22', '#9b59b6', '#00d2ff', '#16a085', '#27ae60', '#2980b9'];
+    const values = top.map(g => (g.minutes / totalMinutesSum) * 100), percents = values.map(v => Math.round(v));
+    const centerTextPlugin = { id: 'centerText', afterDraw: (chart) => { const { ctx, chartArea: { top, height, left, width } } = chart; ctx.save(); const centerX = left + width / 2, centerY = top + height / 2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '900 34px system-ui'; ctx.fillStyle = c.t; ctx.fillText(totalHours, centerX, centerY - 8); ctx.font = 'bold 10px system-ui'; ctx.fillStyle = isDark ? '#6e7681' : '#8c959f'; ctx.letterSpacing = '1px'; ctx.fillText('ЧАСОВ ВСЕГО', centerX, centerY + 22); ctx.restore(); } };
     chG[canvasId] = new Chart(ctx, { 
-        type: 'doughnut', 
-        plugins: [ChartDataLabels, centerTextPlugin],
-        data: { 
-            labels: top.map(g => g.name), 
-            datasets: [{ 
-                data: top.map(g => g.minutes), 
-                backgroundColor: top.map((_, i) => pal[i % pal.length]), 
-                borderWidth: 0,
-                hoverOffset: 15, 
-                borderRadius: 6,
-                spacing: 3, 
-                weight: 1
-            }] 
-        },
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            cutout: '50%', 
-            layout: { padding: 15 },
-            animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' },
-            onHover: (event, activeElements) => {
-                event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default';
-            },
-            onClick: (event, activeElements) => {
-                if (activeElements.length > 0) {
-                    const index = activeElements[0].index;
-                    const item = top[index];
-                    openHistory('filter', null, null, item.name, dataKey, index);
-                }
-            },
-            plugins: { 
-                datalabels: {
-                    color: '#fff',
-                    font: { weight: '800', size: 10 },
-                    formatter: (value, context) => {
-                        const pct = percents[context.dataIndex];
-                        return pct > 5 ? pct + '%' : '';
-                    },
-                    display: 'auto'
-                },
-                tooltip: {
-                    enabled: true,
-                    callbacks: {
-                        label: (context) => {
-                            const val = context.parsed;
-                            const h = Math.floor(val/60);
-                            const m = val%60;
-                            return ` ${h}ч ${m}м (${percents[context.dataIndex]}%)`;
-                        }
-                    }
-                },
-                legend: { display: false } 
-            } 
-        } 
+        type: 'doughnut', plugins: [ChartDataLabels, centerTextPlugin],
+        data: { labels: top.map(g => g.name), datasets: [{ data: top.map(g => g.minutes), backgroundColor: top.map((_, i) => pal[i % pal.length]), borderWidth: 0, hoverOffset: 15, borderRadius: 6, spacing: 3, weight: 1 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '50%', layout: { padding: 15 }, animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' }, onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; }, onClick: (event, activeElements) => { if (activeElements.length > 0) openHistory('filter', null, null, top[activeElements[0].index].name, dataKey, activeElements[0].index); }, plugins: { datalabels: { color: '#fff', font: { weight: '800', size: 10 }, formatter: (value, context) => percents[context.dataIndex] > 5 ? percents[context.dataIndex] + '%' : '', display: 'auto' }, tooltip: { enabled: true, callbacks: { label: (context) => { const val = context.parsed, h = Math.floor(val/60), m = val%60; return ` ${h}ч ${m}м (${percents[context.dataIndex]}%)`; } } }, legend: { display: false } } } 
     });
-
     D[dataKey] = top;
-
-    legendEl.innerHTML = top.map((g, i) => {
-        const color = pal[i % pal.length];
-        const h = Math.floor(g.minutes / 60);
-        const m = g.minutes % 60;
-        const timeStr = h > 0 ? `${h}ч ${m}м` : `${m}м`;
-        const pct = percents[i];
-        const safeName = g.name.replace(/'/g, "\\'");
-        return `
-            <div class="legend-item" 
-                 onclick="openHistory('filter', null, null, '${safeName}', '${dataKey}', ${i})"
-                 onmouseenter="highlightSegment('${canvasId}', ${i}, true)"
-                 onmouseleave="highlightSegment('${canvasId}', ${i}, false)">
-                <div class="legend-dot" style="background:${color}"></div>
-                <div class="legend-name">${g.name}</div>
-                <div class="legend-val">${timeStr} (${pct}%)</div>
-            </div>
-        `;
-    }).join('');
+    legendEl.innerHTML = top.map((g, i) => `<div class="legend-item" onclick="openHistory('filter', null, null, '${g.name.replace(/'/g, "\\'")}', '${dataKey}', ${i})" onmouseenter="highlightSegment('${canvasId}', ${i}, true)" onmouseleave="highlightSegment('${canvasId}', ${i}, false)"><div class="legend-dot" style="background:${pal[i % pal.length]}"></div><div class="legend-name">${g.name}</div><div class="legend-val">${Math.floor(g.minutes / 60) > 0 ? `${Math.floor(g.minutes / 60)}ч ${g.minutes % 60}м` : `${g.minutes % 60}м`} (${percents[i]}%)</div></div>`).join('');
 }
-
-window.highlightSegment = function(canvasId, index, active) {
-    const chart = chG[canvasId];
-    if (!chart) return;
-    if (active) {
-        chart.setActiveElements([{ datasetIndex: 0, index: index }]);
-        chart.tooltip.setActiveElements([{ datasetIndex: 0, index: index }], { x: 0, y: 0 });
-    } else {
-        chart.setActiveElements([]);
-        chart.tooltip.setActiveElements([], { x: 0, y: 0 });
-    }
-    chart.update();
-};
-
-window.mainTab = function(t) {
-    document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
-    document.getElementById('sec-personal').classList.toggle('vis', t==='personal');
-    document.getElementById('sec-group').classList.toggle('vis', t==='group');
-};
+window.highlightSegment = function(canvasId, index, active) { const chart = chG[canvasId]; if (!chart) return; if (active) { chart.setActiveElements([{ datasetIndex: 0, index: index }]); chart.tooltip.setActiveElements([{ datasetIndex: 0, index: index }], { x: 0, y: 0 }); } else { chart.setActiveElements([]); chart.tooltip.setActiveElements([], { x: 0, y: 0 }); } chart.update(); };
+window.mainTab = function(t) { document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t)); document.getElementById('sec-personal').classList.toggle('vis', t==='personal'); document.getElementById('sec-group').classList.toggle('vis', t==='group'); };
 
 window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, extraIndex) {
     lastScrollPos = window.scrollY;
-    
     document.getElementById('main-tabs').classList.add('hidden');
     document.getElementById('years').classList.add('hidden');
     document.getElementById('sec-personal').classList.remove('vis');
@@ -1533,63 +1041,36 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
     const secHist = document.getElementById('sec-history');
     secHist.classList.add('vis');
     
-    if (tg && tg.BackButton) {
-        tg.BackButton.show();
-        tg.BackButton.onClick(window.closeHistory);
-    }
+    if (tg && tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(window.closeHistory); }
     
     const el = document.getElementById('hist-list');
     el.innerHTML = '';
     
     let data;
     if (type === 'all') {
-        data = [...D.history_movies, ...D.history_episodes].sort((a, b) => {
-            if (b.view_date !== a.view_date) return b.view_date.localeCompare(a.view_date);
-            return (b.show_id + (b.episode_number || 0)) - (a.show_id + (a.episode_number || 0));
-        });
-        document.getElementById('hist-title').textContent = 'Вся история просмотров';
-        document.getElementById('ic-hist-type').innerHTML = Icons.dash;
+        data = [...D.history_movies, ...D.history_episodes].sort((a, b) => { if (b.view_date !== a.view_date) return b.view_date.localeCompare(a.view_date); return (b.show_id + (b.episode_number || 0)) - (a.show_id + (a.episode_number || 0)); });
+        document.getElementById('hist-title').textContent = 'Вся история просмотров'; document.getElementById('ic-hist-type').innerHTML = Icons.dash;
     } else if (type === 'ratings' || type === 'rating_filter') {
         if (type === 'rating_filter') {
             const targetBucket = extraIndex; 
-            data = D.ratings.history.filter(item => {
-                const bucket = item.rating >= 1 ? Math.floor(item.rating) : 1;
-                return bucket === targetBucket;
-            });
+            data = D.ratings.history.filter(item => (item.rating >= 1 ? Math.floor(item.rating) : 1) === targetBucket);
             document.getElementById('hist-title').textContent = `Оценки: ${targetBucket}`;
-        } else {
-            data = D.ratings.history;
-            document.getElementById('hist-title').textContent = 'История оценок';
-        }
-        document.getElementById('ic-hist-type').innerHTML = Icons.star;
-        document.getElementById('ic-hist-type').style.color = '#f1c40f';
-        type = 'ratings'; // Сбрасываем тип для правильного рендера карточек ниже
+        } else { data = D.ratings.history; document.getElementById('hist-title').textContent = 'История оценок'; }
+        document.getElementById('ic-hist-type').innerHTML = Icons.star; document.getElementById('ic-hist-type').style.color = '#f1c40f';
+        type = 'ratings';
     }  else if (type === 'day') {
         data = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate);
-        document.getElementById('hist-title').textContent = extraDate;
-        document.getElementById('ic-hist-type').innerHTML = Icons.cal;
+        document.getElementById('hist-title').textContent = extraDate; document.getElementById('ic-hist-type').innerHTML = Icons.cal;
     } else if (type === 'binge') {
-        data = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate)
-            .sort((a, b) => {
-                if (a.season_number !== b.season_number) return a.season_number - b.season_number;
-                return a.episode_number - b.episode_number;
-            });
-        document.getElementById('hist-title').textContent = extraTitle;
-        document.getElementById('ic-hist-type').innerHTML = Icons.bolt;
+        data = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => { if (a.season_number !== b.season_number) return a.season_number - b.season_number; return a.episode_number - b.episode_number; });
+        document.getElementById('hist-title').textContent = extraTitle; document.getElementById('ic-hist-type').innerHTML = Icons.bolt;
     } else if (type === 'filter') {
-        const filterItem = D[extraKey][extraIndex];
-        const allowedIds = filterItem.show_ids || [];
-        
-        data = [...D.history_movies, ...D.history_episodes].filter(i => allowedIds.includes(i.show_id))
-            .sort((a, b) => b.view_date.localeCompare(a.view_date));
-            
+        const allowedIds = D[extraKey][extraIndex].show_ids || [];
+        data = [...D.history_movies, ...D.history_episodes].filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
         document.getElementById('hist-title').textContent = extraTitle;
-        
         let iconHtml = Icons.star;
-        if (extraKey === 'genres' || extraKey === 'genres_top') iconHtml = Icons.masks;
-        else if (extraKey === 'countries') iconHtml = Icons.globe;
+        if (extraKey === 'genres' || extraKey === 'genres_top') iconHtml = Icons.masks; else if (extraKey === 'countries') iconHtml = Icons.globe;
         document.getElementById('ic-hist-type').innerHTML = iconHtml;
-        
     } else {
         data = type === 'movies' ? D.history_movies : D.history_episodes;
         document.getElementById('hist-title').textContent = type === 'movies' ? 'Просмотренные фильмы' : 'Просмотренные эпизоды';
@@ -1598,119 +1079,47 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
     
     if (!data || !data.length) {
         let emptyIco = Icons.dash;
-        if (type === 'movies') emptyIco = Icons.film;
-        else if (type === 'day') emptyIco = Icons.cal;
-        else if (type === 'binge') emptyIco = Icons.bolt;
-        else if (type === 'filter') emptyIco = document.getElementById('ic-hist-type').innerHTML;
-        else if (type === 'ratings') emptyIco = Icons.star;
-        else emptyIco = Icons.tv;
-        
-        el.innerHTML = `<div class="empty"><div class="icon">${emptyIco}</div>Нет просмотров за этот период</div>`;
-        return;
+        if (type === 'movies') emptyIco = Icons.film; else if (type === 'day') emptyIco = Icons.cal; else if (type === 'binge') emptyIco = Icons.bolt; else if (type === 'filter') emptyIco = document.getElementById('ic-hist-type').innerHTML; else if (type === 'ratings') emptyIco = Icons.star; else emptyIco = Icons.tv;
+        el.innerHTML = `<div class="empty"><div class="icon">${emptyIco}</div>Нет просмотров за этот период</div>`; return;
     }
     
     let html = '<div class="card" style="margin:0; padding:0; overflow:hidden;">';
     data.forEach((item, idx) => {
         const delay = Math.min((idx + 1) * 0.03, 0.6); 
-        
         if (type === 'ratings') {
-            const origTitle = item.original_title && item.original_title !== item.title 
-                ? `<div class="hist-orig">${item.original_title}</div>` : '';
+            const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
             const yearSuffix = item.year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.year})</span>` : '';
-            const poster = item.poster_url 
-                ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` 
-                : `<div class="hist-poster"></div>`;
-            
+            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` : `<div class="hist-poster"></div>`;
             let seHtml = '';
-            if (item.season && item.episode) {
-                const e = item.episode < 10 ? '0' + item.episode : item.episode;
-                seHtml = `<span class="hist-badge">s${item.season}e${e}</span>`;
-            } else if (item.season !== undefined && item.season !== null && item.episode === null) {
-                seHtml = `<span class="hist-badge">Сериал</span>`;
-            }
-
+            if (item.season && item.episode) { const e = item.episode < 10 ? '0' + item.episode : item.episode; seHtml = `<span class="hist-badge">s${item.season}e${e}</span>`; } else if (item.season !== undefined && item.season !== null && item.episode === null) { seHtml = `<span class="hist-badge">Сериал</span>`; }
             const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
             const rColor = getRatingColor(item.rating);
-
-            html += `
-            <div class="hist-item anim-item clickable" style="animation-delay:${delay}s; display:flex; align-items:center;">
-                ${poster}
-                <div class="hist-info" style="flex:1;">
-                    <div class="hist-title">${item.title}${yearSuffix}</div>
-                    ${origTitle}
-                    <div class="hist-meta" style="margin-bottom:4px;">${seHtml}</div>
-                    <div class="rating-time">${Icons.time} ${item.date}</div>
-                </div>
-                <div class="big-rating-badge" style="background: ${rColor};">${rVal}</div>
-            </div>`;
+            html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s; display:flex; align-items:center;">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}${yearSuffix}</div>${origTitle}<div class="hist-meta" style="margin-bottom:4px;">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
         } else {
             let metaHtml = '';
             if (item.season_number !== undefined && item.season_number > 0) {
-                const s = item.season_number;
-                const e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
+                const s = item.season_number, e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
                 metaHtml += `<span class="hist-badge">s${s}e${e}</span>`;
-                
-                if (item.user_rating) {
-                    const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1);
-                    metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`;
-                }
-                
-                if (item.user_show_rating) {
-                    const rsVal = Number.isInteger(item.user_show_rating) ? item.user_show_rating : item.user_show_rating.toFixed(1);
-                    metaHtml += `<span class="rating-badge show-lvl">(${rsVal})</span>`;
-                }
+                if (item.user_rating) { const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`; }
+                if (item.user_show_rating) { const rsVal = Number.isInteger(item.user_show_rating) ? item.user_show_rating : item.user_show_rating.toFixed(1); metaHtml += `<span class="rating-badge show-lvl">(${rsVal})</span>`; }
             } else {
-                if (item.user_rating) {
-                    const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1);
-                    metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`;
-                }
+                if (item.user_rating) { const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`; }
             }
-
-            const origTitle = item.show__original_title && item.show__original_title !== item.show__title 
-                ? `<div class="hist-orig">${item.show__original_title}</div>` : '';
-                
+            const origTitle = item.show__original_title && item.show__original_title !== item.show__title ? `<div class="hist-orig">${item.show__original_title}</div>` : '';
             const yearSuffix = item.show__year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.show__year})</span>` : '';
-            const poster = item.poster_url 
-                ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` 
-                : `<div class="hist-poster"></div>`;
-
-            html += `
-            <div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">
-                ${poster}
-                <div class="hist-info">
-                    <div class="hist-title">${item.show__title}${yearSuffix}</div>
-                    ${origTitle}
-                    <div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>
-                </div>
-            </div>`;
+            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` : `<div class="hist-poster"></div>`;
+            html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}${yearSuffix}</div>${origTitle}<div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div></div></div>`;
         }
     });
-    html += '</div>';
-    el.innerHTML = html;
-    window.scrollTo(0, 0);
+    html += '</div>'; el.innerHTML = html; window.scrollTo(0, 0);
 };
 
 window.closeHistory = function() {
-    if (tg && tg.BackButton) {
-        tg.BackButton.hide();
-        tg.BackButton.offClick(window.closeHistory);
-    }
-    
-    // Проверяем, нужно ли показывать вкладки (только если есть группа)
-    if (D && D.group) {
-        document.getElementById('main-tabs').classList.remove('hidden');
-    }
-    
-    // Проверяем, нужно ли показывать выбор года (только если есть годы в мете)
-    if (D && D.meta && D.meta.years && D.meta.years.length > 0) {
-        document.getElementById('years').classList.remove('hidden');
-    }
-    
+    if (tg && tg.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(window.closeHistory); }
+    if (D && D.group) document.getElementById('main-tabs').classList.remove('hidden');
+    if (availableYears.length > 1) document.getElementById('years').classList.remove('hidden');
     document.getElementById('sec-history').classList.remove('vis');
-    
-    const curTab = document.querySelector('#main-tabs .tab.on').dataset.tab;
-    mainTab(curTab);
-    
+    mainTab(document.querySelector('#main-tabs .tab.on')?.dataset.tab || 'personal');
     window.scrollTo(0, lastScrollPos);
 };
 
@@ -1718,60 +1127,117 @@ function renderGroup() {
     const el = document.getElementById('group-root');
     if (!D.group) { el.innerHTML = `<div class="card hoverable"><div class="empty"><div class="icon" style="font-size:clamp(36px, 10vw, 48px);line-height:1;color:var(--text-muted)">${Icons.users}</div>Вы не состоите в группе</div></div>`; return; }
     const g = D.group, p = D.summary;
-
-    const rows = [
-        { lb:'Просмотры', i:Icons.tv, y:p.total_views, gv:g.total_views },
-        { lb:'Эпизоды', i:Icons.film, y:p.total_episodes, gv:g.total_episodes },
-        { lb:'Фильмы', i:Icons.time, y:p.total_movies, gv:g.total_movies },
-        { lb:'Уникальных', i:Icons.star, y:p.unique_shows, gv:g.unique_shows },
-    ];
+    const rows = [ { lb:'Просмотры', i:Icons.tv, y:p.total_views, gv:g.total_views }, { lb:'Эпизоды', i:Icons.film, y:p.total_episodes, gv:g.total_episodes }, { lb:'Фильмы', i:Icons.time, y:p.total_movies, gv:g.total_movies }, { lb:'Уникальных', i:Icons.star, y:p.unique_shows, gv:g.unique_shows } ];
     let hasDiff = false;
-    const cmpH = rows.map((r, idx) => {
-        const d = r.y - r.gv;
-        let dh = d===0 ? `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(12px, 3.2vw, 14px);display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>` : (hasDiff = true, `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`);
-        return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1;color:var(--text-muted)">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(11px, 3vw, 13px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`;
-    }).join('');
-
+    const cmpH = rows.map((r, idx) => { const d = r.y - r.gv; let dh = d===0 ? `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(12px, 3.2vw, 14px);display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>` : (hasDiff = true, `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`); return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1;color:var(--text-muted)">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(11px, 3vw, 13px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`; }).join('');
     const mx = Math.max(...g.members.map(m=>m.views),1);
     const mbH = g.members.map((m, idx) => `<div class="mb anim-list-item" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
-
-    let gGenH = '';
-    if (g.genres?.length) {
-        gGenH = `<div class="card hoverable anim-item" style="animation-delay:0.3s">
-            <div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div>
-            <div class="chart-box" style="height:380px;"><canvas id="c-group-genre"></canvas></div>
-            <div id="legend-group-genre" class="legend-grid"></div>
-        </div>`;
-    }
-
+    let gGenH = g.genres?.length ? `<div class="card hoverable anim-item" style="animation-delay:0.3s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="chart-box" style="height:380px;"><canvas id="c-group-genre"></canvas></div><div id="legend-group-genre" class="legend-grid"></div></div>` : '';
     const membersLabel = `${g.members_count} ${plural(g.members_count, ['участник', 'участника', 'участников'])}`;
-    el.innerHTML = `
-        <div class="card hoverable anim-item">
-            <div style="display:flex;align-items:center;gap:16px">
-                <div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))">${Icons.users}</div>
-                <div>
-                    <div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">${g.group_name}</div>
-                    <div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">${membersLabel} · ${g.duration_display}</div>
-                </div>
-            </div>
-        </div>
-        <div class="card hoverable anim-item" style="animation-delay:0.1s">
-            <div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.chart}</div>Вы vs Группа</div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 Вы</span>
-                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span>
-            </div>
-            ${!hasDiff?`<div style="text-align:center;padding:16px 0;font-size:clamp(15px, 4vw, 18px);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse 2s infinite;"><div class="icon" style="font-size:clamp(20px, 6vw, 24px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
-            ${cmpH}
-        </div>
-        <div class="card hoverable anim-item" style="animation-delay:0.2s">
-            <div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.user}</div>Участники</div>
-            ${mbH}
-        </div>
-        ${gGenH}`;
+    el.innerHTML = `<div class="card hoverable anim-item"><div style="display:flex;align-items:center;gap:16px"><div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))">${Icons.users}</div><div><div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">${g.group_name}</div><div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">${membersLabel} · ${g.duration_display}</div></div></div></div><div class="card hoverable anim-item" style="animation-delay:0.1s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.chart}</div>Вы vs Группа</div><div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)"><span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 Вы</span><span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span></div>${!hasDiff?`<div style="text-align:center;padding:16px 0;font-size:clamp(15px, 4vw, 18px);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse 2s infinite;"><div class="icon" style="font-size:clamp(20px, 6vw, 24px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}${cmpH}</div><div class="card hoverable anim-item" style="animation-delay:0.2s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.user}</div>Участники</div>${mbH}</div>${gGenH}`;
 }
 
-load();
+// Share Modal Logic
+function openShareModal() {
+    const grid = document.getElementById('share-years-grid');
+    grid.innerHTML = '';
+    
+    const hasAll = availableYears.includes('all');
+    grid.innerHTML = `<label><input type="checkbox" class="yr-chk-input" value="all" checked><div class="yr-chk-btn">Всё время</div></label>`;
+    
+    availableYears.filter(y => y !== 'all').forEach(y => {
+        grid.innerHTML += `<label><input type="checkbox" class="yr-chk-input" value="${y}"><div class="yr-chk-btn">${y}</div></label>`;
+    });
+
+    const hasGroup = !!D.group;
+    const groupWrap = document.getElementById('sh-group-wrap');
+    const anonGroupWrap = document.getElementById('sh-anon-group-wrap');
+    if (hasGroup) {
+        groupWrap.style.display = 'flex';
+        anonGroupWrap.style.display = 'flex';
+        document.getElementById('sh-inc-group').checked = true;
+    } else {
+        groupWrap.style.display = 'none';
+        anonGroupWrap.style.display = 'none';
+        document.getElementById('sh-inc-group').checked = false;
+    }
+
+    document.getElementById('sh-anon-user').checked = false;
+    document.getElementById('sh-anon-group').checked = false;
+
+    toggleGroupOpts();
+    document.getElementById('share-modal').classList.add('show');
+}
+
+document.getElementById('share-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'share-modal') {
+        closeShareModal();
+    }
+});
+
+function closeShareModal() {
+    document.getElementById('share-modal').classList.remove('show');
+}
+
+function toggleGroupOpts() {
+    const incGroup = document.getElementById('sh-inc-group').checked;
+    const anonGroupWrap = document.getElementById('sh-anon-group-wrap');
+    if (!incGroup) {
+        anonGroupWrap.style.opacity = '0.4';
+        anonGroupWrap.style.pointerEvents = 'none';
+    } else {
+        anonGroupWrap.style.opacity = '1';
+        anonGroupWrap.style.pointerEvents = 'auto';
+    }
+}
+
+async function submitShare() {
+    const btn = document.getElementById('btn-do-share');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#fff;"></div> Создание...';
+
+    const checkedYears = Array.from(document.querySelectorAll('.yr-chk-input:checked')).map(el => el.value);
+    
+    if (checkedYears.length === 0) {
+        showToast('Выберите хотя бы один период');
+        btn.disabled = false;
+        btn.innerHTML = 'Создать ссылку';
+        return;
+    }
+
+    const config = {
+        years: checkedYears,
+        anon_user: document.getElementById('sh-anon-user').checked,
+        include_group: document.getElementById('sh-inc-group').checked,
+        anon_group: document.getElementById('sh-anon-group').checked
+    };
+
+    try {
+        const r = await fetch('/api/webapp/bake_stats/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ config, init_data: tg?.initData||'' })
+        });
+        const j = await r.json();
+        
+        if (!r.ok || j.error) {
+            showToast('Ошибка при создании слепка');
+        } else {
+            closeShareModal();
+            if (tg) {
+                // Trigger Telegram Inline Query to let user share
+                tg.switchInlineQuery("share_" + j.id, ["users", "groups", "channels"]);
+            }
+        }
+    } catch(e) {
+        showToast('Сетевая ошибка');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Создать ссылку';
+    }
+}
+
+init();
 </script>
 </body>
 </html>
