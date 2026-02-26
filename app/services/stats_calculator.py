@@ -422,7 +422,7 @@ def generate_user_stats(user, year=None):
 
     base_qs = ViewHistory.objects.filter(
         id__in=Subquery(history_ids.values('id'))
-    ).select_related('show')
+    ).select_related('show').prefetch_related('users')
 
     episode_dur = ShowDuration.objects.filter(
         show_id=OuterRef('show_id'),
@@ -456,7 +456,8 @@ def generate_user_stats(user, year=None):
                 'name': user.name or user.username,
                 'year': year,
                 'years': all_years,
-                'role': user_role
+                'role': user_role,
+                'photo_url': user.photo_url
             },
             'summary': summary,
             'heatmap': [],
@@ -485,18 +486,20 @@ def generate_user_stats(user, year=None):
         user=user, show_id=OuterRef('show_id'), season_number__isnull=True
     ).values('rating')[:1]
 
-    movies_history = list(
-        base_qs.filter(season_number=0)
-        .annotate(user_rating=Subquery(user_movie_rating))
-        .values(
-            'show_id', 'show__title', 'show__original_title',
-            'show__year', 'view_date', 'user_rating'
-        )
-        .order_by('-view_date', '-id')
-    )
-    for m in movies_history:
-        m['view_date'] = m['view_date'].strftime('%Y-%m-%d')
-        m['poster_url'] = get_poster_url(m['show_id'])
+    movies_history = []
+    for h in base_qs.filter(season_number=0).annotate(user_rating=Subquery(user_movie_rating)).order_by('-view_date', '-id'):
+        movies_history.append({
+            'show_id': h.show_id,
+            'show__title': h.show.title,
+            'show__original_title': h.show.original_title,
+            'show__year': h.show.year,
+            'view_date': h.view_date.strftime('%Y-%m-%d'),
+            'user_rating': h.user_rating,
+            'poster_url': get_poster_url(h.show_id),
+            'user_ids': list(h.users.values_list('id', flat=True)),
+            'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
+            'user_photos': [u.photo_url for u in h.users.all()]
+        })
 
     user_ep_rating = UserRating.objects.filter(
         user=user, show_id=OuterRef('show_id'),
@@ -508,18 +511,23 @@ def generate_user_stats(user, year=None):
         user=user, show_id=OuterRef('show_id'), season_number__isnull=True
     ).values('rating')[:1]
 
-    episodes_history = list(
-        base_qs.filter(season_number__gt=0)
-        .annotate(user_rating=Subquery(user_ep_rating), user_show_rating=Subquery(user_show_rating))
-        .values(
-            'show_id', 'show__title', 'show__original_title', 'show__year',
-            'season_number', 'episode_number', 'view_date', 'user_rating', 'user_show_rating'
-        )
-        .order_by('-view_date', '-id')
-    )
-    for e in episodes_history:
-        e['view_date'] = e['view_date'].strftime('%Y-%m-%d')
-        e['poster_url'] = get_poster_url(e['show_id'])
+    episodes_history = []
+    for h in base_qs.filter(season_number__gt=0).annotate(user_rating=Subquery(user_ep_rating), user_show_rating=Subquery(user_show_rating)).order_by('-view_date', '-id'):
+        episodes_history.append({
+            'show_id': h.show_id,
+            'show__title': h.show.title,
+            'show__original_title': h.show.original_title,
+            'show__year': h.show.year,
+            'season_number': h.season_number,
+            'episode_number': h.episode_number,
+            'view_date': h.view_date.strftime('%Y-%m-%d'),
+            'user_rating': h.user_rating,
+            'user_show_rating': h.user_show_rating,
+            'poster_url': get_poster_url(h.show_id),
+            'user_ids': list(h.users.values_list('id', flat=True)),
+            'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
+            'user_photos': [u.photo_url for u in h.users.all()]
+        })
 
     result = {
         'meta': {
@@ -527,7 +535,8 @@ def generate_user_stats(user, year=None):
             'name': user.name or user.username,
             'year': year,
             'years': all_years,
-            'role': user_role
+            'role': user_role,
+            'photo_url': user.photo_url
         },
         'summary': summary,
         'heatmap': _get_heatmap(dur_qs, year, all_years),
@@ -613,6 +622,7 @@ def generate_group_stats(user, year=None):
             'id': u.id,
             'name': u.name or u.username or str(u.telegram_id),
             'views': u_views,
+            'photo_url': u.photo_url
         })
     members.sort(key=lambda x: x['views'], reverse=True)
 
@@ -628,7 +638,8 @@ def generate_group_stats(user, year=None):
             'view_date': h.view_date.strftime('%Y-%m-%d'),
             'poster_url': get_poster_url(h.show_id),
             'user_ids': list(h.users.values_list('id', flat=True)),
-            'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()]
+            'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
+            'user_photos': [u.photo_url for u in h.users.all()]
         }
         if h.season_number > 0:
             entry.update({

@@ -884,12 +884,18 @@ def webapp_get_detailed_stats(request):
 
         try:
             view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+            
+            view_user.update_personal_details(
+                username=tg_user.get('username'),
+                name=tg_user.get('first_name'),
+                language=tg_user.get('language_code'),
+                photo_url=tg_user.get('photo_url')
+            )
         except ViewUser.DoesNotExist:
             return JsonResponse({'error': 'User not found'}, status=404)
 
         stats = generate_user_stats(view_user, year=year)
 
-        # Add group stats for comparison
         group_stats = generate_group_stats(view_user, year=year)
         if group_stats:
             stats['group'] = group_stats
@@ -933,6 +939,8 @@ def webapp_bake_stats(request):
             stat = generate_user_stats(view_user, year=year_val)
             stat = json.loads(json.dumps(stat))
 
+            user_info_map = {}
+
             if include_group:
                 group_stats = generate_group_stats(view_user, year=year_val)
                 if group_stats:
@@ -941,44 +949,73 @@ def webapp_bake_stats(request):
                     if anon_group:
                         group_stats['group_name'] = 'Группа'
                     
-                    id_map = {}
                     for idx, member in enumerate(group_stats['members'], 1):
-                        old_id = member.get('id')
-                        id_map[old_id] = idx
+                        mid = member.get('id')
+                        is_me = mid == view_user.id
                         
-                        is_me = old_id == view_user.id
+                        should_hide = False
+                        if is_me and anon_user:
+                            should_hide = True
+                        elif not is_me and anon_group:
+                            should_hide = True
                         
-                        should_hide_name = False
-                        if anon_group:
-                            if not is_me or anon_user:
-                                should_hide_name = True
-                        else:
-                            if is_me and anon_user:
-                                should_hide_name = True
+                        display_name = f'Участник {idx}' if should_hide else member['name']
+                        display_photo = None if should_hide else member.get('photo_url')
                         
-                        if should_hide_name:
-                            member['name'] = f'Участник {idx}'
+                        user_info_map[mid] = {
+                            'id': idx,
+                            'name': display_name,
+                            'photo': display_photo
+                        }
                         
                         member['id'] = idx
-
-                    for h_type in ['history_movies', 'history_episodes']:
-                        for item in group_stats.get(h_type, []):
-                            item['user_ids'] = [
-                                id_map[uid] for uid in item.get('user_ids', []) if uid in id_map
-                            ]
-                    
-                    if not anon_user and view_user.id in id_map:
-                        stat['meta']['id'] = id_map[view_user.id]
+                        member['name'] = display_name
+                        member['photo_url'] = display_photo
 
                     stat['group'] = group_stats
-            elif 'group' in stat:
-                del stat['group']
+            
+            if view_user.id not in user_info_map:
+                user_info_map[view_user.id] = {
+                    'id': 1,
+                    'name': 'Участник' if anon_user else (view_user.name or view_user.username),
+                    'photo': None if anon_user else view_user.photo_url
+                }
+
+            history_pools = [stat]
+            if 'group' in stat:
+                history_pools.append(stat['group'])
+
+            for pool in history_pools:
+                for h_type in ['history_movies', 'history_episodes']:
+                    if h_type not in pool:
+                        continue
+                    for item in pool[h_type]:
+                        new_ids = []
+                        new_names = []
+                        new_photos = []
+                        
+                        for uid in item.get('user_ids', []):
+                            info = user_info_map.get(uid)
+                            if info:
+                                new_ids.append(info['id'])
+                                new_names.append(info['name'])
+                                new_photos.append(info['photo'])
+                            else:
+                                new_ids.append(0)
+                                new_names.append('Участник')
+                                new_photos.append(None)
+                        
+                        item['user_ids'] = new_ids
+                        item['user_names'] = new_names
+                        item['user_photos'] = new_photos
 
             if anon_user:
                 stat['meta']['name'] = 'Участник'
                 stat['meta']['is_anonymous'] = True
+                stat['meta']['photo_url'] = None
                 stat['meta'].pop('id', None)
             else:
+                stat['meta']['id'] = user_info_map[view_user.id]['id']
                 if tg_user.get('photo_url'):
                     stat['meta']['photo_url'] = tg_user.get('photo_url')
 

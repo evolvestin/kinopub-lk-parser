@@ -1140,7 +1140,8 @@ window.renderHistoryList = function() {
     } else {
         html = '<div class="hist-grid">';
 
-        function getUserAvatarHtml(uid, name) {
+        function getUserAvatarHtml(uid, name, photo) {
+            if (photo) return `<img src="${photo}" class="grid-user-avatar" title="${name}">`;
             if (uid === D.meta?.id && D.meta?.photo_url) return `<img src="${D.meta.photo_url}" class="grid-user-avatar" title="${name}">`;
             if (D.group?.members) {
                 const m = D.group.members.find(x => x.id === uid);
@@ -1198,7 +1199,7 @@ window.renderHistoryList = function() {
                 let usersHtml = '';
                 if (item.user_names && item.user_names.length > 0) {
                     if (D.group || item.user_names.length > 1) {
-                        const avatars = item.user_names.map((n, i) => getUserAvatarHtml(item.user_ids[i], n));
+                        const avatars = item.user_names.map((n, i) => getUserAvatarHtml(item.user_ids[i], n, item.user_photos ? item.user_photos[i] : null));
                         usersHtml = `<div class="grid-users">${avatars.join('')}</div>`;
                     }
                 }

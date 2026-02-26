@@ -69,6 +69,7 @@ class ViewUser(BaseModel):
     username = models.CharField(max_length=255, null=True, blank=True)
     name = models.CharField(max_length=255, default='')
     language = models.CharField(max_length=10, default='en')
+    photo_url = models.URLField(max_length=500, null=True, blank=True)
     is_bot_active = models.BooleanField(default=True, verbose_name='Bot Active')
 
     role = models.CharField(
@@ -81,7 +82,7 @@ class ViewUser(BaseModel):
         null=True, blank=True, help_text='ID сообщения в админ-канале для управления ролью'
     )
 
-    def update_personal_details(self, username, name, language, is_active=None):
+    def update_personal_details(self, username, name, language, is_active=None, photo_url=None):
         updated_fields = []
 
         if self.username != username:
@@ -99,6 +100,10 @@ class ViewUser(BaseModel):
         if is_active is not None and self.is_bot_active != is_active:
             self.is_bot_active = is_active
             updated_fields.append('is_bot_active')
+
+        if photo_url is not None and self.photo_url != photo_url:
+            self.photo_url = photo_url
+            updated_fields.append('photo_url')
 
         if updated_fields:
             self.save()
