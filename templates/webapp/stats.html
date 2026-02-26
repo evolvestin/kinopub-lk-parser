@@ -338,7 +338,15 @@
         .critic-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
         .critic-title-box { display: flex; flex-direction: column; }
         .critic-badge { display: inline-flex; align-items: center; gap: 6px; font-size: clamp(12px, 3.2vw, 14px); font-weight: 800; padding: 4px 10px; border-radius: 8px; width: fit-content; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;}
-        .critic-avg { font-size: clamp(32px, 8vw, 42px); font-weight: 900; line-height: 1; display: flex; align-items: baseline; gap: 4px; }
+        .critic-avg { 
+            font-size: clamp(32px, 8vw, 42px); 
+            font-weight: 900; 
+            line-height: 1; 
+            display: flex; 
+            align-items: baseline; 
+            gap: 4px; 
+            color: #f1c40f; 
+        }
         .critic-avg span { font-size: clamp(14px, 4vw, 16px); color: var(--text-muted); font-weight: 700; }
         .critic-total { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-muted); font-weight: 600; text-align: right; }
         .rating-time { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); font-weight: 500; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
@@ -519,8 +527,9 @@
                     <div class="critic-total" id="cr-total"></div>
                 </div>
                 <div class="chart-box" style="height: 180px; margin-bottom: 16px;"><canvas id="c-ratings-dist"></canvas></div>
-                <div class="li li-clickable clickable" style="justify-content: center; padding: 12px; border: 1px solid var(--border);" onclick="openHistory('ratings')">
-                    <span style="font-weight: 800; color: var(--text-primary);">Посмотреть все оценки</span>
+                
+                <div class="stat clickable" style="flex-direction: row; justify-content: center; align-items: center; padding: 16px; margin-top: 12px; border-radius: 15px;" onclick="openHistory('ratings')">
+                    <span style="font-weight: 800; color: var(--text-primary); font-size: clamp(14px, 4vw, 16px);">Все оценки</span>
                 </div>
             </div>
         </div>
@@ -563,7 +572,8 @@ document.addEventListener("DOMContentLoaded", () => {
     i('ic-user', 'user'); i('ic-users', 'users'); i('ic-dash', 'dash');
     i('ic-time', 'time'); i('ic-cal', 'cal'); i('ic-tv', 'tv'); i('ic-film', 'film');
     i('ic-chart', 'chart'); i('ic-flame', 'flame');
-    i('it-gen', 'masks'); i('it-act', 'star'); i('it-cou', 'globe'); i('it-bin', 'bolt');
+    i('it-gen', 'masks'); i('it-act', 'masks'); i('it-cou', 'globe'); i('it-bin', 'bolt');
+    i('it-star', 'star');
 });
 
 const tg = window.Telegram?.WebApp;
@@ -691,10 +701,18 @@ function renderRatingsDist() {
     if (!dist || dist.length === 0) return;
     
     const c = cc();
-    const colors = [
-        '#e74c3c', '#e74c3c', '#e67e22', '#e67e22', 
-        '#f1c40f', '#f1c40f', '#3498db', '#3498db', 
-        '#2ecc71', '#2ecc71'
+    
+    const ratingPalette = [
+        '#f85149', // 1
+        '#f85149', // 2
+        '#e67e22', // 3
+        '#e67e22', // 4
+        '#d29922', // 5
+        '#d29922', // 6
+        '#388bfd', // 7
+        '#388bfd', // 8
+        '#2ea043', // 9
+        '#39d353'  // 10
     ];
 
     chR = new Chart(ctx, {
@@ -703,15 +721,37 @@ function renderRatingsDist() {
             labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
             datasets: [{
                 data: dist,
-                backgroundColor: colors,
-                borderRadius: 4,
-                borderSkipped: false
+                backgroundColor: ratingPalette,
+                hoverOpacity: 0.8,
+                borderRadius: 6,
+                borderSkipped: false,
+                borderWidth: 0
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: { duration: 1000, easing: 'easeOutBack' },
+            animation: {
+                duration: 1000,
+                easing: 'easeOutBack',
+                delay: (context) => {
+                    let delay = 0;
+                    if (context.type === 'data' && context.mode === 'default' && !context.active) {
+                        delay = context.dataIndex * 80;
+                    }
+                    return delay;
+                }
+            },
+            onHover: (event, activeElements) => {
+                event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default';
+            },
+            onClick: (event, activeElements) => {
+                if (activeElements.length > 0) {
+                    const index = activeElements[0].index;
+                    const ratingBucket = index + 1;
+                    openHistory('rating_filter', null, null, null, null, ratingBucket);
+                }
+            },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -720,16 +760,20 @@ function renderRatingsDist() {
                     bodyColor: isDark ? '#8b949e' : '#59636e',
                     borderColor: c.b,
                     borderWidth: 1,
-                    cornerRadius: 8,
+                    cornerRadius: 10,
+                    padding: 12,
                     displayColors: false,
                     callbacks: {
                         title: (ctx) => `Оценка: ${ctx[0].label}`,
-                        label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, ['раз', 'раза', 'раз'])}`
+                        label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, ['оценка', 'оценки', 'оценок'])}`
                     }
                 }
             },
             scales: {
-                x: { ticks: { color: c.t, font: { weight: 'bold' } }, grid: { display: false } },
+                x: { 
+                    ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, 
+                    grid: { display: false } 
+                },
                 y: { display: false, beginAtZero: true }
             }
         }
@@ -909,7 +953,7 @@ function renderHeatmap() {
     const zoomContent = document.getElementById('hm-zoom-content');
     
     if (!D.heatmap?.length) { 
-        el.innerHTML = `<div class="empty"><div class="icon">${Icons.cal}</div>Выберите год</div>`; 
+        el.innerHTML = `<div class="empty"><div class="icon">${Icons.cal}</div>Нет данных</div>`; 
         return; 
     }
     
@@ -1425,11 +1469,21 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
         });
         document.getElementById('hist-title').textContent = 'Вся история просмотров';
         document.getElementById('ic-hist-type').innerHTML = Icons.dash;
-    } else if (type === 'ratings') {
-        data = D.ratings.history;
-        document.getElementById('hist-title').textContent = 'История оценок';
+    } else if (type === 'ratings' || type === 'rating_filter') {
+        if (type === 'rating_filter') {
+            const targetBucket = extraIndex; 
+            data = D.ratings.history.filter(item => {
+                const bucket = item.rating >= 1 ? Math.floor(item.rating) : 1;
+                return bucket === targetBucket;
+            });
+            document.getElementById('hist-title').textContent = `Оценки: ${targetBucket}`;
+        } else {
+            data = D.ratings.history;
+            document.getElementById('hist-title').textContent = 'История оценок';
+        }
         document.getElementById('ic-hist-type').innerHTML = Icons.star;
         document.getElementById('ic-hist-type').style.color = '#f1c40f';
+        type = 'ratings'; // Сбрасываем тип для правильного рендера карточек ниже
     }  else if (type === 'day') {
         data = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate);
         document.getElementById('hist-title').textContent = extraDate;
@@ -1468,6 +1522,7 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
         else if (type === 'day') emptyIco = Icons.cal;
         else if (type === 'binge') emptyIco = Icons.bolt;
         else if (type === 'filter') emptyIco = document.getElementById('ic-hist-type').innerHTML;
+        else if (type === 'ratings') emptyIco = Icons.star;
         else emptyIco = Icons.tv;
         
         el.innerHTML = `<div class="empty"><div class="icon">${emptyIco}</div>Нет просмотров за этот период</div>`;
@@ -1509,7 +1564,6 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
                 <div class="big-rating-badge" style="background: ${rColor};">${rVal}</div>
             </div>`;
         } else {
-            // ... (существующий код отрисовки обычной истории)
             let metaHtml = '';
             if (item.season_number !== undefined && item.season_number > 0) {
                 const s = item.season_number;
