@@ -421,7 +421,7 @@
         }
     </style>
 </head>
-<body>
+<body class="min-h-screen">
     <div class="loader" id="loader"><div class="spinner"></div></div>
 
     <div id="app" class="hidden">
@@ -440,7 +440,7 @@
             <button class="tab on" data-tab="personal" onclick="mainTab('personal')">
                 <div class="icon" id="ic-user"></div>Личная
             </button>
-            <button class="tab" data-tab="group" onclick="mainTab('group')">
+            <button class="tab" data-tab="group" id="tab-group-btn" onclick="mainTab('group')">
                 <div class="icon" id="ic-users"></div>Группа
             </button>
         </div>
@@ -448,8 +448,8 @@
         <div class="years" id="years"></div>
 
         <div class="sec vis" id="sec-personal">
-            <div class="label"><div class="icon" id="ic-dash"></div>Обзор</div>
-            <div class="grid">
+            <div class="label" id="label-overview"><div class="icon" id="ic-dash"></div>Обзор</div>
+            <div class="grid" id="grid-overview">
                 <div class="stat anim-item clickable" style="animation-delay: 0.05s" onclick="openHistory('all')">
                     <div class="stat-icon" id="ic-time"></div>
                     <div class="stat-val" id="s-time">—</div>
@@ -476,7 +476,7 @@
                 </div>
             </div>
 
-            <div class="card hoverable anim-item" style="animation-delay: 0.25s">
+            <div class="card hoverable anim-item" id="card-dynamics" style="animation-delay: 0.25s">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:clamp(16px, 4vw, 20px)">
                     <span style="font-size:clamp(15px, 4vw, 18px);font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:8px">
                         <div class="icon" style="font-size:clamp(18px, 5vw, 22px);line-height:1;color:var(--info)" id="ic-chart"></div>Динамика
@@ -485,15 +485,13 @@
                 <div class="chart-box"><canvas id="c-monthly"></canvas></div>
             </div>
 
-            <div class="card hoverable anim-item" style="animation-delay: 0.3s">
+            <div class="card hoverable anim-item" id="card-weekday" style="animation-delay: 0.3s">
                 <div style="font-size:clamp(15px, 4vw, 18px);font-weight:800;color:var(--text-primary);margin-bottom:clamp(16px, 4vw, 20px)">Дни недели</div>
                 <div class="chart-box" style="height:180px"><canvas id="c-weekday"></canvas></div>
             </div>
 
-            <div class="card hoverable anim-item" style="animation-delay: 0.35s">
-                <div style="font-size:clamp(15px, 4vw, 18px);font-weight:800;color:var(--text-primary);margin-bottom:clamp(16px, 4vw, 20px);display:flex;align-items:center;gap:8px">
-                    <div class="icon" style="font-size:clamp(18px, 5vw, 22px);line-height:1;color:#f85149" id="ic-flame"></div>Интенсивность
-                </div>
+            <div class="label" id="label-heatmap"><div class="icon" style="font-size:clamp(18px, 5vw, 22px);line-height:1;color:#f85149" id="ic-flame"></div>Интенсивность</div>
+            <div class="card hoverable anim-item" id="card-heatmap" style="animation-delay: 0.35s">
                 <div id="heatmaps-wrapper"></div>
                 <div class="hm-leg">
                     <span>Меньше</span>
@@ -502,22 +500,22 @@
                 </div>
             </div>
 
-            <div class="label"><div class="icon" id="it-gen"></div>Жанры</div>
-            <div class="card hoverable anim-item" style="animation-delay: 0.1s; margin-bottom: clamp(12px, 3vw, 16px);">
+            <div class="label" id="label-genres"><div class="icon" id="it-gen"></div>Жанры</div>
+            <div class="card hoverable anim-item" id="card-genres" style="animation-delay: 0.1s; margin-bottom: clamp(12px, 3vw, 16px);">
                 <div class="chart-box" style="height:380px;"><canvas id="c-genre"></canvas></div>
                 <div id="legend-genre" class="legend-grid"></div>
             </div>
 
-            <div class="label"><div class="icon" style="color: #d29922;" id="it-act"></div>Актёры</div>
+            <div class="label" id="label-actors"><div class="icon" style="color: #d29922;" id="it-act"></div>Актёры</div>
             <div class="card hoverable anim-item" style="animation-delay: 0.15s;" id="actors-box"></div>
 
-            <div class="label"><div class="icon" style="color: #388bfd;" id="it-cou"></div>Страны</div>
+            <div class="label" id="label-countries"><div class="icon" style="color: #388bfd;" id="it-cou"></div>Страны</div>
             <div class="card hoverable anim-item" style="animation-delay: 0.2s;" id="countries-box"></div>
 
-            <div class="label"><div class="icon" style="color: #a371f7;" id="it-bin"></div>Марафоны</div>
+            <div class="label" id="label-binges"><div class="icon" style="color: #a371f7;" id="it-bin"></div>Марафоны</div>
             <div class="card hoverable anim-item" style="animation-delay: 0.25s;" id="binges-box"></div>
 
-            <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star"></div>Оценки и критика</div>
+            <div class="label" id="label-ratings"><div class="icon" style="color: #f1c40f;" id="it-star"></div>Оценки и критика</div>
             <div class="card hoverable anim-item" style="animation-delay: 0.3s;" id="ratings-box">
                 <div class="critic-header">
                     <div class="critic-title-box">
@@ -653,21 +651,60 @@ function render() {
 
     const s = D.summary || {};
     const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
-    document.getElementById('s-time').textContent  = s.duration_display || '0';
-    document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
-    document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
-    document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
-    document.getElementById('s-ep').textContent = vEp;
-    document.getElementById('s-ep').nextElementSibling.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
-    const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
-    document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
-    document.getElementById('s-mov').textContent = vMov;
-    document.getElementById('s-mov').nextElementSibling.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
-    document.getElementById('s-uni').textContent = s.movies_duration || '0м';
+    
+    const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
+
+    const hasHistory = vViews > 0;
+    toggle('label-overview', hasHistory);
+    toggle('grid-overview', hasHistory);
+
+    if (hasHistory) {
+        document.getElementById('s-time').textContent  = s.duration_display || '0';
+        document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
+        document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
+        document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
+        document.getElementById('s-ep').textContent = vEp;
+        document.getElementById('s-ep').nextElementSibling.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+        const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
+        document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
+        document.getElementById('s-mov').textContent = vMov;
+        document.getElementById('s-mov').nextElementSibling.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
+        document.getElementById('s-uni').textContent = s.movies_duration || '0м';
+    }
+
+    const hasDynamics = D.monthly_chart?.views?.some(v => v > 0);
+    toggle('card-dynamics', hasDynamics);
+
+    const hasWeekday = D.weekday_chart?.data?.some(v => v > 0);
+    toggle('card-weekday', hasWeekday);
+
+    const hasHeatmap = D.heatmap?.length > 0;
+    toggle('label-heatmap', hasHeatmap);
+    toggle('card-heatmap', hasHeatmap);
+    if (hasHeatmap) renderHeatmap();
+
+    const hasGenres = D.genres?.length > 0;
+    toggle('label-genres', hasGenres);
+    toggle('card-genres', hasGenres);
+    
+    const hasActors = D.actors?.length > 0;
+    toggle('label-actors', hasActors);
+    toggle('actors-box', hasActors);
+    
+    const hasCountries = D.countries?.length > 0;
+    toggle('label-countries', hasCountries);
+    toggle('countries-box', hasCountries);
+    
+    const hasBinges = D.binges?.length > 0;
+    toggle('label-binges', hasBinges);
+    toggle('binges-box', hasBinges);
 
     const rt = D.ratings;
-    if (rt && rt.total > 0) {
-        document.getElementById('ratings-box').style.display = 'block';
+    const hasRatings = rt && rt.total > 0;
+    toggle('label-ratings', hasRatings);
+    toggle('ratings-box', hasRatings);
+
+    if (hasRatings) {
         document.getElementById('cr-avg').innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
         document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
         
@@ -678,18 +715,15 @@ function render() {
         else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
         
         renderRatingsDist();
-    } else {
-        document.getElementById('ratings-box').style.display = 'none';
-        document.getElementById('it-star').parentElement.style.display = 'none';
     }
 
-    renderHeatmap();
+    toggle('tab-group-btn', !!D.group);
     renderGroup();
     renderCharts();
     
-    fillList('actors-box', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
-    fillList('countries-box', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
-    fillBinges();
+    if (hasActors) fillList('actors-box', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
+    if (hasCountries) fillList('countries-box', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+    if (hasBinges) fillBinges();
 }
 
 function renderRatingsDist() {
@@ -1034,7 +1068,7 @@ function renderHeatmap() {
 
 function fillList(id, items, ico, unit, categoryKey) {
     const el = document.getElementById(id);
-    if (!items?.length) { el.innerHTML = `<div class="empty"><div class="icon">${ico || ''}</div>Нет данных</div>`; return; }
+    if (!items?.length) return;
     
     let html = '';
     items.forEach((it, i) => {
@@ -1069,7 +1103,7 @@ function fillList(id, items, ico, unit, categoryKey) {
 
 function fillBinges() {
     const el = document.getElementById('binges-box');
-    if (!D.binges?.length) { el.innerHTML = `<div class="empty"><div class="icon">${Icons.bolt}</div>Нет марафонов</div>`; return; }
+    if (!D.binges?.length) return;
     
     let html = '';
     D.binges.forEach((b, i) => {
