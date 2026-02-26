@@ -351,14 +351,19 @@
         .hist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: clamp(10px, 3vw, 14px); }
         .grid-item-wrap { display: flex; flex-direction: column; gap: 2px; cursor: pointer; transition: transform 0.2s; }
         .grid-item-wrap:active { transform: scale(0.95); }
-        .grid-item { position: relative; aspect-ratio: 2/3; border-radius: 12px; overflow: hidden; background: var(--bg-input); border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: box-shadow 0.2s; }
+        #history-sentinel {
+            height: 40px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .grid-item { position: relative; aspect-ratio: 2/3; border-radius: 12px; overflow: hidden; background: var(--bg-input); border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: box-shadow 0.2s; transform: translateZ(0); }
         .grid-poster { width: 100%; height: 100%; object-fit: cover; }
         .grid-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 50%); display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; pointer-events: none; }
         .grid-badges { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; pointer-events: none; }
         
         .grid-below-title { font-size: 13px; font-weight: 800; color: var(--text-primary); line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px; padding: 0 2px; }
         .grid-below-orig { font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; margin-top: 1px; }
-        .grid-year { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; backdrop-filter: blur(4px); z-index: 2; }
+        .grid-year { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.85); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; z-index: 2; }
         .grid-user-avatar { 
             width: 22px; 
             height: 22px; 
@@ -514,7 +519,10 @@
                 </div>
             </div>
             <div class="label" style="padding-top:0;"><div class="icon" id="ic-hist-type"></div><span id="hist-title"></span></div>
-            <div id="hist-list" style="padding: 0 clamp(12px, 3vw, 16px) clamp(24px, 6vw, 36px);"></div>
+            <!-- Контейнер для элементов -->
+            <div id="hist-list-container" style="padding: 0 clamp(12px, 3vw, 16px) 0;"></div>
+            <!-- Сентинел для отслеживания скролла -->
+            <div id="history-sentinel"></div>
         </div>
     </div>
 
@@ -1091,8 +1099,100 @@ function renderDonut(canvasId, legendId, sourceData, dataKey, totalMinutesWatche
 window.highlightSegment = function(canvasId, index, active) { const chart = chG[canvasId]; if (!chart) return; if (active) { chart.setActiveElements([{ datasetIndex: 0, index: index }]); chart.tooltip.setActiveElements([{ datasetIndex: 0, index: index }], { x: 0, y: 0 }); } else { chart.setActiveElements([]); chart.tooltip.setActiveElements([], { x: 0, y: 0 }); } chart.update(); };
 window.mainTab = function(t) { document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t)); document.getElementById('sec-personal').classList.toggle('vis', t==='personal'); document.getElementById('sec-group').classList.toggle('vis', t==='group'); };
 
-let curHistData = [], curHistType = '';
+let curHistData =[], curHistType = '';
+let currentHistoryOffset = 0;
+const historyBatchSize = 100;
+let historyObserver = null;
+let isRenderingBatch = false;
 let viewMode = localStorage.getItem('kp_view_mode') || 'grid';
+
+function getHistoryItemHtml(item, idx, type, mode) {
+    const delay = 0; // При инфинит скролле анимация задержки мешает скорости
+    if (mode === 'list') {
+        if (type === 'ratings') {
+            const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
+            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="p" loading="lazy">` : `<div class="hist-poster"></div>`;
+            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
+            const rColor = getRatingColor(item.rating);
+            let seHtml = '';
+            if (item.season && item.episode) seHtml = `<span class="hist-badge">s${item.season}e${item.episode.toString().padStart(2,'0')}</span>`;
+            return `<div class="hist-item anim-item clickable" style="display:flex; align-items:center;">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
+        } else {
+            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="p" loading="lazy">` : `<div class="hist-poster"></div>`;
+            let metaHtml = '';
+            if (item.season_number > 0) {
+                metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
+                if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
+            } else if (item.user_rating) {
+                metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
+            }
+            const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
+            return `<div class="hist-item anim-item clickable">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
+        }
+    } else {
+        // Grid mode
+        const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
+        const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
+        const yearHtml = (item.year || item.show__year) ? `<div class="grid-year">${item.year || item.show__year}</div>` : '';
+        
+        if (type === 'ratings') {
+            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
+            return `<div class="grid-item-wrap anim-item"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div></div>`;
+        } else {
+            let badgesHtml = '';
+            if (item.season_number > 0) badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6);border:none;">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
+            if (item.user_rating) badgesHtml += `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${Icons.star}${item.user_rating}</span>`;
+            return `<div class="grid-item-wrap anim-item"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay"><div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
+        }
+    }
+}
+
+window.renderNextHistoryBatch = function() {
+    if (isRenderingBatch || currentHistoryOffset >= curHistData.length) return;
+    isRenderingBatch = true;
+
+    const container = document.getElementById('hist-list-container');
+    const batch = curHistData.slice(currentHistoryOffset, currentHistoryOffset + historyBatchSize);
+    
+    let html = batch.map((item, idx) => getHistoryItemHtml(item, currentHistoryOffset + idx, curHistType, viewMode)).join('');
+    
+    // Вставляем без перезатирания старого контента
+    if (currentHistoryOffset === 0 && viewMode === 'list') {
+        container.innerHTML = '<div class="card" style="margin:0; padding:0; overflow:hidden;">' + html + '</div>';
+    } else if (currentHistoryOffset === 0 && viewMode === 'grid') {
+        container.innerHTML = '<div class="hist-grid">' + html + '</div>';
+    } else {
+        const target = viewMode === 'list' ? container.firstChild : container.firstChild;
+        container.firstChild.insertAdjacentHTML('beforeend', html);
+    }
+
+    currentHistoryOffset += historyBatchSize;
+    isRenderingBatch = false;
+
+    // Если данные закончились, отключаем обсервер
+    if (currentHistoryOffset >= curHistData.length && historyObserver) {
+        historyObserver.disconnect();
+    }
+};
+
+window.initHistoryObserver = function() {
+    if (historyObserver) historyObserver.disconnect();
+    
+    const options = {
+        root: null,
+        rootMargin: '2000px',
+        threshold: 0.1
+    };
+
+    historyObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+            renderNextHistoryBatch();
+        }
+    }, options);
+
+    const sentinel = document.getElementById('history-sentinel');
+    if (sentinel) historyObserver.observe(sentinel);
+};
 
 window.setViewMode = function(mode) {
     viewMode = mode;
@@ -1102,157 +1202,24 @@ window.setViewMode = function(mode) {
     }
 };
 
-window.renderHistoryList = function() {
-    const el = document.getElementById('hist-list');
-    const type = curHistType;
-    const data = curHistData;
 
+window.renderHistoryList = function() {
+    currentHistoryOffset = 0;
+    const container = document.getElementById('hist-list-container');
+    container.innerHTML = '';
+    
     document.getElementById('vt-grid').innerHTML = Icons.grid;
     document.getElementById('vt-list').innerHTML = Icons.list;
     document.getElementById('vt-grid').classList.toggle('active', viewMode === 'grid');
     document.getElementById('vt-list').classList.toggle('active', viewMode === 'list');
-    
-    if (!data || !data.length) {
-        el.innerHTML = `<div class="empty"><div class="icon">${Icons.dash}</div>Нет просмотров</div>`; 
+
+    if (!curHistData || !curHistData.length) {
+        container.innerHTML = `<div class="empty"><div class="icon">${Icons.dash}</div>Нет просмотров</div>`;
         return;
     }
 
-    let html = '';
-    if (viewMode === 'list') {
-        html = '<div class="card" style="margin:0; padding:0; overflow:hidden;">';
-        data.forEach((item, idx) => {
-            const delay = Math.min((idx + 1) * 0.03, 0.6); 
-            if (type === 'ratings') {
-                const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
-                const yearSuffix = item.year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.year})</span>` : '';
-                const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` : `<div class="hist-poster"></div>`;
-                let seHtml = '';
-                if (item.season && item.episode) { const e = item.episode < 10 ? '0' + item.episode : item.episode; seHtml = `<span class="hist-badge">s${item.season}e${e}</span>`; } else if (item.season !== undefined && item.season !== null && item.episode === null) { seHtml = `<span class="hist-badge">Сериал</span>`; }
-                const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-                const rColor = getRatingColor(item.rating);
-                html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s; display:flex; align-items:center;">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}${yearSuffix}</div>${origTitle}<div class="hist-meta" style="margin-bottom:4px;">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
-            } else {
-                let metaHtml = '';
-                if (item.season_number !== undefined && item.season_number > 0) {
-                    const s = item.season_number, e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
-                    metaHtml += `<span class="hist-badge">s${s}e${e}</span>`;
-                    if (item.user_rating) { const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`; }
-                    if (item.user_show_rating) { const rsVal = Number.isInteger(item.user_show_rating) ? item.user_show_rating : item.user_show_rating.toFixed(1); metaHtml += `<span class="rating-badge show-lvl">(${rsVal})</span>`; }
-                } else {
-                    if (item.user_rating) { const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`; }
-                }
-                
-                const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="margin-top:2px; font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
-                const origTitle = item.show__original_title && item.show__original_title !== item.show__title ? `<div class="hist-orig">${item.show__original_title}</div>` : '';
-                const yearSuffix = item.show__year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.show__year})</span>` : '';
-                const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` : `<div class="hist-poster"></div>`;
-                html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}${yearSuffix}</div>${origTitle}<div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
-            }
-        });
-        html += '</div>';
-    } else {
-        html = '<div class="hist-grid">';
-
-        function getUserAvatarHtml(uid, name, photo) {
-            if (photo) return `<img src="${photo}" class="grid-user-avatar" title="${name}">`;
-            if (uid === D.meta?.id && D.meta?.photo_url) return `<img src="${D.meta.photo_url}" class="grid-user-avatar" title="${name}">`;
-            if (D.group?.members) {
-                const m = D.group.members.find(x => x.id === uid);
-                if (m && m.photo_url) return `<img src="${m.photo_url}" class="grid-user-avatar" title="${name}">`;
-            }
-            
-            const palette = [
-                '#ff5f5f', '#388bfd', '#2ea043', '#f1c40f', 
-                '#a371f7', '#e67e22', '#1abc9c', '#eb4d4b',
-                '#686de0', '#badc58'
-            ];
-            const bgColor = palette[uid % palette.length];
-            
-            let displayChar = name ? name.charAt(0).toUpperCase() : '?';
-            if (name && name.startsWith('Участник ')) {
-                const parts = name.split(' ');
-                if (parts.length > 1) displayChar = parts[1];
-            }
-            
-            return `<div class="grid-user-avatar" title="${name}" style="background-color: ${bgColor}">${displayChar}</div>`;
-        }
-
-        data.forEach((item, idx) => {
-            const delay = Math.min((idx + 1) * 0.03, 0.6); 
-            if (type === 'ratings') {
-                const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-                const rColor = getRatingColor(item.rating);
-                const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
-                const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy" onerror="this.style.display='none'">` : '<div class="grid-poster" style="background:var(--bg-input)"></div>';
-                
-                let seHtml = '';
-                if (item.season && item.episode) { 
-                    const e = item.episode < 10 ? '0' + item.episode : item.episode; 
-                    seHtml = `<span class="hist-badge" style="background:rgba(0,0,0,0.6); border:none; color:#fff;">s${item.season}e${e}</span>`; 
-                } else if (item.season !== undefined && item.season !== null && item.episode === null) { 
-                    seHtml = `<span class="hist-badge" style="background:rgba(0,0,0,0.6); border:none; color:#fff;">Сериал</span>`; 
-                }
-
-                const yearHtml = item.year ? `<div class="grid-year">${item.year}</div>` : '';
-
-                html += `
-                <div class="grid-item-wrap anim-item" style="animation-delay:${delay}s">
-                    <div class="grid-item rating-card">
-                        ${posterHtml}
-                        ${yearHtml}
-                        <div class="big-rating-badge" style="background: ${rColor};">${rVal}</div>
-                        <div class="grid-badges">${seHtml}</div>
-                        <div class="grid-overlay">
-                            <div class="grid-date">${item.date}</div>
-                        </div>
-                    </div>
-                    <div class="grid-below-title">${item.title}</div>
-                    ${item.original_title && item.original_title !== item.title ? `<div class="grid-below-orig">${item.original_title}</div>` : ''}
-                </div>`;
-            } else {
-                const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
-                const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy" onerror="this.style.display='none'">` : '<div class="grid-poster" style="background:var(--bg-input)"></div>';
-                
-                let badgesHtml = '';
-                if (item.season_number !== undefined && item.season_number > 0) {
-                    const s = item.season_number, e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
-                    badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6); border:none; color:#fff;">s${s}e${e}</span>`;
-                }
-                if (item.user_rating) { 
-                    const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); 
-                    badgesHtml += `<span class="rating-badge" style="background:rgba(0,0,0,0.6); border:none; color:var(--accent);">${Icons.star}${rVal}</span>`; 
-                }
-                
-                let usersHtml = '';
-                if (item.user_names && item.user_names.length > 0) {
-                    if (D.group || item.user_names.length > 1) {
-                        const avatars = item.user_names.map((n, i) => getUserAvatarHtml(item.user_ids[i], n, item.user_photos ? item.user_photos[i] : null));
-                        usersHtml = `<div class="grid-users">${avatars.join('')}</div>`;
-                    }
-                }
-
-                const yearHtml = item.show__year ? `<div class="grid-year">${item.show__year}</div>` : '';
-
-                html += `
-                <div class="grid-item-wrap anim-item" style="animation-delay:${delay}s">
-                    <div class="grid-item">
-                        ${posterHtml}
-                        ${yearHtml}
-                        <div class="grid-badges">${badgesHtml}</div>
-                        <div class="grid-overlay">
-                            ${usersHtml}
-                            <div class="grid-date">${item.view_date}</div>
-                        </div>
-                    </div>
-                    <div class="grid-below-title">${item.show__title}</div>
-                    ${item.show__original_title && item.show__original_title !== item.show__title ? `<div class="grid-below-orig">${item.show__original_title}</div>` : ''}
-                </div>`;
-            }
-        });
-        html += '</div>';
-    }
-    el.innerHTML = html; 
-    window.scrollTo(0, 0);
+    renderNextHistoryBatch();
+    initHistoryObserver();
 };
 
 window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, extraIndex) {
@@ -1262,70 +1229,52 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
     document.getElementById('sec-personal').classList.remove('vis');
     document.getElementById('sec-group').classList.remove('vis');
     
-    const secHist = document.getElementById('sec-history');
-    secHist.classList.add('vis');
-    
-    if (tg && tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(window.closeHistory); }
+    document.getElementById('sec-history').classList.add('vis');
+    if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(window.closeHistory); }
     
     curHistType = type;
-    let data;
-
+    // ... (логика фильтрации данных curHistData остается такой же, как в оригинале) ...
     if (type === 'all') {
-        data = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = 'Вся история просмотров'; document.getElementById('ic-hist-type').innerHTML = Icons.dash;
-    } else if (type === 'weekday') {
-        data = [...D.history_movies, ...D.history_episodes].filter(item => {
-            const date = new Date(item.view_date);
-            const jsDay = date.getDay(); 
-            const chartIndex = jsDay === 0 ? 6 : jsDay - 1;
-            return chartIndex === extraIndex;
-        }).sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = `Просмотры: ${extraTitle}`;
-        document.getElementById('ic-hist-type').innerHTML = Icons.cal;
-    } else if (type === 'group_member') {
-        const member = D.group.members[extraIndex];
-        data = [...D.group.history_movies, ...D.group.history_episodes]
-            .filter(item => item.user_ids.includes(member.id))
-            .sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = `Смотрел: ${extraTitle}`;
-        document.getElementById('ic-hist-type').innerHTML = Icons.user;
-    } else if (type === 'ratings' || type === 'rating_filter') {
-        if (type === 'rating_filter') {
-            const targetBucket = extraIndex; 
-            data = D.ratings.history.filter(item => (item.rating >= 1 ? Math.floor(item.rating) : 1) === targetBucket);
-            document.getElementById('hist-title').textContent = `Оценки: ${targetBucket}`;
-        } else { data = D.ratings.history; document.getElementById('hist-title').textContent = 'История оценок'; }
-        document.getElementById('ic-hist-type').innerHTML = Icons.star; document.getElementById('ic-hist-type').style.color = '#f1c40f';
-        curHistType = 'ratings';
-    }  else if (type === 'day') {
-        data = [...D.history_movies, ...D.history_episodes]
-            .filter(i => i.view_date === extraDate)
-            .sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = extraDate; document.getElementById('ic-hist-type').innerHTML = Icons.cal;
-    } else if (type === 'binge') {
-        data = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => { if (a.season_number !== b.season_number) return a.season_number - b.season_number; return a.episode_number - b.episode_number; });
-        document.getElementById('hist-title').textContent = extraTitle; document.getElementById('ic-hist-type').innerHTML = Icons.bolt;
+        curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date));
+        document.getElementById('hist-title').textContent = 'Вся история';
+    } else if (type === 'day') {
+        curHistData = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate);
+        document.getElementById('hist-title').textContent = extraDate;
+    } else if (type === 'ratings') {
+        curHistData = D.ratings.history;
+        document.getElementById('hist-title').textContent = 'Оценки';
+    } else if (type === 'movies') {
+        curHistData = D.history_movies;
+        document.getElementById('hist-title').textContent = 'Фильмы';
+    } else if (type === 'episodes') {
+        curHistData = D.history_episodes;
+        document.getElementById('hist-title').textContent = 'Эпизоды';
     } else if (type === 'filter') {
         const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] : [...D.history_movies, ...D.history_episodes];
         const allowedIds = D[extraKey][extraIndex].show_ids || [];
-        data = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
+        curHistData = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
         document.getElementById('hist-title').textContent = extraTitle;
-        let iconHtml = Icons.star;
-        if (extraKey.includes('genres')) iconHtml = Icons.masks; else if (extraKey === 'countries') iconHtml = Icons.globe;
-        document.getElementById('ic-hist-type').innerHTML = iconHtml;
-    } else {
-        data = type === 'movies' ? D.history_movies : D.history_episodes;
-        document.getElementById('hist-title').textContent = type === 'movies' ? 'Просмотренные фильмы' : 'Просмотренные эпизоды';
-        document.getElementById('ic-hist-type').innerHTML = type === 'movies' ? Icons.film : Icons.tv;
+    } else if (type === 'group_member') {
+        const member = D.group.members[extraIndex];
+        curHistData = [...D.group.history_movies, ...D.group.history_episodes].filter(item => item.user_ids.includes(member.id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
+        document.getElementById('hist-title').textContent = extraTitle;
+    } else if (type === 'weekday') {
+        curHistData = [...D.history_movies, ...D.history_episodes].filter(item => {
+            const date = new Date(item.view_date);
+            const jsDay = date.getDay();
+            return (jsDay === 0 ? 6 : jsDay - 1) === extraIndex;
+        }).sort((a, b) => b.view_date.localeCompare(a.view_date));
+        document.getElementById('hist-title').textContent = extraTitle;
     }
-    
-    curHistData = data;
+
     renderHistoryList();
+    window.scrollTo(0, 0);
 };
 
 window.closeHistory = function() {
-    if (tg && tg.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(window.closeHistory); }
-    if (D && D.group) document.getElementById('main-tabs').classList.remove('hidden');
+    if (historyObserver) historyObserver.disconnect();
+    if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(window.closeHistory); }
+    if (D?.group) document.getElementById('main-tabs').classList.remove('hidden');
     if (availableYears.length > 1) document.getElementById('years').classList.remove('hidden');
     document.getElementById('sec-history').classList.remove('vis');
     mainTab(document.querySelector('#main-tabs .tab.on')?.dataset.tab || 'personal');

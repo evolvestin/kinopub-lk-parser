@@ -16,7 +16,10 @@ from django.views.decorators.http import require_http_methods
 
 from app.dashboard import dashboard_callback
 from app.models import (
+    Country,
+    Genre,
     LogEntry,
+    Person,
     SharedStat,
     Show,
     ShowDuration,

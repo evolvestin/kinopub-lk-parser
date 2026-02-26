@@ -497,10 +497,8 @@ async def handle_history_action_command(message: Message, bot: Bot):
 
 
 async def handle_stats_command(message: Message, bot: Bot):
-    """
-    Отправляет кнопку для открытия WebApp со статистикой.
-    """
     dynamic_url = URLStore().get_url()
+    env = os.getenv('ENVIRONMENT', 'DEV')
 
     # Приоритет: Динамическая ссылка -> ENV переменная -> Бэкенд
     base_url = (
