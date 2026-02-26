@@ -32,6 +32,7 @@ from app.models import (
     Genre,
     LogEntry,
     Person,
+    SharedStat,
     Show,
     ShowDuration,
     TelegramLog,
@@ -39,7 +40,6 @@ from app.models import (
     ViewHistory,
     ViewUser,
     ViewUserGroup,
-    SharedStat,
 )
 from app.telegram_bot import TelegramSender
 from app.views import sync_user_permissions

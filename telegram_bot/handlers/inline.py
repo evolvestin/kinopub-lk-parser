@@ -28,31 +28,31 @@ async def inline_share_handler(query: InlineQuery):
 
     bot_username = await BotInstance().get_bot_username()
     env = os.getenv('ENVIRONMENT', 'DEV')
-    
+
     # На проде используем прямой запуск Mini App (требует настройки в BotFather)
     # Формат: https://t.me/bot_username/app_name?startapp=query
     if env == 'PROD':
         app_name = os.getenv('WEBAPP_SHORT_NAME', 'stats')
-        url = f"https://t.me/{bot_username}/{app_name}?startapp=stat_{stat_id}"
-        btn_text = "Открыть статистику"
+        url = f'https://t.me/{bot_username}/{app_name}?startapp=stat_{stat_id}'
+        btn_text = 'Открыть статистику'
     else:
         # В DEV режиме (туннель) идем через Deep Link бота, чтобы избежать BOT_INVALID
-        url = f"https://t.me/{bot_username}?start=stat_{stat_id}"
-        btn_text = "Перейти к статистике"
+        url = f'https://t.me/{bot_username}?start=stat_{stat_id}'
+        btn_text = 'Перейти к статистике'
 
     article = InlineQueryResultArticle(
-        id=f"share_{stat_id}",
-        title="Поделиться статистикой",
-        description="Нажмите, чтобы отправить статистику",
-        thumbnail_url="https://img.icons8.com/color/96/combo-chart--v1.png",
+        id=f'share_{stat_id}',
+        title='Поделиться статистикой',
+        description='Нажмите, чтобы отправить статистику',
+        thumbnail_url='https://img.icons8.com/color/96/combo-chart--v1.png',
         input_message_content=InputTextMessageContent(
-            message_text=f"📊 {bold('Смотри мою статистику!')}",
-            parse_mode="HTML",
-            link_preview_options=LinkPreviewOptions(is_disabled=True)
+            message_text=f'📊 {bold("Смотри мою статистику!")}',
+            parse_mode='HTML',
+            link_preview_options=LinkPreviewOptions(is_disabled=True),
         ),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=btn_text, url=url)]
-        ])
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text=btn_text, url=url)]]
+        ),
     )
 
     await query.answer([article], cache_time=10, is_personal=False)

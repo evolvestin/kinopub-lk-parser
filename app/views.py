@@ -6,10 +6,6 @@ import uuid
 
 from django.conf import settings
 from django.contrib.auth.models import Permission, User
-from app.models import SharedStat
-
-from django.conf import settings
-from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.http import JsonResponse
@@ -21,6 +17,7 @@ from django.views.decorators.http import require_http_methods
 from app.dashboard import dashboard_callback
 from app.models import (
     LogEntry,
+    SharedStat,
     Show,
     ShowDuration,
     TelegramLog,
@@ -884,12 +881,12 @@ def webapp_get_detailed_stats(request):
 
         try:
             view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
-            
+
             view_user.update_personal_details(
                 username=tg_user.get('username'),
                 name=tg_user.get('first_name'),
                 language=tg_user.get('language_code'),
-                photo_url=tg_user.get('photo_url')
+                photo_url=tg_user.get('photo_url'),
             )
         except ViewUser.DoesNotExist:
             return JsonResponse({'error': 'User not found'}, status=404)
@@ -913,7 +910,7 @@ def webapp_bake_stats(request):
     try:
         body = json.loads(request.body)
         init_data = body.get('init_data')
-        
+
         tg_user = validate_telegram_init_data(init_data)
         if not tg_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
@@ -935,7 +932,7 @@ def webapp_bake_stats(request):
         baked_data = {}
         for yr in years:
             year_val = None if yr == 'all' else yr
-            
+
             stat = generate_user_stats(view_user, year=year_val)
             stat = json.loads(json.dumps(stat))
 
@@ -945,40 +942,40 @@ def webapp_bake_stats(request):
                 group_stats = generate_group_stats(view_user, year=year_val)
                 if group_stats:
                     group_stats = json.loads(json.dumps(group_stats))
-                    
+
                     if anon_group:
                         group_stats['group_name'] = 'Группа'
-                    
+
                     for idx, member in enumerate(group_stats['members'], 1):
                         mid = member.get('id')
                         is_me = mid == view_user.id
-                        
+
                         should_hide = False
                         if is_me and anon_user:
                             should_hide = True
                         elif not is_me and anon_group:
                             should_hide = True
-                        
+
                         display_name = f'Участник {idx}' if should_hide else member['name']
                         display_photo = None if should_hide else member.get('photo_url')
-                        
+
                         user_info_map[mid] = {
                             'id': idx,
                             'name': display_name,
-                            'photo': display_photo
+                            'photo': display_photo,
                         }
-                        
+
                         member['id'] = idx
                         member['name'] = display_name
                         member['photo_url'] = display_photo
 
                     stat['group'] = group_stats
-            
+
             if view_user.id not in user_info_map:
                 user_info_map[view_user.id] = {
                     'id': 1,
                     'name': 'Участник' if anon_user else (view_user.name or view_user.username),
-                    'photo': None if anon_user else view_user.photo_url
+                    'photo': None if anon_user else view_user.photo_url,
                 }
 
             history_pools = [stat]
@@ -990,24 +987,20 @@ def webapp_bake_stats(request):
                     if h_type not in pool:
                         continue
                     for item in pool[h_type]:
-                        new_ids = []
-                        new_names = []
-                        new_photos = []
-                        
+                        mapped_users = []
+
                         for uid in item.get('user_ids', []):
                             info = user_info_map.get(uid)
                             if info:
-                                new_ids.append(info['id'])
-                                new_names.append(info['name'])
-                                new_photos.append(info['photo'])
+                                mapped_users.append(info)
                             else:
-                                new_ids.append(0)
-                                new_names.append('Участник')
-                                new_photos.append(None)
-                        
-                        item['user_ids'] = new_ids
-                        item['user_names'] = new_names
-                        item['user_photos'] = new_photos
+                                mapped_users.append({'id': 0, 'name': 'Участник', 'photo': None})
+
+                        mapped_users.sort(key=lambda x: x['id'])
+
+                        item['user_ids'] = [u['id'] for u in mapped_users]
+                        item['user_names'] = [u['name'] for u in mapped_users]
+                        item['user_photos'] = [u['photo'] for u in mapped_users]
 
             if anon_user:
                 stat['meta']['name'] = 'Участник'
@@ -1021,18 +1014,14 @@ def webapp_bake_stats(request):
 
             baked_data[str(yr)] = stat
 
-        final_payload = {
-            'metadata': {'years': years}, 
-            'data': baked_data
-        }
+        final_payload = {'metadata': {'years': years}, 'data': baked_data}
 
-        content_hash = hashlib.sha256(json.dumps(final_payload, sort_keys=True).encode()).hexdigest()
+        content_hash = hashlib.sha256(
+            json.dumps(final_payload, sort_keys=True).encode()
+        ).hexdigest()
         stat_id = content_hash[:16]
-        
-        SharedStat.objects.get_or_create(
-            id=stat_id, 
-            defaults={'data': final_payload}
-        )
+
+        SharedStat.objects.get_or_create(id=stat_id, defaults={'data': final_payload})
 
         return JsonResponse({'id': stat_id})
 

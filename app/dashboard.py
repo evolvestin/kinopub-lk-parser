@@ -11,7 +11,6 @@ from shared.constants import DATETIME_FORMAT
 from shared.formatters import format_duration
 
 
-
 def dashboard_callback(context):
     ShowDuration = apps.get_model('app', 'ShowDuration')
     ViewHistory = apps.get_model('app', 'ViewHistory')

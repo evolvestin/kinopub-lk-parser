@@ -43,7 +43,7 @@ class Command(LoggableBaseCommand):
         if not ids_to_scan and options.get('file'):
             file_path = os.path.join('/data', options['file'])
             if os.path.exists(file_path):
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     for line in f:
                         clean_line = line.strip()
                         if clean_line.isdigit():

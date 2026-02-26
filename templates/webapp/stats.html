@@ -359,14 +359,27 @@
         .grid-below-title { font-size: 13px; font-weight: 800; color: var(--text-primary); line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px; padding: 0 2px; }
         .grid-below-orig { font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; margin-top: 1px; }
         .grid-year { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; backdrop-filter: blur(4px); z-index: 2; }
-        .grid-user-avatar { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg-input); background: var(--info); color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-left: -6px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); object-fit: cover; z-index: 1;}
+        .grid-user-avatar { 
+            width: 22px; 
+            height: 22px; 
+            border-radius: 50%; 
+            border: 1.5px solid var(--bg-card); 
+            color: #fff; 
+            font-size: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-weight: 900; 
+            margin-left: -8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3); 
+            object-fit: cover; 
+            z-index: 1;
+        }
         .grid-user-avatar:first-child { margin-left: 0; }
         .grid-users { display: flex; flex-wrap: wrap; margin-bottom: 6px; padding-left: 2px; }
-        .grid-date { color: var(--accent); font-size: 10px; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        .grid-date { color: var(--accent); font-size: 10px; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,0.8); text-align: right; width: 100%; }
         
-        .grid-item.rating-card .grid-badges { top: auto; bottom: 8px; right: 8px; }
-        .grid-item.rating-card .grid-overlay { padding-bottom: 30px; }
-        .grid-item .big-rating-badge { width: 32px; height: 32px; font-size: 14px; position: absolute; top: 8px; left: 8px; }
+        .grid-item .big-rating-badge { width: 32px; height: 32px; font-size: 14px; position: absolute; bottom: 8px; left: 8px; z-index: 5; }
         .grid-item .rating-badge { background: rgba(0,0,0,0.6); color: var(--accent); border: 1px solid rgba(255,255,255,0.1); }
         .grid-item .hist-badge { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
     </style>
@@ -1147,7 +1160,21 @@ window.renderHistoryList = function() {
                 const m = D.group.members.find(x => x.id === uid);
                 if (m && m.photo_url) return `<img src="${m.photo_url}" class="grid-user-avatar" title="${name}">`;
             }
-            return `<div class="grid-user-avatar" title="${name}">${name ? name.charAt(0).toUpperCase() : '?'}</div>`;
+            
+            const palette = [
+                '#ff5f5f', '#388bfd', '#2ea043', '#f1c40f', 
+                '#a371f7', '#e67e22', '#1abc9c', '#eb4d4b',
+                '#686de0', '#badc58'
+            ];
+            const bgColor = palette[uid % palette.length];
+            
+            let displayChar = name ? name.charAt(0).toUpperCase() : '?';
+            if (name && name.startsWith('Участник ')) {
+                const parts = name.split(' ');
+                if (parts.length > 1) displayChar = parts[1];
+            }
+            
+            return `<div class="grid-user-avatar" title="${name}" style="background-color: ${bgColor}">${displayChar}</div>`;
         }
 
         data.forEach((item, idx) => {

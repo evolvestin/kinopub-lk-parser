@@ -8,7 +8,6 @@ import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from urllib.parse import urlparse
 
 import undetected_chromedriver as uc
 from django.conf import settings
@@ -83,23 +82,18 @@ def _extract_int_from_string(text):
     return int(digits)
 
 
-def update_show_details(driver, show_id, force=False):
+def update_show_details(driver, show_id, force=False, session_type='main'):
     target_path = f'item/view/{show_id}'
+    base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
 
-    if target_path not in driver.current_url:
-        base_url = settings.SITE_URL
-
-        if driver.current_url and driver.current_url.startswith('http'):
-            parsed = urlparse(driver.current_url)
-            if parsed.netloc:
-                base_url = f'{parsed.scheme}://{parsed.netloc}/'
-
-        try:
-            driver.get(f'{base_url}{target_path}')
-            time.sleep(2)
-        except Exception as e:
-            logging.error(f'Error navigating to show page {show_id}: {e}')
-            return
+    try:
+        driver = open_url_safe(
+            driver, f'{base_url.rstrip("/")}/{target_path}', session_type=session_type
+        )
+        time.sleep(2)
+    except Exception as e:
+        logging.error(f'Error navigating to show page {show_id}: {e}')
+        return
 
     if 'Not Found' in driver.title or '404' in driver.title:
         logging.warning(f'Show {show_id} returned 404.')
@@ -532,32 +526,45 @@ def initialize_driver_session(headless=True, session_type='main'):
         return None
 
 
-def _fetch_playlist_data(driver, url):
+def _fetch_playlist_data(driver, url, session_type='main'):
     logging.info(f'Requesting playlist data from {url}...')
-    try:
-        driver.get(url)
-        wait = WebDriverWait(driver, 20)
-        wait.until(
-            expected_conditions.presence_of_element_located(
-                (By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]')
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            driver = open_url_safe(driver, url, session_type=session_type)
+            wait = WebDriverWait(driver, 30)
+            wait.until(
+                expected_conditions.presence_of_element_located(
+                    (By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]')
+                )
             )
-        )
-        script_element = driver.find_element(
-            By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]'
-        )
-        script_text = script_element.get_attribute('innerHTML')
-        match = re.search(r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);', script_text, re.DOTALL)
-        if match:
-            return json.loads(match.group(1))
-        logging.warning(f'Could not find PLAYER_PLAYLIST JSON for {url}')
-    except Exception as e:
-        logging.error(f'Error getting playlist data from {url}: {e}')
+            script_element = driver.find_element(
+                By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]'
+            )
+            script_text = script_element.get_attribute('innerHTML')
+            match = re.search(r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);', script_text, re.DOTALL)
+            if match:
+                return json.loads(match.group(1))
+
+            if attempt < max_retries - 1:
+                time.sleep(5)
+                continue
+            logging.warning(f'Could not find PLAYER_PLAYLIST JSON for {url}')
+        except Exception as e:
+            if attempt < max_retries - 1:
+                logging.warning(f'Retry {attempt + 1} for playlist {url} due to: {e}')
+                time.sleep(5)
+                continue
+            logging.error(
+                f'Error getting playlist data from {url} after {max_retries} attempts: {e}'
+            )
     return None
 
 
-def get_movie_duration_and_save(driver, show_id):
-    movie_url = f'{settings.SITE_URL}item/play/{show_id}/s0e1'
-    playlist_data = _fetch_playlist_data(driver, movie_url)
+def get_movie_duration_and_save(driver, show_id, session_type='main'):
+    base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
+    movie_url = f'{base_url.rstrip("/")}/item/play/{show_id}/s0e1'
+    playlist_data = _fetch_playlist_data(driver, movie_url, session_type=session_type)
 
     if playlist_data and 'duration' in playlist_data[0]:
         duration_sec = playlist_data[0]['duration']
@@ -572,9 +579,10 @@ def get_movie_duration_and_save(driver, show_id):
         logging.warning('Playlist data empty or missing duration for movie %s', movie_url)
 
 
-def get_season_durations_and_save(driver, show_id, season):
-    episode_url = f'{settings.SITE_URL}item/play/{show_id}/s{season}e1'
-    playlist_data = _fetch_playlist_data(driver, episode_url)
+def get_season_durations_and_save(driver, show_id, season, session_type='main'):
+    base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
+    episode_url = f'{base_url.rstrip("/")}/item/play/{show_id}/s{season}e1'
+    playlist_data = _fetch_playlist_data(driver, episode_url, session_type=session_type)
 
     if not playlist_data:
         return
@@ -605,7 +613,7 @@ def get_season_durations_and_save(driver, show_id, season):
         logging.warning('No episodes found in playlist for show id%d season %d', show_id, season)
 
 
-def parse_and_save_history(driver, mode, latest_db_date=None):
+def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main'):
     wait = WebDriverWait(driver, 20)
     wait.until(expected_conditions.presence_of_element_located((By.CSS_SELECTOR, '.item-list')))
 
@@ -766,12 +774,12 @@ def parse_and_save_history(driver, mode, latest_db_date=None):
             len(unique_movie_ids_to_fetch),
         )
         for show_id in unique_movie_ids_to_fetch:
-            get_movie_duration_and_save(driver, show_id)
+            get_movie_duration_and_save(driver, show_id, session_type=session_type)
 
     if seasons_to_fetch:
         logging.info('Need to fetch duration data for %d season(s).', len(seasons_to_fetch))
         for (show_id, season), _ in seasons_to_fetch.items():
-            get_season_durations_and_save(driver, show_id, season)
+            get_season_durations_and_save(driver, show_id, season, session_type=session_type)
 
     return views_added, stop_parsing
 
@@ -931,18 +939,16 @@ def run_parser_session(headless=True, driver_instance=None):
         close_driver(driver)
 
 
-def process_show_durations(driver, show):
-    """
-    Determines if the show is a movie or series and fetches durations accordingly.
-    For series, it parses the available seasons from window.PLAYER_SEASONS on the player page.
-    """
+def process_show_durations(driver, show, session_type='main'):
     if show.type not in SERIES_TYPES:
-        get_movie_duration_and_save(driver, show.id)
+        get_movie_duration_and_save(driver, show.id, session_type=session_type)
     else:
         try:
-            player_url = f'{settings.SITE_URL}item/play/{show.id}/s1e1'
+            base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
+            player_url = f'{base_url.rstrip("/")}/item/play/{show.id}/s1e1'
             logging.info(f'Navigating to player to fetch seasons list: {player_url}')
-            driver.get(player_url)
+
+            driver = open_url_safe(driver, player_url, session_type=session_type)
 
             wait = WebDriverWait(driver, 20)
             wait.until(
@@ -973,7 +979,7 @@ def process_show_durations(driver, show):
             logging.info(f'Found seasons {sorted(list(seasons))} for show {show.id}')
 
             for season in sorted(list(seasons)):
-                get_season_durations_and_save(driver, show.id, season)
+                get_season_durations_and_save(driver, show.id, season, session_type=session_type)
 
         except Exception as e:
             logging.error(f'Error processing seasons for show {show.id}: {e}')

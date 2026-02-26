@@ -15,9 +15,17 @@ urlpatterns = [
     # WebApp Endpoints
     path('webapp/', views.webapp_index, name='webapp_index'),
     path('api/webapp/stats/', views.webapp_get_stats, name='webapp_get_stats'),
-    path('api/webapp/detailed_stats/', views.webapp_get_detailed_stats, name='webapp_get_detailed_stats'),
+    path(
+        'api/webapp/detailed_stats/',
+        views.webapp_get_detailed_stats,
+        name='webapp_get_detailed_stats',
+    ),
     path('api/webapp/bake_stats/', views.webapp_bake_stats, name='webapp_bake_stats'),
-    path('api/webapp/shared_stats/<str:stat_id>/', views.webapp_get_shared_stats, name='webapp_get_shared_stats'),
+    path(
+        'api/webapp/shared_stats/<str:stat_id>/',
+        views.webapp_get_shared_stats,
+        name='webapp_get_shared_stats',
+    ),
     # Bot API Endpoints
     path('api/bot/check/<int:telegram_id>/', views.check_bot_user),
     path('api/bot/register/', views.register_bot_user),

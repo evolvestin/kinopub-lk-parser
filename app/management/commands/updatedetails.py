@@ -105,7 +105,7 @@ class Command(LoggableBaseCommand):
                     if specific_id:
                         Show.objects.filter(id=show_id).update(year=None, updated_at=timezone.now())
 
-                    update_show_details(driver, show_id)
+                    update_show_details(driver, show_id, session_type='aux')
 
                     logging.info(f'Successfully updated details for show ID {show_id}.')
                     updated_count += 1

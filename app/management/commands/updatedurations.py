@@ -57,7 +57,6 @@ class Command(LoggableBaseCommand):
                 logging.error(f'Show ID {specific_id} not found.')
                 return
         else:
-            # --- Existing logic for batch selection ---
             target_show_type = None
             url_type = None
 
@@ -76,14 +75,6 @@ class Command(LoggableBaseCommand):
                     f'Series mode detected ({target_show_type}). '
                     f'Limit ignored. Fetching shows based on logs...'
                 )
-
-                # Для краткости: в режиме --id мы пропускаем этот блок поиска.
-                # Если вы хотите сохранить полную логику, она остается в ветке else.
-                # Здесь предполагается, что оригинальный код поиска ID остается внутри `else`.
-
-                # В данном блоке я упрощаю вывод для соблюдения лимита токенов,
-                # подразумевая что старая логика остается в блоке `else`, если она не меняется.
-                # Но так как я должен выдать полный рабочий блок функции, я скопирую логику поиска.
 
                 first_anchor_log = (
                     LogEntry.objects.filter(
@@ -192,11 +183,10 @@ class Command(LoggableBaseCommand):
                         raise Exception(f'Driver unresponsive: {e}') from e
 
                     show = Show.objects.get(id=show_id)
-                    process_show_durations(driver, show)
+                    process_show_durations(driver, show, session_type='main')
 
                     logging.info(f'Finished processing durations for show ID {show_id}.')
 
-                    # Очищаем ошибки только если это не ручной запуск
                     if not specific_id:
                         LogEntry.objects.filter(
                             Q(message__icontains=f'show id {show_id}')

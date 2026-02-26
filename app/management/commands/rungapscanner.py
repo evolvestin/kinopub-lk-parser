@@ -1,4 +1,3 @@
-import logging
 import re
 import time
 
@@ -64,7 +63,7 @@ class Command(LoggableBaseCommand):
         processed_count = 0
 
         try:
-            for index, show_id in enumerate(missing_ids, start=1):
+            for _, show_id in enumerate(missing_ids, start=1):
                 if driver is None:
                     driver = initialize_driver_session(session_type='aux')
                     if not driver:

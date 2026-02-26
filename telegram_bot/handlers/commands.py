@@ -36,18 +36,27 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 or os.getenv('BACKEND_URL')
                 or 'http://localhost:8000'
             )
-            
+
             # Для DEV-режима формируем кнопку WebApp с shared_id в URL
-            web_app_url = f"{base_url.rstrip('/')}/webapp/?shared_id={stat_id}"
-            
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="📊 Посмотреть статистику", web_app=WebAppInfo(url=web_app_url))]
-            ])
-            
+            web_app_url = f'{base_url.rstrip("/")}/webapp/?shared_id={stat_id}'
+
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text='📊 Посмотреть статистику', web_app=WebAppInfo(url=web_app_url)
+                        )
+                    ]
+                ]
+            )
+
             await sender.send_message(
                 chat_id=user.id,
-                text=f"📂 {bold('Получен доступ к общей статистике')}\n\nНажмите на кнопку ниже для просмотра.",
-                keyboard=keyboard
+                text=(
+                    f'📂 {bold("Получен доступ к общей статистике")}\n\n'
+                    f'Нажмите на кнопку ниже для просмотра.'
+                ),
+                reply_markup=keyboard,
             )
             return
 
@@ -206,7 +215,9 @@ async def handle_history_command(message: Message, bot: Bot):
     await _send_history_report(sender, message.chat.id, show_id, is_guest=False)
 
 
-async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int, is_guest: bool = False):
+async def _send_history_report(
+    sender: MessageSender, chat_id: int, show_id: int, is_guest: bool = False
+):
     show_data = await client.get_show_details(show_id, telegram_id=chat_id)
     if not show_data:
         await sender.send_message(chat_id, '❌ Ошибки получения данных.')

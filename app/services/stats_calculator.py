@@ -50,7 +50,9 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
     durs = dur_qs.aggregate(
         total_seconds=Sum('final_duration'),
         series_seconds=Sum('final_duration', filter=Q(season_number__gt=0)),
-        movies_seconds=Sum('final_duration', filter=Q(season_number=0) | Q(season_number__isnull=True))
+        movies_seconds=Sum(
+            'final_duration', filter=Q(season_number=0) | Q(season_number__isnull=True)
+        ),
     )
 
     total_seconds = durs['total_seconds'] or 0
@@ -139,7 +141,7 @@ def _get_favorites(base_qs, dur_qs):
         if gd['show__genres__name']:
             genre_mins_map[gd['show__genres__name']] = int((gd['m'] or 0) / 60)
 
-    for g in genres_qs[:20]: # Увеличиваем лимит до 20 для полноты картины
+    for g in genres_qs[:20]:  # Увеличиваем лимит до 20 для полноты картины
         name = g['name']
         show_ids = list(
             base_qs.filter(show__genres__id=g['tid']).values_list('show_id', flat=True).distinct()
@@ -149,7 +151,9 @@ def _get_favorites(base_qs, dur_qs):
                 'name': name,
                 'count': g['count'],
                 'minutes': genre_mins_map.get(name, 0),
-                'percentage': round((g['count'] / total_mentions * 100), 1) if total_mentions else 0,
+                'percentage': round((g['count'] / total_mentions * 100), 1)
+                if total_mentions
+                else 0,
                 'show_ids': show_ids,
             }
         )
@@ -168,14 +172,14 @@ def _get_favorites(base_qs, dur_qs):
                 .values_list('show_id', flat=True)
                 .distinct()
             )
-            
+
             show_titles = list(
                 base_qs.filter(**{f'show__{field}__id': p['tid']})
                 .order_by('show__original_title')
                 .values_list('show__original_title', flat=True)
                 .distinct()
             )
-            
+
             result.append(
                 {
                     'name': p['name'],
@@ -183,7 +187,7 @@ def _get_favorites(base_qs, dur_qs):
                     'views': p['views'],
                     'count': p['views'],
                     'show_ids': show_ids,
-                    'sub': ', '.join(show_titles)
+                    'sub': ', '.join(show_titles),
                 }
             )
         return result
@@ -374,13 +378,19 @@ def generate_user_stats(user, year=None):
 
     current_yr = timezone.now().year
 
-    history_years = ViewHistory.objects.filter(users=user).annotate(
-        y=ExtractYear('view_date')
-    ).values_list('y', flat=True).distinct()
+    history_years = (
+        ViewHistory.objects.filter(users=user)
+        .annotate(y=ExtractYear('view_date'))
+        .values_list('y', flat=True)
+        .distinct()
+    )
 
-    rating_years = UserRating.objects.filter(user=user).annotate(
-        y=ExtractYear('updated_at')
-    ).values_list('y', flat=True).distinct()
+    rating_years = (
+        UserRating.objects.filter(user=user)
+        .annotate(y=ExtractYear('updated_at'))
+        .values_list('y', flat=True)
+        .distinct()
+    )
 
     all_years = sorted(list(set(history_years) | set(rating_years)), reverse=True)
 
@@ -404,25 +414,29 @@ def generate_user_stats(user, year=None):
 
     ratings_history = []
     for r in ratings_qs.select_related('show').order_by('-updated_at'):
-        ratings_history.append({
-            'show_id': r.show_id,
-            'title': r.show.title,
-            'original_title': r.show.original_title,
-            'year': r.show.year,
-            'season': r.season_number,
-            'episode': r.episode_number,
-            'rating': r.rating,
-            'date': r.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'poster_url': get_poster_url(r.show_id)
-        })
+        ratings_history.append(
+            {
+                'show_id': r.show_id,
+                'title': r.show.title,
+                'original_title': r.show.original_title,
+                'year': r.show.year,
+                'season': r.season_number,
+                'episode': r.episode_number,
+                'rating': r.rating,
+                'date': r.updated_at.strftime('%Y-%m-%d'),
+                'poster_url': get_poster_url(r.show_id),
+            }
+        )
 
     history_ids = ViewHistory.objects.filter(users=user, is_checked=True)
     if year:
         history_ids = history_ids.filter(view_date__year=year)
 
-    base_qs = ViewHistory.objects.filter(
-        id__in=Subquery(history_ids.values('id'))
-    ).select_related('show').prefetch_related('users')
+    base_qs = (
+        ViewHistory.objects.filter(id__in=Subquery(history_ids.values('id')))
+        .select_related('show')
+        .prefetch_related('users')
+    )
 
     episode_dur = ShowDuration.objects.filter(
         show_id=OuterRef('show_id'),
@@ -446,7 +460,7 @@ def generate_user_stats(user, year=None):
 
     if is_redundant and str(year) == str(current_yr):
         summary['period_label'] = 'Все время'
-    
+
     user_role = str(user.role).lower() if user.role else 'guest'
 
     if summary['total_views'] == 0:
@@ -457,7 +471,7 @@ def generate_user_stats(user, year=None):
                 'year': year,
                 'years': all_years,
                 'role': user_role,
-                'photo_url': user.photo_url
+                'photo_url': user.photo_url,
             },
             'summary': summary,
             'heatmap': [],
@@ -473,8 +487,8 @@ def generate_user_stats(user, year=None):
                 'total': total_ratings,
                 'avg': round(avg_rating, 1),
                 'distribution': dist_list,
-                'history': ratings_history
-            }
+                'history': ratings_history,
+            },
         }
         cache.set(cache_key, result, timeout=86400)
         return result
@@ -487,24 +501,31 @@ def generate_user_stats(user, year=None):
     ).values('rating')[:1]
 
     movies_history = []
-    for h in base_qs.filter(season_number=0).annotate(user_rating=Subquery(user_movie_rating)).order_by('-view_date', '-id'):
-        movies_history.append({
-            'show_id': h.show_id,
-            'show__title': h.show.title,
-            'show__original_title': h.show.original_title,
-            'show__year': h.show.year,
-            'view_date': h.view_date.strftime('%Y-%m-%d'),
-            'user_rating': h.user_rating,
-            'poster_url': get_poster_url(h.show_id),
-            'user_ids': list(h.users.values_list('id', flat=True)),
-            'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
-            'user_photos': [u.photo_url for u in h.users.all()]
-        })
+    for h in (
+        base_qs.filter(season_number=0)
+        .annotate(user_rating=Subquery(user_movie_rating))
+        .order_by('-view_date', '-id')
+    ):
+        movies_history.append(
+            {
+                'show_id': h.show_id,
+                'show__title': h.show.title,
+                'show__original_title': h.show.original_title,
+                'show__year': h.show.year,
+                'view_date': h.view_date.strftime('%Y-%m-%d'),
+                'user_rating': h.user_rating,
+                'poster_url': get_poster_url(h.show_id),
+                'user_ids': list(h.users.values_list('id', flat=True)),
+                'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
+                'user_photos': [u.photo_url for u in h.users.all()],
+            }
+        )
 
     user_ep_rating = UserRating.objects.filter(
-        user=user, show_id=OuterRef('show_id'),
+        user=user,
+        show_id=OuterRef('show_id'),
         season_number=OuterRef('season_number'),
-        episode_number=OuterRef('episode_number')
+        episode_number=OuterRef('episode_number'),
     ).values('rating')[:1]
 
     user_show_rating = UserRating.objects.filter(
@@ -512,22 +533,28 @@ def generate_user_stats(user, year=None):
     ).values('rating')[:1]
 
     episodes_history = []
-    for h in base_qs.filter(season_number__gt=0).annotate(user_rating=Subquery(user_ep_rating), user_show_rating=Subquery(user_show_rating)).order_by('-view_date', '-id'):
-        episodes_history.append({
-            'show_id': h.show_id,
-            'show__title': h.show.title,
-            'show__original_title': h.show.original_title,
-            'show__year': h.show.year,
-            'season_number': h.season_number,
-            'episode_number': h.episode_number,
-            'view_date': h.view_date.strftime('%Y-%m-%d'),
-            'user_rating': h.user_rating,
-            'user_show_rating': h.user_show_rating,
-            'poster_url': get_poster_url(h.show_id),
-            'user_ids': list(h.users.values_list('id', flat=True)),
-            'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
-            'user_photos': [u.photo_url for u in h.users.all()]
-        })
+    for h in (
+        base_qs.filter(season_number__gt=0)
+        .annotate(user_rating=Subquery(user_ep_rating), user_show_rating=Subquery(user_show_rating))
+        .order_by('-view_date', '-id')
+    ):
+        episodes_history.append(
+            {
+                'show_id': h.show_id,
+                'show__title': h.show.title,
+                'show__original_title': h.show.original_title,
+                'show__year': h.show.year,
+                'season_number': h.season_number,
+                'episode_number': h.episode_number,
+                'view_date': h.view_date.strftime('%Y-%m-%d'),
+                'user_rating': h.user_rating,
+                'user_show_rating': h.user_show_rating,
+                'poster_url': get_poster_url(h.show_id),
+                'user_ids': list(h.users.values_list('id', flat=True)),
+                'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
+                'user_photos': [u.photo_url for u in h.users.all()],
+            }
+        )
 
     result = {
         'meta': {
@@ -536,7 +563,7 @@ def generate_user_stats(user, year=None):
             'year': year,
             'years': all_years,
             'role': user_role,
-            'photo_url': user.photo_url
+            'photo_url': user.photo_url,
         },
         'summary': summary,
         'heatmap': _get_heatmap(dur_qs, year, all_years),
@@ -552,8 +579,8 @@ def generate_user_stats(user, year=None):
             'total': total_ratings,
             'avg': round(avg_rating, 1),
             'distribution': dist_list,
-            'history': ratings_history
-        }
+            'history': ratings_history,
+        },
     }
     cache.set(cache_key, result, timeout=86400)
     return result
@@ -577,8 +604,12 @@ def generate_group_stats(user, year=None):
         history_filter &= Q(view_date__year=year)
 
     history_ids = ViewHistory.objects.filter(history_filter).values('id').distinct()
-    
-    base_qs = ViewHistory.objects.filter(id__in=Subquery(history_ids)).select_related('show').prefetch_related('users')
+
+    base_qs = (
+        ViewHistory.objects.filter(id__in=Subquery(history_ids))
+        .select_related('show')
+        .prefetch_related('users')
+    )
 
     episode_dur = ShowDuration.objects.filter(
         show_id=OuterRef('show_id'),
@@ -616,14 +647,16 @@ def generate_group_stats(user, year=None):
         u_history_filter = Q(users=u, is_checked=True)
         if year:
             u_history_filter &= Q(view_date__year=year)
-        
+
         u_views = ViewHistory.objects.filter(u_history_filter).count()
-        members.append({
-            'id': u.id,
-            'name': u.name or u.username or str(u.telegram_id),
-            'views': u_views,
-            'photo_url': u.photo_url
-        })
+        members.append(
+            {
+                'id': u.id,
+                'name': u.name or u.username or str(u.telegram_id),
+                'views': u_views,
+                'photo_url': u.photo_url,
+            }
+        )
     members.sort(key=lambda x: x['views'], reverse=True)
 
     history_movies = []
@@ -639,13 +672,15 @@ def generate_group_stats(user, year=None):
             'poster_url': get_poster_url(h.show_id),
             'user_ids': list(h.users.values_list('id', flat=True)),
             'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
-            'user_photos': [u.photo_url for u in h.users.all()]
+            'user_photos': [u.photo_url for u in h.users.all()],
         }
         if h.season_number > 0:
-            entry.update({
-                'season_number': h.season_number,
-                'episode_number': h.episode_number,
-            })
+            entry.update(
+                {
+                    'season_number': h.season_number,
+                    'episode_number': h.episode_number,
+                }
+            )
             history_episodes.append(entry)
         else:
             history_movies.append(entry)

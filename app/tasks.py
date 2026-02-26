@@ -254,9 +254,6 @@ def run_daily_sync_task():
 
 
 def _process_batch_from_queue(queue_name, session_type, process_func, batch_size=50):
-    """
-    Универсальная функция для обработки пакета ID из Redis очереди.
-    """
     redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
 
     count = redis_client.scard(queue_name)
@@ -285,11 +282,11 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
                 _ = driver.current_url
 
                 if session_type == 'aux':
-                    process_func(driver, show_id)
+                    process_func(driver, show_id, session_type=session_type)
                 else:
                     try:
                         show = Show.objects.get(id=show_id)
-                        process_func(driver, show)
+                        process_func(driver, show, session_type=session_type)
                     except Show.DoesNotExist:
                         logging.warning(f'Show {show_id} not found in DB, skipping.')
                         continue

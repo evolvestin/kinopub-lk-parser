@@ -40,7 +40,7 @@ class Command(LoggableBaseCommand):
                 logging.info(f'--- Processing category: {show_type} (type={url_type}) ---')
                 base_url = f'{settings.SITE_URL}media/new-serial-episodes?type={url_type}'
 
-                driver.get(base_url)
+                driver = open_url_safe(driver, base_url, session_type='main')
                 total_pages = get_total_pages(driver)
                 logging.info(f'Found {total_pages} pages of new episodes for {show_type}.')
 
@@ -102,8 +102,8 @@ class Command(LoggableBaseCommand):
                                 f'Show {show_id} missing details/year. Performing full update...'
                             )
                             try:
-                                update_show_details(driver, show_id)
-                                process_show_durations(driver, show)
+                                update_show_details(driver, show_id, session_type='main')
+                                process_show_durations(driver, show, session_type='main')
                                 delay_needed = True
                             except Exception as e:
                                 logging.error(f'Failed full update for show {show_id}: {e}')
@@ -114,7 +114,9 @@ class Command(LoggableBaseCommand):
                                 f' Fetching season...'
                             )
                             try:
-                                get_season_durations_and_save(driver, show_id, season)
+                                get_season_durations_and_save(
+                                    driver, show_id, season, session_type='main'
+                                )
                                 delay_needed = True
                             except Exception as e:
                                 logging.error(f'Failed duration update for {show_id}: {e}')

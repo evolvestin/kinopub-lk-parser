@@ -1,6 +1,8 @@
+import uuid
+
 from django.contrib.auth.models import User
 from django.db import models
-import uuid
+
 from shared.constants import DATETIME_FORMAT, RATING_VALUES, UserRole
 from shared.formatters import format_se
 
@@ -338,4 +340,4 @@ class SharedStat(BaseModel):
         verbose_name_plural = 'Shared Stats'
 
     def __str__(self):
-        return f"Snapshot {self.id}"
+        return f'Snapshot {self.id}'
