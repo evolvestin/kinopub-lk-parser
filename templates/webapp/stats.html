@@ -132,13 +132,27 @@
         .yr:not(.on):active { transform: scale(0.92); }
 
         .label {
-            display: flex; align-items: center; gap: clamp(6px, 2vw, 8px);
-            font-size: clamp(12px, 3.5vw, 14px); font-weight: 800; text-transform: uppercase;
-            letter-spacing: 1px; color: var(--text-secondary); padding: clamp(16px, 4vw, 20px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px);
+            display: flex;
+            align-items: center;
+            gap: clamp(6px, 2vw, 8px);
+            font-size: clamp(12px, 3.5vw, 14px);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            padding: clamp(12px, 3vw, 16px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px);
+        }
+        .card .label {
+            padding: 0;
+            font-size: clamp(14px, 4vw, 16px);
+            color: var(--text-primary);
+        }
+        .card .label.more-pad {
+            padding: 0 0 clamp(4px, 4vw, 8px) 0;
         }
         .label .icon { font-size: clamp(16px, 4.5vw, 18px); line-height: 1; color: var(--accent); }
 
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 3vw, 16px); padding: 0 clamp(16px, 4vw, 20px) clamp(16px, 4vw, 20px); }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 3vw, 16px); padding: 0 clamp(16px, 4vw, 20px) clamp(8px, 2.5vw, 12px); }
         .stat {
             background: linear-gradient(145deg, var(--bg-card), var(--bg-input)); border: 1px solid var(--border);
             border-radius: var(--radius); padding: clamp(16px, 4vw, 20px); box-shadow: var(--shadow-sm);
@@ -335,8 +349,8 @@
         
         .glow-text { text-shadow: 0 0 12px rgba(255,255,255,0.2); }
 
-        .critic-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-        .critic-title-box { display: flex; flex-direction: column; }
+        .critic-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; padding-top: 10px;}
+        .critic-title-box { display: flex; flex-direction: column;}
         .critic-badge { display: inline-flex; align-items: center; gap: 6px; font-size: clamp(12px, 3.2vw, 14px); font-weight: 800; padding: 4px 10px; border-radius: 8px; width: fit-content; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;}
         .critic-avg { 
             font-size: clamp(32px, 8vw, 42px); 
@@ -345,7 +359,6 @@
             display: flex; 
             align-items: baseline; 
             gap: 4px; 
-            color: #f1c40f; 
         }
         .critic-avg span { font-size: clamp(14px, 4vw, 16px); color: var(--text-muted); font-weight: 700; }
         .critic-total { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-muted); font-weight: 600; text-align: right; }
@@ -477,21 +490,17 @@
             </div>
 
             <div class="card hoverable anim-item" id="card-dynamics" style="animation-delay: 0.25s">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:clamp(16px, 4vw, 20px)">
-                    <span style="font-size:clamp(15px, 4vw, 18px);font-weight:800;color:var(--text-primary);display:flex;align-items:center;gap:8px">
-                        <div class="icon" style="font-size:clamp(18px, 5vw, 22px);line-height:1;color:var(--info)" id="ic-chart"></div>Динамика
-                    </span>
-                </div>
+                <div class="label"><div class="icon" style="color:var(--info)" id="ic-chart-internal"></div>Динамика</div>
                 <div class="chart-box"><canvas id="c-monthly"></canvas></div>
             </div>
 
             <div class="card hoverable anim-item" id="card-weekday" style="animation-delay: 0.3s">
-                <div style="font-size:clamp(15px, 4vw, 18px);font-weight:800;color:var(--text-primary);margin-bottom:clamp(16px, 4vw, 20px)">Дни недели</div>
+                <div class="label more-pad"><div class="icon" style="color:#2ecc71" id="ic-weekday-internal"></div>Дни недели</div>
                 <div class="chart-box" style="height:180px"><canvas id="c-weekday"></canvas></div>
             </div>
 
-            <div class="label" id="label-heatmap"><div class="icon" style="font-size:clamp(18px, 5vw, 22px);line-height:1;color:#f85149" id="ic-flame"></div>Интенсивность</div>
             <div class="card hoverable anim-item" id="card-heatmap" style="animation-delay: 0.35s">
+                <div class="label more-pad"><div class="icon" style="color:#f85149" id="ic-flame-internal"></div>Интенсивность</div>
                 <div id="heatmaps-wrapper"></div>
                 <div class="hm-leg">
                     <span>Меньше</span>
@@ -500,23 +509,29 @@
                 </div>
             </div>
 
-            <div class="label" id="label-genres"><div class="icon" id="it-gen"></div>Жанры</div>
             <div class="card hoverable anim-item" id="card-genres" style="animation-delay: 0.1s; margin-bottom: clamp(12px, 3vw, 16px);">
+                <div class="label"><div class="icon" id="it-gen-internal"></div>Жанры</div>
                 <div class="chart-box" style="height:380px;"><canvas id="c-genre"></canvas></div>
                 <div id="legend-genre" class="legend-grid"></div>
             </div>
 
-            <div class="label" id="label-actors"><div class="icon" style="color: #d29922;" id="it-act"></div>Актёры</div>
-            <div class="card hoverable anim-item" style="animation-delay: 0.15s;" id="actors-box"></div>
+            <div class="card hoverable anim-item" style="animation-delay: 0.15s;" id="card-actors">
+                <div class="label"><div class="icon" style="color: #d29922;" id="it-act-internal"></div>Актёры</div>
+                <div id="actors-list"></div>
+            </div>
 
-            <div class="label" id="label-countries"><div class="icon" style="color: #388bfd;" id="it-cou"></div>Страны</div>
-            <div class="card hoverable anim-item" style="animation-delay: 0.2s;" id="countries-box"></div>
+            <div class="card hoverable anim-item" style="animation-delay: 0.2s;" id="card-countries">
+                <div class="label"><div class="icon" style="color: #388bfd;" id="it-cou-internal"></div>Страны</div>
+                <div id="countries-list"></div>
+            </div>
 
-            <div class="label" id="label-binges"><div class="icon" style="color: #a371f7;" id="it-bin"></div>Марафоны</div>
-            <div class="card hoverable anim-item" style="animation-delay: 0.25s;" id="binges-box"></div>
+            <div class="card hoverable anim-item" style="animation-delay: 0.25s;" id="card-binges">
+                <div class="label"><div class="icon" style="color: #a371f7;" id="it-bin-internal"></div>Марафоны</div>
+                <div id="binges-list"></div>
+            </div>
 
-            <div class="label" id="label-ratings"><div class="icon" style="color: #f1c40f;" id="it-star"></div>Оценки и критика</div>
             <div class="card hoverable anim-item" style="animation-delay: 0.3s;" id="ratings-box">
+                <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star-internal"></div>Оценки и критика</div>
                 <div class="critic-header">
                     <div class="critic-title-box">
                         <div class="critic-badge" id="cr-badge"></div>
@@ -525,7 +540,6 @@
                     <div class="critic-total" id="cr-total"></div>
                 </div>
                 <div class="chart-box" style="height: 180px; margin-bottom: 16px;"><canvas id="c-ratings-dist"></canvas></div>
-                
                 <div class="stat clickable" style="flex-direction: row; justify-content: center; align-items: center; padding: 16px; margin-top: 12px; border-radius: 15px;" onclick="openHistory('ratings')">
                     <span style="font-weight: 800; color: var(--text-primary); font-size: clamp(14px, 4vw, 16px);">Все оценки</span>
                 </div>
@@ -562,16 +576,18 @@ const Icons = {
     globe: '<svg viewBox="0 0 512 512"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48zm89.15 112.59A151.78 151.78 0 01366 240H288v-87.35a265.41 265.41 0 0157.15 8zM256 80.59A231.87 231.87 0 01283.47 152H228.53A231.87 231.87 0 01256 80.59zM166.85 160.59A265.41 265.41 0 01224 152.65V240h-78A151.78 151.78 0 01166.85 160.59zM80.58 240H146a256.32 256.32 0 000 32H80.58a176 176 0 010-32zm86.27 111.41A151.78 151.78 0 01146 272h78v87.35a265.41 265.41 0 01-57.15-7.94zM256 431.41A231.87 231.87 0 01228.53 360h54.94A231.87 231.87 0 01256 431.41zM345.15 351.41A265.41 265.41 0 01288 359.35V272h78A151.78 151.78 0 01345.15 351.41zM431.42 272H366a256.32 256.32 0 000-32h65.42a176 176 0 010 32z"/></svg>',
     bolt: '<svg viewBox="0 0 512 512"><path d="M312 32h-110a18 18 0 00-17.74 21l32 188H152a18.3 18.3 0 00-14.86 28.92l160 216a18 18 0 0031.57-12.78l-23-189.14H360a18.3 18.3 0 0015-28.84L215 72h97a18 18 0 000-36z"/></svg>',
     flame: '<svg viewBox="0 0 512 512"><path d="M313.29 82.26c-11.42-30.82-50.62-31-62.29.35C227.18 146.42 160 178.68 160 256c0 53 43 96 96 96s96-43 96-96c0-67.62-54-106.82-38.71-173.74zM256 320c-17.64 0-32-14.36-32-32 0-33.15 28.57-55 42-83.39 12 25.15 22 50.18 22 83.39 0 17.64-14.36 32-32 32z"/><path d="M255.8 48c-42.54 0-82.68 20.31-112 54.34-31 36-47.8 84.34-47.8 135.59 0 114.69 93.31 208.07 208 208.07S512 352.62 512 237.93C512 119 407.41 48 255.8 48zm0 366c-88.22 0-160-71.78-160-160 0-41.6 13.92-80.49 40.23-112.5C160.7 171.84 200.56 150 240 150c18.52 0 35.1 4.54 48 13 41.52-32.55 80-28 80 75 0 88.22-71.78 160-160 160z"/></svg>',
-    check: '<svg viewBox="0 0 512 512"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29l-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg>'
+    check: '<svg viewBox="0 0 512 512"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29l-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg>',
+    days: '<svg viewBox="0 0 512 512"><path d="M400 48V16h-64v32H176V16h-64v32H48v448h416V48h-64zM112 432H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32z"/></svg>'
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
 document.addEventListener("DOMContentLoaded", () => {
     i('ic-user', 'user'); i('ic-users', 'users'); i('ic-dash', 'dash');
     i('ic-time', 'time'); i('ic-cal', 'cal'); i('ic-tv', 'tv'); i('ic-film', 'film');
-    i('ic-chart', 'chart'); i('ic-flame', 'flame');
-    i('it-gen', 'masks'); i('it-act', 'masks'); i('it-cou', 'globe'); i('it-bin', 'bolt');
-    i('it-star', 'star');
+    i('ic-chart-internal', 'chart'); i('ic-flame-internal', 'flame');
+    i('it-gen-internal', 'masks'); i('it-act-internal', 'masks'); 
+    i('it-cou-internal', 'globe'); i('it-bin-internal', 'bolt');
+    i('it-star-internal', 'star'); i('ic-weekday-internal', 'days');
 });
 
 const tg = window.Telegram?.WebApp;
@@ -654,22 +670,48 @@ function render() {
     
     const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
 
-    const hasHistory = vViews > 0;
-    toggle('label-overview', hasHistory);
-    toggle('grid-overview', hasHistory);
+    const hasGroup = !!D.group;
+    toggle('main-tabs', hasGroup);
 
-    if (hasHistory) {
-        document.getElementById('s-time').textContent  = s.duration_display || '0';
+    const userRole = String(D.meta.role || 'guest').toLowerCase();
+    const isGuest = userRole === 'guest';
+    
+    const showOverview = !isGuest;
+    toggle('label-overview', showOverview);
+    toggle('grid-overview', showOverview);
+
+    if (showOverview) {
+        document.getElementById('s-time').textContent  = s.duration_display || '0м';
         document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
         document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
         document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
         document.getElementById('s-ep').textContent = vEp;
-        document.getElementById('s-ep').nextElementSibling.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+        
+        const epLbl = document.getElementById('s-ep').nextElementSibling;
+        if (epLbl) epLbl.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+        
         const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
         document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
         document.getElementById('s-mov').textContent = vMov;
-        document.getElementById('s-mov').nextElementSibling.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
+        
+        const movLbl = document.getElementById('s-mov').nextElementSibling;
+        if (movLbl) movLbl.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
+        
         document.getElementById('s-uni').textContent = s.movies_duration || '0м';
+    }
+
+    const showWelcome = !isGuest && vViews === 0;
+    let welcomeEl = document.getElementById('welcome-empty-state');
+    if (showWelcome) {
+        if (!welcomeEl) {
+            welcomeEl = document.createElement('div');
+            welcomeEl.id = 'welcome-empty-state';
+            welcomeEl.className = 'card anim-item';
+            welcomeEl.innerHTML = `<div class="empty"><div class="icon">${Icons.tv}</div>Здесь будет ваша статистика, когда вы начнете смотреть кино.</div>`;
+            document.getElementById('sec-personal').appendChild(welcomeEl);
+        }
+    } else if (welcomeEl) {
+        welcomeEl.remove();
     }
 
     const hasDynamics = D.monthly_chart?.views?.some(v => v > 0);
@@ -679,33 +721,37 @@ function render() {
     toggle('card-weekday', hasWeekday);
 
     const hasHeatmap = D.heatmap?.length > 0;
-    toggle('label-heatmap', hasHeatmap);
     toggle('card-heatmap', hasHeatmap);
     if (hasHeatmap) renderHeatmap();
 
     const hasGenres = D.genres?.length > 0;
-    toggle('label-genres', hasGenres);
     toggle('card-genres', hasGenres);
     
     const hasActors = D.actors?.length > 0;
-    toggle('label-actors', hasActors);
-    toggle('actors-box', hasActors);
+    toggle('card-actors', hasActors);
     
     const hasCountries = D.countries?.length > 0;
-    toggle('label-countries', hasCountries);
-    toggle('countries-box', hasCountries);
+    toggle('card-countries', hasCountries);
     
     const hasBinges = D.binges?.length > 0;
-    toggle('label-binges', hasBinges);
-    toggle('binges-box', hasBinges);
+    toggle('card-binges', hasBinges);
 
     const rt = D.ratings;
     const hasRatings = rt && rt.total > 0;
-    toggle('label-ratings', hasRatings);
     toggle('ratings-box', hasRatings);
 
     if (hasRatings) {
-        document.getElementById('cr-avg').innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
+        const ratingPalette = [
+            '#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', 
+            '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'
+        ];
+        const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
+        const scoreColor = ratingPalette[colorIdx];
+
+        const avgEl = document.getElementById('cr-avg');
+        avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
+        avgEl.style.color = scoreColor;
+
         document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
         
         const badge = document.getElementById('cr-badge');
@@ -721,8 +767,8 @@ function render() {
     renderGroup();
     renderCharts();
     
-    if (hasActors) fillList('actors-box', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
-    if (hasCountries) fillList('countries-box', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+    if (hasActors) fillList('actors-list', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
+    if (hasCountries) fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
     if (hasBinges) fillBinges();
 }
 
@@ -737,16 +783,8 @@ function renderRatingsDist() {
     const c = cc();
     
     const ratingPalette = [
-        '#f85149', // 1
-        '#f85149', // 2
-        '#e67e22', // 3
-        '#e67e22', // 4
-        '#d29922', // 5
-        '#d29922', // 6
-        '#388bfd', // 7
-        '#388bfd', // 8
-        '#2ea043', // 9
-        '#39d353'  // 10
+        '#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', 
+        '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'
     ];
 
     chR = new Chart(ctx, {
@@ -756,7 +794,7 @@ function renderRatingsDist() {
             datasets: [{
                 data: dist,
                 backgroundColor: ratingPalette,
-                hoverOpacity: 0.8,
+                hoverBackgroundColor: ratingPalette,
                 borderRadius: 6,
                 borderSkipped: false,
                 borderWidth: 0
@@ -824,6 +862,14 @@ function getRatingColor(rating) {
 function renderYears() {
     const c = document.getElementById('years');
     const yrs = D.meta?.years || [];
+    
+    if (yrs.length === 0) {
+        c.classList.add('hidden');
+        return;
+    }
+    
+    c.classList.remove('hidden');
+
     if (curYear && curYear !== 'all' && yrs.length && !yrs.includes(curYear)) {
         curYear = yrs[0];
     }
@@ -1102,7 +1148,7 @@ function fillList(id, items, ico, unit, categoryKey) {
 }
 
 function fillBinges() {
-    const el = document.getElementById('binges-box');
+    const el = document.getElementById('binges-list');
     if (!D.binges?.length) return;
     
     let html = '';
@@ -1208,7 +1254,7 @@ function renderMonthly() {
                         color: c.t, 
                         usePointStyle: true, 
                         boxWidth: 8, 
-                        padding: 30,
+                        padding: 15,
                         font: { size: fSizeAx, family: 'system-ui' } 
                     } 
                 },
@@ -1649,8 +1695,17 @@ window.closeHistory = function() {
         tg.BackButton.hide();
         tg.BackButton.offClick(window.closeHistory);
     }
-    document.getElementById('main-tabs').classList.remove('hidden');
-    document.getElementById('years').classList.remove('hidden');
+    
+    // Проверяем, нужно ли показывать вкладки (только если есть группа)
+    if (D && D.group) {
+        document.getElementById('main-tabs').classList.remove('hidden');
+    }
+    
+    // Проверяем, нужно ли показывать выбор года (только если есть годы в мете)
+    if (D && D.meta && D.meta.years && D.meta.years.length > 0) {
+        document.getElementById('years').classList.remove('hidden');
+    }
+    
     document.getElementById('sec-history').classList.remove('vis');
     
     const curTab = document.querySelector('#main-tabs .tab.on').dataset.tab;
@@ -1682,11 +1737,38 @@ function renderGroup() {
 
     let gGenH = '';
     if (g.genres?.length) {
-        gGenH = `<div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="card hoverable anim-item" style="animation-delay:0.3s"><div class="chart-box" style="height:380px;"><canvas id="c-group-genre"></canvas></div><div id="legend-group-genre" class="legend-grid"></div></div>`;
+        gGenH = `<div class="card hoverable anim-item" style="animation-delay:0.3s">
+            <div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div>
+            <div class="chart-box" style="height:380px;"><canvas id="c-group-genre"></canvas></div>
+            <div id="legend-group-genre" class="legend-grid"></div>
+        </div>`;
     }
 
     const membersLabel = `${g.members_count} ${plural(g.members_count, ['участник', 'участника', 'участников'])}`;
-    el.innerHTML = `<div class="card hoverable anim-item"><div style="display:flex;align-items:center;gap:16px"><div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))">${Icons.users}</div><div><div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">${g.group_name}</div><div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">${membersLabel} · ${g.duration_display}</div></div></div></div><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.chart}</div>Вы vs Группа</div><div class="card hoverable anim-item" style="animation-delay:0.1s"><div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)"><span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 Вы</span><span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span></div>${!hasDiff?`<div style="text-align:center;padding:16px 0;font-size:clamp(15px, 4vw, 18px);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse 2s infinite;"><div class="icon" style="font-size:clamp(20px, 6vw, 24px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}${cmpH}</div><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.user}</div>Участники</div><div class="card hoverable anim-item" style="animation-delay:0.2s">${mbH}</div>${gGenH}`;
+    el.innerHTML = `
+        <div class="card hoverable anim-item">
+            <div style="display:flex;align-items:center;gap:16px">
+                <div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))">${Icons.users}</div>
+                <div>
+                    <div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">${g.group_name}</div>
+                    <div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">${membersLabel} · ${g.duration_display}</div>
+                </div>
+            </div>
+        </div>
+        <div class="card hoverable anim-item" style="animation-delay:0.1s">
+            <div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.chart}</div>Вы vs Группа</div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 Вы</span>
+                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span>
+            </div>
+            ${!hasDiff?`<div style="text-align:center;padding:16px 0;font-size:clamp(15px, 4vw, 18px);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse 2s infinite;"><div class="icon" style="font-size:clamp(20px, 6vw, 24px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
+            ${cmpH}
+        </div>
+        <div class="card hoverable anim-item" style="animation-delay:0.2s">
+            <div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.user}</div>Участники</div>
+            ${mbH}
+        </div>
+        ${gGenH}`;
 }
 
 load();

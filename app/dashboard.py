@@ -8,6 +8,8 @@ from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
 from shared.constants import DATETIME_FORMAT
+from shared.formatters import format_duration
+
 
 
 def dashboard_callback(context):
@@ -35,10 +37,7 @@ def dashboard_callback(context):
     ).aggregate(total_duration=Sum('duration'))
 
     total_seconds = total_seconds_result.get('total_duration') or 0
-    total_minutes, _ = divmod(total_seconds, 60)
-    total_hours, remaining_minutes = divmod(total_minutes, 60)
-    total_days, remaining_hours = divmod(total_hours, 24)
-    duration_str = f'{total_days} д. {remaining_hours} ч. {remaining_minutes} м.'
+    duration_str = format_duration(total_seconds)
 
     statistics_aggregate = ViewHistory.objects.aggregate(
         total_episodes=Count('id', filter=Q(season_number__gt=0)),

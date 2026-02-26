@@ -26,23 +26,13 @@ from django.db.models.functions import (
 from django.utils import timezone
 
 from app.models import ShowDuration, UserRating, ViewHistory, ViewUserGroup
+from shared.formatters import format_duration
 from shared.media import get_poster_url
 
 logger = logging.getLogger(__name__)
 
 
 def _get_yearly_summary(base_qs, dur_qs, year=None):
-    def format_dur_short(seconds):
-        if not seconds:
-            return "0м"
-        d, rem = divmod(int(seconds), 86400)
-        h, m = divmod(rem // 60, 60)
-        parts = []
-        if d > 0: parts.append(f"{d}д")
-        if h > 0: parts.append(f"{h}ч")
-        if m > 0 or not parts: parts.append(f"{m}м")
-        return " ".join(parts)
-
     counts = base_qs.aggregate(
         total_views=Count('id'),
         total_episodes=Count('id', filter=Q(season_number__gt=0)),
@@ -65,20 +55,22 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
 
     total_seconds = durs['total_seconds'] or 0
     total_minutes = total_seconds // 60
-    days, rem = divmod(total_seconds, 86400)
-    hours, minutes = divmod(rem // 60, 60)
 
     if year:
-        total_days_in_period = 366 if calendar.isleap(int(year)) else 365
-        if int(year) == timezone.now().year:
-            total_days_in_period = timezone.now().timetuple().tm_yday
+        try:
+            total_days_in_period = 366 if calendar.isleap(int(year)) else 365
+            if int(year) == timezone.now().year:
+                total_days_in_period = timezone.now().timetuple().tm_yday
+        except (ValueError, TypeError):
+            total_days_in_period = 1
     else:
         if counts['first_view'] and counts['last_view']:
             total_days_in_period = (counts['last_view'] - counts['first_view']).days + 1
         else:
             total_days_in_period = 1
 
-    activity_percent = round((counts['active_days'] / total_days_in_period) * 100, 1)
+    active_days = counts['active_days'] or 0
+    activity_percent = round((active_days / total_days_in_period) * 100, 1)
     daily_avg = round(total_minutes / total_days_in_period, 1)
 
     monthly_stats = (
@@ -107,16 +99,16 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
     return {
         'total_seconds_watched': total_seconds,
         'total_minutes_watched': total_minutes,
-        'duration_display': f'{days}д {hours}ч {minutes}м',
-        'series_duration': format_dur_short(durs['series_seconds']),
-        'movies_duration': format_dur_short(durs['movies_seconds']),
+        'duration_display': format_duration(total_seconds),
+        'series_duration': format_duration(durs['series_seconds'] or 0),
+        'movies_duration': format_duration(durs['movies_seconds'] or 0),
         'continuous_days': round(total_seconds / 86400, 1),
-        'total_views': counts['total_views'],
-        'total_episodes': counts['total_episodes'],
-        'total_movies': counts['total_movies'],
-        'unique_shows': counts['unique_shows'],
-        'unique_series': counts['unique_series'],
-        'unique_movies': counts['unique_movies'],
+        'total_views': counts['total_views'] or 0,
+        'total_episodes': counts['total_episodes'] or 0,
+        'total_movies': counts['total_movies'] or 0,
+        'unique_shows': counts['unique_shows'] or 0,
+        'unique_series': counts['unique_series'] or 0,
+        'unique_movies': counts['unique_movies'] or 0,
         'activity_percent': activity_percent,
         'daily_average_min': daily_avg,
         'period_label': str(year) if year else 'Все время',
@@ -380,11 +372,57 @@ def generate_user_stats(user, year=None):
     if cached:
         return cached
 
+    current_yr = timezone.now().year
+
+    history_years = ViewHistory.objects.filter(users=user).annotate(
+        y=ExtractYear('view_date')
+    ).values_list('y', flat=True).distinct()
+
+    rating_years = UserRating.objects.filter(user=user).annotate(
+        y=ExtractYear('updated_at')
+    ).values_list('y', flat=True).distinct()
+
+    all_years = sorted(list(set(history_years) | set(rating_years)), reverse=True)
+
+    is_redundant = len(all_years) == 1 and all_years[0] == current_yr
+    if is_redundant:
+        all_years = []
+
+    ratings_qs = UserRating.objects.filter(user=user)
+    if year:
+        ratings_qs = ratings_qs.filter(updated_at__year=year)
+
+    total_ratings = ratings_qs.count()
+    avg_rating = ratings_qs.aggregate(avg=Avg('rating'))['avg'] or 0.0
+
+    dist_data = {str(i): 0 for i in range(1, 11)}
+    for r in ratings_qs.values('rating').annotate(cnt=Count('id')):
+        bucket = str(int(r['rating'])) if r['rating'] >= 1 else '1'
+        dist_data[bucket] += r['cnt']
+
+    dist_list = [dist_data[str(i)] for i in range(1, 11)]
+
+    ratings_history = []
+    for r in ratings_qs.select_related('show').order_by('-updated_at'):
+        ratings_history.append({
+            'show_id': r.show_id,
+            'title': r.show.title,
+            'original_title': r.show.original_title,
+            'year': r.show.year,
+            'season': r.season_number,
+            'episode': r.episode_number,
+            'rating': r.rating,
+            'date': r.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'poster_url': get_poster_url(r.show_id)
+        })
+
     history_ids = ViewHistory.objects.filter(users=user, is_checked=True)
     if year:
         history_ids = history_ids.filter(view_date__year=year)
-    
-    base_qs = ViewHistory.objects.filter(id__in=Subquery(history_ids.values('id'))).select_related('show')
+
+    base_qs = ViewHistory.objects.filter(
+        id__in=Subquery(history_ids.values('id'))
+    ).select_related('show')
 
     episode_dur = ShowDuration.objects.filter(
         show_id=OuterRef('show_id'),
@@ -406,22 +444,39 @@ def generate_user_stats(user, year=None):
 
     summary = _get_yearly_summary(base_qs, dur_qs, year)
 
-    all_years = list(
-        ViewHistory.objects.filter(users=user)
-        .annotate(y=ExtractYear('view_date'))
-        .values_list('y', flat=True)
-        .distinct()
-        .order_by('-y')
-    )
+    if is_redundant and str(year) == str(current_yr):
+        summary['period_label'] = 'Все время'
+    
+    user_role = str(user.role).lower() if user.role else 'guest'
 
     if summary['total_views'] == 0:
-        return {
-            'meta': {'id': user.id, 'name': user.name or user.username, 'year': year, 'years': all_years},
-            'summary': summary, 'heatmap': [], 'genres': [], 'actors': [], 'countries': [], 'binges': [],
+        result = {
+            'meta': {
+                'id': user.id,
+                'name': user.name or user.username,
+                'year': year,
+                'years': all_years,
+                'role': user_role
+            },
+            'summary': summary,
+            'heatmap': [],
+            'genres': [],
+            'actors': [],
+            'countries': [],
+            'binges': [],
             'monthly_chart': {'labels': [], 'views': [], 'hours': [], 'episodes': [], 'movies': []},
-            'weekday_chart': {'labels': [], 'data': []}, 'history_movies': [], 'history_episodes': [],
-            'ratings': {'total': 0, 'avg': 0, 'distribution': [], 'history': []}
+            'weekday_chart': {'labels': [], 'data': []},
+            'history_movies': [],
+            'history_episodes': [],
+            'ratings': {
+                'total': total_ratings,
+                'avg': round(avg_rating, 1),
+                'distribution': dist_list,
+                'history': ratings_history
+            }
         }
+        cache.set(cache_key, result, timeout=86400)
+        return result
 
     favs = _get_favorites(base_qs, dur_qs)
     binge = _get_binge_records(base_qs)
@@ -433,7 +488,10 @@ def generate_user_stats(user, year=None):
     movies_history = list(
         base_qs.filter(season_number=0)
         .annotate(user_rating=Subquery(user_movie_rating))
-        .values('show_id', 'show__title', 'show__original_title', 'show__year', 'view_date', 'user_rating')
+        .values(
+            'show_id', 'show__title', 'show__original_title',
+            'show__year', 'view_date', 'user_rating'
+        )
         .order_by('-view_date', '-id')
     )
     for m in movies_history:
@@ -441,9 +499,11 @@ def generate_user_stats(user, year=None):
         m['poster_url'] = get_poster_url(m['show_id'])
 
     user_ep_rating = UserRating.objects.filter(
-        user=user, show_id=OuterRef('show_id'), season_number=OuterRef('season_number'), episode_number=OuterRef('episode_number')
+        user=user, show_id=OuterRef('show_id'),
+        season_number=OuterRef('season_number'),
+        episode_number=OuterRef('episode_number')
     ).values('rating')[:1]
-    
+
     user_show_rating = UserRating.objects.filter(
         user=user, show_id=OuterRef('show_id'), season_number__isnull=True
     ).values('rating')[:1]
@@ -451,49 +511,40 @@ def generate_user_stats(user, year=None):
     episodes_history = list(
         base_qs.filter(season_number__gt=0)
         .annotate(user_rating=Subquery(user_ep_rating), user_show_rating=Subquery(user_show_rating))
-        .values('show_id', 'show__title', 'show__original_title', 'show__year', 'season_number', 'episode_number', 'view_date', 'user_rating', 'user_show_rating')
+        .values(
+            'show_id', 'show__title', 'show__original_title', 'show__year',
+            'season_number', 'episode_number', 'view_date', 'user_rating', 'user_show_rating'
+        )
         .order_by('-view_date', '-id')
     )
     for e in episodes_history:
         e['view_date'] = e['view_date'].strftime('%Y-%m-%d')
         e['poster_url'] = get_poster_url(e['show_id'])
 
-    ratings_qs = UserRating.objects.filter(user=user)
-    if year:
-        ratings_qs = ratings_qs.filter(updated_at__year=year)
-
-    total_ratings = ratings_qs.count()
-    avg_rating = ratings_qs.aggregate(avg=Avg('rating'))['avg'] or 0.0
-
-    dist_data = {str(i): 0 for i in range(1, 11)}
-    for r in ratings_qs.values('rating').annotate(cnt=Count('id')):
-        bucket = str(int(r['rating'])) if r['rating'] >= 1 else "1"
-        dist_data[bucket] += r['cnt']
-    
-    dist_list = [dist_data[str(i)] for i in range(1, 11)]
-
-    ratings_history = []
-    for r in ratings_qs.select_related('show').order_by('-updated_at'):
-        ratings_history.append({
-            'show_id': r.show_id,
-            'title': r.show.title,
-            'original_title': r.show.original_title,
-            'year': r.show.year,
-            'season': r.season_number,
-            'episode': r.episode_number,
-            'rating': r.rating,
-            'date': r.updated_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'poster_url': get_poster_url(r.show_id)
-        })
-
     result = {
-        'meta': {'id': user.id, 'name': user.name or user.username, 'year': year, 'years': all_years},
+        'meta': {
+            'id': user.id,
+            'name': user.name or user.username,
+            'year': year,
+            'years': all_years,
+            'role': user_role
+        },
         'summary': summary,
         'heatmap': _get_heatmap(dur_qs, year, all_years),
-        'genres': favs['genres'], 'actors': favs['actors'], 'countries': favs['countries'],
-        'binges': binge, 'monthly_chart': _get_monthly_chart(base_qs, dur_qs),
-        'weekday_chart': _get_weekday_chart(base_qs), 'history_movies': movies_history, 'history_episodes': episodes_history,
-        'ratings': {'total': total_ratings, 'avg': round(avg_rating, 1), 'distribution': dist_list, 'history': ratings_history}
+        'genres': favs['genres'],
+        'actors': favs['actors'],
+        'countries': favs['countries'],
+        'binges': binge,
+        'monthly_chart': _get_monthly_chart(base_qs, dur_qs),
+        'weekday_chart': _get_weekday_chart(base_qs),
+        'history_movies': movies_history,
+        'history_episodes': episodes_history,
+        'ratings': {
+            'total': total_ratings,
+            'avg': round(avg_rating, 1),
+            'distribution': dist_list,
+            'history': ratings_history
+        }
     }
     cache.set(cache_key, result, timeout=86400)
     return result
@@ -512,12 +563,10 @@ def generate_group_stats(user, year=None):
     group = groups.first()
     group_users = list(group.users.all())
 
-    # ГАРАНТИРУЕМ УНИКАЛЬНОСТЬ: получаем ID записей, которые видел ХОТЯ БЫ ОДИН участник группы
     history_ids = ViewHistory.objects.filter(users__in=group_users, is_checked=True)
     if year:
         history_ids = history_ids.filter(view_date__year=year)
     
-    # Строим base_qs строго по этим ID, чтобы исключить дублирование строк из-за M2M связи с пользователями
     base_qs = ViewHistory.objects.filter(id__in=Subquery(history_ids.values('id'))).select_related('show')
 
     episode_dur = ShowDuration.objects.filter(
@@ -548,14 +597,11 @@ def generate_group_stats(user, year=None):
 
     total_seconds = durs['total_seconds'] or 0
     total_minutes = total_seconds // 60
-    days, rem = divmod(total_seconds, 86400)
-    hours, minutes = divmod(rem // 60, 60)
 
     favs = _get_favorites(base_qs, dur_qs)
 
     members = []
     for u in group_users:
-        # Для каждого участника считаем его вклад отдельно
         u_views = history_ids.filter(users=u).count()
         members.append({
             'name': u.name or u.username or str(u.telegram_id),
@@ -572,7 +618,7 @@ def generate_group_stats(user, year=None):
         'total_movies': counts['total_movies'],
         'unique_shows': counts['unique_shows'],
         'total_minutes_watched': total_minutes,
-        'duration_display': f'{days}д {hours}ч {minutes}м',
+        'duration_display': format_duration(total_seconds),
         'active_days': counts['active_days'],
         'genres': favs['genres'],
     }

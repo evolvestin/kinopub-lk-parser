@@ -222,7 +222,9 @@ class TelegramSender:
 
         channel_url = None
         if not is_channel:
-            channel_url = self._get_channel_post_url(view_history_obj.telegram_message_id)
+            # Ссылка на канал не должна быть доступна гостям
+            if for_user and for_user.role != UserRole.GUEST:
+                channel_url = self._get_channel_post_url(view_history_obj.telegram_message_id)
 
         keyboard = get_history_notification_keyboard(
             view_history_obj,

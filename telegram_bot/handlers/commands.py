@@ -55,7 +55,7 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                             await sender.send_message(user.id, '🗑 Вы убраны из списка зрителей.')
 
                         if show_id:
-                            await _send_history_report(sender, user.id, show_id)
+                            await _send_history_report(sender, user.id, show_id, is_guest=False)
                     else:
                         await sender.send_message(
                             user.id, '❌ Ошибка обновления статуса просмотра.'
@@ -91,7 +91,7 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                         await sender.send_message(user.id, '❌ Не удалось убрать просмотр.')
 
                 if show_id:
-                    await _send_history_report(sender, user.id, show_id)
+                    await _send_history_report(sender, user.id, show_id, is_guest=False)
                 else:
                     msg = '✅ Просмотр добавлен.' if action == 'claim' else '🗑 Просмотр убран.'
                     await sender.send_message(user.id, msg)
@@ -148,7 +148,7 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
 
             try:
                 show_id = int(args.split('_')[1])
-                await _send_history_report(sender, user.id, show_id)
+                await _send_history_report(sender, user.id, show_id, is_guest=False)
             except (IndexError, ValueError):
                 await sender.send_message(
                     chat_id=user.id, text='❌ Некорректная ссылка на историю.'
@@ -179,10 +179,10 @@ async def handle_history_command(message: Message, bot: Bot):
 
     show_id = int(match.group(1))
     sender = MessageSender(bot)
-    await _send_history_report(sender, message.chat.id, show_id)
+    await _send_history_report(sender, message.chat.id, show_id, is_guest=False)
 
 
-async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int):
+async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int, is_guest: bool = False):
     show_data = await client.get_show_details(show_id, telegram_id=chat_id)
     if not show_data:
         await sender.send_message(chat_id, '❌ Ошибки получения данных.')
@@ -212,7 +212,8 @@ async def _send_history_report(sender: MessageSender, chat_id: int, show_id: int
             season = item.get('season')
             episode = item.get('episode')
 
-            if item.get('message_id') and channel_id:
+            # Ссылка на пост в канале только для не-гостей
+            if not is_guest and item.get('message_id') and channel_id:
                 link = None
                 if channel_id.startswith('-100'):
                     link = f'https://t.me/c/{channel_id[4:]}/{item["message_id"]}'
@@ -457,7 +458,7 @@ async def handle_history_action_command(message: Message, bot: Bot):
             return
 
     # Обновляем список, присылая новое сообщение
-    await _send_history_report(sender, user_id, show_id)
+    await _send_history_report(sender, user_id, show_id, is_guest=False)
 
 
 async def handle_stats_command(message: Message, bot: Bot):
