@@ -342,6 +342,33 @@
         body.has-banner #app {
             margin-top: 50px;
         }
+
+        .view-toggle { display: flex; background: var(--bg-input); border-radius: 10px; padding: 3px; border: 1px solid var(--border); margin-bottom: clamp(12px, 3.5vw, 16px); }
+        .vt-btn { background: transparent; border: none; color: var(--text-muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none; }
+        .vt-btn.active { background: var(--bg-card); color: var(--text-primary); box-shadow: var(--shadow-sm); }
+        .vt-btn svg { width: 18px; height: 18px; }
+
+        .hist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: clamp(10px, 3vw, 14px); }
+        .grid-item-wrap { display: flex; flex-direction: column; gap: 2px; cursor: pointer; transition: transform 0.2s; }
+        .grid-item-wrap:active { transform: scale(0.95); }
+        .grid-item { position: relative; aspect-ratio: 2/3; border-radius: 12px; overflow: hidden; background: var(--bg-input); border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: box-shadow 0.2s; }
+        .grid-poster { width: 100%; height: 100%; object-fit: cover; }
+        .grid-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 50%); display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; pointer-events: none; }
+        .grid-badges { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; pointer-events: none; }
+        
+        .grid-below-title { font-size: 13px; font-weight: 800; color: var(--text-primary); line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px; padding: 0 2px; }
+        .grid-below-orig { font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; margin-top: 1px; }
+        .grid-year { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; backdrop-filter: blur(4px); z-index: 2; }
+        .grid-user-avatar { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg-input); background: var(--info); color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-left: -6px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); object-fit: cover; z-index: 1;}
+        .grid-user-avatar:first-child { margin-left: 0; }
+        .grid-users { display: flex; flex-wrap: wrap; margin-bottom: 6px; padding-left: 2px; }
+        .grid-date { color: var(--accent); font-size: 10px; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+        
+        .grid-item.rating-card .grid-badges { top: auto; bottom: 8px; right: 8px; }
+        .grid-item.rating-card .grid-overlay { padding-bottom: 30px; }
+        .grid-item .big-rating-badge { width: 32px; height: 32px; font-size: 14px; position: absolute; top: 8px; left: 8px; }
+        .grid-item .rating-badge { background: rgba(0,0,0,0.6); color: var(--accent); border: 1px solid rgba(255,255,255,0.1); }
+        .grid-item .hist-badge { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
     </style>
 </head>
 <body>
@@ -464,10 +491,14 @@
         <div class="sec" id="sec-group"><div id="group-root"></div></div>
 
         <div class="sec" id="sec-history">
-            <div class="header" style="padding-bottom: 0;">
+            <div class="header" style="padding-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
                 <button onclick="closeHistory()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin-bottom:clamp(12px, 3.5vw, 16px); display:inline-flex;">
                     <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
                 </button>
+                <div class="view-toggle" id="view-toggle">
+                    <button class="vt-btn" id="vt-grid" onclick="setViewMode('grid')"></button>
+                    <button class="vt-btn" id="vt-list" onclick="setViewMode('list')"></button>
+                </div>
             </div>
             <div class="label" style="padding-top:0;"><div class="icon" id="ic-hist-type"></div><span id="hist-title"></span></div>
             <div id="hist-list" style="padding: 0 clamp(12px, 3vw, 16px) clamp(24px, 6vw, 36px);"></div>
@@ -529,7 +560,9 @@ const Icons = {
     bolt: '<svg viewBox="0 0 512 512"><path d="M312 32h-110a18 18 0 00-17.74 21l32 188H152a18.3 18.3 0 00-14.86 28.92l160 216a18 18 0 0031.57-12.78l-23-189.14H360a18.3 18.3 0 0015-28.84L215 72h97a18 18 0 000-36z"/></svg>',
     flame: '<svg viewBox="0 0 512 512"><path d="M313.29 82.26c-11.42-30.82-50.62-31-62.29.35C227.18 146.42 160 178.68 160 256c0 53 43 96 96 96s96-43 96-96c0-67.62-54-106.82-38.71-173.74zM256 320c-17.64 0-32-14.36-32-32 0-33.15 28.57-55 42-83.39 12 25.15 22 50.18 22 83.39 0 17.64-14.36 32-32 32z"/><path d="M255.8 48c-42.54 0-82.68 20.31-112 54.34-31 36-47.8 84.34-47.8 135.59 0 114.69 93.31 208.07 208 208.07S512 352.62 512 237.93C512 119 407.41 48 255.8 48zm0 366c-88.22 0-160-71.78-160-160 0-41.6 13.92-80.49 40.23-112.5C160.7 171.84 200.56 150 240 150c18.52 0 35.1 4.54 48 13 41.52-32.55 80-28 80 75 0 88.22-71.78 160-160 160z"/></svg>',
     check: '<svg viewBox="0 0 512 512"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29l-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg>',
-    days: '<svg viewBox="0 0 512 512"><path d="M400 48V16h-64v32H176V16h-64v32H48v448h416V48h-64zM112 432H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32z"/></svg>'
+    days: '<svg viewBox="0 0 512 512"><path d="M400 48V16h-64v32H176V16h-64v32H48v448h416V48h-64zM112 432H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32z"/></svg>',
+    grid: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
+    list: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>'
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -1045,6 +1078,155 @@ function renderDonut(canvasId, legendId, sourceData, dataKey, totalMinutesWatche
 window.highlightSegment = function(canvasId, index, active) { const chart = chG[canvasId]; if (!chart) return; if (active) { chart.setActiveElements([{ datasetIndex: 0, index: index }]); chart.tooltip.setActiveElements([{ datasetIndex: 0, index: index }], { x: 0, y: 0 }); } else { chart.setActiveElements([]); chart.tooltip.setActiveElements([], { x: 0, y: 0 }); } chart.update(); };
 window.mainTab = function(t) { document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t)); document.getElementById('sec-personal').classList.toggle('vis', t==='personal'); document.getElementById('sec-group').classList.toggle('vis', t==='group'); };
 
+let curHistData = [], curHistType = '';
+let viewMode = localStorage.getItem('kp_view_mode') || 'grid';
+
+window.setViewMode = function(mode) {
+    viewMode = mode;
+    localStorage.setItem('kp_view_mode', mode);
+    if (document.getElementById('sec-history').classList.contains('vis')) {
+        renderHistoryList();
+    }
+};
+
+window.renderHistoryList = function() {
+    const el = document.getElementById('hist-list');
+    const type = curHistType;
+    const data = curHistData;
+
+    document.getElementById('vt-grid').innerHTML = Icons.grid;
+    document.getElementById('vt-list').innerHTML = Icons.list;
+    document.getElementById('vt-grid').classList.toggle('active', viewMode === 'grid');
+    document.getElementById('vt-list').classList.toggle('active', viewMode === 'list');
+    
+    if (!data || !data.length) {
+        el.innerHTML = `<div class="empty"><div class="icon">${Icons.dash}</div>Нет просмотров</div>`; 
+        return;
+    }
+
+    let html = '';
+    if (viewMode === 'list') {
+        html = '<div class="card" style="margin:0; padding:0; overflow:hidden;">';
+        data.forEach((item, idx) => {
+            const delay = Math.min((idx + 1) * 0.03, 0.6); 
+            if (type === 'ratings') {
+                const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
+                const yearSuffix = item.year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.year})</span>` : '';
+                const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` : `<div class="hist-poster"></div>`;
+                let seHtml = '';
+                if (item.season && item.episode) { const e = item.episode < 10 ? '0' + item.episode : item.episode; seHtml = `<span class="hist-badge">s${item.season}e${e}</span>`; } else if (item.season !== undefined && item.season !== null && item.episode === null) { seHtml = `<span class="hist-badge">Сериал</span>`; }
+                const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
+                const rColor = getRatingColor(item.rating);
+                html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s; display:flex; align-items:center;">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}${yearSuffix}</div>${origTitle}<div class="hist-meta" style="margin-bottom:4px;">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
+            } else {
+                let metaHtml = '';
+                if (item.season_number !== undefined && item.season_number > 0) {
+                    const s = item.season_number, e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
+                    metaHtml += `<span class="hist-badge">s${s}e${e}</span>`;
+                    if (item.user_rating) { const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`; }
+                    if (item.user_show_rating) { const rsVal = Number.isInteger(item.user_show_rating) ? item.user_show_rating : item.user_show_rating.toFixed(1); metaHtml += `<span class="rating-badge show-lvl">(${rsVal})</span>`; }
+                } else {
+                    if (item.user_rating) { const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`; }
+                }
+                
+                const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="margin-top:2px; font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
+                const origTitle = item.show__original_title && item.show__original_title !== item.show__title ? `<div class="hist-orig">${item.show__original_title}</div>` : '';
+                const yearSuffix = item.show__year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.show__year})</span>` : '';
+                const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` : `<div class="hist-poster"></div>`;
+                html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}${yearSuffix}</div>${origTitle}<div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
+            }
+        });
+        html += '</div>';
+    } else {
+        html = '<div class="hist-grid">';
+
+        function getUserAvatarHtml(uid, name) {
+            if (uid === D.meta?.id && D.meta?.photo_url) return `<img src="${D.meta.photo_url}" class="grid-user-avatar" title="${name}">`;
+            if (D.group?.members) {
+                const m = D.group.members.find(x => x.id === uid);
+                if (m && m.photo_url) return `<img src="${m.photo_url}" class="grid-user-avatar" title="${name}">`;
+            }
+            return `<div class="grid-user-avatar" title="${name}">${name ? name.charAt(0).toUpperCase() : '?'}</div>`;
+        }
+
+        data.forEach((item, idx) => {
+            const delay = Math.min((idx + 1) * 0.03, 0.6); 
+            if (type === 'ratings') {
+                const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
+                const rColor = getRatingColor(item.rating);
+                const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
+                const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy" onerror="this.style.display='none'">` : '<div class="grid-poster" style="background:var(--bg-input)"></div>';
+                
+                let seHtml = '';
+                if (item.season && item.episode) { 
+                    const e = item.episode < 10 ? '0' + item.episode : item.episode; 
+                    seHtml = `<span class="hist-badge" style="background:rgba(0,0,0,0.6); border:none; color:#fff;">s${item.season}e${e}</span>`; 
+                } else if (item.season !== undefined && item.season !== null && item.episode === null) { 
+                    seHtml = `<span class="hist-badge" style="background:rgba(0,0,0,0.6); border:none; color:#fff;">Сериал</span>`; 
+                }
+
+                const yearHtml = item.year ? `<div class="grid-year">${item.year}</div>` : '';
+
+                html += `
+                <div class="grid-item-wrap anim-item" style="animation-delay:${delay}s">
+                    <div class="grid-item rating-card">
+                        ${posterHtml}
+                        ${yearHtml}
+                        <div class="big-rating-badge" style="background: ${rColor};">${rVal}</div>
+                        <div class="grid-badges">${seHtml}</div>
+                        <div class="grid-overlay">
+                            <div class="grid-date">${item.date}</div>
+                        </div>
+                    </div>
+                    <div class="grid-below-title">${item.title}</div>
+                    ${item.original_title && item.original_title !== item.title ? `<div class="grid-below-orig">${item.original_title}</div>` : ''}
+                </div>`;
+            } else {
+                const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
+                const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy" onerror="this.style.display='none'">` : '<div class="grid-poster" style="background:var(--bg-input)"></div>';
+                
+                let badgesHtml = '';
+                if (item.season_number !== undefined && item.season_number > 0) {
+                    const s = item.season_number, e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
+                    badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6); border:none; color:#fff;">s${s}e${e}</span>`;
+                }
+                if (item.user_rating) { 
+                    const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); 
+                    badgesHtml += `<span class="rating-badge" style="background:rgba(0,0,0,0.6); border:none; color:var(--accent);">${Icons.star}${rVal}</span>`; 
+                }
+                
+                let usersHtml = '';
+                if (item.user_names && item.user_names.length > 0) {
+                    if (D.group || item.user_names.length > 1) {
+                        const avatars = item.user_names.map((n, i) => getUserAvatarHtml(item.user_ids[i], n));
+                        usersHtml = `<div class="grid-users">${avatars.join('')}</div>`;
+                    }
+                }
+
+                const yearHtml = item.show__year ? `<div class="grid-year">${item.show__year}</div>` : '';
+
+                html += `
+                <div class="grid-item-wrap anim-item" style="animation-delay:${delay}s">
+                    <div class="grid-item">
+                        ${posterHtml}
+                        ${yearHtml}
+                        <div class="grid-badges">${badgesHtml}</div>
+                        <div class="grid-overlay">
+                            ${usersHtml}
+                            <div class="grid-date">${item.view_date}</div>
+                        </div>
+                    </div>
+                    <div class="grid-below-title">${item.show__title}</div>
+                    ${item.show__original_title && item.show__original_title !== item.show__title ? `<div class="grid-below-orig">${item.show__original_title}</div>` : ''}
+                </div>`;
+            }
+        });
+        html += '</div>';
+    }
+    el.innerHTML = html; 
+    window.scrollTo(0, 0);
+};
+
 window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, extraIndex) {
     lastScrollPos = window.scrollY;
     document.getElementById('main-tabs').classList.add('hidden');
@@ -1057,10 +1239,9 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
     
     if (tg && tg.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(window.closeHistory); }
     
-    const el = document.getElementById('hist-list');
-    el.innerHTML = '';
-    
+    curHistType = type;
     let data;
+
     if (type === 'all') {
         data = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date));
         document.getElementById('hist-title').textContent = 'Вся история просмотров'; document.getElementById('ic-hist-type').innerHTML = Icons.dash;
@@ -1087,7 +1268,7 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
             document.getElementById('hist-title').textContent = `Оценки: ${targetBucket}`;
         } else { data = D.ratings.history; document.getElementById('hist-title').textContent = 'История оценок'; }
         document.getElementById('ic-hist-type').innerHTML = Icons.star; document.getElementById('ic-hist-type').style.color = '#f1c40f';
-        type = 'ratings';
+        curHistType = 'ratings';
     }  else if (type === 'day') {
         data = [...D.history_movies, ...D.history_episodes]
             .filter(i => i.view_date === extraDate)
@@ -1110,42 +1291,8 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
         document.getElementById('ic-hist-type').innerHTML = type === 'movies' ? Icons.film : Icons.tv;
     }
     
-    if (!data || !data.length) {
-        let emptyIco = Icons.dash;
-        el.innerHTML = `<div class="empty"><div class="icon">${emptyIco}</div>Нет просмотров</div>`; return;
-    }
-    
-    let html = '<div class="card" style="margin:0; padding:0; overflow:hidden;">';
-    data.forEach((item, idx) => {
-        const delay = Math.min((idx + 1) * 0.03, 0.6); 
-        if (type === 'ratings') {
-            const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
-            const yearSuffix = item.year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.year})</span>` : '';
-            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` : `<div class="hist-poster"></div>`;
-            let seHtml = '';
-            if (item.season && item.episode) { const e = item.episode < 10 ? '0' + item.episode : item.episode; seHtml = `<span class="hist-badge">s${item.season}e${e}</span>`; } else if (item.season !== undefined && item.season !== null && item.episode === null) { seHtml = `<span class="hist-badge">Сериал</span>`; }
-            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-            const rColor = getRatingColor(item.rating);
-            html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s; display:flex; align-items:center;">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}${yearSuffix}</div>${origTitle}<div class="hist-meta" style="margin-bottom:4px;">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
-        } else {
-            let metaHtml = '';
-            if (item.season_number !== undefined && item.season_number > 0) {
-                const s = item.season_number, e = item.episode_number < 10 ? '0'+item.episode_number : item.episode_number;
-                metaHtml += `<span class="hist-badge">s${s}e${e}</span>`;
-                if (item.user_rating) { const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`; }
-                if (item.user_show_rating) { const rsVal = Number.isInteger(item.user_show_rating) ? item.user_show_rating : item.user_show_rating.toFixed(1); metaHtml += `<span class="rating-badge show-lvl">(${rsVal})</span>`; }
-            } else {
-                if (item.user_rating) { const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`; }
-            }
-            
-            const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="margin-top:2px; font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
-            const origTitle = item.show__original_title && item.show__original_title !== item.show__title ? `<div class="hist-orig">${item.show__original_title}</div>` : '';
-            const yearSuffix = item.show__year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.show__year})</span>` : '';
-            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` : `<div class="hist-poster"></div>`;
-            html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}${yearSuffix}</div>${origTitle}<div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
-        }
-    });
-    html += '</div>'; el.innerHTML = html; window.scrollTo(0, 0);
+    curHistData = data;
+    renderHistoryList();
 };
 
 window.closeHistory = function() {
