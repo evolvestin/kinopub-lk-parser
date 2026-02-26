@@ -446,7 +446,7 @@
             </div>
 
             <div class="card hoverable anim-item" style="animation-delay: 0.3s;" id="ratings-box">
-                <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star-internal"></div>Оценки и критика</div>
+                <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star-internal"></div>Оценки</div>
                 <div class="critic-header">
                     <div class="critic-title-box">
                         <div class="critic-badge" id="cr-badge"></div>
@@ -665,7 +665,9 @@ function render() {
     
     const avEl = document.getElementById('avatar');
     if (D.meta.is_anonymous) {
-        avEl.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><line x1="4" y1="4" x2="20" y2="20" stroke="rgba(255,255,255,0.3)"></line></svg>`;
+        avEl.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><line x1="4" x2="20" y2="20" stroke="rgba(255,255,255,0.3)"></line></svg>`;
+    } else if (D.meta.photo_url) {
+        avEl.innerHTML = `<img src="${D.meta.photo_url}" alt="A">`;
     } else {
         const u = tg?.initDataUnsafe?.user;
         if (!isSharedMode && u && u.photo_url) avEl.innerHTML = `<img src="${u.photo_url}" alt="A">`;
@@ -1004,7 +1006,19 @@ function renderWeekday() {
     chW = new Chart(ctx, { 
         type: 'bar', 
         data: { labels: ch.labels, datasets: [{ data: ch.data, backgroundColor: ch.data.map((_, i) => i >= 5 ? weGradient : barGradient), hoverBackgroundColor: ch.data.map((_, i) => i >= 5 ? '#60a5fa' : '#39d353'), borderRadius: 8, borderSkipped: false, borderWidth: 0, hoverBorderWidth: 0 }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1000, easing: 'easeOutBack', delay: (context) => context.type === 'data' && context.mode === 'default' && !context.active ? context.dataIndex * 100 : 0 }, plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { label: (context) => { const val = context.parsed.y; const pct = totalViews > 0 ? Math.round((val / totalViews) * 100) : 0; return ` ${val} ${plural(val, ['просмотр', 'просмотра', 'просмотров'])} (${pct}%)`; } } } }, scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { ticks: { color: c.t, font: { size: fSizeAx }, precision: 0 }, grid: { color: c.g }, beginAtZero: true, border: { display: false } } } } 
+        options: { 
+            responsive: true, maintainAspectRatio: false, 
+            animation: { duration: 1000, easing: 'easeOutBack', delay: (context) => context.type === 'data' && context.mode === 'default' && !context.active ? context.dataIndex * 100 : 0 }, 
+            onClick: (event, activeElements) => {
+                if (activeElements.length > 0) {
+                    const idx = activeElements[0].index;
+                    openHistory('weekday', null, null, ch.labels[idx], null, idx);
+                }
+            },
+            onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; },
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { label: (context) => { const val = context.parsed.y; const pct = totalViews > 0 ? Math.round((val / totalViews) * 100) : 0; return ` ${val} ${plural(val, ['просмотр', 'просмотра', 'просмотров'])} (${pct}%)`; } } } }, 
+            scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { ticks: { color: c.t, font: { size: fSizeAx }, precision: 0 }, grid: { color: c.g }, beginAtZero: true, border: { display: false } } } 
+        } 
     });
 }
 
@@ -1048,8 +1062,24 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
     
     let data;
     if (type === 'all') {
-        data = [...D.history_movies, ...D.history_episodes].sort((a, b) => { if (b.view_date !== a.view_date) return b.view_date.localeCompare(a.view_date); return (b.show_id + (b.episode_number || 0)) - (a.show_id + (a.episode_number || 0)); });
+        data = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date));
         document.getElementById('hist-title').textContent = 'Вся история просмотров'; document.getElementById('ic-hist-type').innerHTML = Icons.dash;
+    } else if (type === 'weekday') {
+        data = [...D.history_movies, ...D.history_episodes].filter(item => {
+            const date = new Date(item.view_date);
+            const jsDay = date.getDay(); 
+            const chartIndex = jsDay === 0 ? 6 : jsDay - 1;
+            return chartIndex === extraIndex;
+        }).sort((a, b) => b.view_date.localeCompare(a.view_date));
+        document.getElementById('hist-title').textContent = `Просмотры: ${extraTitle}`;
+        document.getElementById('ic-hist-type').innerHTML = Icons.cal;
+    } else if (type === 'group_member') {
+        const member = D.group.members[extraIndex];
+        data = [...D.group.history_movies, ...D.group.history_episodes]
+            .filter(item => item.user_ids.includes(member.id))
+            .sort((a, b) => b.view_date.localeCompare(a.view_date));
+        document.getElementById('hist-title').textContent = `Смотрел: ${extraTitle}`;
+        document.getElementById('ic-hist-type').innerHTML = Icons.user;
     } else if (type === 'ratings' || type === 'rating_filter') {
         if (type === 'rating_filter') {
             const targetBucket = extraIndex; 
@@ -1059,17 +1089,20 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
         document.getElementById('ic-hist-type').innerHTML = Icons.star; document.getElementById('ic-hist-type').style.color = '#f1c40f';
         type = 'ratings';
     }  else if (type === 'day') {
-        data = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate);
+        data = [...D.history_movies, ...D.history_episodes]
+            .filter(i => i.view_date === extraDate)
+            .sort((a, b) => b.view_date.localeCompare(a.view_date));
         document.getElementById('hist-title').textContent = extraDate; document.getElementById('ic-hist-type').innerHTML = Icons.cal;
     } else if (type === 'binge') {
         data = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => { if (a.season_number !== b.season_number) return a.season_number - b.season_number; return a.episode_number - b.episode_number; });
         document.getElementById('hist-title').textContent = extraTitle; document.getElementById('ic-hist-type').innerHTML = Icons.bolt;
     } else if (type === 'filter') {
+        const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] : [...D.history_movies, ...D.history_episodes];
         const allowedIds = D[extraKey][extraIndex].show_ids || [];
-        data = [...D.history_movies, ...D.history_episodes].filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
+        data = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
         document.getElementById('hist-title').textContent = extraTitle;
         let iconHtml = Icons.star;
-        if (extraKey === 'genres' || extraKey === 'genres_top') iconHtml = Icons.masks; else if (extraKey === 'countries') iconHtml = Icons.globe;
+        if (extraKey.includes('genres')) iconHtml = Icons.masks; else if (extraKey === 'countries') iconHtml = Icons.globe;
         document.getElementById('ic-hist-type').innerHTML = iconHtml;
     } else {
         data = type === 'movies' ? D.history_movies : D.history_episodes;
@@ -1079,8 +1112,7 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
     
     if (!data || !data.length) {
         let emptyIco = Icons.dash;
-        if (type === 'movies') emptyIco = Icons.film; else if (type === 'day') emptyIco = Icons.cal; else if (type === 'binge') emptyIco = Icons.bolt; else if (type === 'filter') emptyIco = document.getElementById('ic-hist-type').innerHTML; else if (type === 'ratings') emptyIco = Icons.star; else emptyIco = Icons.tv;
-        el.innerHTML = `<div class="empty"><div class="icon">${emptyIco}</div>Нет просмотров за этот период</div>`; return;
+        el.innerHTML = `<div class="empty"><div class="icon">${emptyIco}</div>Нет просмотров</div>`; return;
     }
     
     let html = '<div class="card" style="margin:0; padding:0; overflow:hidden;">';
@@ -1105,10 +1137,12 @@ window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, ex
             } else {
                 if (item.user_rating) { const rVal = Number.isInteger(item.user_rating) ? item.user_rating : item.user_rating.toFixed(1); metaHtml += `<span class="rating-badge">${Icons.star}${rVal}</span>`; }
             }
+            
+            const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="margin-top:2px; font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
             const origTitle = item.show__original_title && item.show__original_title !== item.show__title ? `<div class="hist-orig">${item.show__original_title}</div>` : '';
             const yearSuffix = item.show__year ? ` <span style="color:var(--text-muted); font-weight:500;">(${item.show__year})</span>` : '';
             const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="poster" loading="lazy" onerror="this.style.display='none'">` : `<div class="hist-poster"></div>`;
-            html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}${yearSuffix}</div>${origTitle}<div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div></div></div>`;
+            html += `<div class="hist-item anim-item clickable" style="animation-delay:${delay}s;">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}${yearSuffix}</div>${origTitle}<div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
         }
     });
     html += '</div>'; el.innerHTML = html; window.scrollTo(0, 0);
@@ -1125,16 +1159,57 @@ window.closeHistory = function() {
 
 function renderGroup() {
     const el = document.getElementById('group-root');
-    if (!D.group) { el.innerHTML = `<div class="card hoverable"><div class="empty"><div class="icon" style="font-size:clamp(36px, 10vw, 48px);line-height:1;color:var(--text-muted)">${Icons.users}</div>Вы не состоите в группе</div></div>`; return; }
+    if (!D.group) { 
+        el.innerHTML = `<div class="card hoverable"><div class="empty"><div class="icon" style="font-size:clamp(36px, 10vw, 48px);line-height:1;color:var(--text-muted)">${Icons.users}</div>Вы не состоите в группе</div></div>`; 
+        return; 
+    }
+    
     const g = D.group, p = D.summary;
-    const rows = [ { lb:'Просмотры', i:Icons.tv, y:p.total_views, gv:g.total_views }, { lb:'Эпизоды', i:Icons.film, y:p.total_episodes, gv:g.total_episodes }, { lb:'Фильмы', i:Icons.time, y:p.total_movies, gv:g.total_movies }, { lb:'Уникальных', i:Icons.star, y:p.unique_shows, gv:g.unique_shows } ];
+    const subjectLabel = isSharedMode ? D.meta.name : 'Вы';
+    
+    const rows = [ 
+        { lb:'Просмотры', i:Icons.tv, y:p.total_views, gv:g.total_views }, 
+        { lb:'Эпизоды', i:Icons.film, y:p.total_episodes, gv:g.total_episodes }, 
+        { lb:'Фильмы', i:Icons.time, y:p.total_movies, gv:g.total_movies }, 
+        { lb:'Уникальных', i:Icons.star, y:p.unique_shows, gv:g.unique_shows } 
+    ];
+    
     let hasDiff = false;
-    const cmpH = rows.map((r, idx) => { const d = r.y - r.gv; let dh = d===0 ? `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(12px, 3.2vw, 14px);display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>` : (hasDiff = true, `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`); return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1;color:var(--text-muted)">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(11px, 3vw, 13px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`; }).join('');
+    const cmpH = rows.map((r, idx) => { 
+        const d = r.y - r.gv; 
+        let dh = d===0 ? `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(12px, 3.2vw, 14px);display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>` : (hasDiff = true, `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`); 
+        return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1;color:var(--text-muted)">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(11px, 3vw, 13px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`; 
+    }).join('');
+    
     const mx = Math.max(...g.members.map(m=>m.views),1);
-    const mbH = g.members.map((m, idx) => `<div class="mb anim-list-item" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
+    const mbH = g.members.map((m, idx) => `<div class="mb anim-list-item clickable" onclick="openHistory('group_member', null, null, '${m.name.replace(/'/g, "\\'")}', null, ${idx})" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
     let gGenH = g.genres?.length ? `<div class="card hoverable anim-item" style="animation-delay:0.3s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="chart-box" style="height:380px;"><canvas id="c-group-genre"></canvas></div><div id="legend-group-genre" class="legend-grid"></div></div>` : '';
     const membersLabel = `${g.members_count} ${plural(g.members_count, ['участник', 'участника', 'участников'])}`;
-    el.innerHTML = `<div class="card hoverable anim-item"><div style="display:flex;align-items:center;gap:16px"><div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))">${Icons.users}</div><div><div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">${g.group_name}</div><div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">${membersLabel} · ${g.duration_display}</div></div></div></div><div class="card hoverable anim-item" style="animation-delay:0.1s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.chart}</div>Вы vs Группа</div><div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)"><span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 Вы</span><span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span></div>${!hasDiff?`<div style="text-align:center;padding:16px 0;font-size:clamp(15px, 4vw, 18px);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse 2s infinite;"><div class="icon" style="font-size:clamp(20px, 6vw, 24px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}${cmpH}</div><div class="card hoverable anim-item" style="animation-delay:0.2s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.user}</div>Участники</div>${mbH}</div>${gGenH}`;
+    
+    el.innerHTML = `
+        <div class="card hoverable anim-item">
+            <div style="display:flex;align-items:center;gap:16px">
+                <div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))">${Icons.users}</div>
+                <div>
+                    <div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">${g.group_name}</div>
+                    <div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">${membersLabel} · ${g.duration_display}</div>
+                </div>
+            </div>
+        </div>
+        <div class="card hoverable anim-item" style="animation-delay:0.1s">
+            <div class="label more-pad"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.chart}</div>${subjectLabel} vs Группа</div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 ${subjectLabel}</span>
+                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span>
+            </div>
+            ${!hasDiff?`<div style="text-align:center;padding:16px 0;font-size:clamp(15px, 4 vw, 18px);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse 2s infinite;"><div class="icon" style="font-size:clamp(20px, 6vw, 24px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
+            ${cmpH}
+        </div>
+        <div class="card hoverable anim-item" style="animation-delay:0.2s">
+            <div class="label more-pad"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.user}</div>Участники</div>
+            ${mbH}
+        </div>
+        ${gGenH}`;
 }
 
 // Share Modal Logic

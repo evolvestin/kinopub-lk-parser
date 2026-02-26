@@ -551,7 +551,7 @@ def generate_user_stats(user, year=None):
 
 
 def generate_group_stats(user, year=None):
-    cache_key = f'group_stats_v3:{user.id}:{year or "all"}'
+    cache_key = f'group_stats_v4:{user.id}:{year or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -563,11 +563,13 @@ def generate_group_stats(user, year=None):
     group = groups.first()
     group_users = list(group.users.all())
 
-    history_ids = ViewHistory.objects.filter(users__in=group_users, is_checked=True)
+    history_filter = Q(users__in=group_users, is_checked=True)
     if year:
-        history_ids = history_ids.filter(view_date__year=year)
+        history_filter &= Q(view_date__year=year)
+
+    history_ids = ViewHistory.objects.filter(history_filter).values('id').distinct()
     
-    base_qs = ViewHistory.objects.filter(id__in=Subquery(history_ids.values('id'))).select_related('show')
+    base_qs = ViewHistory.objects.filter(id__in=Subquery(history_ids)).select_related('show').prefetch_related('users')
 
     episode_dur = ShowDuration.objects.filter(
         show_id=OuterRef('show_id'),
@@ -602,12 +604,40 @@ def generate_group_stats(user, year=None):
 
     members = []
     for u in group_users:
-        u_views = history_ids.filter(users=u).count()
+        u_history_filter = Q(users=u, is_checked=True)
+        if year:
+            u_history_filter &= Q(view_date__year=year)
+        
+        u_views = ViewHistory.objects.filter(u_history_filter).count()
         members.append({
+            'id': u.id,
             'name': u.name or u.username or str(u.telegram_id),
             'views': u_views,
         })
     members.sort(key=lambda x: x['views'], reverse=True)
+
+    history_movies = []
+    history_episodes = []
+
+    for h in base_qs.order_by('-view_date', '-id'):
+        entry = {
+            'show_id': h.show_id,
+            'show__title': h.show.title,
+            'show__original_title': h.show.original_title,
+            'show__year': h.show.year,
+            'view_date': h.view_date.strftime('%Y-%m-%d'),
+            'poster_url': get_poster_url(h.show_id),
+            'user_ids': list(h.users.values_list('id', flat=True)),
+            'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()]
+        }
+        if h.season_number > 0:
+            entry.update({
+                'season_number': h.season_number,
+                'episode_number': h.episode_number,
+            })
+            history_episodes.append(entry)
+        else:
+            history_movies.append(entry)
 
     result = {
         'group_name': group.name,
@@ -621,6 +651,8 @@ def generate_group_stats(user, year=None):
         'duration_display': format_duration(total_seconds),
         'active_days': counts['active_days'],
         'genres': favs['genres'],
+        'history_movies': history_movies,
+        'history_episodes': history_episodes,
     }
 
     cache.set(cache_key, result, timeout=86400)

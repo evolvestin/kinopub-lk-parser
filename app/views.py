@@ -1,8 +1,11 @@
 import functools
+import hashlib
 import json
 import logging
 import uuid
-import uuid
+
+from django.conf import settings
+from django.contrib.auth.models import Permission, User
 from app.models import SharedStat
 
 from django.conf import settings
@@ -930,35 +933,71 @@ def webapp_bake_stats(request):
             stat = generate_user_stats(view_user, year=year_val)
             stat = json.loads(json.dumps(stat))
 
-            if anon_user:
-                stat['meta']['name'] = 'Аноним'
-                stat['meta']['is_anonymous'] = True
-
             if include_group:
                 group_stats = generate_group_stats(view_user, year=year_val)
                 if group_stats:
                     group_stats = json.loads(json.dumps(group_stats))
+                    
                     if anon_group:
                         group_stats['group_name'] = 'Группа'
-                        for idx, member in enumerate(group_stats['members'], 1):
+                    
+                    id_map = {}
+                    for idx, member in enumerate(group_stats['members'], 1):
+                        old_id = member.get('id')
+                        id_map[old_id] = idx
+                        
+                        is_me = old_id == view_user.id
+                        
+                        should_hide_name = False
+                        if anon_group:
+                            if not is_me or anon_user:
+                                should_hide_name = True
+                        else:
+                            if is_me and anon_user:
+                                should_hide_name = True
+                        
+                        if should_hide_name:
                             member['name'] = f'Участник {idx}'
+                        
+                        member['id'] = idx
+
+                    for h_type in ['history_movies', 'history_episodes']:
+                        for item in group_stats.get(h_type, []):
+                            item['user_ids'] = [
+                                id_map[uid] for uid in item.get('user_ids', []) if uid in id_map
+                            ]
+                    
+                    if not anon_user and view_user.id in id_map:
+                        stat['meta']['id'] = id_map[view_user.id]
+
                     stat['group'] = group_stats
             elif 'group' in stat:
                 del stat['group']
 
+            if anon_user:
+                stat['meta']['name'] = 'Участник'
+                stat['meta']['is_anonymous'] = True
+                stat['meta'].pop('id', None)
+            else:
+                if tg_user.get('photo_url'):
+                    stat['meta']['photo_url'] = tg_user.get('photo_url')
+
             baked_data[str(yr)] = stat
 
-        stat_id = uuid.uuid4().hex[:12]
+        final_payload = {
+            'metadata': {'years': years}, 
+            'data': baked_data
+        }
+
+        content_hash = hashlib.sha256(json.dumps(final_payload, sort_keys=True).encode()).hexdigest()
+        stat_id = content_hash[:16]
         
-        SharedStat.objects.create(
+        SharedStat.objects.get_or_create(
             id=stat_id, 
-            data={
-                "metadata": {"years": years}, 
-                "data": baked_data
-            }
+            defaults={'data': final_payload}
         )
 
-        return JsonResponse({"id": stat_id})
+        return JsonResponse({'id': stat_id})
 
     except Exception as e:
         logging.error(f'WebApp Bake Stats Error: {e}', exc_info=True)
