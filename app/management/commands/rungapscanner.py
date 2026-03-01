@@ -3,8 +3,6 @@ import re
 import time
 
 from django.conf import settings
-
-from django.conf import settings
 from django.db.models import Max
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
@@ -63,7 +61,9 @@ class Command(LoggableBaseCommand):
             logging.info(f'Gap scanner finished successfully up to ID {end_id}')
             return
 
-        logging.info(f'GapScanner: Found {total_missing} gaps to check in range {start_id}-{end_id}')
+        logging.info(
+            f'GapScanner: Found {total_missing} gaps to check in range {start_id}-{end_id}'
+        )
 
         driver = None
         processed_count = 0
@@ -73,9 +73,12 @@ class Command(LoggableBaseCommand):
         try:
             for idx, show_id in enumerate(missing_ids, start=1):
                 current_id = show_id
-                
+
                 if idx % 50 == 0 or idx == 1:
-                    logging.info(f'GapScanner Progress: Checked {idx}/{total_missing} (Current ID: {show_id})')
+                    logging.info(
+                        f'GapScanner Progress: Checked {idx}/{total_missing}'
+                        f' (Current ID: {show_id})'
+                    )
 
                 if driver is None:
                     driver = initialize_driver_session(session_type='aux')
@@ -126,24 +129,32 @@ class Command(LoggableBaseCommand):
 
                     except Exception as e:
                         if is_fatal_selenium_error(e):
-                            logging.warning(f'GapScanner: Driver crash on ID {show_id}, restarting...')
+                            logging.warning(
+                                f'GapScanner: Driver crash on ID {show_id}, restarting...'
+                            )
                             close_driver(driver)
                             driver = initialize_driver_session(session_type='aux')
                             if not driver:
                                 return
 
                         if attempt >= max_attempts:
-                            logging.error(f'GapScanner: Failed ID {show_id} after {max_attempts} attempts.')
+                            logging.error(
+                                f'GapScanner: Failed ID {show_id} after {max_attempts} attempts.'
+                            )
                             raise e
                         else:
                             time.sleep(5)
 
             logging.info(f'Gap scanner finished successfully up to ID {end_id}')
-            logging.info(f'GapScanner: Finished. Total checked: {total_missing}, New found: {found_count}')
+            logging.info(
+                f'GapScanner: Finished. Total checked: {total_missing}, New found: {found_count}'
+            )
 
         except (Exception, KeyboardInterrupt) as e:
             logging.error(f'GapScanner: Interrupted at ID {current_id}. Error: {str(e)[:200]}')
-            logging.warning(f'Gap scanner finished successfully up to ID {current_id} (interrupted)')
+            logging.warning(
+                f'Gap scanner finished successfully up to ID {current_id} (interrupted)'
+            )
             raise e
 
         finally:
