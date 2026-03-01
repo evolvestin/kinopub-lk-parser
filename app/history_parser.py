@@ -55,6 +55,9 @@ def is_fatal_selenium_error(e):
         or 'connection refused' in err_str
         or 'max retries exceeded' in err_str
         or 'invalid session' in err_str
+        or 'remote end closed connection' in err_str
+        or 'remotedisconnected' in err_str
+        or 'protocolerror' in err_str
     )
 
 
@@ -316,11 +319,14 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
 
         user_data_dir = os.path.join('/data', f'uc_browser_data_{profile_key}')
         if os.path.exists(user_data_dir):
-            try:
-                shutil.rmtree(user_data_dir)
-                logging.info(f'Cleaned up existing user data directory: {user_data_dir}')
-            except Exception as e:
-                logging.warning(f'Could not clean user data directory: {e}')
+            for _ in range(3):
+                try:
+                    shutil.rmtree(user_data_dir, ignore_errors=True)
+                    if not os.path.exists(user_data_dir):
+                        break
+                    time.sleep(1)
+                except Exception:
+                    pass
 
         driver_executable_path = None
         if os.path.exists('/home/app/bin/chromedriver'):

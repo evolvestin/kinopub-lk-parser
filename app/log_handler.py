@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import traceback
 
@@ -41,17 +42,25 @@ class DatabaseLogHandler(logging.Handler):
             channel_layer = get_channel_layer()
             if channel_layer:
                 try:
-                    async_to_sync(channel_layer.group_send)(
-                        'logs',
-                        {
-                            'type': 'log_message',
-                            'created_at': now.strftime('%H:%M:%S'),
-                            'level': record.levelname,
-                            'module': record.module,
-                            'message': msg,
-                        },
-                    )
-                except RuntimeError:
+                    loop = None
+                    try:
+                        loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        pass
+
+                    event_data = {
+                        'type': 'log_message',
+                        'created_at': now.strftime('%H:%M:%S'),
+                        'level': record.levelname,
+                        'module': record.module,
+                        'message': msg,
+                    }
+
+                    if loop and loop.is_running():
+                        loop.create_task(channel_layer.group_send('logs', event_data))
+                    else:
+                        async_to_sync(channel_layer.group_send)('logs', event_data)
+                except Exception:
                     pass
 
             if record.levelno >= logging.ERROR:

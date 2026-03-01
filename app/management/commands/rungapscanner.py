@@ -80,9 +80,19 @@ class Command(LoggableBaseCommand):
                     )
 
                 if driver is None:
-                    driver = initialize_driver_session(session_type='aux')
+                    for attempt_init in range(1, 4):
+                        driver = initialize_driver_session(session_type='aux')
+                        if driver:
+                            break
+                        wait_time = attempt_init * 15
+                        logging.warning(
+                            f'GapScanner: Driver init failed (attempt {attempt_init}). '
+                            f'Waiting {wait_time}s...'
+                        )
+                        time.sleep(wait_time)
+
                     if not driver:
-                        logging.error('GapScanner: Failed to initialize Selenium driver.')
+                        logging.error('GapScanner: Failed to initialize driver after 3 attempts.')
                         return
 
                 target_url = f'{settings.SITE_AUX_URL}item/view/{show_id}'
@@ -132,9 +142,12 @@ class Command(LoggableBaseCommand):
                                 f'GapScanner: Driver crash on ID {show_id}, restarting...'
                             )
                             close_driver(driver)
-                            driver = initialize_driver_session(session_type='aux')
-                            if not driver:
-                                return
+                            driver = None
+                            time.sleep(5)
+                            if attempt < max_attempts:
+                                continue
+                            else:
+                                raise e
 
                         if attempt >= max_attempts:
                             logging.error(
