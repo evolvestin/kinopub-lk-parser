@@ -154,15 +154,9 @@ def backup_cookies():
     BackupManager().perform_cookies_backup()
 
 
-@shared_task(bind=True)
-def run_admin_command(self, task_run_id):
-    try:
-        task_run = TaskRun.objects.get(id=task_run_id)
-    except TaskRun.DoesNotExist:
-        return
-
+def _execute_admin_command_process(celery_task_id, task_run):
     task_run.status = 'RUNNING'
-    task_run.celery_task_id = self.request.id
+    task_run.celery_task_id = celery_task_id
     task_run.save()
 
     cmd = [sys.executable, 'manage.py', task_run.command]
@@ -237,6 +231,40 @@ def run_admin_command(self, task_run_id):
             task_run.status = 'FAILURE'
             task_run.error_message = f'Worker exception: {str(e)}'
             task_run.save()
+
+
+@shared_task(bind=True)
+def run_admin_command(self, task_run_id):
+    try:
+        task_run = TaskRun.objects.get(id=task_run_id)
+    except TaskRun.DoesNotExist:
+        return
+
+    selenium_commands = {
+        'runfullscan',
+        'rungapscanner',
+        'runhistoryparser',
+        'runnewepisodes',
+        'rundailysync',
+        'updatedetails',
+        'updatedurations',
+        'scanbyids',
+        'ff',
+    }
+
+    if task_run.command in selenium_commands:
+        with _redis_lock('selenium_global_lock', timeout=21600) as acquired:
+            if not acquired:
+                task_run.status = 'FAILURE'
+                task_run.output = (
+                    '[System] Отменено: другая задача парсинга (Selenium) уже выполняется.'
+                )
+                task_run.error_message = 'Selenium lock is busy'
+                task_run.save()
+                return
+            _execute_admin_command_process(self.request.id, task_run)
+    else:
+        _execute_admin_command_process(self.request.id, task_run)
 
 
 @shared_task
