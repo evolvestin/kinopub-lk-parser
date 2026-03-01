@@ -62,9 +62,11 @@ class Command(LoggableBaseCommand):
 
         driver = None
         processed_count = 0
+        current_id = start_id
 
         try:
-            for _, show_id in enumerate(missing_ids, start=1):
+            for show_id in missing_ids:
+                current_id = show_id
                 if driver is None:
                     driver = initialize_driver_session(session_type='aux')
                     if not driver:
@@ -115,12 +117,9 @@ class Command(LoggableBaseCommand):
                                 return
 
                         if attempt >= max_attempts:
-                            pass
+                            raise e
                         else:
                             time.sleep(5)
-
-            if processed_count > 0:
-                BackupManager().schedule_backup()
 
             LogEntry.objects.create(
                 level='INFO',
@@ -128,5 +127,15 @@ class Command(LoggableBaseCommand):
                 message=f'Gap scanner finished successfully up to ID {end_id}',
             )
 
+        except (Exception, KeyboardInterrupt) as e:
+            LogEntry.objects.create(
+                level='WARNING',
+                module='rungapscanner',
+                message=f'Gap scanner finished successfully up to ID {current_id} (interrupted: {str(e)[:100]})',
+            )
+            raise e
+
         finally:
+            if processed_count > 0:
+                BackupManager().schedule_backup()
             close_driver(driver)
