@@ -16,10 +16,7 @@ from django.views.decorators.http import require_http_methods
 
 from app.dashboard import dashboard_callback
 from app.models import (
-    Country,
-    Genre,
     LogEntry,
-    Person,
     SharedStat,
     Show,
     ShowDuration,
@@ -980,7 +977,7 @@ def webapp_bake_stats(request):
                     uid = 1 if group_exists else 0
                 else:
                     name = view_user.name or view_user.username
-                    uid = 1 if group_exists else 0 # В группе всегда есть ID
+                    uid = 1 if group_exists else 0  # В группе всегда есть ID
 
                 user_info_map[view_user.id] = {
                     'id': uid,
@@ -1022,7 +1019,9 @@ def webapp_bake_stats(request):
             baked_data[str(yr)] = stat
 
         final_payload = {'metadata': {'years': years}, 'data': baked_data}
-        content_hash = hashlib.sha256(json.dumps(final_payload, sort_keys=True).encode()).hexdigest()
+        content_hash = hashlib.sha256(
+            json.dumps(final_payload, sort_keys=True).encode()
+        ).hexdigest()
         stat_id = content_hash[:16]
         SharedStat.objects.get_or_create(id=stat_id, defaults={'data': final_payload})
         return JsonResponse({'id': stat_id})

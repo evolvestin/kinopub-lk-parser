@@ -9,6 +9,7 @@ from app.history_parser import (
     close_driver,
     initialize_driver_session,
     is_fatal_selenium_error,
+    open_url_safe,
     process_show_durations,
     update_show_details,
 )
@@ -51,7 +52,6 @@ class Command(LoggableBaseCommand):
             else:
                 logging.warning(f'File not found: {file_path}')
 
-        # Дедубликация и сортировка
         ids_to_scan = sorted(list(set(ids_to_scan)))
 
         if not ids_to_scan:
@@ -75,16 +75,14 @@ class Command(LoggableBaseCommand):
                 logging.info(f'[{index}/{len(ids_to_scan)}] Processing Show ID: {show_id}')
 
                 try:
-                    try:
-                        _ = driver.current_url
-                    except Exception as e:
-                        raise Exception(f'Driver unresponsive: {e}') from e
+                    target_url = f'{settings.SITE_AUX_URL}item/view/{show_id}'
+                    driver = open_url_safe(driver, target_url, session_type='aux')
 
-                    update_show_details(driver, show_id, force=True)
+                    update_show_details(driver, show_id, force=True, session_type='aux')
 
                     try:
                         show = Show.objects.get(id=show_id)
-                        process_show_durations(driver, show)
+                        process_show_durations(driver, show, session_type='aux')
                     except Show.DoesNotExist:
                         logging.warning(f'Show {show_id} does not exist after details update.')
 

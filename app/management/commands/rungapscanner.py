@@ -11,6 +11,7 @@ from app.history_parser import (
     close_driver,
     initialize_driver_session,
     is_fatal_selenium_error,
+    open_url_safe,
     process_show_durations,
     update_show_details,
 )
@@ -78,7 +79,7 @@ class Command(LoggableBaseCommand):
                     attempt += 1
                     try:
                         time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
-                        driver.get(target_url)
+                        driver = open_url_safe(driver, target_url, session_type='aux')
 
                         page_title = driver.title
                         if 'Not Found' in page_title or '404' in page_title:
@@ -88,17 +89,18 @@ class Command(LoggableBaseCommand):
                         is_valid_show = False
                         try:
                             title_el = driver.find_element(By.TAG_NAME, 'h3')
-                            if title_el.text.strip().split('\n')[0]:
+                            title_text = title_el.text.strip().split('\n')[0]
+                            if title_text and title_text != 'Авторизация':
                                 is_valid_show = True
                         except NoSuchElementException:
                             if 'window.PLAYER_ITEM_ID' in driver.page_source:
                                 is_valid_show = True
 
                         if is_valid_show:
-                            update_show_details(driver, show_id, force=True)
+                            update_show_details(driver, show_id, force=True, session_type='aux')
                             try:
                                 show = Show.objects.get(id=show_id)
-                                process_show_durations(driver, show)
+                                process_show_durations(driver, show, session_type='aux')
                             except Show.DoesNotExist:
                                 pass
                             processed_count += 1

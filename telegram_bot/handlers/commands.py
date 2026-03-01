@@ -494,8 +494,6 @@ async def handle_history_action_command(message: Message, bot: Bot):
 
 async def handle_stats_command(message: Message, bot: Bot):
     dynamic_url = URLStore().get_url()
-    env = os.getenv('ENVIRONMENT', 'DEV')
-
     # Приоритет: Динамическая ссылка -> ENV переменная -> Бэкенд
     base_url = (
         dynamic_url

@@ -95,6 +95,10 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         logging.error(f'Error navigating to show page {show_id}: {e}')
         return
 
+    if '/user/login' in driver.current_url:
+        logging.error(f'Failed to fetch show {show_id}: Stuck on login page.')
+        return
+
     if 'Not Found' in driver.title or '404' in driver.title:
         logging.warning(f'Show {show_id} returned 404.')
         return
@@ -118,9 +122,15 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
 
         try:
             h3_elem = driver.find_element(By.TAG_NAME, 'h3')
-            lines = h3_elem.text.split('\n')
-            if lines[0].strip():
-                show.title = lines[0].strip()
+            title_text = h3_elem.text.split('\n')[0].strip()
+
+            if title_text == 'Авторизация':
+                logging.error('Detected login header instead of show title. Aborting save.')
+                return
+
+            if title_text:
+                show.title = title_text
+
             try:
                 small_elem = h3_elem.find_element(By.TAG_NAME, 'small')
                 raw_orig = small_elem.text.replace('HD', '').replace('+ AC3', '').strip()
@@ -139,11 +149,15 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         show.save()
 
         wait = WebDriverWait(driver, 10)
-        info_table = wait.until(
-            expected_conditions.presence_of_element_located(
-                (By.CSS_SELECTOR, 'table.table-striped')
+        try:
+            info_table = wait.until(
+                expected_conditions.presence_of_element_located(
+                    (By.CSS_SELECTOR, 'table.table-striped')
+                )
             )
-        )
+        except TimeoutException:
+            logging.warning(f'Info table not found for show {show_id}. Metadata update skipped.')
+            return
 
         def get_row_data(text_label):
             try:
@@ -528,7 +542,7 @@ def initialize_driver_session(headless=True, session_type='main'):
 
 def _extract_js_data(driver, var_name, regex_pattern):
     try:
-        data = driver.execute_script(f"return window.{var_name};")
+        data = driver.execute_script(f'return window.{var_name};')
         if data:
             return data
     except Exception:
@@ -557,11 +571,9 @@ def _fetch_playlist_data(driver, url, session_type='main'):
             time.sleep(3)
 
             data = _extract_js_data(
-                driver, 
-                'PLAYER_PLAYLIST', 
-                r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);'
+                driver, 'PLAYER_PLAYLIST', r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);'
             )
-            
+
             if data:
                 return data
 
@@ -592,7 +604,7 @@ def get_movie_duration_and_save(driver, show_id, session_type='main'):
             if item.get('duration'):
                 duration_sec = item['duration']
                 break
-        
+
         if duration_sec:
             ShowDuration.objects.update_or_create(
                 show_id=show_id,
@@ -844,14 +856,35 @@ def open_url_safe(driver, url, headless=True, session_type='main'):
                 raise Exception('Не удалось перезапустить драйвер после обнаружения защиты.')
 
             new_driver.get(url)
-
             if is_cloudflare_page(new_driver):
                 close_driver(new_driver)
                 raise Exception('Защита Cloudflare срабатывает повторно после перезапуска.')
-
             return new_driver
+
+        if '/user/login' in driver.current_url and '/user/login' not in url:
+            logging.warning('Сессия истекла (редирект на логин). Попытка повторной авторизации...')
+
+            login = settings.KINOPUB_LOGIN if session_type == 'main' else settings.KINOPUB_AUX_LOGIN
+            password = (
+                settings.KINOPUB_PASSWORD
+                if session_type == 'main'
+                else settings.KINOPUB_AUX_PASSWORD
+            )
+            cookie_path = (
+                settings.COOKIES_FILE_PATH_MAIN
+                if session_type == 'main'
+                else settings.COOKIES_FILE_PATH_AUX
+            )
+            base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
+
+            if do_login(driver, login, password, cookie_path, base_url):
+                logging.info('Авторизация восстановлена. Переход к целевому URL.')
+                driver.get(url)
+            else:
+                raise Exception('Не удалось восстановить сессию через do_login.')
+
     except Exception as e:
-        logging.error(f'Ошибка при проверке Cloudflare: {e}')
+        logging.error(f'Ошибка при проверке состояния страницы: {e}')
         raise
     return driver
 
@@ -980,9 +1013,7 @@ def process_show_durations(driver, show, session_type='main'):
             time.sleep(3)
 
             seasons_data = _extract_js_data(
-                driver, 
-                'PLAYER_SEASONS', 
-                r'window\.PLAYER_SEASONS\s*=\s*(\[.*?\]);'
+                driver, 'PLAYER_SEASONS', r'window\.PLAYER_SEASONS\s*=\s*(\[.*?\]);'
             )
 
             seasons = set()
