@@ -526,30 +526,50 @@ def initialize_driver_session(headless=True, session_type='main'):
         return None
 
 
+def _extract_js_data(driver, var_name, regex_pattern):
+    try:
+        data = driver.execute_script(f"return window.{var_name};")
+        if data:
+            return data
+    except Exception:
+        pass
+
+    scripts = driver.find_elements(By.TAG_NAME, 'script')
+    for script in scripts:
+        try:
+            content = script.get_attribute('innerHTML')
+            if not content:
+                continue
+            match = re.search(regex_pattern, content, re.DOTALL)
+            if match:
+                return json.loads(match.group(1))
+        except (Exception, json.JSONDecodeError):
+            continue
+    return None
+
+
 def _fetch_playlist_data(driver, url, session_type='main'):
     logging.info(f'Requesting playlist data from {url}...')
     max_retries = 3
     for attempt in range(max_retries):
         try:
             driver = open_url_safe(driver, url, session_type=session_type)
-            wait = WebDriverWait(driver, 30)
-            wait.until(
-                expected_conditions.presence_of_element_located(
-                    (By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]')
-                )
+            time.sleep(3)
+
+            data = _extract_js_data(
+                driver, 
+                'PLAYER_PLAYLIST', 
+                r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);'
             )
-            script_element = driver.find_element(
-                By.XPATH, '//script[contains(text(), "window.PLAYER_PLAYLIST")]'
-            )
-            script_text = script_element.get_attribute('innerHTML')
-            match = re.search(r'window\.PLAYER_PLAYLIST\s*=\s*(\[.*?\]);', script_text, re.DOTALL)
-            if match:
-                return json.loads(match.group(1))
+            
+            if data:
+                return data
 
             if attempt < max_retries - 1:
+                logging.warning(f'Playlist variable not found on {url}. Retrying...')
                 time.sleep(5)
                 continue
-            logging.warning(f'Could not find PLAYER_PLAYLIST JSON for {url}')
+            logging.warning(f'Could not find PLAYER_PLAYLIST for {url}')
         except Exception as e:
             if attempt < max_retries - 1:
                 logging.warning(f'Retry {attempt + 1} for playlist {url} due to: {e}')
@@ -566,17 +586,25 @@ def get_movie_duration_and_save(driver, show_id, session_type='main'):
     movie_url = f'{base_url.rstrip("/")}/item/play/{show_id}/s0e1'
     playlist_data = _fetch_playlist_data(driver, movie_url, session_type=session_type)
 
-    if playlist_data and 'duration' in playlist_data[0]:
-        duration_sec = playlist_data[0]['duration']
-        ShowDuration.objects.update_or_create(
-            show_id=show_id,
-            season_number=None,
-            episode_number=None,
-            defaults={'duration_seconds': duration_sec},
-        )
-        logging.info('Cached duration for movie id%d: %d seconds.', show_id, duration_sec)
-    elif playlist_data:
-        logging.warning('Playlist data empty or missing duration for movie %s', movie_url)
+    if playlist_data:
+        duration_sec = None
+        for item in playlist_data:
+            if item.get('duration'):
+                duration_sec = item['duration']
+                break
+        
+        if duration_sec:
+            ShowDuration.objects.update_or_create(
+                show_id=show_id,
+                season_number=None,
+                episode_number=None,
+                defaults={'duration_seconds': duration_sec},
+            )
+            logging.info('Cached duration for movie id%d: %d seconds.', show_id, duration_sec)
+        else:
+            logging.warning('Playlist data found but duration is missing for %s', movie_url)
+    else:
+        logging.warning('Could not fetch playlist data for movie %s', movie_url)
 
 
 def get_season_durations_and_save(driver, show_id, season, session_type='main'):
@@ -949,30 +977,22 @@ def process_show_durations(driver, show, session_type='main'):
             logging.info(f'Navigating to player to fetch seasons list: {player_url}')
 
             driver = open_url_safe(driver, player_url, session_type=session_type)
+            time.sleep(3)
 
-            wait = WebDriverWait(driver, 20)
-            wait.until(
-                expected_conditions.presence_of_element_located(
-                    (By.XPATH, '//script[contains(text(), "window.PLAYER_SEASONS")]')
-                )
+            seasons_data = _extract_js_data(
+                driver, 
+                'PLAYER_SEASONS', 
+                r'window\.PLAYER_SEASONS\s*=\s*(\[.*?\]);'
             )
-
-            script_element = driver.find_element(
-                By.XPATH, '//script[contains(text(), "window.PLAYER_SEASONS")]'
-            )
-            script_text = script_element.get_attribute('innerHTML')
-
-            match = re.search(r'window\.PLAYER_SEASONS\s*=\s*(\[.*?\]);', script_text, re.DOTALL)
 
             seasons = set()
-            if match:
-                seasons_data = json.loads(match.group(1))
+            if seasons_data:
                 for item in seasons_data:
                     if 'season' in item:
                         seasons.add(int(item['season']))
             else:
                 logging.warning(
-                    f'Could not regex PLAYER_SEASONS for show {show.id}. Defaulting to season 1.'
+                    f'Could not extract seasons for show {show.id}. Defaulting to season 1.'
                 )
                 seasons.add(1)
 
