@@ -33,7 +33,6 @@ class Command(LoggableBaseCommand):
 
         last_log = (
             LogEntry.objects.filter(
-                module='rungapscanner',
                 message__contains='Gap scanner finished successfully up to ID',
             )
             .order_by('-created_at')
