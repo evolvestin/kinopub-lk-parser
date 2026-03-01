@@ -37,7 +37,6 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 or 'http://localhost:8000'
             )
 
-            # Для DEV-режима формируем кнопку WebApp с shared_id в URL
             web_app_url = f'{base_url.rstrip("/")}/webapp/?shared_id={stat_id}'
 
             keyboard = InlineKeyboardMarkup(
@@ -56,7 +55,7 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                     f'📂 {bold("Получен доступ к общей статистике")}\n\n'
                     f'Нажмите на кнопку ниже для просмотра.'
                 ),
-                reply_markup=keyboard,
+                keyboard=keyboard,
             )
             return
 
@@ -66,18 +65,15 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 view_id = int(parts[2])
                 show_id = int(parts[3]) if len(parts) > 3 else None
 
-                # Проверяем наличие групп у пользователя
                 groups = await client.get_user_groups(user.id)
 
                 if groups:
-                    # Если есть группы, предлагаем выбор
                     await sender.send_message(
                         chat_id=user.id,
                         text=f'{bold("Выберите режим отметки просмотра:")}',
                         keyboard=keyboards.get_claim_mode_keyboard(view_id, groups, show_id),
                     )
                 else:
-                    # Старая логика (мгновенное переключение)
                     result = await client.toggle_view_user(user.id, view_id)
 
                     if result and result.get('status') == 'ok':

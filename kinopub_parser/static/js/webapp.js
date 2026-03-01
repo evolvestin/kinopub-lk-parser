@@ -1,0 +1,962 @@
+const Icons = {
+    moon: '<svg viewBox="0 0 512 512"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
+    sun: '<svg viewBox="0 0 512 512"><path d="M256 118a22 22 0 01-22-22V48a22 22 0 0144 0v48a22 22 0 01-22 22zM256 486a22 22 0 01-22-22v-48a22 22 0 0144 0v48a22 22 0 01-22 22zM369.14 164.86a22 22 0 01-15.56-37.55l33.94-33.94a22 22 0 0131.11 31.11l-33.94 33.94a21.93 21.93 0 01-15.55 6.44zM108.92 425.08a22 22 0 01-15.55-37.56l33.94-33.94a22 22 0 1131.11 31.11l-33.94 33.94a21.94 21.94 0 01-15.56 6.45zM464 278h-48a22 22 0 010-44h48a22 22 0 010 44zM96 278H48a22 22 0 010-44h48a22 22 0 010 44zM403.08 425.08a21.94 21.94 0 01-15.56-6.45l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.55 37.56zM142.86 164.86a21.93 21.93 0 01-15.55-6.44l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.56 37.55zM256 358a102 102 0 11102-102 102.12 102.12 0 01-102 102z"/></svg>',
+    user: '<svg viewBox="0 0 512 512"><path d="M256 288c79.53 0 144-64.47 144-144S335.53 0 256 0 112 64.47 112 144s64.47 144 144 144zm128 32h-24.1c-30.83 18.66-67.43 28-103.9 28s-73.07-9.34-103.9-28H128c-70.69 0-128 57.31-128 128v56c0 13.25 10.75 24 24 24h464c13.25 0 24-10.75 24-24v-56c0-70.69-57.31-128-128-128z"/></svg>',
+    users: '<svg viewBox="0 0 512 512"><path d="M336 256c-20.56 0-40.44-5.06-58.26-14.34-14.73 21-36.42 36.63-61.64 43.68C236.41 298.54 263.26 304 290.5 304h25.4C379.79 304 432 356.21 432 419.86v43.21a20.89 20.89 0 0019.2 20.93h41.6a20.9 20.9 0 0019.2-20.93v-43.21C512 344.21 433.79 256 336 256zM336 224a104 104 0 10-104-104 104.12 104.12 0 00104 104zM201.5 272c-63.53 0-115.2 51.68-115.2 115.21v43.86A20.94 20.94 0 00105.5 452h192a20.94 20.94 0 0019.2-20.93v-43.86C316.7 323.68 265.03 272 201.5 272zM201.5 240A112 112 0 1089.5 128a112.12 112.12 0 00112 112z"/></svg>',
+    dash: '<svg viewBox="0 0 512 512"><path d="M200 48H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM424 48H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM200 272H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40zM424 272H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40z"/></svg>',
+    time: '<svg viewBox="0 0 512 512"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48zm96 240h-96a16 16 0 01-16-16V128a16 16 0 0132 0v128h80a16 16 0 010 32z"/></svg>',
+    cal: '<svg viewBox="0 0 512 512"><path d="M416 64h-16V48a16 16 0 00-32 0v16H144V48a16 16 0 00-32 0v16H96a64 64 0 00-64 64v320a64 64 0 0064 64h320a64 64 0 0064-64V128a64 64 0 00-64-64zm16 384a16 16 0 01-16 16H96a16 16 0 01-16-16V208h352z"/></svg>',
+    tv: '<svg viewBox="0 0 512 512"><path d="M447.86 384H64.14A48.2 48.2 0 0116 335.86V128.14A48.2 48.2 0 0164.14 80h383.72A48.2 48.2 0 01496 128.14v207.72A48.2 48.2 0 01447.86 384zM256 416c-48.87 0-98.39 12-113 18.52-5.71 2.54-9 8.24-9 14.28a15.82 15.82 0 0015.42 16.63c33.09-1.28 70.84-1.43 106.58-1.43 36.31 0 74.45.15 106.58 1.43A15.82 15.82 0 00378 448.8c0-6-3.29-11.74-9-14.28C354.39 428 304.87 416 256 416z"/></svg>',
+    film: '<svg viewBox="0 0 512 512"><path d="M436 48H76a44.05 44.05 0 00-44 44v328a44.05 44.05 0 0044 44h360a44.05 44.05 0 0044-44V92a44.05 44.05 0 00-44-44zM136 400H88v-48h48zm0-96H88v-48h48zm0-96H88v-48h48zm0-96H88V64h48zm288 288h-48v-48h48zm0-96h-48v-48h48zm0-96h-48v-48h48zm0-96h-48V64h48z"/></svg>',
+    chart: '<svg viewBox="0 0 512 512"><path d="M480 384H64V48a16 16 0 00-32 0v352a16 16 0 0016 16h432a16 16 0 000-32z"/><path d="M112 320h48a16 16 0 0016-16V144a16 16 0 00-16-16h-48a16 16 0 00-16 16v160a16 16 0 0016 16zM240 320h48a16 16 0 0016-16V208a16 16 0 00-16-16h-48a16 16 0 00-16 16v96a16 16 0 0016 16zM368 320h48a16 16 0 0016-16V80a16 16 0 00-16-16h-48a16 16 0 00-16 16v224a16 16 0 0016 16z"/></svg>',
+    masks: '<svg viewBox="0 0 512 512"><path d="M374.83 148.5c-20.73-35.41-61.35-43.1-99.28-40.35-6.61.48-12.78 1.15-18.42 1.94-39.77 5.61-75.14-3.23-95.64-38.38A180.78 180.78 0 00122 55.45c-29.35.53-53.72 26-58.84 55.51-14.88 85.54-6.39 173.23 23.32 240.59 13.9 31.5 35.79 53 58 53h.46c24.23-1 43.17-18.4 56.44-48 11.23-25.07 16-53.64 21.05-83.33 3.6-21.05 7.42-43.34 16.89-63.56-5.71-1.39-11.41-2.92-17.15-4.43-15.65-4.14-25-18-20.89-33.65a25.4 25.4 0 0132.88-18.19c23.07 6.4 51.5 15.67 76.5 33.15 48.74 34.11 36.85 91.22 36.85 91.22a201.81 201.81 0 0040.35-71.39c4.27-14.28.32-41.56-13.03-57.87zM102.58 205.15a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42zm86 16.51a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42z"/><path d="M449.62 189.65c-20-43.43-63.85-61.27-111-61.27-23.36 0-46.73 4-66.36 8.78-22.39-17-54-28-80.12-35-15.48-4.2-24.93 9.77-20.89 25.4a25.4 25.4 0 0032.88 18.2c6-1.51 11.75-2.73 17.51-3.66a220.4 220.4 0 01-13 46 179.88 179.88 0 0113.1 19.34c38 52.32 94.61 74.32 153.37 74.32a188 188 0 0021.2-1.22c-.64.12-.52 0-1.11.15a133 133 0 01-17.7 21c-5.26 5-11.45 9.76-18.72 14.18-12.78 7.78-26.24 13-39.73 15.35A177.36 177.36 0 00346.59 455c14.25 31 35.08 51 57.82 51h.51c23.59-1 42.14-18.74 55-48 29.83-67.75 38.64-155.8 23.37-241.64-5.35-29.62-28.77-44.62-33.67-26.71zm-136.2 30.68a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42zm86 0a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42z"/></svg>',
+    star: '<svg viewBox="0 0 512 512"><path d="M480 208H328L256 48l-72 160H32l128 104-48 152 144-104 144 104-48-152 128-104z"/></svg>',
+    globe: '<svg viewBox="0 0 512 512"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48zm89.15 112.59A151.78 151.78 0 01366 240H288v-87.35a265.41 265.41 0 0157.15 8zM256 80.59A231.87 231.87 0 01283.47 152H228.53A231.87 231.87 0 01256 80.59zM166.85 160.59A265.41 265.41 0 01224 152.65V240h-78A151.78 151.78 0 01166.85 160.59zM80.58 240H146a256.32 256.32 0 000 32H80.58a176 176 0 010-32zm86.27 111.41A151.78 151.78 0 01146 272h78v87.35a265.41 265.41 0 01-57.15-7.94zM256 431.41A231.87 231.87 0 01228.53 360h54.94A231.87 231.87 0 01256 431.41zM345.15 351.41A265.41 265.41 0 01288 359.35V272h78A151.78 151.78 0 01345.15 351.41zM431.42 272H366a256.32 256.32 0 000-32h65.42a176 176 0 010 32z"/></svg>',
+    bolt: '<svg viewBox="0 0 512 512"><path d="M312 32h-110a18 18 0 00-17.74 21l32 188H152a18.3 18.3 0 00-14.86 28.92l160 216a18 18 0 0031.57-12.78l-23-189.14H360a18.3 18.3 0 0015-28.84L215 72h97a18 18 0 000-36z"/></svg>',
+    flame: '<svg viewBox="0 0 512 512"><path d="M313.29 82.26c-11.42-30.82-50.62-31-62.29.35C227.18 146.42 160 178.68 160 256c0 53 43 96 96 96s96-43 96-96c0-67.62-54-106.82-38.71-173.74zM256 320c-17.64 0-32-14.36-32-32 0-33.15 28.57-55 42-83.39 12 25.15 22 50.18 22 83.39 0 17.64-14.36 32-32 32z"/><path d="M255.8 48c-42.54 0-82.68 20.31-112 54.34-31 36-47.8 84.34-47.8 135.59 0 114.69 93.31 208.07 208 208.07S512 352.62 512 237.93C512 119 407.41 48 255.8 48zm0 366c-88.22 0-160-71.78-160-160 0-41.6 13.92-80.49 40.23-112.5C160.7 171.84 200.56 150 240 150c18.52 0 35.1 4.54 48 13 41.52-32.55 80-28 80 75 0 88.22-71.78 160-160 160z"/></svg>',
+    check: '<svg viewBox="0 0 512 512"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29l-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg>',
+    days: '<svg viewBox="0 0 512 512"><path d="M400 48V16h-64v32H176V16h-64v32H48v448h416V48h-64zM112 432H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32z"/></svg>',
+    grid: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
+    list: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>'
+};
+
+function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
+
+function initIcons() {
+    i('ic-user', 'user'); i('ic-users', 'users'); i('ic-dash', 'dash');
+    i('ic-time', 'time'); i('ic-cal', 'cal'); i('ic-tv', 'tv'); i('ic-film', 'film');
+    i('ic-chart-internal', 'chart'); i('ic-flame-internal', 'flame');
+    i('it-gen-internal', 'masks'); i('it-act-internal', 'masks'); 
+    i('it-cou-internal', 'globe'); i('it-bin-internal', 'bolt');
+    i('it-star-internal', 'star'); i('ic-weekday-internal', 'days');
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", initIcons);
+} else {
+    initIcons();
+}
+
+const tg = window.Telegram?.WebApp;
+if (tg) {
+    tg.expand();
+    if (tg.ready) tg.ready();
+}
+
+let chR = null;
+let D = null, curYear = null, isDark = true;
+let chM = null, chW = null, chG = {}, lastScrollPos = 0;
+
+let isSharedMode = false;
+let SharedDataMap = {};
+let availableYears = [];
+
+function toggleTheme() {
+    isDark = !isDark;
+    document.body.classList.toggle('light', !isDark);
+    document.getElementById('theme-btn').innerHTML = isDark ? Icons.moon : Icons.sun;
+    localStorage.setItem('kt', isDark ? 'd' : 'l');
+    if (D) renderCharts();
+}
+(function initTheme() {
+    if (tg && tg.colorScheme === 'light') isDark = false;
+    const stored = localStorage.getItem('kt');
+    if (stored === 'l') isDark = false;
+    if (stored === 'd') isDark = true;
+    
+    if (!isDark) document.body.classList.add('light');
+    document.addEventListener("DOMContentLoaded", () => document.getElementById('theme-btn').innerHTML = isDark ? Icons.moon : Icons.sun);
+})();
+
+function cc() {
+    const t = isDark ? 'rgba(229, 231, 235, .8)' : 'rgba(31, 35, 40, .8)';
+    const g = isDark ? 'rgba(255, 255, 255, .05)' : 'rgba(0, 0, 0, .05)';
+    const b = isDark ? '#2d333b' : '#d0d7de';
+    return { t, g, b, a: '#2ecc71', ab: isDark ? 'rgba(46, 204, 113, .2)' : 'rgba(46, 204, 113, .15)', i: '#60a5fa', ib: isDark ? 'rgba(96, 165, 250, .2)' : 'rgba(96, 165, 250, .15)' };
+}
+
+async function init() {
+    const startParam = tg?.initDataUnsafe?.start_param || '';
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedIdFromUrl = urlParams.get('shared_id');
+
+        if (sharedIdFromUrl || startParam.startsWith('stat_')) {
+        isSharedMode = true;
+        document.body.classList.add('has-banner');
+        
+        document.getElementById('share-btn').classList.add('hidden');
+        const bannerContainer = document.getElementById('shared-banner-container');
+        bannerContainer.innerHTML = `<div class="shared-banner"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Вы просматриваете чужую статистику</div>`;
+        
+        const sid = sharedIdFromUrl || startParam.replace('stat_', '');
+        await loadShared(sid);
+    } else {
+        await load();
+    }
+}
+
+async function loadShared(statId) {
+    document.getElementById('loader').classList.remove('hidden');
+    try {
+        const r = await fetch(`/api/webapp/shared_stats/${statId}/`);
+        if (!r.ok) throw new Error(`Ошибка HTTP сервера: ${r.status}`);
+        const j = await r.json();
+        if (j.error) throw new Error(j.error);
+        
+        SharedDataMap = j.data;
+        availableYears = j.metadata.years;
+        curYear = availableYears[0];
+        D = SharedDataMap[curYear];
+        
+        render();
+    } catch(e) { 
+        console.error(e); 
+        document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Слепок не найден или произошла ошибка:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
+        document.getElementById('app').classList.remove('hidden');
+    } finally {
+        hideLoader();
+    }
+}
+
+async function load(year) {
+    if (year === undefined || year === null) year = curYear;
+    curYear = year;
+    document.getElementById('loader').classList.remove('hidden');
+    try {
+        const p = year && year !== 'all' ? { period_type:'year', period_value: year } : { period_type:'year', period_value: 0 };
+        const r = await fetch('/api/webapp/detailed_stats/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...p, init_data: tg?.initData||'' }) });
+        if (!r.ok) throw new Error(`Ошибка HTTP сервера: ${r.status}`);
+        const j = await r.json();
+        if (j.error) throw new Error(j.error);
+        
+        D = j;
+        if (!availableYears.length && D.meta?.years) {
+            availableYears = [...D.meta.years];
+        }
+        render();
+    } catch(e) { 
+        console.error('Load error:', e); 
+        document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Ошибка загрузки данных:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
+        document.getElementById('app').classList.remove('hidden');
+    } finally { 
+        hideLoader();
+    }
+}
+
+function hideLoader() {
+    document.getElementById('loader').style.opacity = '0';
+    setTimeout(() => document.getElementById('loader').classList.add('hidden'), 400);
+    document.getElementById('app').classList.remove('hidden'); 
+}
+
+function plural(n, forms) {
+    let n10 = Math.abs(n) % 10;
+    let n100 = Math.abs(n) % 100;
+    if (n100 >= 11 && n100 <= 14) return forms[2];
+    if (n10 === 1) return forms[0];
+    if (n10 >= 2 && n10 <= 4) return forms[1];
+    return forms[2];
+}
+
+const UserAvatarColors = ['#3498db', '#9b59b6', '#f1c40f', '#e67e22', '#e74c3c', '#1abc9c', '#34495e', '#2ecc71'];
+
+function getUserColor(id) {
+    if (id === 0) return 'var(--bg-input)';
+    return UserAvatarColors[(id - 1) % UserAvatarColors.length];
+}
+
+function render() {
+    if (!D?.meta) return;
+    const n = D.meta.name || 'Пользователь';
+    document.getElementById('user-name').textContent = n;
+    
+    const avEl = document.getElementById('avatar');
+    if (D.meta.is_anonymous) {
+        const myId = D.meta.id || 0;
+        if (myId > 0) {
+            avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${getUserColor(myId)};color:#fff;font-weight:900;">${myId}</div>`;
+        } else {
+            avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-muted);">${Icons.user}</div>`;
+        }
+    } else if (D.meta.photo_url) {
+        avEl.innerHTML = `<img src="${D.meta.photo_url}" alt="A">`;
+    } else {
+        const u = tg?.initDataUnsafe?.user;
+        if (!isSharedMode && u && u.photo_url) avEl.innerHTML = `<img src="${u.photo_url}" alt="A">`;
+        else avEl.textContent = n.charAt(0).toUpperCase();
+    }
+
+    document.getElementById('period-label').textContent = D.summary?.period_label || '';
+    renderYears();
+
+    const s = D.summary || {};
+    const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
+    
+    const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
+
+    const hasGroup = !!D.group;
+    toggle('main-tabs', hasGroup);
+
+    const userRole = String(D.meta.role || 'guest').toLowerCase();
+    const isGuest = userRole === 'guest';
+    
+    const showOverview = !isGuest;
+    toggle('label-overview', showOverview);
+    toggle('grid-overview', showOverview);
+
+    if (showOverview) {
+        document.getElementById('s-time').textContent  = s.duration_display || '0м';
+        document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
+        document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
+        document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
+        document.getElementById('s-ep').textContent = vEp;
+        const epLbl = document.getElementById('s-ep').nextElementSibling;
+        if (epLbl) epLbl.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+        const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
+        document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
+        document.getElementById('s-mov').textContent = vMov;
+        const movLbl = document.getElementById('s-mov').nextElementSibling;
+        if (movLbl) movLbl.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
+        document.getElementById('s-uni').textContent = s.movies_duration || '0м';
+    }
+
+    const showWelcome = !isGuest && vViews === 0;
+    let welcomeEl = document.getElementById('welcome-empty-state');
+    if (showWelcome) {
+        if (!welcomeEl) {
+            welcomeEl = document.createElement('div');
+            welcomeEl.id = 'welcome-empty-state';
+            welcomeEl.className = 'card anim-item';
+            welcomeEl.innerHTML = `<div class="empty"><div class="icon">${Icons.tv}</div>Здесь будет ваша статистика, когда вы начнете смотреть кино.</div>`;
+            document.getElementById('sec-personal').appendChild(welcomeEl);
+        }
+    } else if (welcomeEl) {
+        welcomeEl.remove();
+    }
+
+    const hasDynamics = D.monthly_chart?.views?.some(v => v > 0);
+    toggle('card-dynamics', hasDynamics);
+
+    const hasWeekday = D.weekday_chart?.data?.some(v => v > 0);
+    toggle('card-weekday', hasWeekday);
+
+    const hasHeatmap = D.heatmap?.length > 0;
+    toggle('card-heatmap', hasHeatmap);
+    if (hasHeatmap) renderHeatmap();
+
+    const hasGenres = D.genres?.length > 0;
+    toggle('card-genres', hasGenres);
+    
+    const hasActors = D.actors?.length > 0;
+    toggle('card-actors', hasActors);
+    
+    const hasCountries = D.countries?.length > 0;
+    toggle('card-countries', hasCountries);
+    
+    const hasBinges = D.binges?.length > 0;
+    toggle('card-binges', hasBinges);
+
+    const rt = D.ratings;
+    const hasRatings = rt && rt.total > 0;
+    toggle('ratings-box', hasRatings);
+
+    if (hasRatings) {
+        const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
+        const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
+        const scoreColor = ratingPalette[colorIdx];
+        const avgEl = document.getElementById('cr-avg');
+        avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
+        avgEl.style.color = scoreColor;
+        document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
+        const badge = document.getElementById('cr-badge');
+        if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.background = 'rgba(46, 204, 113, 0.15)'; badge.style.color = '#2ecc71'; }
+        else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.background = 'rgba(56, 139, 253, 0.15)'; badge.style.color = '#60a5fa'; }
+        else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.background = 'rgba(210, 153, 34, 0.15)'; badge.style.color = '#d29922'; }
+        else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
+        renderRatingsDist();
+    }
+
+    toggle('tab-group-btn', !!D.group);
+    renderGroup();
+    renderCharts();
+    
+    if (hasActors) fillList('actors-list', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
+    if (hasCountries) fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+    if (hasBinges) fillBinges();
+}
+
+function renderRatingsDist() {
+    if (typeof Chart === 'undefined') return;
+    
+    const canvas = document.getElementById('c-ratings-dist');
+    const ctx = canvas.getContext('2d');
+    if (chR) chR.destroy();
+    const dist = D.ratings.distribution;
+    if (!dist || dist.length === 0) return;
+    const c = cc();
+    const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
+
+    chR = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], datasets: [{ data: dist, backgroundColor: ratingPalette, hoverBackgroundColor: ratingPalette, borderRadius: 6, borderSkipped: false, borderWidth: 0 }] },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: 1000, easing: 'easeOutBack', delay: (context) => context.type === 'data' && context.mode === 'default' && !context.active ? context.dataIndex * 80 : 0 },
+            onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; },
+            onClick: (event, activeElements) => { if (activeElements.length > 0) openHistory('rating_filter', null, null, null, null, activeElements[0].index + 1); },
+            plugins: {
+                legend: { display: false },
+                tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { title: (ctx) => `Оценка: ${ctx[0].label}`, label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, ['оценка', 'оценки', 'оценок'])}` } }
+            },
+            scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { display: false, beginAtZero: true } }
+        }
+    });
+}
+
+function getRatingColor(rating) {
+    if (rating >= 8.5) return 'linear-gradient(135deg, #2ecc71, #27ae60)';
+    if (rating >= 7.0) return 'linear-gradient(135deg, #60a5fa, #3b82f6)';
+    if (rating >= 5.5) return 'linear-gradient(135deg, #f1c40f, #d35400)';
+    return 'linear-gradient(135deg, #e74c3c, #c0392b)';
+}
+
+function renderYears() {
+    const c = document.getElementById('years');
+    const yrs = isSharedMode ? availableYears : (D.meta?.years || []);
+    
+    if (yrs.length <= 1) {
+        c.classList.add('hidden');
+        return;
+    }
+    c.classList.remove('hidden');
+
+    let h = '';
+    if (!isSharedMode || yrs.includes('all')) {
+        h += '<button class="yr clickable" onclick="pickYear(\'all\')">Всё время</button>';
+    }
+    
+    yrs.filter(y => y !== 'all').forEach(y => { 
+        h += `<button class="yr clickable" onclick="pickYear('${y}')">${y}</button>`; 
+    });
+    c.innerHTML = h;
+    markYear();
+}
+
+function markYear() {
+    document.querySelectorAll('#years .yr').forEach(b => {
+        const v = b.textContent.trim();
+        const isAllTime = curYear === 'all' || !curYear;
+        const targetStr = isAllTime ? 'Всё время' : String(curYear);
+        b.classList.toggle('on', v === targetStr);
+    });
+}
+
+window.pickYear = y => { 
+    curYear = y; 
+    markYear(); 
+    if (isSharedMode) {
+        D = SharedDataMap[y];
+        render();
+    } else {
+        load(y); 
+    }
+};
+
+let toastTimer = null;
+function showToast(text) {
+    let el = document.getElementById('toast-msg');
+    if (!el) { el = document.createElement('div'); el.id = 'toast-msg'; el.className = 'toast'; document.body.appendChild(el); }
+    el.textContent = text; el.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.classList.remove('show'); }, 2000);
+}
+
+function initGlobalHeatmapZoom() {
+    const viewport = document.getElementById('heatmaps-wrapper');
+    const content = document.getElementById('hm-zoom-content');
+    if (!viewport || !content) return;
+
+    viewport.style.overflow = 'hidden';
+    viewport.style.touchAction = 'none'; 
+    content.style.transformOrigin = '0 0';
+
+    let scale = 1, translateX = 0, translateY = 0;
+    let startScale = 1, startDist = 0, startMidX = 0, startMidY = 0, startTranslateX = 0, startTranslateY = 0;
+    let isZooming = false, isPanning = false;
+
+    const updateTransform = () => { content.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`; };
+
+    viewport.addEventListener('touchstart', (e) => {
+        const t = e.touches;
+        if (t.length === 1) { isPanning = true; isZooming = false; startMidX = t[0].clientX; startMidY = t[0].clientY; startTranslateX = translateX; startTranslateY = translateY; } 
+        else if (t.length === 2) { isZooming = true; isPanning = false; startDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY); startScale = scale; startMidX = (t[0].clientX + t[1].clientX) / 2; startMidY = (t[0].clientY + t[1].clientY) / 2; startTranslateX = translateX; startTranslateY = translateY; }
+    }, { passive: false });
+
+    viewport.addEventListener('touchmove', (e) => {
+        const t = e.touches; const rect = viewport.getBoundingClientRect();
+        if (isZooming && t.length === 2) {
+            e.preventDefault();
+            const currentDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+            const newScale = Math.min(Math.max(1, (currentDist / startDist) * startScale), 4);
+            const currentMidX = (t[0].clientX + t[1].clientX) / 2, currentMidY = (t[0].clientY + t[1].clientY) / 2;
+            const mouseX = startMidX - rect.left, mouseY = startMidY - rect.top;
+            const scaleRatio = newScale / startScale;
+            translateX = currentMidX - rect.left - (mouseX - startTranslateX) * scaleRatio;
+            translateY = currentMidY - rect.top - (mouseY - startTranslateY) * scaleRatio;
+            scale = newScale; updateTransform();
+        } else if (isPanning && t.length === 1) {
+            e.preventDefault();
+            const deltaX = t[0].clientX - startMidX, deltaY = t[0].clientY - startMidY;
+            translateX = startTranslateX + deltaX; translateY = startTranslateY + deltaY;
+            if (scale > 1) {
+                const minX = rect.width - (content.offsetWidth * scale), minY = rect.height - (content.offsetHeight * scale);
+                translateX = Math.min(0, Math.max(minX, translateX)); translateY = Math.min(0, Math.max(minY, translateY));
+            } else { translateX = 0; translateY = 0; }
+            updateTransform();
+        }
+    }, { passive: false });
+
+    viewport.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+            isZooming = false; isPanning = false;
+            if (scale < 1.01) { scale = 1; translateX = 0; translateY = 0; content.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)'; updateTransform(); setTimeout(() => content.style.transition = '', 300); }
+        } else if (e.touches.length === 1) {
+            isZooming = false; isPanning = true; startMidX = e.touches[0].clientX; startMidY = e.touches[0].clientY; startTranslateX = translateX; startTranslateY = translateY;
+        }
+    }, { passive: true });
+}
+
+function renderHeatmap() {
+    const el = document.getElementById('heatmaps-wrapper'); 
+    el.innerHTML = '<div id="hm-zoom-content"></div>';
+    const zoomContent = document.getElementById('hm-zoom-content');
+    if (!D.heatmap?.length) { el.innerHTML = `<div class="empty"><div class="icon">${Icons.cal}</div>Нет данных</div>`; return; }
+    
+    const fragment = document.createDocumentFragment();
+    const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
+    
+    D.heatmap.forEach((hItem, index) => {
+        const yr = hItem.year; const data = hItem.data; const offset = (new Date(yr, 0, 1).getDay() + 6) % 7; const totalColumns = Math.ceil((offset + data.length) / 7);
+        const block = document.createElement('div'); block.className = 'hm-zoom-area'; if (index > 0) block.style.marginTop = '20px';
+        if (D.heatmap.length > 1) {
+            const title = document.createElement('div'); title.style.fontSize = '13px'; title.style.fontWeight = '800'; title.style.color = 'var(--text-muted)'; title.style.marginBottom = '8px'; title.textContent = yr; block.appendChild(title);
+        }
+        const wrapper = document.createElement('div'); wrapper.className = 'hm-wrapper';
+        const hm = document.createElement('div'); hm.className = 'hm'; hm.style.gridTemplateColumns = `max-content repeat(${totalColumns}, minmax(0, 1fr))`;
+        
+        dayLabels.forEach(lbl => { const l = document.createElement('div'); l.className = 'hc-label'; l.textContent = lbl; hm.appendChild(l); });
+        for (let i = 0; i < offset; i++) { const d = document.createElement('div'); d.className = 'hc'; d.style.opacity = '0'; d.style.pointerEvents = 'none'; hm.appendChild(d); }
+        
+        let curr = new Date(yr, 0, 1);
+        data.forEach(v => { 
+            const d = document.createElement('div'); 
+            const y = curr.getFullYear(), m = String(curr.getMonth() + 1).padStart(2, '0'), day = String(curr.getDate()).padStart(2, '0');
+            const currStr = `${y}-${m}-${day}`, displayDate = `${day}.${m}.${y}`;
+            d.className = 'hc clickable' + (v ? ' h' + v : ''); 
+            if (v > 0) { d.setAttribute('onclick', `openHistory('day', null, '${currStr}', '${currStr}')`); } else { d.setAttribute('onclick', `showToast('${displayDate}: просмотров нет')`); }
+            hm.appendChild(d); curr.setDate(curr.getDate() + 1);
+        });
+        wrapper.appendChild(hm); block.appendChild(wrapper); fragment.appendChild(block);
+    });
+    zoomContent.appendChild(fragment); initGlobalHeatmapZoom();
+}
+
+function fillList(id, items, ico, unit, categoryKey) {
+    const el = document.getElementById(id);
+    if (!items?.length) return;
+    let html = '';
+    items.forEach((it, i) => {
+        const cnt = it.count || it.views || 0, sub = it.sub || (it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
+        const lbl = Array.isArray(unit) ? `${cnt} ${plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
+        const delay = (i + 1) * 0.05;
+        let visual = it.emoji ? `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>` : (ico ? `<div class="icon" style="color:var(--text-muted)">${ico}</div>` : '');
+        const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        html += `<div class="li li-clickable anim-list-item clickable" onclick="openHistory('filter', null, null, '${safeName}', '${categoryKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
+    });
+    el.innerHTML = html;
+}
+
+function fillBinges() {
+    const el = document.getElementById('binges-list');
+    if (!D.binges?.length) return;
+    let html = '';
+    D.binges.forEach((b, i) => {
+        const delay = (i + 1) * 0.05, safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        const posterHtml = b.poster_url ? `<img src="${b.poster_url}" style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.1);" onerror="this.style.display='none'">` : `<div style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
+        html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')"><div class="li-l">${posterHtml}<div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r" style="color:var(--info)">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span></div>`;
+    });
+    el.innerHTML = html;
+}
+
+function renderCharts() { 
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js не загружен. Отрисовка графиков пропущена.');
+        return;
+    }
+    try {
+        renderMonthly(); 
+        renderWeekday(); 
+        renderDonut('c-genre', 'legend-genre', D.genres, 'genres_top', D.summary.total_minutes_watched);
+        if (D.group) renderDonut('c-group-genre', 'legend-group-genre', D.group.genres, 'group_genres_top', D.group.total_minutes_watched);
+    } catch (e) {
+        console.error('Ошибка при отрисовке графиков:', e);
+    }
+}
+
+const fSizeAx = Math.max(10, Math.min(13, window.innerWidth * 0.03));
+function getCtxGradient(ctx, colorStart, colorEnd) { let gradient = ctx.createLinearGradient(0, 0, 0, 400); gradient.addColorStop(0, colorStart); gradient.addColorStop(1, colorEnd); return gradient; }
+
+function renderMonthly() {
+    const canvas = document.getElementById('c-monthly'), ctx = canvas.getContext('2d');
+    if (chM) chM.destroy();
+    const ch = D.monthly_chart; if (!ch?.labels?.length) return;
+    const c = cc();
+    let fillGradient = getCtxGradient(ctx, isDark?'rgba(35, 134, 54, 0.4)':'rgba(46, 160, 67, 0.3)', 'rgba(35, 134, 54, 0.0)'), lineGradient = ctx.createLinearGradient(0, 0, canvas.width || 400, 0);
+    lineGradient.addColorStop(0, '#2ea043'); lineGradient.addColorStop(1, '#3fb950');
+    chM = new Chart(ctx, { 
+        type:'line', 
+        data:{ labels:ch.labels, datasets:[{ label: ' Просмотры', data: ch.views, backgroundColor: fillGradient, borderColor: lineGradient, borderWidth: 3, tension: 0.4, fill: true, yAxisID: 'y', pointBackgroundColor: isDark ? '#0d1117' : '#ffffff', pointBorderColor: '#3fb950', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6 }, { label: ' Часы', data: ch.hours, backgroundColor: 'transparent', borderColor: c.i, borderWidth: 2, borderDash: [5, 5], tension: 0.4, fill: false, yAxisID: 'y1', pointBackgroundColor: isDark ? '#0d1117' : '#ffffff', pointBorderColor: c.i, pointRadius: 0, pointHoverRadius: 5 }] },
+        options:{ responsive:true, maintainAspectRatio:false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins:{ legend: { display: true, position: 'top', labels: { color: c.t, usePointStyle: true, boxWidth: 8, padding: 15, font: { size: fSizeAx, family: 'system-ui' } } }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, padding: 12, cornerRadius: 8, displayColors: true, boxPadding: 6, bodySpacing: 8, titleSpacing: 10 } }, interaction: { mode: 'index', intersect: false }, scales:{ x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} }, y:{ type: 'linear', display: true, position: 'left', ticks:{color:c.a,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true }, y1: { type: 'linear', display: true, position: 'right', ticks:{color:c.i,font:{size:fSizeAx}}, grid:{drawOnChartArea: false}, beginAtZero:true } } } 
+    });
+}
+
+function renderWeekday() {
+    const canvas = document.getElementById('c-weekday'), ctx = canvas.getContext('2d');
+    if (chW) chW.destroy();
+    const ch = D.weekday_chart; if (!ch?.labels?.length) return;
+    const c = cc(), totalViews = ch.data.reduce((a, b) => a + b, 0);
+    let barGradient = getCtxGradient(ctx, '#2ea043', '#238636'), weGradient = getCtxGradient(ctx, '#388bfd', '#1f6feb');
+    chW = new Chart(ctx, { 
+        type: 'bar', 
+        data: { labels: ch.labels, datasets: [{ data: ch.data, backgroundColor: ch.data.map((_, i) => i >= 5 ? weGradient : barGradient), hoverBackgroundColor: ch.data.map((_, i) => i >= 5 ? '#60a5fa' : '#39d353'), borderRadius: 8, borderSkipped: false, borderWidth: 0, hoverBorderWidth: 0 }] },
+        options: { 
+            responsive: true, maintainAspectRatio: false, 
+            animation: { duration: 1000, easing: 'easeOutBack', delay: (context) => context.type === 'data' && context.mode === 'default' && !context.active ? context.dataIndex * 100 : 0 }, 
+            onClick: (event, activeElements) => {
+                if (activeElements.length > 0) {
+                    const idx = activeElements[0].index;
+                    openHistory('weekday', null, null, ch.labels[idx], null, idx);
+                }
+            },
+            onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; },
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { label: (context) => { const val = context.parsed.y; const pct = totalViews > 0 ? Math.round((val / totalViews) * 100) : 0; return ` ${val} ${plural(val, ['просмотр', 'просмотра', 'просмотров'])} (${pct}%)`; } } } }, 
+            scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { ticks: { color: c.t, font: { size: fSizeAx }, precision: 0 }, grid: { color: c.g }, beginAtZero: true, border: { display: false } } } 
+        } 
+    });
+}
+
+function renderDonut(canvasId, legendId, sourceData, dataKey, totalMinutesWatched) {
+    const canvas = document.getElementById(canvasId); if (!canvas) return;
+    const ctx = canvas.getContext('2d'), legendEl = document.getElementById(legendId);
+    if (chG[canvasId]) chG[canvasId].destroy(); if (!sourceData?.length) return;
+    const c = cc();
+    let top = JSON.parse(JSON.stringify(sourceData)).slice(0, 10);
+    const totalMinutesSum = sourceData.reduce((acc, g) => acc + g.minutes, 0), topMinutes = top.reduce((acc, g) => acc + g.minutes, 0);
+    if (totalMinutesSum > topMinutes) { const others = sourceData.slice(10); top.push({ name: 'Другие', minutes: totalMinutesSum - topMinutes, count: 0, show_ids: [...new Set(others.flatMap(g => g.show_ids || []))] }); }
+    const totalHours = Math.floor(totalMinutesWatched / 60);
+    const pal = ['#2ea043', '#388bfd', '#f85149', '#d29922', '#a371f7', '#1abc9c', '#e67e22', '#9b59b6', '#00d2ff', '#16a085', '#27ae60', '#2980b9'];
+    const values = top.map(g => (g.minutes / totalMinutesSum) * 100), percents = values.map(v => Math.round(v));
+    const centerTextPlugin = { id: 'centerText', afterDraw: (chart) => { const { ctx, chartArea: { top, height, left, width } } = chart; ctx.save(); const centerX = left + width / 2, centerY = top + height / 2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '900 34px system-ui'; ctx.fillStyle = c.t; ctx.fillText(totalHours, centerX, centerY - 8); ctx.font = 'bold 10px system-ui'; ctx.fillStyle = isDark ? '#6e7681' : '#8c959f'; ctx.letterSpacing = '1px'; ctx.fillText('ЧАСОВ ВСЕГО', centerX, centerY + 22); ctx.restore(); } };
+    chG[canvasId] = new Chart(ctx, { 
+        type: 'doughnut', plugins: [ChartDataLabels, centerTextPlugin],
+        data: { labels: top.map(g => g.name), datasets: [{ data: top.map(g => g.minutes), backgroundColor: top.map((_, i) => pal[i % pal.length]), borderWidth: 0, hoverOffset: 15, borderRadius: 6, spacing: 3, weight: 1 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '50%', layout: { padding: 15 }, animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' }, onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; }, onClick: (event, activeElements) => { if (activeElements.length > 0) openHistory('filter', null, null, top[activeElements[0].index].name, dataKey, activeElements[0].index); }, plugins: { datalabels: { color: '#fff', font: { weight: '800', size: 10 }, formatter: (value, context) => percents[context.dataIndex] > 5 ? percents[context.dataIndex] + '%' : '', display: 'auto' }, tooltip: { enabled: true, callbacks: { label: (context) => { const val = context.parsed, h = Math.floor(val/60), m = val%60; return ` ${h}ч ${m}м (${percents[context.dataIndex]}%)`; } } }, legend: { display: false } } } 
+    });
+    D[dataKey] = top;
+    legendEl.innerHTML = top.map((g, i) => `<div class="legend-item" onclick="openHistory('filter', null, null, '${g.name.replace(/'/g, "\\'")}', '${dataKey}', ${i})" onmouseenter="highlightSegment('${canvasId}', ${i}, true)" onmouseleave="highlightSegment('${canvasId}', ${i}, false)"><div class="legend-dot" style="background:${pal[i % pal.length]}"></div><div class="legend-name">${g.name}</div><div class="legend-val">${Math.floor(g.minutes / 60) > 0 ? `${Math.floor(g.minutes / 60)}ч ${g.minutes % 60}м` : `${g.minutes % 60}м`} (${percents[i]}%)</div></div>`).join('');
+}
+window.highlightSegment = function(canvasId, index, active) { const chart = chG[canvasId]; if (!chart) return; if (active) { chart.setActiveElements([{ datasetIndex: 0, index: index }]); chart.tooltip.setActiveElements([{ datasetIndex: 0, index: index }], { x: 0, y: 0 }); } else { chart.setActiveElements([]); chart.tooltip.setActiveElements([], { x: 0, y: 0 }); } chart.update(); };
+window.mainTab = function(t) { 
+    document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t)); 
+    document.getElementById('sec-personal').classList.toggle('hidden', t!=='personal'); 
+    document.getElementById('sec-group').classList.toggle('hidden', t!=='group'); 
+};
+
+let curHistData =[], curHistType = '';
+let currentHistoryOffset = 0;
+const historyBatchSize = 100;
+let historyObserver = null;
+let isRenderingBatch = false;
+let viewMode = localStorage.getItem('kp_view_mode') || 'grid';
+
+function getHistoryItemHtml(item, idx, type, mode) {
+    const delay = 0;
+    if (mode === 'list') {
+        if (type === 'ratings') {
+            const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
+            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="p" loading="lazy">` : `<div class="hist-poster"></div>`;
+            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
+            const rColor = getRatingColor(item.rating);
+            let seHtml = '';
+            if (item.season && item.episode) seHtml = `<span class="hist-badge">s${item.season}e${item.episode.toString().padStart(2,'0')}</span>`;
+            return `<div class="hist-item anim-item clickable" style="display:flex; align-items:center;">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
+        } else {
+            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="p" loading="lazy">` : `<div class="hist-poster"></div>`;
+            let metaHtml = '';
+            if (item.season_number > 0) {
+                metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
+                if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
+            } else if (item.user_rating) {
+                metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
+            }
+            const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
+            return `<div class="hist-item anim-item clickable">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
+        }
+    } else {
+        const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
+        const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
+        const yearHtml = (item.year || item.show__year) ? `<div class="grid-year">${item.year || item.show__year}</div>` : '';
+        
+        if (type === 'ratings') {
+            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
+            const origHtml = (item.original_title && item.original_title !== item.title) ? `<div class="grid-below-orig">${item.original_title}</div>` : '';
+            return `<div class="grid-item-wrap anim-item"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div>${origHtml}</div>`;
+        } else {
+            let badgesHtml = '';
+            if (item.season_number > 0) badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6);border:none;">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
+            if (item.user_rating) badgesHtml += `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${Icons.star}${item.user_rating}</span>`;
+            
+            let usersHtml = '';
+            if (item.user_names && item.user_names.length > 0) {
+                let avatars = '';
+                for (let i = 0; i < item.user_names.length; i++) {
+                    const name = item.user_names[i] || '?';
+                    const photo = item.user_photos && item.user_photos[i];
+                    const userId = (item.user_ids && item.user_ids[i]);
+
+                    if (photo) {
+                        avatars += `<img src="${photo}" class="grid-user-avatar">`;
+                    } else {
+                        let content;
+                        if (isSharedMode && userId !== undefined) {
+                            content = userId > 0 ? userId : `<div style="font-size:10px; display:flex; align-items:center; justify-content:center;">${Icons.user}</div>`;
+                        } else {
+                            content = name.charAt(0).toUpperCase();
+                        }
+                        avatars += `<div class="grid-user-avatar" style="background:${getUserColor(userId || 0)}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:900;">${content}</div>`;
+                    }
+                }
+                usersHtml = `<div class="grid-users">${avatars}</div>`;
+            }
+
+            const origHtml = (item.show__original_title && item.show__original_title !== item.show__title) ? `<div class="grid-below-orig">${item.show__original_title}</div>` : '';
+            return `<div class="grid-item-wrap anim-item"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div>${origHtml}</div>`;
+        }
+    }
+}
+
+window.renderNextHistoryBatch = function() {
+    if (isRenderingBatch || currentHistoryOffset >= curHistData.length) return;
+    isRenderingBatch = true;
+
+    const container = document.getElementById('hist-list-container');
+    const batch = curHistData.slice(currentHistoryOffset, currentHistoryOffset + historyBatchSize);
+    
+    let html = batch.map((item, idx) => getHistoryItemHtml(item, currentHistoryOffset + idx, curHistType, viewMode)).join('');
+    
+    // Вставляем без перезатирания старого контента
+    if (currentHistoryOffset === 0 && viewMode === 'list') {
+        container.innerHTML = '<div class="card" style="margin:0; padding:0; overflow:hidden;">' + html + '</div>';
+    } else if (currentHistoryOffset === 0 && viewMode === 'grid') {
+        container.innerHTML = '<div class="hist-grid">' + html + '</div>';
+    } else {
+        const target = viewMode === 'list' ? container.firstChild : container.firstChild;
+        container.firstChild.insertAdjacentHTML('beforeend', html);
+    }
+
+    currentHistoryOffset += historyBatchSize;
+    isRenderingBatch = false;
+
+    // Если данные закончились, отключаем обсервер
+    if (currentHistoryOffset >= curHistData.length && historyObserver) {
+        historyObserver.disconnect();
+    }
+};
+
+window.initHistoryObserver = function() {
+    if (historyObserver) historyObserver.disconnect();
+    
+    const options = {
+        root: null,
+        rootMargin: '2000px',
+        threshold: 0.1
+    };
+
+    historyObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+            renderNextHistoryBatch();
+        }
+    }, options);
+
+    const sentinel = document.getElementById('history-sentinel');
+    if (sentinel) historyObserver.observe(sentinel);
+};
+
+window.setViewMode = function(mode) {
+    viewMode = mode;
+    localStorage.setItem('kp_view_mode', mode);
+    if (document.getElementById('view-history').classList.contains('vis')) {
+        renderHistoryList();
+    }
+};
+
+
+window.renderHistoryList = function() {
+    currentHistoryOffset = 0;
+    const container = document.getElementById('hist-list-container');
+    container.innerHTML = '';
+    
+    document.getElementById('vt-grid').innerHTML = Icons.grid;
+    document.getElementById('vt-list').innerHTML = Icons.list;
+    document.getElementById('vt-grid').classList.toggle('active', viewMode === 'grid');
+    document.getElementById('vt-list').classList.toggle('active', viewMode === 'list');
+
+    if (!curHistData || !curHistData.length) {
+        container.innerHTML = `<div class="empty"><div class="icon">${Icons.dash}</div>Нет просмотров</div>`;
+        return;
+    }
+
+    renderNextHistoryBatch();
+    initHistoryObserver();
+};
+
+window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, extraIndex) {
+    lastScrollPos = window.scrollY;
+    
+    document.getElementById('view-stats').classList.add('hidden');
+    document.getElementById('view-history').classList.remove('hidden');
+    
+    if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(window.closeHistory); }
+    
+    curHistType = type;
+    
+    if (type === 'all') {
+        curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date));
+        document.getElementById('hist-title').textContent = 'Вся история';
+    } else if (type === 'day') {
+        curHistData = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate);
+        document.getElementById('hist-title').textContent = extraDate;
+    } else if (type === 'binge') {
+        curHistData = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => {
+            if (a.season_number !== b.season_number) return a.season_number - b.season_number;
+            return a.episode_number - b.episode_number;
+        });
+        document.getElementById('hist-title').textContent = extraTitle;
+    } else if (type === 'ratings') {
+        curHistData = D.ratings.history;
+        document.getElementById('hist-title').textContent = 'Оценки';
+    } else if (type === 'movies') {
+        curHistData = D.history_movies;
+        document.getElementById('hist-title').textContent = 'Фильмы';
+    } else if (type === 'episodes') {
+        curHistData = D.history_episodes;
+        document.getElementById('hist-title').textContent = 'Эпизоды';
+    } else if (type === 'filter') {
+        const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] : [...D.history_movies, ...D.history_episodes];
+        const allowedIds = D[extraKey][extraIndex].show_ids || [];
+        curHistData = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
+        document.getElementById('hist-title').textContent = extraTitle;
+    } else if (type === 'group_member') {
+        const member = D.group.members[extraIndex];
+        curHistData = [...D.group.history_movies, ...D.group.history_episodes].filter(item => item.user_ids.includes(member.id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
+        document.getElementById('hist-title').textContent = extraTitle;
+    } else if (type === 'weekday') {
+        curHistData = [...D.history_movies, ...D.history_episodes].filter(item => {
+            const date = new Date(item.view_date);
+            const jsDay = date.getDay();
+            return (jsDay === 0 ? 6 : jsDay - 1) === extraIndex;
+        }).sort((a, b) => b.view_date.localeCompare(a.view_date));
+        document.getElementById('hist-title').textContent = extraTitle;
+    } else if (type === 'rating_filter') {
+        curHistData = D.ratings.history.filter(item => {
+            let b = Math.floor(item.rating);
+            if (b < 1) b = 1;
+            return b === extraIndex;
+        });
+        document.getElementById('hist-title').textContent = `Оценка: ${extraIndex}`;
+        curHistType = 'ratings'; 
+    }
+
+    renderHistoryList();
+    window.scrollTo(0, 0);
+};
+
+window.closeHistory = function() {
+    if (historyObserver) historyObserver.disconnect();
+    if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(window.closeHistory); }
+    
+    // Скрываем экран истории и возвращаем экран статистики
+    document.getElementById('view-history').classList.add('hidden');
+    document.getElementById('view-stats').classList.remove('hidden');
+    
+    window.scrollTo(0, lastScrollPos);
+};
+
+function renderGroup() {
+    const el = document.getElementById('group-root');
+    if (!D.group) { 
+        el.innerHTML = `<div class="card hoverable"><div class="empty"><div class="icon" style="font-size:clamp(36px, 10vw, 48px);line-height:1;color:var(--text-muted)">${Icons.users}</div>Вы не состоите в группе</div></div>`; 
+        return; 
+    }
+    
+    const g = D.group, p = D.summary;
+    const subjectLabel = isSharedMode ? D.meta.name : 'Вы';
+    
+    const rows = [ 
+        { lb:'Просмотры', i:Icons.tv, y:p.total_views, gv:g.total_views }, 
+        { lb:'Эпизоды', i:Icons.film, y:p.total_episodes, gv:g.total_episodes }, 
+        { lb:'Фильмы', i:Icons.time, y:p.total_movies, gv:g.total_movies }, 
+        { lb:'Уникальных', i:Icons.star, y:p.unique_shows, gv:g.unique_shows } 
+    ];
+    
+    let hasDiff = false;
+    const cmpH = rows.map((r, idx) => { 
+        const d = r.y - r.gv; 
+        let dh = d===0 ? `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(12px, 3.2vw, 14px);display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>` : (hasDiff = true, `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`); 
+        return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1;color:var(--text-muted)">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(11px, 3vw, 13px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`; 
+    }).join('');
+    
+    const mx = Math.max(...g.members.map(m=>m.views),1);
+    const mbH = g.members.map((m, idx) => `<div class="mb anim-list-item clickable" onclick="openHistory('group_member', null, null, '${m.name.replace(/'/g, "\\'")}', null, ${idx})" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
+    let gGenH = g.genres?.length ? `<div class="card hoverable anim-item" style="animation-delay:0.3s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="chart-box" style="height:380px;"><canvas id="c-group-genre"></canvas></div><div id="legend-group-genre" class="legend-grid"></div></div>` : '';
+    const membersLabel = `${g.members_count} ${plural(g.members_count, ['участник', 'участника', 'участников'])}`;
+    
+    el.innerHTML = `
+        <div class="card hoverable anim-item">
+            <div style="display:flex;align-items:center;gap:16px">
+                <div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))">${Icons.users}</div>
+                <div>
+                    <div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">${g.group_name}</div>
+                    <div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">${membersLabel} · ${g.duration_display}</div>
+                </div>
+            </div>
+        </div>
+        <div class="card hoverable anim-item" style="animation-delay:0.1s">
+            <div class="label more-pad"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.chart}</div>${subjectLabel} vs Группа</div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 ${subjectLabel}</span>
+                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span>
+            </div>
+            ${!hasDiff?`<div style="text-align:center;padding:16px 0;font-size:clamp(15px, 4 vw, 18px);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse 2s infinite;"><div class="icon" style="font-size:clamp(20px, 6vw, 24px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
+            ${cmpH}
+        </div>
+        <div class="card hoverable anim-item" style="animation-delay:0.2s">
+            <div class="label more-pad"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.user}</div>Участники</div>
+            ${mbH}
+        </div>
+        ${gGenH}`;
+}
+
+// Share Modal Logic
+function openShareModal() {
+    const grid = document.getElementById('share-years-grid');
+    grid.innerHTML = '';
+    
+    const hasAll = availableYears.includes('all');
+    grid.innerHTML = `<label><input type="checkbox" class="yr-chk-input" value="all" checked><div class="yr-chk-btn">Всё время</div></label>`;
+    
+    availableYears.filter(y => y !== 'all').forEach(y => {
+        grid.innerHTML += `<label><input type="checkbox" class="yr-chk-input" value="${y}"><div class="yr-chk-btn">${y}</div></label>`;
+    });
+
+    const hasGroup = !!D.group;
+    const groupWrap = document.getElementById('sh-group-wrap');
+    const anonGroupWrap = document.getElementById('sh-anon-group-wrap');
+    if (hasGroup) {
+        groupWrap.style.display = 'flex';
+        anonGroupWrap.style.display = 'flex';
+        document.getElementById('sh-inc-group').checked = true;
+    } else {
+        groupWrap.style.display = 'none';
+        anonGroupWrap.style.display = 'none';
+        document.getElementById('sh-inc-group').checked = false;
+    }
+
+    document.getElementById('sh-anon-user').checked = false;
+    document.getElementById('sh-anon-group').checked = false;
+
+    toggleGroupOpts();
+    document.getElementById('share-modal').classList.add('show');
+}
+
+document.getElementById('share-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'share-modal') {
+        closeShareModal();
+    }
+});
+
+function closeShareModal() {
+    document.getElementById('share-modal').classList.remove('show');
+}
+
+function toggleGroupOpts() {
+    const incGroup = document.getElementById('sh-inc-group').checked;
+    const anonGroupWrap = document.getElementById('sh-anon-group-wrap');
+    if (!incGroup) {
+        anonGroupWrap.style.opacity = '0.4';
+        anonGroupWrap.style.pointerEvents = 'none';
+    } else {
+        anonGroupWrap.style.opacity = '1';
+        anonGroupWrap.style.pointerEvents = 'auto';
+    }
+}
+
+async function submitShare() {
+    const btn = document.getElementById('btn-do-share');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#fff;"></div> Создание...';
+
+    const checkedYears = Array.from(document.querySelectorAll('.yr-chk-input:checked')).map(el => el.value);
+    
+    if (checkedYears.length === 0) {
+        showToast('Выберите хотя бы один период');
+        btn.disabled = false;
+        btn.innerHTML = 'Создать ссылку';
+        return;
+    }
+
+    const config = {
+        years: checkedYears,
+        anon_user: document.getElementById('sh-anon-user').checked,
+        include_group: document.getElementById('sh-inc-group').checked,
+        anon_group: document.getElementById('sh-anon-group').checked
+    };
+
+    try {
+        const r = await fetch('/api/webapp/bake_stats/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ config, init_data: tg?.initData||'' })
+        });
+        const j = await r.json();
+        
+        if (!r.ok || j.error) {
+            showToast('Ошибка при создании слепка');
+        } else {
+            closeShareModal();
+            if (tg) {
+                // Trigger Telegram Inline Query to let user share
+                tg.switchInlineQuery("share_" + j.id, ["users", "groups", "channels"]);
+            }
+        }
+    } catch(e) {
+        showToast('Сетевая ошибка');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Создать ссылку';
+    }
+}
+
+
+window.App = {
+    toggleTheme: typeof toggleTheme !== 'undefined' ? toggleTheme : null,
+    openShareModal: typeof openShareModal !== 'undefined' ? openShareModal : null,
+    closeShareModal: typeof closeShareModal !== 'undefined' ? closeShareModal : null,
+    toggleGroupOpts: typeof toggleGroupOpts !== 'undefined' ? toggleGroupOpts : null,
+    submitShare: typeof submitShare !== 'undefined' ? submitShare : null,
+    mainTab: typeof window.mainTab !== 'undefined' ? window.mainTab : null,
+    pickYear: typeof window.pickYear !== 'undefined' ? window.pickYear : null,
+    openHistory: typeof window.openHistory !== 'undefined' ? window.openHistory : null,
+    closeHistory: typeof window.closeHistory !== 'undefined' ? window.closeHistory : null,
+    setViewMode: typeof window.setViewMode !== 'undefined' ? window.setViewMode : null
+};

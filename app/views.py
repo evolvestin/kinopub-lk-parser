@@ -935,15 +935,16 @@ def webapp_bake_stats(request):
         baked_data = {}
         for yr in years:
             year_val = None if yr == 'all' else yr
-
             stat = generate_user_stats(view_user, year=year_val)
             stat = json.loads(json.dumps(stat))
 
             user_info_map = {}
+            group_exists = False
 
             if include_group:
                 group_stats = generate_group_stats(view_user, year=year_val)
                 if group_stats:
+                    group_exists = True
                     group_stats = json.loads(json.dumps(group_stats))
 
                     if anon_group:
@@ -967,7 +968,6 @@ def webapp_bake_stats(request):
                             'name': display_name,
                             'photo': display_photo,
                         }
-
                         member['id'] = idx
                         member['name'] = display_name
                         member['photo_url'] = display_photo
@@ -975,9 +975,16 @@ def webapp_bake_stats(request):
                     stat['group'] = group_stats
 
             if view_user.id not in user_info_map:
+                if anon_user:
+                    name = 'Участник 1' if group_exists else 'Пользователь'
+                    uid = 1 if group_exists else 0
+                else:
+                    name = view_user.name or view_user.username
+                    uid = 1 if group_exists else 0 # В группе всегда есть ID
+
                 user_info_map[view_user.id] = {
-                    'id': 1,
-                    'name': 'Участник' if anon_user else (view_user.name or view_user.username),
+                    'id': uid,
+                    'name': name,
                     'photo': None if anon_user else view_user.photo_url,
                 }
 
@@ -991,25 +998,22 @@ def webapp_bake_stats(request):
                         continue
                     for item in pool[h_type]:
                         mapped_users = []
-
                         for uid in item.get('user_ids', []):
                             info = user_info_map.get(uid)
                             if info:
                                 mapped_users.append(info)
                             else:
                                 mapped_users.append({'id': 0, 'name': 'Участник', 'photo': None})
-
                         mapped_users.sort(key=lambda x: x['id'])
-
                         item['user_ids'] = [u['id'] for u in mapped_users]
                         item['user_names'] = [u['name'] for u in mapped_users]
                         item['user_photos'] = [u['photo'] for u in mapped_users]
 
             if anon_user:
-                stat['meta']['name'] = 'Участник'
+                stat['meta']['name'] = 'Участник 1' if group_exists else 'Пользователь'
                 stat['meta']['is_anonymous'] = True
                 stat['meta']['photo_url'] = None
-                stat['meta'].pop('id', None)
+                stat['meta']['id'] = 1 if group_exists else 0
             else:
                 stat['meta']['id'] = user_info_map[view_user.id]['id']
                 if tg_user.get('photo_url'):
@@ -1018,14 +1022,9 @@ def webapp_bake_stats(request):
             baked_data[str(yr)] = stat
 
         final_payload = {'metadata': {'years': years}, 'data': baked_data}
-
-        content_hash = hashlib.sha256(
-            json.dumps(final_payload, sort_keys=True).encode()
-        ).hexdigest()
+        content_hash = hashlib.sha256(json.dumps(final_payload, sort_keys=True).encode()).hexdigest()
         stat_id = content_hash[:16]
-
         SharedStat.objects.get_or_create(id=stat_id, defaults={'data': final_payload})
-
         return JsonResponse({'id': stat_id})
 
     except Exception as e:

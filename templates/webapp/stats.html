@@ -1,397 +1,19 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KinoStats</title>
+    <title>KinoStats App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-    <style>
-        :root {
-            --bg-main: #14181f;
-            --bg-card: #1b1f26;
-            --bg-input: #232830;
-            --border: #2d333b;
-            --text-primary: #e5e7eb;
-            --text-secondary: #9ca3af;
-            --text-muted: #6e7681;
-            --accent: #2ecc71;
-            --accent-hover: #27ae60;
-            --accent-dim: rgba(46, 204, 113, 0.15);
-            --info: #60a5fa;
-            --info-dim: rgba(96, 165, 250, 0.15);
-            --danger: #e74c3c;
-            --radius: 16px;
-            --radius-lg: 24px;
-            --shadow-sm: 0 4px 12px rgba(0,0,0,0.2);
-            --shadow-glow: 0 8px 24px rgba(46, 204, 113, 0.15);
-            --transition-bounce: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            --transition-smooth: 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        }
-        .light {
-            --bg-main: #f6f8fa;
-            --bg-card: #ffffff;
-            --bg-input: #f0f6fc;
-            --border: #d0d7de;
-            --text-primary: #1f2328;
-            --text-secondary: #59636e;
-            --text-muted: #8c959f;
-            --shadow-sm: 0 4px 12px rgba(0,0,0,0.05);
-            --shadow-glow: 0 8px 24px rgba(35, 134, 54, 0.2);
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
-        body {
-            background: var(--bg-main);
-            color: var(--text-secondary);
-            font-family: var(--tg-theme-font-family, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
-            font-size: clamp(14px, 4vw, 16px);
-            line-height: 1.5;
-            -webkit-font-smoothing: antialiased;
-            padding-bottom: clamp(24px, 8vw, 36px);
-            transition: background var(--transition-smooth), color var(--transition-smooth);
-            overflow-x: hidden;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: clamp(16px, 4vw, 20px);
-            margin: 0 clamp(12px, 3.5vw, 16px) clamp(12px, 3vw, 16px);
-            box-shadow: var(--shadow-sm);
-            transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), background var(--transition-smooth), border-color var(--transition-smooth);
-        }
-
-        @media (hover: hover) {
-            .card.hoverable:hover {
-                transform: translateY(-4px);
-                box-shadow: 0 12px 32px rgba(0,0,0,0.2);
-                border-color: var(--accent);
-            }
-            .clickable:hover { background: var(--bg-input); }
-            .li-clickable:hover { transform: translateX(6px); background: var(--bg-input); }
-            .tab:not(.on):hover { background: var(--bg-input); color: var(--text-primary); }
-            .yr:not(.on):hover { background: var(--bg-input); color: var(--text-primary); }
-            .stat.clickable:hover { transform: translateY(-3px); box-shadow: var(--shadow-glow); border-color: var(--accent); }
-            .hist-item.clickable:hover .hist-poster { transform: scale(1.05) rotate(2deg); }
-        }
-
-        .clickable { cursor: pointer; transition: transform var(--transition-bounce), background var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth); }
-        .clickable:active { transform: scale(0.95); background: var(--bg-input) !important; }
-
-        .header { display: flex; align-items: center; justify-content: space-between; padding: clamp(16px, 5vw, 24px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px); }
-        .header-left { display: flex; align-items: center; gap: clamp(12px, 3vw, 16px); }
-        .avatar {
-            width: clamp(48px, 13vw, 56px); height: clamp(48px, 13vw, 56px); border-radius: 50%;
-            background: linear-gradient(135deg, var(--bg-input), var(--border));
-            display: flex; align-items: center; justify-content: center;
-            font-size: clamp(20px, 6vw, 24px); font-weight: 800; color: var(--text-primary); flex-shrink: 0;
-            overflow: hidden; border: 2px solid var(--bg-card); box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transition: transform var(--transition-bounce);
-        }
-        .avatar:active { transform: scale(0.9) rotate(-10deg); }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        
-        .header-name { font-size: clamp(20px, 6vw, 24px); font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; line-height: 1.2; }
-        .header-sub  { font-size: clamp(12px, 3.5vw, 14px); color: var(--accent); font-weight: 600; margin-top: 2px; }
-        
-        .top-controls { display: flex; gap: 8px; }
-
-        .theme-btn, .share-btn {
-            width: clamp(36px, 10vw, 44px); height: clamp(36px, 10vw, 44px); border-radius: 50%;
-            background: var(--bg-input); border: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; color: var(--text-primary); transition: transform var(--transition-bounce), background var(--transition-smooth);
-            box-shadow: var(--shadow-sm);
-        }
-        .theme-btn:active, .share-btn:active { transform: scale(0.85); }
-        .theme-btn .icon, .share-btn .icon { font-size: clamp(18px, 5vw, 22px); line-height: 1; }
-
-        .tabs { display: flex; gap: clamp(8px, 2vw, 12px); padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .tabs::-webkit-scrollbar { display: none; }
-        .tab {
-            display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); flex-shrink: 0; padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 20px); border-radius: 12px;
-            font-size: clamp(14px, 3.8vw, 16px); font-weight: 700; white-space: nowrap;
-            border: 1px solid var(--border); background: var(--bg-card);
-            color: var(--text-muted); cursor: pointer; transition: all var(--transition-bounce);
-        }
-        .tab .icon { font-size: clamp(16px, 4.5vw, 20px); line-height: 1; }
-        .tab.on { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: var(--shadow-glow); transform: translateY(-2px); }
-        .tab:not(.on):active { transform: scale(0.92); }
-
-        .years { display: flex; gap: clamp(6px, 1.5vw, 8px); padding: clamp(4px, 1vw, 8px) clamp(16px, 4vw, 20px) clamp(12px, 3vw, 16px); overflow-x: auto; scrollbar-width: none; }
-        .years::-webkit-scrollbar { display: none; }
-        .yr {
-            flex-shrink: 0; padding: clamp(6px, 2vw, 8px) clamp(12px, 3.5vw, 16px); border-radius: 10px;
-            font-size: clamp(13px, 3.5vw, 15px); font-weight: 700;
-            border: 1px solid var(--border); background: var(--bg-card);
-            color: var(--text-muted); cursor: pointer; transition: all var(--transition-bounce);
-        }
-        .yr.on { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); transform: scale(1.05); }
-        .yr:not(.on):active { transform: scale(0.92); }
-
-        .label {
-            display: flex; align-items: center; gap: clamp(6px, 2vw, 8px);
-            font-size: clamp(12px, 3.5vw, 14px); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
-            color: var(--text-secondary); padding: clamp(12px, 3vw, 16px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px);
-        }
-        .card .label { padding: 0; font-size: clamp(14px, 4vw, 16px); color: var(--text-primary); }
-        .card .label.more-pad { padding: 0 0 clamp(4px, 4vw, 8px) 0; }
-        .label .icon { font-size: clamp(16px, 4.5vw, 18px); line-height: 1; color: var(--accent); }
-
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(12px, 3vw, 16px); padding: 0 clamp(16px, 4vw, 20px) clamp(8px, 2.5vw, 12px); }
-        .stat {
-            background: linear-gradient(145deg, var(--bg-card), var(--bg-input)); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: clamp(16px, 4vw, 20px); box-shadow: var(--shadow-sm);
-            display: flex; flex-direction: column; position: relative; overflow: hidden;
-        }
-        .stat::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--accent); opacity: 0; transition: opacity var(--transition-smooth); }
-        .stat.clickable:hover::before { opacity: 1; }
-        
-        .stat-icon  { font-size: clamp(24px, 7vw, 28px); line-height: 1; margin-bottom: clamp(10px, 3vw, 12px); color: var(--text-primary); transition: transform var(--transition-bounce); }
-        .stat.clickable:hover .stat-icon { transform: scale(1.1) rotate(5deg); color: var(--accent); }
-        
-        .stat-val   { font-size: clamp(24px, 6.5vw, 32px); font-weight: 900; color: var(--text-primary); line-height: 1.1; letter-spacing: -0.5px; }
-        .stat-lbl   { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); font-weight: 600; margin-top: clamp(4px, 1.5vw, 6px); }
-        .stat-sub   { font-size: clamp(12px, 3.2vw, 14px); color: var(--accent); margin-top: clamp(4px, 1.5vw, 6px); font-weight: 700; display: inline-flex; align-items: center; gap: 4px; background: var(--accent-dim); padding: 2px 8px; border-radius: 10px; width: fit-content; }
-        
-        .stat.clickable::after {
-            content: ''; position: absolute; top: clamp(16px, 4vw, 20px); right: clamp(16px, 4vw, 20px);
-            width: clamp(8px, 2.5vw, 12px); height: clamp(8px, 2.5vw, 12px);
-            border-top: 2.5px solid var(--text-muted); border-right: 2.5px solid var(--text-muted);
-            transform: rotate(45deg); opacity: 0.5; transition: border-color var(--transition-smooth), transform var(--transition-bounce);
-        }
-        .stat.clickable:hover::after { border-color: var(--accent); transform: rotate(45deg) translate(2px, -2px); opacity: 1; }
-
-        .li { display: flex; align-items: center; justify-content: space-between; padding: clamp(12px, 3.5vw, 16px) 0; border-bottom: 1px dashed var(--border); }
-        .li:last-child { border: none; }
-        .li-clickable {
-            padding: clamp(10px, 3vw, 14px) clamp(12px, 3.5vw, 16px);
-            margin: 4px calc(-1 * clamp(12px, 3.5vw, 16px)) 0;
-            border-radius: 12px;
-            border-bottom: none !important;
-            transition: all var(--transition-smooth);
-        }
-        .li-l { display: flex; align-items: center; gap: clamp(12px, 3vw, 16px); min-width: 0; flex: 1; }
-        .li-r { font-size: clamp(14px, 4vw, 16px); font-weight: 800; color: var(--text-primary); flex-shrink: 0; margin-left: 12px; text-align: right; font-variant-numeric: tabular-nums; }
-        .li-rank { font-size: clamp(14px, 4vw, 16px); font-weight: 800; color: var(--text-secondary); width: clamp(24px, 6vw, 28px); text-align: center; flex-shrink: 0; opacity: 0.8; }
-        .li-name { display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); font-size: clamp(14px, 4vw, 16px); font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .li-sub  { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); margin-top: 4px; font-weight: 500; }
-
-        .chart-box { position: relative; width: 100%; height: 320px; margin: 0 auto; }
-
-        .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: clamp(32px, 9vw, 48px) clamp(16px, 4vw, 20px); color: var(--text-muted); font-size: clamp(14px, 4vw, 16px); font-weight: 600; text-align: center; }
-        .empty .icon { font-size: clamp(36px, 10vw, 48px); line-height: 1; margin-bottom: clamp(12px, 3.5vw, 16px); opacity: 0.3; }
-
-        .loader { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(13, 17, 23, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: opacity 0.4s ease; }
-        .light .loader { background: rgba(246, 248, 250, 0.8); }
-        .spinner { width: clamp(32px, 9vw, 48px); height: clamp(32px, 9vw, 48px); border: 4px solid var(--bg-input); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .sec { display: none; opacity: 0; transition: opacity var(--transition-smooth); }
-        .sec.vis { display: block; opacity: 1; }
-        .hidden { display: none !important; opacity: 0; pointer-events: none; }
-
-        @keyframes slideInUp { 0% { opacity: 0; transform: translateY(20px) scale(0.97); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
-        @keyframes slideInRight { 0% { opacity: 0; transform: translateX(-15px); } 100% { opacity: 1; transform: translateX(0); } }
-        .anim-item { animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
-        .anim-list-item { animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
-
-        svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; flex-shrink: 0; fill: currentColor; }
-
-        /* HEATMAP CSS */
-        .hm { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; gap: 1px; width: 100%; box-sizing: border-box; }
-        .hc { width: 100%; aspect-ratio: 1 / 1; border-radius: 15%; background: var(--bg-input); transition: transform var(--transition-bounce), background var(--transition-smooth); cursor: crosshair; position: relative; min-width: 0; }
-        .hc-label { display: flex; align-items: center; font-size: 1.8cqw; line-height: 1; font-weight: 800; color: var(--text-muted); user-select: none; padding-right: 5px; }
-        @media (max-width: 480px) { .hc-label { font-size: 7px; } }
-        .h1 { background: rgba(35, 134, 54, 0.3); } .h2 { background: rgba(35, 134, 54, 0.6); } .h3 { background: rgba(35, 134, 54, 0.85); } .h4 { background: #39d353; box-shadow: 0 0 6px rgba(57, 211, 83, 0.3); }
-        .hm-leg { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 12px; font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
-        .hm-leg .hc { width: 10px; height: 10px; border-radius: 15%; cursor: default; }
-        .hm-wrapper { width: 100%; container-type: inline-size; overflow: hidden; }
-        #heatmaps-wrapper { width: 100%; position: relative; }
-        #hm-zoom-content { transform-origin: 0 0; transition: transform 0.1s ease-out; width: 100%; display: block; will-change: transform; }
-        .hm-zoom-area { padding-bottom: 10px; }
-        
-        /* OTHERS */
-        .hist-item { display: flex; gap: clamp(12px, 3.5vw, 16px); padding: clamp(12px, 3.5vw, 16px) clamp(16px, 4vw, 20px); border-bottom: 1px solid var(--border); transition: background var(--transition-smooth); }
-        .hist-item:last-child { border: none; }
-        .hist-poster { width: clamp(48px, 14vw, 60px); height: clamp(72px, 21vw, 90px); border-radius: 8px; object-fit: cover; background: var(--bg-input); flex-shrink: 0; border: 1px solid var(--border); transition: transform var(--transition-bounce); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        .hist-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-        .hist-title { font-size: clamp(15px, 4.2vw, 18px); font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; margin-bottom: 2px; }
-        .hist-orig { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
-        .hist-meta { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-secondary); display: flex; gap: clamp(8px, 2.5vw, 12px); align-items: center; flex-wrap: wrap; font-weight: 600; }
-        .hist-badge { background: var(--bg-input); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; font-size: clamp(11px, 3vw, 13px); font-weight: 800; color: var(--text-primary); border: 1px solid var(--border); letter-spacing: 0.5px; }
-        .rating-badge { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 800; font-size: clamp(12px, 3.2vw, 14px); background: var(--accent-dim); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; }
-        .rating-badge.show-lvl { color: var(--text-primary); background: var(--bg-input); }
-        .rating-badge svg { font-size: clamp(14px, 3.8vw, 16px); margin-top: -2px; }
-        .big-rating-badge { display: flex; align-items: center; justify-content: center; width: clamp(40px, 11vw, 48px); height: clamp(40px, 11vw, 48px); border-radius: 12px; font-size: clamp(16px, 4.5vw, 18px); font-weight: 900; color: #fff; flex-shrink: 0; box-shadow: var(--shadow-sm); }
-        .glow-text { text-shadow: 0 0 12px rgba(255,255,255,0.2); }
-        .critic-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; padding-top: 10px;}
-        .critic-title-box { display: flex; flex-direction: column;}
-        .critic-badge { display: inline-flex; align-items: center; gap: 6px; font-size: clamp(12px, 3.2vw, 14px); font-weight: 800; padding: 4px 10px; border-radius: 8px; width: fit-content; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;}
-        .critic-avg { font-size: clamp(32px, 8vw, 42px); font-weight: 900; line-height: 1; display: flex; align-items: baseline; gap: 4px; }
-        .critic-avg span { font-size: clamp(14px, 4vw, 16px); color: var(--text-muted); font-weight: 700; }
-        .critic-total { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-muted); font-weight: 600; text-align: right; }
-        .rating-time { font-size: clamp(11px, 3vw, 13px); color: var(--text-muted); font-weight: 500; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
-
-        .legend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 20px; }
-        .legend-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: all var(--transition-smooth); }
-        .legend-item:hover { border-color: var(--accent); transform: translateY(-2px); background: var(--bg-card); }
-        .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-        .legend-name { font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .legend-val { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-left: auto; }
-        
-        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--bg-input); color: var(--text-primary); padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 700; border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 1000; transition: transform var(--transition-bounce), opacity var(--transition-smooth); opacity: 0; pointer-events: none; white-space: nowrap; }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-
-        /* Group Compare styling */
-        .cmp { display: flex; justify-content: space-between; align-items: center; padding: clamp(10px, 3vw, 12px) 0; border-bottom: 1px dashed var(--border); }
-        .cmp:last-child { border: none; }
-        .cmp-lb { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-secondary); font-weight: 700; display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); }
-        .cmp-vs { display: flex; gap: clamp(12px, 3vw, 16px); align-items: center; }
-        .cmp-v  { font-size: clamp(14px, 4vw, 16px); font-weight: 800; text-align: right; min-width: clamp(40px, 11vw, 48px); font-variant-numeric: tabular-nums; }
-        .cmp-you { color: var(--accent); }
-        .cmp-grp { color: var(--info); }
-        .cmp-d  { font-size: clamp(11px, 3vw, 13px); font-weight: 800; padding: clamp(4px, 1vw, 6px) clamp(8px, 2vw, 10px); border-radius: 8px; min-width: 50px; text-align: center; }
-        .d-up   { background: var(--accent-dim); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-        .d-dn   { background: rgba(248, 81, 73, 0.15); color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
-        .d-eq   { background: var(--bg-input); color: var(--text-muted); }
-
-        .mb { display: flex; align-items: center; gap: clamp(10px, 3vw, 12px); margin-bottom: clamp(12px, 3.5vw, 16px); }
-        .mb-n { font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; color: var(--text-primary); width: clamp(70px, 20vw, 90px); text-align: right; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .mb-t { flex: 1; height: clamp(8px, 2.5vw, 10px); background: var(--bg-input); border-radius: 5px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1); }
-        .mb-f { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--info), #a371f7); transition: width 1s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .mb-c { font-size: clamp(12px, 3.2vw, 14px); font-weight: 800; color: var(--text-muted); width: clamp(32px, 9vw, 40px); flex-shrink: 0; text-align: right; }
-
-        /* SHARE MODAL STYLES */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
-            z-index: 1000; display: flex; align-items: flex-end; justify-content: center;
-            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
-        }
-        .modal-overlay.show { opacity: 1; pointer-events: auto; }
-        .modal-content {
-            background: var(--bg-card); width: 100%; max-width: 500px;
-            border-radius: 24px 24px 0 0; padding: 24px;
-            transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            border-top: 1px solid var(--border); box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
-            max-height: 90vh; overflow-y: auto;
-        }
-        .modal-overlay.show .modal-content { transform: translateY(0); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .modal-title { font-size: 20px; font-weight: 800; color: var(--text-primary); }
-        .modal-close { background: var(--bg-input); border: none; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
-        .modal-close:hover { background: var(--border); color: var(--text-primary); }
-        .share-section-title { font-size: 14px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin: 20px 0 10px; letter-spacing: 0.5px; }
-        .share-opts { display: flex; flex-direction: column; gap: 12px; }
-        
-        .chk-row { display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; }
-        .chk-box {
-            width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--border);
-            display: flex; justify-content: center; align-items: center; background: var(--bg-input);
-            transition: all 0.2s; flex-shrink: 0;
-        }
-        .chk-row input:checked + .chk-box { background: var(--accent); border-color: var(--accent); }
-        .chk-row input:checked + .chk-box::after { content: ''; width: 6px; height: 10px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-top: -2px; }
-        .chk-row input { display: none; }
-        .chk-text { font-size: 15px; font-weight: 600; color: var(--text-primary); }
-        
-        .years-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; }
-        .yr-chk-btn {
-            background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted);
-            border-radius: 10px; padding: 8px 0; text-align: center; font-weight: 700; font-size: 14px;
-            cursor: pointer; transition: all 0.2s; user-select: none;
-        }
-        .yr-chk-input { display: none; }
-        .yr-chk-input:checked + .yr-chk-btn { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-
-        .btn-primary {
-            width: 100%; background: var(--accent); color: #fff; border: none; padding: 16px; border-radius: 16px;
-            font-size: 16px; font-weight: 800; margin-top: 30px; cursor: pointer; box-shadow: var(--shadow-glow);
-            transition: transform 0.2s, background 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px;
-        }
-        .btn-primary:active { transform: scale(0.96); background: var(--accent-hover); }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
-
-        /* Shared mode banner */
-        .shared-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-            background: var(--bg-card);
-            background-image: linear-gradient(var(--info-dim), var(--info-dim));
-            color: var(--info);
-            padding: 12px 16px;
-            font-size: 13px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            border-bottom: 1px solid var(--border);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-        }
-
-        body.has-banner #app {
-            margin-top: 50px;
-        }
-
-        .view-toggle { display: flex; background: var(--bg-input); border-radius: 10px; padding: 3px; border: 1px solid var(--border); margin-bottom: clamp(12px, 3.5vw, 16px); }
-        .vt-btn { background: transparent; border: none; color: var(--text-muted); padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; outline: none; }
-        .vt-btn.active { background: var(--bg-card); color: var(--text-primary); box-shadow: var(--shadow-sm); }
-        .vt-btn svg { width: 18px; height: 18px; }
-
-        .hist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: clamp(10px, 3vw, 14px); }
-        .grid-item-wrap { display: flex; flex-direction: column; gap: 2px; cursor: pointer; transition: transform 0.2s; }
-        .grid-item-wrap:active { transform: scale(0.95); }
-        #history-sentinel {
-            height: 40px;
-            width: 100%;
-            margin-top: 10px;
-        }
-        .grid-item { position: relative; aspect-ratio: 2/3; border-radius: 12px; overflow: hidden; background: var(--bg-input); border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: box-shadow 0.2s; transform: translateZ(0); }
-        .grid-poster { width: 100%; height: 100%; object-fit: cover; }
-        .grid-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 50%); display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; pointer-events: none; }
-        .grid-badges { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; pointer-events: none; }
-        
-        .grid-below-title { font-size: 13px; font-weight: 800; color: var(--text-primary); line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 4px; padding: 0 2px; }
-        .grid-below-orig { font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; margin-top: 1px; }
-        .grid-year { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.85); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; z-index: 2; }
-        .grid-user-avatar { 
-            width: 22px; 
-            height: 22px; 
-            border-radius: 50%; 
-            border: 1.5px solid var(--bg-card); 
-            color: #fff; 
-            font-size: 10px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-weight: 900; 
-            margin-left: -8px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3); 
-            object-fit: cover; 
-            z-index: 1;
-        }
-        .grid-user-avatar:first-child { margin-left: 0; }
-        .grid-users { display: flex; flex-wrap: wrap; margin-bottom: 6px; padding-left: 2px; }
-        .grid-date { color: var(--accent); font-size: 10px; font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,0.8); text-align: right; width: 100%; }
-        
-        .grid-item .big-rating-badge { width: 32px; height: 32px; font-size: 14px; position: absolute; bottom: 8px; left: 8px; z-index: 5; }
-        .grid-item .rating-badge { background: rgba(0,0,0,0.6); color: var(--accent); border: 1px solid rgba(255,255,255,0.1); }
-        .grid-item .hist-badge { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/webapp.css' %}">
 </head>
 <body>
     <div class="loader" id="loader"><div class="spinner"></div></div>
     <div id="shared-banner-container"></div>
+    
     <div id="app" class="hidden">
         <div class="header">
             <div class="header-left">
@@ -402,127 +24,136 @@
                 </div>
             </div>
             <div class="top-controls">
-                <button class="share-btn" id="share-btn" onclick="openShareModal()">
+                <button class="share-btn" id="share-btn" onclick="window.App.openShareModal()">
                     <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                 </button>
-                <button class="theme-btn" id="theme-btn" onclick="toggleTheme()"></button>
+                <button class="theme-btn" id="theme-btn" onclick="window.App.toggleTheme()"></button>
             </div>
         </div>
 
-        <div class="tabs" id="main-tabs">
-            <button class="tab on" data-tab="personal" onclick="mainTab('personal')">
-                <div class="icon" id="ic-user"></div>Личная
-            </button>
-            <button class="tab" data-tab="group" id="tab-group-btn" onclick="mainTab('group')">
-                <div class="icon" id="ic-users"></div>Группа
-            </button>
-        </div>
-
-        <div class="years" id="years"></div>
-
-        <div class="sec vis" id="sec-personal">
-            <div class="label" id="label-overview"><div class="icon" id="ic-dash"></div>Обзор</div>
-            <div class="grid" id="grid-overview">
-                <div class="stat anim-item clickable" style="animation-delay: 0.05s" onclick="openHistory('all')">
-                    <div class="stat-icon" id="ic-time"></div>
-                    <div class="stat-val" id="s-time">—</div>
-                    <div class="stat-lbl">Время просмотра</div>
-                    <div class="stat-sub" id="s-views"></div>
+        <div id="views-container">
+            <!-- VIEW: STATS -->
+            <div class="view active-view" id="view-stats">
+                <div class="tabs" id="main-tabs">
+                    <button class="tab on" data-tab="personal" onclick="window.App.mainTab('personal')">
+                        <div class="icon" id="ic-user"></div>Личная
+                    </button>
+                    <button class="tab" data-tab="group" id="tab-group-btn" onclick="window.App.mainTab('group')">
+                        <div class="icon" id="ic-users"></div>Группа
+                    </button>
                 </div>
-                <div class="stat anim-item" style="animation-delay: 0.1s">
-                    <div class="stat-icon" id="ic-cal"></div>
-                    <div class="stat-val" id="s-act">0%</div>
-                    <div class="stat-lbl">Активность</div>
-                    <div class="stat-sub" id="s-daily" style="background: var(--info-dim); color: var(--info)"></div>
-                </div>
-                <div class="stat anim-item clickable" style="animation-delay: 0.15s" onclick="openHistory('episodes')">
-                    <div class="stat-icon" id="ic-tv"></div>
-                    <div class="stat-val" id="s-ep">0</div>
-                    <div class="stat-lbl">Эпизодов</div>
-                    <div class="stat-sub" id="s-ser" style="background: rgba(163, 113, 247, 0.15); color: #a371f7"></div>
-                </div>
-                <div class="stat anim-item clickable" style="animation-delay: 0.2s" onclick="openHistory('movies')">
-                    <div class="stat-icon" id="ic-film"></div>
-                    <div class="stat-val" id="s-mov">0</div>
-                    <div class="stat-lbl">Фильмов</div>
-                    <div class="stat-sub" id="s-uni" style="background: rgba(210, 153, 34, 0.15); color: #d29922"></div>
-                </div>
-            </div>
 
-            <div class="card hoverable anim-item" id="card-dynamics" style="animation-delay: 0.25s">
-                <div class="label"><div class="icon" style="color:var(--info)" id="ic-chart-internal"></div>Динамика</div>
-                <div class="chart-box"><canvas id="c-monthly"></canvas></div>
-            </div>
+                <div class="years" id="years"></div>
 
-            <div class="card hoverable anim-item" id="card-weekday" style="animation-delay: 0.3s">
-                <div class="label more-pad"><div class="icon" style="color:#2ecc71" id="ic-weekday-internal"></div>Дни недели</div>
-                <div class="chart-box" style="height:180px"><canvas id="c-weekday"></canvas></div>
-            </div>
-
-            <div class="card hoverable anim-item" id="card-heatmap" style="animation-delay: 0.35s">
-                <div class="label more-pad"><div class="icon" style="color:#f85149" id="ic-flame-internal"></div>Интенсивность</div>
-                <div id="heatmaps-wrapper"></div>
-                <div class="hm-leg">
-                    <span>Меньше</span>
-                    <div class="hc"></div><div class="hc h1"></div><div class="hc h2"></div><div class="hc h3"></div><div class="hc h4"></div>
-                    <span>Больше</span>
-                </div>
-            </div>
-
-            <div class="card hoverable anim-item" id="card-genres" style="animation-delay: 0.1s; margin-bottom: clamp(12px, 3vw, 16px);">
-                <div class="label"><div class="icon" id="it-gen-internal"></div>Жанры</div>
-                <div class="chart-box" style="height:380px;"><canvas id="c-genre"></canvas></div>
-                <div id="legend-genre" class="legend-grid"></div>
-            </div>
-
-            <div class="card hoverable anim-item" style="animation-delay: 0.15s;" id="card-actors">
-                <div class="label"><div class="icon" style="color: #d29922;" id="it-act-internal"></div>Актёры</div>
-                <div id="actors-list"></div>
-            </div>
-
-            <div class="card hoverable anim-item" style="animation-delay: 0.2s;" id="card-countries">
-                <div class="label"><div class="icon" style="color: #388bfd;" id="it-cou-internal"></div>Страны</div>
-                <div id="countries-list"></div>
-            </div>
-
-            <div class="card hoverable anim-item" style="animation-delay: 0.25s;" id="card-binges">
-                <div class="label"><div class="icon" style="color: #a371f7;" id="it-bin-internal"></div>Марафоны</div>
-                <div id="binges-list"></div>
-            </div>
-
-            <div class="card hoverable anim-item" style="animation-delay: 0.3s;" id="ratings-box">
-                <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star-internal"></div>Оценки</div>
-                <div class="critic-header">
-                    <div class="critic-title-box">
-                        <div class="critic-badge" id="cr-badge"></div>
-                        <div class="critic-avg" id="cr-avg">0.0<span>/ 10</span></div>
+                <div id="sec-personal">
+                    <div class="label" id="label-overview"><div class="icon" id="ic-dash"></div>Обзор</div>
+                    <div class="grid" id="grid-overview">
+                        <div class="stat anim-item clickable" style="animation-delay: 0.05s" onclick="window.App.openHistory('all')">
+                            <div class="stat-icon" id="ic-time"></div>
+                            <div class="stat-val" id="s-time">—</div>
+                            <div class="stat-lbl">Время просмотра</div>
+                            <div class="stat-sub" id="s-views"></div>
+                        </div>
+                        <div class="stat anim-item" style="animation-delay: 0.1s">
+                            <div class="stat-icon" id="ic-cal"></div>
+                            <div class="stat-val" id="s-act">0%</div>
+                            <div class="stat-lbl">Активность</div>
+                            <div class="stat-sub" id="s-daily" style="background: var(--info-dim); color: var(--info)"></div>
+                        </div>
+                        <div class="stat anim-item clickable" style="animation-delay: 0.15s" onclick="window.App.openHistory('episodes')">
+                            <div class="stat-icon" id="ic-tv"></div>
+                            <div class="stat-val" id="s-ep">0</div>
+                            <div class="stat-lbl">Эпизодов</div>
+                            <div class="stat-sub" id="s-ser" style="background: rgba(163, 113, 247, 0.15); color: #a371f7"></div>
+                        </div>
+                        <div class="stat anim-item clickable" style="animation-delay: 0.2s" onclick="window.App.openHistory('movies')">
+                            <div class="stat-icon" id="ic-film"></div>
+                            <div class="stat-val" id="s-mov">0</div>
+                            <div class="stat-lbl">Фильмов</div>
+                            <div class="stat-sub" id="s-uni" style="background: rgba(210, 153, 34, 0.15); color: #d29922"></div>
+                        </div>
                     </div>
-                    <div class="critic-total" id="cr-total"></div>
-                </div>
-                <div class="chart-box" style="height: 180px; margin-bottom: 16px;"><canvas id="c-ratings-dist"></canvas></div>
-                <div class="stat clickable" style="flex-direction: row; justify-content: center; align-items: center; padding: 16px; margin-top: 12px; border-radius: 15px;" onclick="openHistory('ratings')">
-                    <span style="font-weight: 800; color: var(--text-primary); font-size: clamp(14px, 4vw, 16px);">Все оценки</span>
-                </div>
-            </div>
-        </div>
 
-        <div class="sec" id="sec-group"><div id="group-root"></div></div>
+                    <div class="card hoverable anim-item" id="card-dynamics" style="animation-delay: 0.25s">
+                        <div class="label"><div class="icon" style="color:var(--info)" id="ic-chart-internal"></div>Динамика</div>
+                        <div class="chart-box"><canvas id="c-monthly"></canvas></div>
+                    </div>
 
-        <div class="sec" id="sec-history">
-            <div class="header" style="padding-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
-                <button onclick="closeHistory()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin-bottom:clamp(12px, 3.5vw, 16px); display:inline-flex;">
-                    <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
-                </button>
-                <div class="view-toggle" id="view-toggle">
-                    <button class="vt-btn" id="vt-grid" onclick="setViewMode('grid')"></button>
-                    <button class="vt-btn" id="vt-list" onclick="setViewMode('list')"></button>
+                    <div class="card hoverable anim-item" id="card-weekday" style="animation-delay: 0.3s">
+                        <div class="label more-pad"><div class="icon" style="color:#2ecc71" id="ic-weekday-internal"></div>Дни недели</div>
+                        <div class="chart-box" style="height:180px"><canvas id="c-weekday"></canvas></div>
+                    </div>
+
+                    <div class="card hoverable anim-item" id="card-heatmap" style="animation-delay: 0.35s">
+                        <div class="label more-pad"><div class="icon" style="color:#f85149" id="ic-flame-internal"></div>Интенсивность</div>
+                        <div id="heatmaps-wrapper"></div>
+                        <div class="hm-leg">
+                            <span>Меньше</span>
+                            <div class="hc"></div><div class="hc h1"></div><div class="hc h2"></div><div class="hc h3"></div><div class="hc h4"></div>
+                            <span>Больше</span>
+                        </div>
+                    </div>
+
+                    <div class="card hoverable anim-item" id="card-genres" style="animation-delay: 0.1s; margin-bottom: clamp(12px, 3vw, 16px);">
+                        <div class="label"><div class="icon" id="it-gen-internal"></div>Жанры</div>
+                        <div class="chart-box" style="height:380px;"><canvas id="c-genre"></canvas></div>
+                        <div id="legend-genre" class="legend-grid"></div>
+                    </div>
+
+                    <div class="card hoverable anim-item" style="animation-delay: 0.15s;" id="card-actors">
+                        <div class="label"><div class="icon" style="color: #d29922;" id="it-act-internal"></div>Актёры</div>
+                        <div id="actors-list"></div>
+                    </div>
+
+                    <div class="card hoverable anim-item" style="animation-delay: 0.2s;" id="card-countries">
+                        <div class="label"><div class="icon" style="color: #388bfd;" id="it-cou-internal"></div>Страны</div>
+                        <div id="countries-list"></div>
+                    </div>
+
+                    <div class="card hoverable anim-item" style="animation-delay: 0.25s;" id="card-binges">
+                        <div class="label"><div class="icon" style="color: #a371f7;" id="it-bin-internal"></div>Марафоны</div>
+                        <div id="binges-list"></div>
+                    </div>
+
+                    <div class="card hoverable anim-item" style="animation-delay: 0.3s;" id="ratings-box">
+                        <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star-internal"></div>Оценки</div>
+                        <div class="critic-header">
+                            <div class="critic-title-box">
+                                <div class="critic-badge" id="cr-badge"></div>
+                                <div class="critic-avg" id="cr-avg">0.0<span>/ 10</span></div>
+                            </div>
+                            <div class="critic-total" id="cr-total"></div>
+                        </div>
+                        <div class="chart-box" style="height: 180px; margin-bottom: 16px;"><canvas id="c-ratings-dist"></canvas></div>
+                        <div class="stat clickable" style="flex-direction: row; justify-content: center; align-items: center; padding: 16px; margin-top: 12px; border-radius: 15px;" onclick="window.App.openHistory('ratings')">
+                            <span style="font-weight: 800; color: var(--text-primary); font-size: clamp(14px, 4vw, 16px);">Все оценки</span>
+                        </div>
+                    </div>
                 </div>
+
+                <div id="sec-group" class="hidden"><div id="group-root"></div></div>
             </div>
-            <div class="label" style="padding-top:0;"><div class="icon" id="ic-hist-type"></div><span id="hist-title"></span></div>
-            <!-- Контейнер для элементов -->
-            <div id="hist-list-container" style="padding: 0 clamp(12px, 3vw, 16px) 0;"></div>
-            <!-- Сентинел для отслеживания скролла -->
-            <div id="history-sentinel"></div>
+
+            <!-- VIEW: HISTORY -->
+            <div class="view hidden" id="view-history">
+                <div class="header" style="padding-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
+                    <button onclick="window.App.closeHistory()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin-bottom:clamp(12px, 3.5vw, 16px); display:inline-flex;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
+                    </button>
+                    <div class="view-toggle" id="view-toggle">
+                        <button class="vt-btn" id="vt-grid" onclick="window.App.setViewMode('grid')"></button>
+                        <button class="vt-btn" id="vt-list" onclick="window.App.setViewMode('list')"></button>
+                    </div>
+                </div>
+                <div class="label" style="padding-top:0;"><span id="hist-title"></span></div>
+                <div id="hist-list-container" style="padding: 0 clamp(12px, 3vw, 16px) 0;"></div>
+                <div id="history-sentinel"></div>
+            </div>
+            
+            <!-- VIEW: CATALOG (Future Aggregator Feature) -->
+            <div class="view" id="view-catalog">
+                <!-- Задел на будущее (Каталог, Поиск, и т.д.) -->
+            </div>
         </div>
     </div>
 
@@ -531,7 +162,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title">Поделиться статистикой</div>
-                <button class="modal-close" onclick="closeShareModal()">×</button>
+                <button class="modal-close" onclick="window.App.closeShareModal()">×</button>
             </div>
             
             <div class="share-section-title">Годы для экспорта</div>
@@ -545,7 +176,7 @@
                     <span class="chk-text">Скрыть мой профиль (Аноним)</span>
                 </label>
                 <label class="chk-row" id="sh-group-wrap">
-                    <input type="checkbox" id="sh-inc-group" checked onchange="toggleGroupOpts()">
+                    <input type="checkbox" id="sh-inc-group" checked onchange="window.App.toggleGroupOpts()">
                     <div class="chk-box"></div>
                     <span class="chk-text">Включить вкладку "Группа"</span>
                 </label>
@@ -556,887 +187,23 @@
                 </label>
             </div>
 
-            <button class="btn-primary" id="btn-do-share" onclick="submitShare()">
+            <button class="btn-primary" id="btn-do-share" onclick="window.App.submitShare()">
                 <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
                 Создать ссылку
             </button>
         </div>
     </div>
 
-<script>
-const Icons = {
-    moon: '<svg viewBox="0 0 512 512"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
-    sun: '<svg viewBox="0 0 512 512"><path d="M256 118a22 22 0 01-22-22V48a22 22 0 0144 0v48a22 22 0 01-22 22zM256 486a22 22 0 01-22-22v-48a22 22 0 0144 0v48a22 22 0 01-22 22zM369.14 164.86a22 22 0 01-15.56-37.55l33.94-33.94a22 22 0 0131.11 31.11l-33.94 33.94a21.93 21.93 0 01-15.55 6.44zM108.92 425.08a22 22 0 01-15.55-37.56l33.94-33.94a22 22 0 1131.11 31.11l-33.94 33.94a21.94 21.94 0 01-15.56 6.45zM464 278h-48a22 22 0 010-44h48a22 22 0 010 44zM96 278H48a22 22 0 010-44h48a22 22 0 010 44zM403.08 425.08a21.94 21.94 0 01-15.56-6.45l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.55 37.56zM142.86 164.86a21.93 21.93 0 01-15.55-6.44l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.56 37.55zM256 358a102 102 0 11102-102 102.12 102.12 0 01-102 102z"/></svg>',
-    user: '<svg viewBox="0 0 512 512"><path d="M256 288c79.53 0 144-64.47 144-144S335.53 0 256 0 112 64.47 112 144s64.47 144 144 144zm128 32h-24.1c-30.83 18.66-67.43 28-103.9 28s-73.07-9.34-103.9-28H128c-70.69 0-128 57.31-128 128v56c0 13.25 10.75 24 24 24h464c13.25 0 24-10.75 24-24v-56c0-70.69-57.31-128-128-128z"/></svg>',
-    users: '<svg viewBox="0 0 512 512"><path d="M336 256c-20.56 0-40.44-5.06-58.26-14.34-14.73 21-36.42 36.63-61.64 43.68C236.41 298.54 263.26 304 290.5 304h25.4C379.79 304 432 356.21 432 419.86v43.21a20.89 20.89 0 0019.2 20.93h41.6a20.9 20.9 0 0019.2-20.93v-43.21C512 344.21 433.79 256 336 256zM336 224a104 104 0 10-104-104 104.12 104.12 0 00104 104zM201.5 272c-63.53 0-115.2 51.68-115.2 115.21v43.86A20.94 20.94 0 00105.5 452h192a20.94 20.94 0 0019.2-20.93v-43.86C316.7 323.68 265.03 272 201.5 272zM201.5 240A112 112 0 1089.5 128a112.12 112.12 0 00112 112z"/></svg>',
-    dash: '<svg viewBox="0 0 512 512"><path d="M200 48H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM424 48H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM200 272H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40zM424 272H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40z"/></svg>',
-    time: '<svg viewBox="0 0 512 512"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48zm96 240h-96a16 16 0 01-16-16V128a16 16 0 0132 0v128h80a16 16 0 010 32z"/></svg>',
-    cal: '<svg viewBox="0 0 512 512"><path d="M416 64h-16V48a16 16 0 00-32 0v16H144V48a16 16 0 00-32 0v16H96a64 64 0 00-64 64v320a64 64 0 0064 64h320a64 64 0 0064-64V128a64 64 0 00-64-64zm16 384a16 16 0 01-16 16H96a16 16 0 01-16-16V208h352z"/></svg>',
-    tv: '<svg viewBox="0 0 512 512"><path d="M447.86 384H64.14A48.2 48.2 0 0116 335.86V128.14A48.2 48.2 0 0164.14 80h383.72A48.2 48.2 0 01496 128.14v207.72A48.2 48.2 0 01447.86 384zM256 416c-48.87 0-98.39 12-113 18.52-5.71 2.54-9 8.24-9 14.28a15.82 15.82 0 0015.42 16.63c33.09-1.28 70.84-1.43 106.58-1.43 36.31 0 74.45.15 106.58 1.43A15.82 15.82 0 00378 448.8c0-6-3.29-11.74-9-14.28C354.39 428 304.87 416 256 416z"/></svg>',
-    film: '<svg viewBox="0 0 512 512"><path d="M436 48H76a44.05 44.05 0 00-44 44v328a44.05 44.05 0 0044 44h360a44.05 44.05 0 0044-44V92a44.05 44.05 0 00-44-44zM136 400H88v-48h48zm0-96H88v-48h48zm0-96H88v-48h48zm0-96H88V64h48zm288 288h-48v-48h48zm0-96h-48v-48h48zm0-96h-48v-48h48zm0-96h-48V64h48z"/></svg>',
-    chart: '<svg viewBox="0 0 512 512"><path d="M480 384H64V48a16 16 0 00-32 0v352a16 16 0 0016 16h432a16 16 0 000-32z"/><path d="M112 320h48a16 16 0 0016-16V144a16 16 0 00-16-16h-48a16 16 0 00-16 16v160a16 16 0 0016 16zM240 320h48a16 16 0 0016-16V208a16 16 0 00-16-16h-48a16 16 0 00-16 16v96a16 16 0 0016 16zM368 320h48a16 16 0 0016-16V80a16 16 0 00-16-16h-48a16 16 0 00-16 16v224a16 16 0 0016 16z"/></svg>',
-    masks: '<svg viewBox="0 0 512 512"><path d="M374.83 148.5c-20.73-35.41-61.35-43.1-99.28-40.35-6.61.48-12.78 1.15-18.42 1.94-39.77 5.61-75.14-3.23-95.64-38.38A180.78 180.78 0 00122 55.45c-29.35.53-53.72 26-58.84 55.51-14.88 85.54-6.39 173.23 23.32 240.59 13.9 31.5 35.79 53 58 53h.46c24.23-1 43.17-18.4 56.44-48 11.23-25.07 16-53.64 21.05-83.33 3.6-21.05 7.42-43.34 16.89-63.56-5.71-1.39-11.41-2.92-17.15-4.43-15.65-4.14-25-18-20.89-33.65a25.4 25.4 0 0132.88-18.19c23.07 6.4 51.5 15.67 76.5 33.15 48.74 34.11 36.85 91.22 36.85 91.22a201.81 201.81 0 0040.35-71.39c4.27-14.28.32-41.56-13.03-57.87zM102.58 205.15a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42zm86 16.51a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42z"/><path d="M449.62 189.65c-20-43.43-63.85-61.27-111-61.27-23.36 0-46.73 4-66.36 8.78-22.39-17-54-28-80.12-35-15.48-4.2-24.93 9.77-20.89 25.4a25.4 25.4 0 0032.88 18.2c6-1.51 11.75-2.73 17.51-3.66a220.4 220.4 0 01-13 46 179.88 179.88 0 0113.1 19.34c38 52.32 94.61 74.32 153.37 74.32a188 188 0 0021.2-1.22c-.64.12-.52 0-1.11.15a133 133 0 01-17.7 21c-5.26 5-11.45 9.76-18.72 14.18-12.78 7.78-26.24 13-39.73 15.35A177.36 177.36 0 00346.59 455c14.25 31 35.08 51 57.82 51h.51c23.59-1 42.14-18.74 55-48 29.83-67.75 38.64-155.8 23.37-241.64-5.35-29.62-28.77-44.62-33.67-26.71zm-136.2 30.68a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42zm86 0a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42z"/></svg>',
-    star: '<svg viewBox="0 0 512 512"><path d="M480 208H328L256 48l-72 160H32l128 104-48 152 144-104 144 104-48-152 128-104z"/></svg>',
-    globe: '<svg viewBox="0 0 512 512"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48zm89.15 112.59A151.78 151.78 0 01366 240H288v-87.35a265.41 265.41 0 0157.15 8zM256 80.59A231.87 231.87 0 01283.47 152H228.53A231.87 231.87 0 01256 80.59zM166.85 160.59A265.41 265.41 0 01224 152.65V240h-78A151.78 151.78 0 01166.85 160.59zM80.58 240H146a256.32 256.32 0 000 32H80.58a176 176 0 010-32zm86.27 111.41A151.78 151.78 0 01146 272h78v87.35a265.41 265.41 0 01-57.15-7.94zM256 431.41A231.87 231.87 0 01228.53 360h54.94A231.87 231.87 0 01256 431.41zM345.15 351.41A265.41 265.41 0 01288 359.35V272h78A151.78 151.78 0 01345.15 351.41zM431.42 272H366a256.32 256.32 0 000-32h65.42a176 176 0 010 32z"/></svg>',
-    bolt: '<svg viewBox="0 0 512 512"><path d="M312 32h-110a18 18 0 00-17.74 21l32 188H152a18.3 18.3 0 00-14.86 28.92l160 216a18 18 0 0031.57-12.78l-23-189.14H360a18.3 18.3 0 0015-28.84L215 72h97a18 18 0 000-36z"/></svg>',
-    flame: '<svg viewBox="0 0 512 512"><path d="M313.29 82.26c-11.42-30.82-50.62-31-62.29.35C227.18 146.42 160 178.68 160 256c0 53 43 96 96 96s96-43 96-96c0-67.62-54-106.82-38.71-173.74zM256 320c-17.64 0-32-14.36-32-32 0-33.15 28.57-55 42-83.39 12 25.15 22 50.18 22 83.39 0 17.64-14.36 32-32 32z"/><path d="M255.8 48c-42.54 0-82.68 20.31-112 54.34-31 36-47.8 84.34-47.8 135.59 0 114.69 93.31 208.07 208 208.07S512 352.62 512 237.93C512 119 407.41 48 255.8 48zm0 366c-88.22 0-160-71.78-160-160 0-41.6 13.92-80.49 40.23-112.5C160.7 171.84 200.56 150 240 150c18.52 0 35.1 4.54 48 13 41.52-32.55 80-28 80 75 0 88.22-71.78 160-160 160z"/></svg>',
-    check: '<svg viewBox="0 0 512 512"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29l-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg>',
-    days: '<svg viewBox="0 0 512 512"><path d="M400 48V16h-64v32H176V16h-64v32H48v448h416V48h-64zM112 432H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32z"/></svg>',
-    grid: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
-    list: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>'
-};
-
-function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
-document.addEventListener("DOMContentLoaded", () => {
-    i('ic-user', 'user'); i('ic-users', 'users'); i('ic-dash', 'dash');
-    i('ic-time', 'time'); i('ic-cal', 'cal'); i('ic-tv', 'tv'); i('ic-film', 'film');
-    i('ic-chart-internal', 'chart'); i('ic-flame-internal', 'flame');
-    i('it-gen-internal', 'masks'); i('it-act-internal', 'masks'); 
-    i('it-cou-internal', 'globe'); i('it-bin-internal', 'bolt');
-    i('it-star-internal', 'star'); i('ic-weekday-internal', 'days');
-});
-
-const tg = window.Telegram?.WebApp;
-if (tg) {
-    tg.expand();
-}
-
-let chR = null;
-let D = null, curYear = null, isDark = true;
-let chM = null, chW = null, chG = {}, lastScrollPos = 0;
-
-let isSharedMode = false;
-let SharedDataMap = {};
-let availableYears = [];
-
-function toggleTheme() {
-    isDark = !isDark;
-    document.body.classList.toggle('light', !isDark);
-    document.getElementById('theme-btn').innerHTML = isDark ? Icons.moon : Icons.sun;
-    localStorage.setItem('kt', isDark ? 'd' : 'l');
-    if (D) renderCharts();
-}
-(function initTheme() {
-    if (tg && tg.colorScheme === 'light') isDark = false;
-    const stored = localStorage.getItem('kt');
-    if (stored === 'l') isDark = false;
-    if (stored === 'd') isDark = true;
-    
-    if (!isDark) document.body.classList.add('light');
-    document.addEventListener("DOMContentLoaded", () => document.getElementById('theme-btn').innerHTML = isDark ? Icons.moon : Icons.sun);
-})();
-
-function cc() {
-    const t = isDark ? 'rgba(229, 231, 235, .8)' : 'rgba(31, 35, 40, .8)';
-    const g = isDark ? 'rgba(255, 255, 255, .05)' : 'rgba(0, 0, 0, .05)';
-    const b = isDark ? '#2d333b' : '#d0d7de';
-    return { t, g, b, a: '#2ecc71', ab: isDark ? 'rgba(46, 204, 113, .2)' : 'rgba(46, 204, 113, .15)', i: '#60a5fa', ib: isDark ? 'rgba(96, 165, 250, .2)' : 'rgba(96, 165, 250, .15)' };
-}
-
-async function init() {
-    const startParam = tg?.initDataUnsafe?.start_param || '';
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedIdFromUrl = urlParams.get('shared_id');
-
-        if (sharedIdFromUrl || startParam.startsWith('stat_')) {
-        isSharedMode = true;
-        document.body.classList.add('has-banner');
-        
-        document.getElementById('share-btn').classList.add('hidden');
-        const bannerContainer = document.getElementById('shared-banner-container');
-        bannerContainer.innerHTML = `<div class="shared-banner"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Вы просматриваете чужую статистику</div>`;
-        
-        const sid = sharedIdFromUrl || startParam.replace('stat_', '');
-        await loadShared(sid);
-    } else {
-        await load();
-    }
-}
-
-async function loadShared(statId) {
-    document.getElementById('loader').classList.remove('hidden');
-    try {
-        const r = await fetch(`/api/webapp/shared_stats/${statId}/`);
-        const j = await r.json();
-        if (!r.ok || j.error) { 
-            document.body.innerHTML = `<div style="padding: 40px; text-align:center; font-size: 18px; color: var(--text-primary);">❌ Слепок не найден или удален.</div>`;
-            return; 
-        }
-        
-        SharedDataMap = j.data;
-        availableYears = j.metadata.years;
-        curYear = availableYears[0];
-        D = SharedDataMap[curYear];
-        
-        render();
-    } catch(e) { 
-        console.error(e); 
-        document.body.innerHTML = `<div style="padding: 40px; text-align:center; font-size: 18px; color: var(--text-primary);">❌ Ошибка загрузки.</div>`;
-    } finally {
-        hideLoader();
-    }
-}
-
-async function load(year) {
-    if (year === undefined || year === null) year = curYear;
-    curYear = year;
-    document.getElementById('loader').classList.remove('hidden');
-    try {
-        const p = year && year !== 'all' ? { period_type:'year', period_value: year } : { period_type:'year', period_value: 0 };
-        const r = await fetch('/api/webapp/detailed_stats/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...p, init_data: tg?.initData||'' }) });
-        const j = await r.json();
-        if (!r.ok || j.error) { console.error('API error:', j); alert('Ошибка: '+(j.error||'Неизвестная')); return; }
-        D = j;
-        if (!availableYears.length && D.meta?.years) {
-            availableYears = [...D.meta.years];
-        }
-        render();
-    } catch(e) { console.error('Load error:', e); alert('Ошибка сети'); }
-    finally { 
-        hideLoader();
-    }
-}
-
-function hideLoader() {
-    document.getElementById('loader').style.opacity = '0';
-    setTimeout(() => document.getElementById('loader').classList.add('hidden'), 400);
-    document.getElementById('app').classList.remove('hidden'); 
-}
-
-function plural(n, forms) {
-    let n10 = Math.abs(n) % 10;
-    let n100 = Math.abs(n) % 100;
-    if (n100 >= 11 && n100 <= 14) return forms[2];
-    if (n10 === 1) return forms[0];
-    if (n10 >= 2 && n10 <= 4) return forms[1];
-    return forms[2];
-}
-
-function render() {
-    if (!D?.meta) return;
-    const n = D.meta.name || 'Пользователь';
-    document.getElementById('user-name').textContent = n;
-    
-    const avEl = document.getElementById('avatar');
-    if (D.meta.is_anonymous) {
-        avEl.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><line x1="4" x2="20" y2="20" stroke="rgba(255,255,255,0.3)"></line></svg>`;
-    } else if (D.meta.photo_url) {
-        avEl.innerHTML = `<img src="${D.meta.photo_url}" alt="A">`;
-    } else {
-        const u = tg?.initDataUnsafe?.user;
-        if (!isSharedMode && u && u.photo_url) avEl.innerHTML = `<img src="${u.photo_url}" alt="A">`;
-        else avEl.textContent = n.charAt(0).toUpperCase();
-    }
-
-    document.getElementById('period-label').textContent = D.summary?.period_label || '';
-    renderYears();
-
-    const s = D.summary || {};
-    const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
-    
-    const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
-
-    const hasGroup = !!D.group;
-    toggle('main-tabs', hasGroup);
-
-    const userRole = String(D.meta.role || 'guest').toLowerCase();
-    const isGuest = userRole === 'guest';
-    
-    const showOverview = !isGuest;
-    toggle('label-overview', showOverview);
-    toggle('grid-overview', showOverview);
-
-    if (showOverview) {
-        document.getElementById('s-time').textContent  = s.duration_display || '0м';
-        document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
-        document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
-        document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
-        document.getElementById('s-ep').textContent = vEp;
-        const epLbl = document.getElementById('s-ep').nextElementSibling;
-        if (epLbl) epLbl.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
-        const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
-        document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
-        document.getElementById('s-mov').textContent = vMov;
-        const movLbl = document.getElementById('s-mov').nextElementSibling;
-        if (movLbl) movLbl.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
-        document.getElementById('s-uni').textContent = s.movies_duration || '0м';
-    }
-
-    const showWelcome = !isGuest && vViews === 0;
-    let welcomeEl = document.getElementById('welcome-empty-state');
-    if (showWelcome) {
-        if (!welcomeEl) {
-            welcomeEl = document.createElement('div');
-            welcomeEl.id = 'welcome-empty-state';
-            welcomeEl.className = 'card anim-item';
-            welcomeEl.innerHTML = `<div class="empty"><div class="icon">${Icons.tv}</div>Здесь будет ваша статистика, когда вы начнете смотреть кино.</div>`;
-            document.getElementById('sec-personal').appendChild(welcomeEl);
-        }
-    } else if (welcomeEl) {
-        welcomeEl.remove();
-    }
-
-    const hasDynamics = D.monthly_chart?.views?.some(v => v > 0);
-    toggle('card-dynamics', hasDynamics);
-
-    const hasWeekday = D.weekday_chart?.data?.some(v => v > 0);
-    toggle('card-weekday', hasWeekday);
-
-    const hasHeatmap = D.heatmap?.length > 0;
-    toggle('card-heatmap', hasHeatmap);
-    if (hasHeatmap) renderHeatmap();
-
-    const hasGenres = D.genres?.length > 0;
-    toggle('card-genres', hasGenres);
-    
-    const hasActors = D.actors?.length > 0;
-    toggle('card-actors', hasActors);
-    
-    const hasCountries = D.countries?.length > 0;
-    toggle('card-countries', hasCountries);
-    
-    const hasBinges = D.binges?.length > 0;
-    toggle('card-binges', hasBinges);
-
-    const rt = D.ratings;
-    const hasRatings = rt && rt.total > 0;
-    toggle('ratings-box', hasRatings);
-
-    if (hasRatings) {
-        const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
-        const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
-        const scoreColor = ratingPalette[colorIdx];
-        const avgEl = document.getElementById('cr-avg');
-        avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
-        avgEl.style.color = scoreColor;
-        document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
-        const badge = document.getElementById('cr-badge');
-        if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.background = 'rgba(46, 204, 113, 0.15)'; badge.style.color = '#2ecc71'; }
-        else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.background = 'rgba(56, 139, 253, 0.15)'; badge.style.color = '#60a5fa'; }
-        else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.background = 'rgba(210, 153, 34, 0.15)'; badge.style.color = '#d29922'; }
-        else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
-        renderRatingsDist();
-    }
-
-    toggle('tab-group-btn', !!D.group);
-    renderGroup();
-    renderCharts();
-    
-    if (hasActors) fillList('actors-list', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
-    if (hasCountries) fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
-    if (hasBinges) fillBinges();
-}
-
-function renderRatingsDist() {
-    const canvas = document.getElementById('c-ratings-dist');
-    const ctx = canvas.getContext('2d');
-    if (chR) chR.destroy();
-    const dist = D.ratings.distribution;
-    if (!dist || dist.length === 0) return;
-    const c = cc();
-    const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
-
-    chR = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'], datasets: [{ data: dist, backgroundColor: ratingPalette, hoverBackgroundColor: ratingPalette, borderRadius: 6, borderSkipped: false, borderWidth: 0 }] },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            animation: { duration: 1000, easing: 'easeOutBack', delay: (context) => context.type === 'data' && context.mode === 'default' && !context.active ? context.dataIndex * 80 : 0 },
-            onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; },
-            onClick: (event, activeElements) => { if (activeElements.length > 0) openHistory('rating_filter', null, null, null, null, activeElements[0].index + 1); },
-            plugins: {
-                legend: { display: false },
-                tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { title: (ctx) => `Оценка: ${ctx[0].label}`, label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, ['оценка', 'оценки', 'оценок'])}` } }
-            },
-            scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { display: false, beginAtZero: true } }
-        }
-    });
-}
-
-function getRatingColor(rating) {
-    if (rating >= 8.5) return 'linear-gradient(135deg, #2ecc71, #27ae60)';
-    if (rating >= 7.0) return 'linear-gradient(135deg, #60a5fa, #3b82f6)';
-    if (rating >= 5.5) return 'linear-gradient(135deg, #f1c40f, #d35400)';
-    return 'linear-gradient(135deg, #e74c3c, #c0392b)';
-}
-
-function renderYears() {
-    const c = document.getElementById('years');
-    const yrs = isSharedMode ? availableYears : (D.meta?.years || []);
-    
-    if (yrs.length <= 1) {
-        c.classList.add('hidden');
-        return;
-    }
-    c.classList.remove('hidden');
-
-    let h = '';
-    if (!isSharedMode || yrs.includes('all')) {
-        h += '<button class="yr clickable" onclick="pickYear(\'all\')">Всё время</button>';
-    }
-    
-    yrs.filter(y => y !== 'all').forEach(y => { 
-        h += `<button class="yr clickable" onclick="pickYear('${y}')">${y}</button>`; 
-    });
-    c.innerHTML = h;
-    markYear();
-}
-
-function markYear() {
-    document.querySelectorAll('#years .yr').forEach(b => {
-        const v = b.textContent.trim();
-        const isAllTime = curYear === 'all' || !curYear;
-        const targetStr = isAllTime ? 'Всё время' : String(curYear);
-        b.classList.toggle('on', v === targetStr);
-    });
-}
-
-window.pickYear = y => { 
-    curYear = y; 
-    markYear(); 
-    if (isSharedMode) {
-        D = SharedDataMap[y];
-        render();
-    } else {
-        load(y); 
-    }
-};
-
-let toastTimer = null;
-function showToast(text) {
-    let el = document.getElementById('toast-msg');
-    if (!el) { el = document.createElement('div'); el.id = 'toast-msg'; el.className = 'toast'; document.body.appendChild(el); }
-    el.textContent = text; el.classList.add('show');
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.classList.remove('show'); }, 2000);
-}
-
-function initGlobalHeatmapZoom() {
-    const viewport = document.getElementById('heatmaps-wrapper');
-    const content = document.getElementById('hm-zoom-content');
-    if (!viewport || !content) return;
-
-    viewport.style.overflow = 'hidden';
-    viewport.style.touchAction = 'none'; 
-    content.style.transformOrigin = '0 0';
-
-    let scale = 1, translateX = 0, translateY = 0;
-    let startScale = 1, startDist = 0, startMidX = 0, startMidY = 0, startTranslateX = 0, startTranslateY = 0;
-    let isZooming = false, isPanning = false;
-
-    const updateTransform = () => { content.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`; };
-
-    viewport.addEventListener('touchstart', (e) => {
-        const t = e.touches;
-        if (t.length === 1) { isPanning = true; isZooming = false; startMidX = t[0].clientX; startMidY = t[0].clientY; startTranslateX = translateX; startTranslateY = translateY; } 
-        else if (t.length === 2) { isZooming = true; isPanning = false; startDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY); startScale = scale; startMidX = (t[0].clientX + t[1].clientX) / 2; startMidY = (t[0].clientY + t[1].clientY) / 2; startTranslateX = translateX; startTranslateY = translateY; }
-    }, { passive: false });
-
-    viewport.addEventListener('touchmove', (e) => {
-        const t = e.touches; const rect = viewport.getBoundingClientRect();
-        if (isZooming && t.length === 2) {
-            e.preventDefault();
-            const currentDist = Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
-            const newScale = Math.min(Math.max(1, (currentDist / startDist) * startScale), 4);
-            const currentMidX = (t[0].clientX + t[1].clientX) / 2, currentMidY = (t[0].clientY + t[1].clientY) / 2;
-            const mouseX = startMidX - rect.left, mouseY = startMidY - rect.top;
-            const scaleRatio = newScale / startScale;
-            translateX = currentMidX - rect.left - (mouseX - startTranslateX) * scaleRatio;
-            translateY = currentMidY - rect.top - (mouseY - startTranslateY) * scaleRatio;
-            scale = newScale; updateTransform();
-        } else if (isPanning && t.length === 1) {
-            e.preventDefault();
-            const deltaX = t[0].clientX - startMidX, deltaY = t[0].clientY - startMidY;
-            translateX = startTranslateX + deltaX; translateY = startTranslateY + deltaY;
-            if (scale > 1) {
-                const minX = rect.width - (content.offsetWidth * scale), minY = rect.height - (content.offsetHeight * scale);
-                translateX = Math.min(0, Math.max(minX, translateX)); translateY = Math.min(0, Math.max(minY, translateY));
-            } else { translateX = 0; translateY = 0; }
-            updateTransform();
-        }
-    }, { passive: false });
-
-    viewport.addEventListener('touchend', (e) => {
-        if (e.touches.length === 0) {
-            isZooming = false; isPanning = false;
-            if (scale < 1.01) { scale = 1; translateX = 0; translateY = 0; content.style.transition = 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)'; updateTransform(); setTimeout(() => content.style.transition = '', 300); }
-        } else if (e.touches.length === 1) {
-            isZooming = false; isPanning = true; startMidX = e.touches[0].clientX; startMidY = e.touches[0].clientY; startTranslateX = translateX; startTranslateY = translateY;
-        }
-    }, { passive: true });
-}
-
-function renderHeatmap() {
-    const el = document.getElementById('heatmaps-wrapper'); 
-    el.innerHTML = '<div id="hm-zoom-content"></div>';
-    const zoomContent = document.getElementById('hm-zoom-content');
-    if (!D.heatmap?.length) { el.innerHTML = `<div class="empty"><div class="icon">${Icons.cal}</div>Нет данных</div>`; return; }
-    
-    const fragment = document.createDocumentFragment();
-    const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
-    
-    D.heatmap.forEach((hItem, index) => {
-        const yr = hItem.year; const data = hItem.data; const offset = (new Date(yr, 0, 1).getDay() + 6) % 7; const totalColumns = Math.ceil((offset + data.length) / 7);
-        const block = document.createElement('div'); block.className = 'hm-zoom-area'; if (index > 0) block.style.marginTop = '20px';
-        if (D.heatmap.length > 1) {
-            const title = document.createElement('div'); title.style.fontSize = '13px'; title.style.fontWeight = '800'; title.style.color = 'var(--text-muted)'; title.style.marginBottom = '8px'; title.textContent = yr; block.appendChild(title);
-        }
-        const wrapper = document.createElement('div'); wrapper.className = 'hm-wrapper';
-        const hm = document.createElement('div'); hm.className = 'hm'; hm.style.gridTemplateColumns = `max-content repeat(${totalColumns}, minmax(0, 1fr))`;
-        
-        dayLabels.forEach(lbl => { const l = document.createElement('div'); l.className = 'hc-label'; l.textContent = lbl; hm.appendChild(l); });
-        for (let i = 0; i < offset; i++) { const d = document.createElement('div'); d.className = 'hc'; d.style.opacity = '0'; d.style.pointerEvents = 'none'; hm.appendChild(d); }
-        
-        let curr = new Date(yr, 0, 1);
-        data.forEach(v => { 
-            const d = document.createElement('div'); 
-            const y = curr.getFullYear(), m = String(curr.getMonth() + 1).padStart(2, '0'), day = String(curr.getDate()).padStart(2, '0');
-            const currStr = `${y}-${m}-${day}`, displayDate = `${day}.${m}.${y}`;
-            d.className = 'hc clickable' + (v ? ' h' + v : ''); 
-            if (v > 0) { d.setAttribute('onclick', `openHistory('day', null, '${currStr}', '${currStr}')`); } else { d.setAttribute('onclick', `showToast('${displayDate}: просмотров нет')`); }
-            hm.appendChild(d); curr.setDate(curr.getDate() + 1);
-        });
-        wrapper.appendChild(hm); block.appendChild(wrapper); fragment.appendChild(block);
-    });
-    zoomContent.appendChild(fragment); initGlobalHeatmapZoom();
-}
-
-function fillList(id, items, ico, unit, categoryKey) {
-    const el = document.getElementById(id);
-    if (!items?.length) return;
-    let html = '';
-    items.forEach((it, i) => {
-        const cnt = it.count || it.views || 0, sub = it.sub || (it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
-        const lbl = Array.isArray(unit) ? `${cnt} ${plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
-        const delay = (i + 1) * 0.05;
-        let visual = it.emoji ? `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>` : (ico ? `<div class="icon" style="color:var(--text-muted)">${ico}</div>` : '');
-        const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-        html += `<div class="li li-clickable anim-list-item clickable" onclick="openHistory('filter', null, null, '${safeName}', '${categoryKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
-    });
-    el.innerHTML = html;
-}
-
-function fillBinges() {
-    const el = document.getElementById('binges-list');
-    if (!D.binges?.length) return;
-    let html = '';
-    D.binges.forEach((b, i) => {
-        const delay = (i + 1) * 0.05, safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-        const posterHtml = b.poster_url ? `<img src="${b.poster_url}" style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.1);" onerror="this.style.display='none'">` : `<div style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
-        html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')"><div class="li-l">${posterHtml}<div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r" style="color:var(--info)">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span></div>`;
-    });
-    el.innerHTML = html;
-}
-
-function renderCharts() { 
-    renderMonthly(); renderWeekday(); 
-    renderDonut('c-genre', 'legend-genre', D.genres, 'genres_top', D.summary.total_minutes_watched);
-    if (D.group) renderDonut('c-group-genre', 'legend-group-genre', D.group.genres, 'group_genres_top', D.group.total_minutes_watched);
-}
-
-const fSizeAx = Math.max(10, Math.min(13, window.innerWidth * 0.03));
-function getCtxGradient(ctx, colorStart, colorEnd) { let gradient = ctx.createLinearGradient(0, 0, 0, 400); gradient.addColorStop(0, colorStart); gradient.addColorStop(1, colorEnd); return gradient; }
-
-function renderMonthly() {
-    const canvas = document.getElementById('c-monthly'), ctx = canvas.getContext('2d');
-    if (chM) chM.destroy();
-    const ch = D.monthly_chart; if (!ch?.labels?.length) return;
-    const c = cc();
-    let fillGradient = getCtxGradient(ctx, isDark?'rgba(35, 134, 54, 0.4)':'rgba(46, 160, 67, 0.3)', 'rgba(35, 134, 54, 0.0)'), lineGradient = ctx.createLinearGradient(0, 0, canvas.width || 400, 0);
-    lineGradient.addColorStop(0, '#2ea043'); lineGradient.addColorStop(1, '#3fb950');
-    chM = new Chart(ctx, { 
-        type:'line', 
-        data:{ labels:ch.labels, datasets:[{ label: ' Просмотры', data: ch.views, backgroundColor: fillGradient, borderColor: lineGradient, borderWidth: 3, tension: 0.4, fill: true, yAxisID: 'y', pointBackgroundColor: isDark ? '#0d1117' : '#ffffff', pointBorderColor: '#3fb950', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6 }, { label: ' Часы', data: ch.hours, backgroundColor: 'transparent', borderColor: c.i, borderWidth: 2, borderDash: [5, 5], tension: 0.4, fill: false, yAxisID: 'y1', pointBackgroundColor: isDark ? '#0d1117' : '#ffffff', pointBorderColor: c.i, pointRadius: 0, pointHoverRadius: 5 }] },
-        options:{ responsive:true, maintainAspectRatio:false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins:{ legend: { display: true, position: 'top', labels: { color: c.t, usePointStyle: true, boxWidth: 8, padding: 15, font: { size: fSizeAx, family: 'system-ui' } } }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, padding: 12, cornerRadius: 8, displayColors: true, boxPadding: 6, bodySpacing: 8, titleSpacing: 10 } }, interaction: { mode: 'index', intersect: false }, scales:{ x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} }, y:{ type: 'linear', display: true, position: 'left', ticks:{color:c.a,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true }, y1: { type: 'linear', display: true, position: 'right', ticks:{color:c.i,font:{size:fSizeAx}}, grid:{drawOnChartArea: false}, beginAtZero:true } } } 
-    });
-}
-
-function renderWeekday() {
-    const canvas = document.getElementById('c-weekday'), ctx = canvas.getContext('2d');
-    if (chW) chW.destroy();
-    const ch = D.weekday_chart; if (!ch?.labels?.length) return;
-    const c = cc(), totalViews = ch.data.reduce((a, b) => a + b, 0);
-    let barGradient = getCtxGradient(ctx, '#2ea043', '#238636'), weGradient = getCtxGradient(ctx, '#388bfd', '#1f6feb');
-    chW = new Chart(ctx, { 
-        type: 'bar', 
-        data: { labels: ch.labels, datasets: [{ data: ch.data, backgroundColor: ch.data.map((_, i) => i >= 5 ? weGradient : barGradient), hoverBackgroundColor: ch.data.map((_, i) => i >= 5 ? '#60a5fa' : '#39d353'), borderRadius: 8, borderSkipped: false, borderWidth: 0, hoverBorderWidth: 0 }] },
-        options: { 
-            responsive: true, maintainAspectRatio: false, 
-            animation: { duration: 1000, easing: 'easeOutBack', delay: (context) => context.type === 'data' && context.mode === 'default' && !context.active ? context.dataIndex * 100 : 0 }, 
-            onClick: (event, activeElements) => {
-                if (activeElements.length > 0) {
-                    const idx = activeElements[0].index;
-                    openHistory('weekday', null, null, ch.labels[idx], null, idx);
-                }
-            },
-            onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; },
-            plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { label: (context) => { const val = context.parsed.y; const pct = totalViews > 0 ? Math.round((val / totalViews) * 100) : 0; return ` ${val} ${plural(val, ['просмотр', 'просмотра', 'просмотров'])} (${pct}%)`; } } } }, 
-            scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { ticks: { color: c.t, font: { size: fSizeAx }, precision: 0 }, grid: { color: c.g }, beginAtZero: true, border: { display: false } } } 
-        } 
-    });
-}
-
-function renderDonut(canvasId, legendId, sourceData, dataKey, totalMinutesWatched) {
-    const canvas = document.getElementById(canvasId); if (!canvas) return;
-    const ctx = canvas.getContext('2d'), legendEl = document.getElementById(legendId);
-    if (chG[canvasId]) chG[canvasId].destroy(); if (!sourceData?.length) return;
-    const c = cc();
-    let top = JSON.parse(JSON.stringify(sourceData)).slice(0, 10);
-    const totalMinutesSum = sourceData.reduce((acc, g) => acc + g.minutes, 0), topMinutes = top.reduce((acc, g) => acc + g.minutes, 0);
-    if (totalMinutesSum > topMinutes) { const others = sourceData.slice(10); top.push({ name: 'Другие', minutes: totalMinutesSum - topMinutes, count: 0, show_ids: [...new Set(others.flatMap(g => g.show_ids || []))] }); }
-    const totalHours = Math.floor(totalMinutesWatched / 60);
-    const pal = ['#2ea043', '#388bfd', '#f85149', '#d29922', '#a371f7', '#1abc9c', '#e67e22', '#9b59b6', '#00d2ff', '#16a085', '#27ae60', '#2980b9'];
-    const values = top.map(g => (g.minutes / totalMinutesSum) * 100), percents = values.map(v => Math.round(v));
-    const centerTextPlugin = { id: 'centerText', afterDraw: (chart) => { const { ctx, chartArea: { top, height, left, width } } = chart; ctx.save(); const centerX = left + width / 2, centerY = top + height / 2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '900 34px system-ui'; ctx.fillStyle = c.t; ctx.fillText(totalHours, centerX, centerY - 8); ctx.font = 'bold 10px system-ui'; ctx.fillStyle = isDark ? '#6e7681' : '#8c959f'; ctx.letterSpacing = '1px'; ctx.fillText('ЧАСОВ ВСЕГО', centerX, centerY + 22); ctx.restore(); } };
-    chG[canvasId] = new Chart(ctx, { 
-        type: 'doughnut', plugins: [ChartDataLabels, centerTextPlugin],
-        data: { labels: top.map(g => g.name), datasets: [{ data: top.map(g => g.minutes), backgroundColor: top.map((_, i) => pal[i % pal.length]), borderWidth: 0, hoverOffset: 15, borderRadius: 6, spacing: 3, weight: 1 }] },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '50%', layout: { padding: 15 }, animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' }, onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; }, onClick: (event, activeElements) => { if (activeElements.length > 0) openHistory('filter', null, null, top[activeElements[0].index].name, dataKey, activeElements[0].index); }, plugins: { datalabels: { color: '#fff', font: { weight: '800', size: 10 }, formatter: (value, context) => percents[context.dataIndex] > 5 ? percents[context.dataIndex] + '%' : '', display: 'auto' }, tooltip: { enabled: true, callbacks: { label: (context) => { const val = context.parsed, h = Math.floor(val/60), m = val%60; return ` ${h}ч ${m}м (${percents[context.dataIndex]}%)`; } } }, legend: { display: false } } } 
-    });
-    D[dataKey] = top;
-    legendEl.innerHTML = top.map((g, i) => `<div class="legend-item" onclick="openHistory('filter', null, null, '${g.name.replace(/'/g, "\\'")}', '${dataKey}', ${i})" onmouseenter="highlightSegment('${canvasId}', ${i}, true)" onmouseleave="highlightSegment('${canvasId}', ${i}, false)"><div class="legend-dot" style="background:${pal[i % pal.length]}"></div><div class="legend-name">${g.name}</div><div class="legend-val">${Math.floor(g.minutes / 60) > 0 ? `${Math.floor(g.minutes / 60)}ч ${g.minutes % 60}м` : `${g.minutes % 60}м`} (${percents[i]}%)</div></div>`).join('');
-}
-window.highlightSegment = function(canvasId, index, active) { const chart = chG[canvasId]; if (!chart) return; if (active) { chart.setActiveElements([{ datasetIndex: 0, index: index }]); chart.tooltip.setActiveElements([{ datasetIndex: 0, index: index }], { x: 0, y: 0 }); } else { chart.setActiveElements([]); chart.tooltip.setActiveElements([], { x: 0, y: 0 }); } chart.update(); };
-window.mainTab = function(t) { document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t)); document.getElementById('sec-personal').classList.toggle('vis', t==='personal'); document.getElementById('sec-group').classList.toggle('vis', t==='group'); };
-
-let curHistData =[], curHistType = '';
-let currentHistoryOffset = 0;
-const historyBatchSize = 100;
-let historyObserver = null;
-let isRenderingBatch = false;
-let viewMode = localStorage.getItem('kp_view_mode') || 'grid';
-
-function getHistoryItemHtml(item, idx, type, mode) {
-    const delay = 0; // При инфинит скролле анимация задержки мешает скорости
-    if (mode === 'list') {
-        if (type === 'ratings') {
-            const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
-            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="p" loading="lazy">` : `<div class="hist-poster"></div>`;
-            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-            const rColor = getRatingColor(item.rating);
-            let seHtml = '';
-            if (item.season && item.episode) seHtml = `<span class="hist-badge">s${item.season}e${item.episode.toString().padStart(2,'0')}</span>`;
-            return `<div class="hist-item anim-item clickable" style="display:flex; align-items:center;">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
+    <script src="{% static 'js/webapp.js' %}?v=1.2"></script>
+    <script>
+        // Запуск логики приложения с защитой от незагруженного файла
+        if (typeof init === 'function') {
+            init();
         } else {
-            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="p" loading="lazy">` : `<div class="hist-poster"></div>`;
-            let metaHtml = '';
-            if (item.season_number > 0) {
-                metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
-                if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
-            } else if (item.user_rating) {
-                metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
-            }
-            const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
-            return `<div class="hist-item anim-item clickable">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('app').innerHTML = '<div style="padding: 40px; text-align: center; color: #e74c3c; font-family: sans-serif; font-size: 16px;"><b>Критическая ошибка:</b><br><br>Скрипт приложения не загрузился. Пожалуйста, очистите кэш Telegram или перезапустите WebApp.</div>';
+            document.getElementById('app').classList.remove('hidden');
         }
-    } else {
-        // Grid mode
-        const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
-        const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
-        const yearHtml = (item.year || item.show__year) ? `<div class="grid-year">${item.year || item.show__year}</div>` : '';
-        
-        if (type === 'ratings') {
-            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-            return `<div class="grid-item-wrap anim-item"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div></div>`;
-        } else {
-            let badgesHtml = '';
-            if (item.season_number > 0) badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6);border:none;">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
-            if (item.user_rating) badgesHtml += `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${Icons.star}${item.user_rating}</span>`;
-            return `<div class="grid-item-wrap anim-item"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay"><div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
-        }
-    }
-}
-
-window.renderNextHistoryBatch = function() {
-    if (isRenderingBatch || currentHistoryOffset >= curHistData.length) return;
-    isRenderingBatch = true;
-
-    const container = document.getElementById('hist-list-container');
-    const batch = curHistData.slice(currentHistoryOffset, currentHistoryOffset + historyBatchSize);
-    
-    let html = batch.map((item, idx) => getHistoryItemHtml(item, currentHistoryOffset + idx, curHistType, viewMode)).join('');
-    
-    // Вставляем без перезатирания старого контента
-    if (currentHistoryOffset === 0 && viewMode === 'list') {
-        container.innerHTML = '<div class="card" style="margin:0; padding:0; overflow:hidden;">' + html + '</div>';
-    } else if (currentHistoryOffset === 0 && viewMode === 'grid') {
-        container.innerHTML = '<div class="hist-grid">' + html + '</div>';
-    } else {
-        const target = viewMode === 'list' ? container.firstChild : container.firstChild;
-        container.firstChild.insertAdjacentHTML('beforeend', html);
-    }
-
-    currentHistoryOffset += historyBatchSize;
-    isRenderingBatch = false;
-
-    // Если данные закончились, отключаем обсервер
-    if (currentHistoryOffset >= curHistData.length && historyObserver) {
-        historyObserver.disconnect();
-    }
-};
-
-window.initHistoryObserver = function() {
-    if (historyObserver) historyObserver.disconnect();
-    
-    const options = {
-        root: null,
-        rootMargin: '2000px',
-        threshold: 0.1
-    };
-
-    historyObserver = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-            renderNextHistoryBatch();
-        }
-    }, options);
-
-    const sentinel = document.getElementById('history-sentinel');
-    if (sentinel) historyObserver.observe(sentinel);
-};
-
-window.setViewMode = function(mode) {
-    viewMode = mode;
-    localStorage.setItem('kp_view_mode', mode);
-    if (document.getElementById('sec-history').classList.contains('vis')) {
-        renderHistoryList();
-    }
-};
-
-
-window.renderHistoryList = function() {
-    currentHistoryOffset = 0;
-    const container = document.getElementById('hist-list-container');
-    container.innerHTML = '';
-    
-    document.getElementById('vt-grid').innerHTML = Icons.grid;
-    document.getElementById('vt-list').innerHTML = Icons.list;
-    document.getElementById('vt-grid').classList.toggle('active', viewMode === 'grid');
-    document.getElementById('vt-list').classList.toggle('active', viewMode === 'list');
-
-    if (!curHistData || !curHistData.length) {
-        container.innerHTML = `<div class="empty"><div class="icon">${Icons.dash}</div>Нет просмотров</div>`;
-        return;
-    }
-
-    renderNextHistoryBatch();
-    initHistoryObserver();
-};
-
-window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, extraIndex) {
-    lastScrollPos = window.scrollY;
-    document.getElementById('main-tabs').classList.add('hidden');
-    document.getElementById('years').classList.add('hidden');
-    document.getElementById('sec-personal').classList.remove('vis');
-    document.getElementById('sec-group').classList.remove('vis');
-    
-    document.getElementById('sec-history').classList.add('vis');
-    if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(window.closeHistory); }
-    
-    curHistType = type;
-    // ... (логика фильтрации данных curHistData остается такой же, как в оригинале) ...
-    if (type === 'all') {
-        curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = 'Вся история';
-    } else if (type === 'day') {
-        curHistData = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate);
-        document.getElementById('hist-title').textContent = extraDate;
-    } else if (type === 'ratings') {
-        curHistData = D.ratings.history;
-        document.getElementById('hist-title').textContent = 'Оценки';
-    } else if (type === 'movies') {
-        curHistData = D.history_movies;
-        document.getElementById('hist-title').textContent = 'Фильмы';
-    } else if (type === 'episodes') {
-        curHistData = D.history_episodes;
-        document.getElementById('hist-title').textContent = 'Эпизоды';
-    } else if (type === 'filter') {
-        const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] : [...D.history_movies, ...D.history_episodes];
-        const allowedIds = D[extraKey][extraIndex].show_ids || [];
-        curHistData = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = extraTitle;
-    } else if (type === 'group_member') {
-        const member = D.group.members[extraIndex];
-        curHistData = [...D.group.history_movies, ...D.group.history_episodes].filter(item => item.user_ids.includes(member.id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = extraTitle;
-    } else if (type === 'weekday') {
-        curHistData = [...D.history_movies, ...D.history_episodes].filter(item => {
-            const date = new Date(item.view_date);
-            const jsDay = date.getDay();
-            return (jsDay === 0 ? 6 : jsDay - 1) === extraIndex;
-        }).sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = extraTitle;
-    }
-
-    renderHistoryList();
-    window.scrollTo(0, 0);
-};
-
-window.closeHistory = function() {
-    if (historyObserver) historyObserver.disconnect();
-    if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(window.closeHistory); }
-    if (D?.group) document.getElementById('main-tabs').classList.remove('hidden');
-    if (availableYears.length > 1) document.getElementById('years').classList.remove('hidden');
-    document.getElementById('sec-history').classList.remove('vis');
-    mainTab(document.querySelector('#main-tabs .tab.on')?.dataset.tab || 'personal');
-    window.scrollTo(0, lastScrollPos);
-};
-
-function renderGroup() {
-    const el = document.getElementById('group-root');
-    if (!D.group) { 
-        el.innerHTML = `<div class="card hoverable"><div class="empty"><div class="icon" style="font-size:clamp(36px, 10vw, 48px);line-height:1;color:var(--text-muted)">${Icons.users}</div>Вы не состоите в группе</div></div>`; 
-        return; 
-    }
-    
-    const g = D.group, p = D.summary;
-    const subjectLabel = isSharedMode ? D.meta.name : 'Вы';
-    
-    const rows = [ 
-        { lb:'Просмотры', i:Icons.tv, y:p.total_views, gv:g.total_views }, 
-        { lb:'Эпизоды', i:Icons.film, y:p.total_episodes, gv:g.total_episodes }, 
-        { lb:'Фильмы', i:Icons.time, y:p.total_movies, gv:g.total_movies }, 
-        { lb:'Уникальных', i:Icons.star, y:p.unique_shows, gv:g.unique_shows } 
-    ];
-    
-    let hasDiff = false;
-    const cmpH = rows.map((r, idx) => { 
-        const d = r.y - r.gv; 
-        let dh = d===0 ? `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(12px, 3.2vw, 14px);display:inline-block;vertical-align:middle;line-height:1">${Icons.check}</div> Мэтч</span>` : (hasDiff = true, `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`); 
-        return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1;color:var(--text-muted)">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(11px, 3vw, 13px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`; 
-    }).join('');
-    
-    const mx = Math.max(...g.members.map(m=>m.views),1);
-    const mbH = g.members.map((m, idx) => `<div class="mb anim-list-item clickable" onclick="openHistory('group_member', null, null, '${m.name.replace(/'/g, "\\'")}', null, ${idx})" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
-    let gGenH = g.genres?.length ? `<div class="card hoverable anim-item" style="animation-delay:0.3s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="chart-box" style="height:380px;"><canvas id="c-group-genre"></canvas></div><div id="legend-group-genre" class="legend-grid"></div></div>` : '';
-    const membersLabel = `${g.members_count} ${plural(g.members_count, ['участник', 'участника', 'участников'])}`;
-    
-    el.innerHTML = `
-        <div class="card hoverable anim-item">
-            <div style="display:flex;align-items:center;gap:16px">
-                <div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))">${Icons.users}</div>
-                <div>
-                    <div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">${g.group_name}</div>
-                    <div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">${membersLabel} · ${g.duration_display}</div>
-                </div>
-            </div>
-        </div>
-        <div class="card hoverable anim-item" style="animation-delay:0.1s">
-            <div class="label more-pad"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.chart}</div>${subjectLabel} vs Группа</div>
-            <div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 ${subjectLabel}</span>
-                <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span>
-            </div>
-            ${!hasDiff?`<div style="text-align:center;padding:16px 0;font-size:clamp(15px, 4 vw, 18px);color:var(--accent);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;animation:pulse 2s infinite;"><div class="icon" style="font-size:clamp(20px, 6vw, 24px);line-height:1">${Icons.check}</div> Полный мэтч!</div>`:''}
-            ${cmpH}
-        </div>
-        <div class="card hoverable anim-item" style="animation-delay:0.2s">
-            <div class="label more-pad"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.user}</div>Участники</div>
-            ${mbH}
-        </div>
-        ${gGenH}`;
-}
-
-// Share Modal Logic
-function openShareModal() {
-    const grid = document.getElementById('share-years-grid');
-    grid.innerHTML = '';
-    
-    const hasAll = availableYears.includes('all');
-    grid.innerHTML = `<label><input type="checkbox" class="yr-chk-input" value="all" checked><div class="yr-chk-btn">Всё время</div></label>`;
-    
-    availableYears.filter(y => y !== 'all').forEach(y => {
-        grid.innerHTML += `<label><input type="checkbox" class="yr-chk-input" value="${y}"><div class="yr-chk-btn">${y}</div></label>`;
-    });
-
-    const hasGroup = !!D.group;
-    const groupWrap = document.getElementById('sh-group-wrap');
-    const anonGroupWrap = document.getElementById('sh-anon-group-wrap');
-    if (hasGroup) {
-        groupWrap.style.display = 'flex';
-        anonGroupWrap.style.display = 'flex';
-        document.getElementById('sh-inc-group').checked = true;
-    } else {
-        groupWrap.style.display = 'none';
-        anonGroupWrap.style.display = 'none';
-        document.getElementById('sh-inc-group').checked = false;
-    }
-
-    document.getElementById('sh-anon-user').checked = false;
-    document.getElementById('sh-anon-group').checked = false;
-
-    toggleGroupOpts();
-    document.getElementById('share-modal').classList.add('show');
-}
-
-document.getElementById('share-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'share-modal') {
-        closeShareModal();
-    }
-});
-
-function closeShareModal() {
-    document.getElementById('share-modal').classList.remove('show');
-}
-
-function toggleGroupOpts() {
-    const incGroup = document.getElementById('sh-inc-group').checked;
-    const anonGroupWrap = document.getElementById('sh-anon-group-wrap');
-    if (!incGroup) {
-        anonGroupWrap.style.opacity = '0.4';
-        anonGroupWrap.style.pointerEvents = 'none';
-    } else {
-        anonGroupWrap.style.opacity = '1';
-        anonGroupWrap.style.pointerEvents = 'auto';
-    }
-}
-
-async function submitShare() {
-    const btn = document.getElementById('btn-do-share');
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:#fff;"></div> Создание...';
-
-    const checkedYears = Array.from(document.querySelectorAll('.yr-chk-input:checked')).map(el => el.value);
-    
-    if (checkedYears.length === 0) {
-        showToast('Выберите хотя бы один период');
-        btn.disabled = false;
-        btn.innerHTML = 'Создать ссылку';
-        return;
-    }
-
-    const config = {
-        years: checkedYears,
-        anon_user: document.getElementById('sh-anon-user').checked,
-        include_group: document.getElementById('sh-inc-group').checked,
-        anon_group: document.getElementById('sh-anon-group').checked
-    };
-
-    try {
-        const r = await fetch('/api/webapp/bake_stats/', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ config, init_data: tg?.initData||'' })
-        });
-        const j = await r.json();
-        
-        if (!r.ok || j.error) {
-            showToast('Ошибка при создании слепка');
-        } else {
-            closeShareModal();
-            if (tg) {
-                // Trigger Telegram Inline Query to let user share
-                tg.switchInlineQuery("share_" + j.id, ["users", "groups", "channels"]);
-            }
-        }
-    } catch(e) {
-        showToast('Сетевая ошибка');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Создать ссылку';
-    }
-}
-
-init();
-</script>
+    </script>
 </body>
 </html>
