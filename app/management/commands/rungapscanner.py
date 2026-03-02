@@ -3,7 +3,7 @@ import re
 import time
 
 from django.conf import settings
-from django.db.models import Max
+from django.db.models import Max, Q
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 
@@ -33,7 +33,8 @@ class Command(LoggableBaseCommand):
 
         last_log = (
             LogEntry.objects.filter(
-                message__contains='Gap scanner finished successfully up to ID',
+                Q(message__contains='Gap scanner finished successfully up to ID') |
+                Q(message__contains='GapScanner Progress:')
             )
             .order_by('-created_at')
             .first()
@@ -41,7 +42,7 @@ class Command(LoggableBaseCommand):
 
         start_id = 1
         if last_log:
-            match = re.search(r'up to ID (\d+)', last_log.message)
+            match = re.search(r'(?:up to ID|Current ID:)\s*(\d+)', last_log.message)
             if match:
                 start_id = int(match.group(1))
 
