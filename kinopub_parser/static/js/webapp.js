@@ -1,6 +1,6 @@
 const Icons = {
     moon: '<svg viewBox="0 0 512 512"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
-    sun: '<svg viewBox="0 0 512 512"><path d="M256 118a22 22 0 01-22-22V48a22 22 0 0144 0v48a22 22 0 01-22 22zM256 486a22 22 0 01-22-22v-48a22 22 0 0144 0v48a22 22 0 01-22 22zM369.14 164.86a22 22 0 01-15.56-37.55l33.94-33.94a22 22 0 0131.11 31.11l-33.94 33.94a21.93 21.93 0 01-15.55 6.44zM108.92 425.08a22 22 0 01-15.55-37.56l33.94-33.94a22 22 0 1131.11 31.11l-33.94 33.94a21.94 21.94 0 01-15.56 6.45zM464 278h-48a22 22 0 010-44h48a22 22 0 010 44zM96 278H48a22 22 0 010-44h48a22 22 0 010 44zM403.08 425.08a21.94 21.94 0 01-15.56-6.45l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.55 37.56zM142.86 164.86a21.93 21.93 0 01-15.55-6.44l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.56 37.55zM256 358a102 102 0 11102-102 102.12 102.12 0 01-102 102z"/></svg>',
+    sun: '<svg viewBox="0 0 512 512"><path d="M256 118a22 22 0 01-22-22V48a22 22 0 0144 0v48a22 22 0 01-22 22zM256 486a22 22 0 01-22-22v-48a22 22 0 0144 0v48a22 22 0 01-22 22zM369.14 164.86a22 22 0 01-15.56-37.55l33.94-33.94a22 22 0 0131.11 31.11l-33.94 33.94a21.93 21.93 0 01-15.55 6.44zM108.92 425.08a22 22 0 01-15.55-37.56l33.94-33.94a22 22 1131.11 31.11l-33.94 33.94a21.94 21.94 0 01-15.56 6.45zM464 278h-48a22 22 0 010-44h48a22 22 0 010 44zM96 278H48a22 22 0 010-44h48a22 22 0 010 44zM403.08 425.08a21.94 21.94 0 01-15.56-6.45l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.55 37.56zM142.86 164.86a21.93 21.93 0 01-15.55-6.44l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.56 37.55zM256 358a102 102 0 11102-102 102.12 102.12 0 01-102 102z"/></svg>',
     user: '<svg viewBox="0 0 512 512"><path d="M256 288c79.53 0 144-64.47 144-144S335.53 0 256 0 112 64.47 112 144s64.47 144 144 144zm128 32h-24.1c-30.83 18.66-67.43 28-103.9 28s-73.07-9.34-103.9-28H128c-70.69 0-128 57.31-128 128v56c0 13.25 10.75 24 24 24h464c13.25 0 24-10.75 24-24v-56c0-70.69-57.31-128-128-128z"/></svg>',
     users: '<svg viewBox="0 0 512 512"><path d="M336 256c-20.56 0-40.44-5.06-58.26-14.34-14.73 21-36.42 36.63-61.64 43.68C236.41 298.54 263.26 304 290.5 304h25.4C379.79 304 432 356.21 432 419.86v43.21a20.89 20.89 0 0019.2 20.93h41.6a20.9 20.9 0 0019.2-20.93v-43.21C512 344.21 433.79 256 336 256zM336 224a104 104 0 10-104-104 104.12 104.12 0 00104 104zM201.5 272c-63.53 0-115.2 51.68-115.2 115.21v43.86A20.94 20.94 0 00105.5 452h192a20.94 20.94 0 0019.2-20.93v-43.86C316.7 323.68 265.03 272 201.5 272zM201.5 240A112 112 0 1089.5 128a112.12 112.12 0 00112 112z"/></svg>',
     dash: '<svg viewBox="0 0 512 512"><path d="M200 48H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM424 48H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM200 272H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40zM424 272H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40z"/></svg>',
@@ -303,7 +303,7 @@ function renderRatingsDist() {
             responsive: true, maintainAspectRatio: false,
             animation: { duration: 1000, easing: 'easeOutBack', delay: (context) => context.type === 'data' && context.mode === 'default' && !context.active ? context.dataIndex * 80 : 0 },
             onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; },
-            onClick: (event, activeElements) => { if (activeElements.length > 0) openHistory('rating_filter', null, null, null, null, activeElements[0].index + 1); },
+            onClick: (event, activeElements) => { if (activeElements.length > 0) window.openHistoryLayer('rating_filter', 'Оценка: ' + (activeElements[0].index + 1), null, null, null, activeElements[0].index + 1); },
             plugins: {
                 legend: { display: false },
                 tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { title: (ctx) => `Оценка: ${ctx[0].label}`, label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, ['оценка', 'оценки', 'оценок'])}` } }
@@ -453,7 +453,7 @@ function renderHeatmap() {
             const y = curr.getFullYear(), m = String(curr.getMonth() + 1).padStart(2, '0'), day = String(curr.getDate()).padStart(2, '0');
             const currStr = `${y}-${m}-${day}`, displayDate = `${day}.${m}.${y}`;
             d.className = 'hc clickable' + (v ? ' h' + v : ''); 
-            if (v > 0) { d.setAttribute('onclick', `openHistory('day', null, '${currStr}', '${currStr}')`); } else { d.setAttribute('onclick', `showToast('${displayDate}: просмотров нет')`); }
+            if (v > 0) { d.setAttribute('onclick', `window.openHistoryLayer('day', '${displayDate}', null, '${currStr}')`); } else { d.setAttribute('onclick', `showToast('${displayDate}: просмотров нет')`); }
             hm.appendChild(d); curr.setDate(curr.getDate() + 1);
         });
         wrapper.appendChild(hm); block.appendChild(wrapper); fragment.appendChild(block);
@@ -471,7 +471,7 @@ function fillList(id, items, ico, unit, categoryKey) {
         const delay = (i + 1) * 0.05;
         let visual = it.emoji ? `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>` : (ico ? `<div class="icon" style="color:var(--text-muted)">${ico}</div>` : '');
         const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-        html += `<div class="li li-clickable anim-list-item clickable" onclick="openHistory('filter', null, null, '${safeName}', '${categoryKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
+        html += `<div class="li li-clickable anim-list-item clickable" onclick="window.openHistoryLayer('filter', '${safeName}', null, null, '${categoryKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
     });
     el.innerHTML = html;
 }
@@ -483,7 +483,7 @@ function fillBinges() {
     D.binges.forEach((b, i) => {
         const delay = (i + 1) * 0.05, safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         const posterHtml = b.poster_url ? `<img src="${b.poster_url}" style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.1);" onerror="this.style.display='none'">` : `<div style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
-        html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="openHistory('binge', ${b.show_id}, '${b.date}', '${safeTitle}')"><div class="li-l">${posterHtml}<div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r" style="color:var(--info)">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span></div>`;
+        html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="window.openHistoryLayer('binge', '${safeTitle}', ${b.show_id}, '${b.date}')"><div class="li-l">${posterHtml}<div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r" style="color:var(--info)">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span></div>`;
     });
     el.innerHTML = html;
 }
@@ -535,7 +535,7 @@ function renderWeekday() {
             onClick: (event, activeElements) => {
                 if (activeElements.length > 0) {
                     const idx = activeElements[0].index;
-                    openHistory('weekday', null, null, ch.labels[idx], null, idx);
+                    window.openHistoryLayer('weekday', ch.labels[idx], null, null, null, idx);
                 }
             },
             onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; },
@@ -560,10 +560,10 @@ function renderDonut(canvasId, legendId, sourceData, dataKey, totalMinutesWatche
     chG[canvasId] = new Chart(ctx, { 
         type: 'doughnut', plugins: [ChartDataLabels, centerTextPlugin],
         data: { labels: top.map(g => g.name), datasets: [{ data: top.map(g => g.minutes), backgroundColor: top.map((_, i) => pal[i % pal.length]), borderWidth: 0, hoverOffset: 15, borderRadius: 6, spacing: 3, weight: 1 }] },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '50%', layout: { padding: 15 }, animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' }, onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; }, onClick: (event, activeElements) => { if (activeElements.length > 0) openHistory('filter', null, null, top[activeElements[0].index].name, dataKey, activeElements[0].index); }, plugins: { datalabels: { color: '#fff', font: { weight: '800', size: 10 }, formatter: (value, context) => percents[context.dataIndex] > 5 ? percents[context.dataIndex] + '%' : '', display: 'auto' }, tooltip: { enabled: true, callbacks: { label: (context) => { const val = context.parsed, h = Math.floor(val/60), m = val%60; return ` ${h}ч ${m}м (${percents[context.dataIndex]}%)`; } } }, legend: { display: false } } } 
+        options: { responsive: true, maintainAspectRatio: false, cutout: '50%', layout: { padding: 15 }, animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' }, onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; }, onClick: (event, activeElements) => { if (activeElements.length > 0) window.openHistoryLayer('filter', top[activeElements[0].index].name, null, null, dataKey, activeElements[0].index); }, plugins: { datalabels: { color: '#fff', font: { weight: '800', size: 10 }, formatter: (value, context) => percents[context.dataIndex] > 5 ? percents[context.dataIndex] + '%' : '', display: 'auto' }, tooltip: { enabled: true, callbacks: { label: (context) => { const val = context.parsed, h = Math.floor(val/60), m = val%60; return ` ${h}ч ${m}м (${percents[context.dataIndex]}%)`; } } }, legend: { display: false } } } 
     });
     D[dataKey] = top;
-    legendEl.innerHTML = top.map((g, i) => `<div class="legend-item" onclick="openHistory('filter', null, null, '${g.name.replace(/'/g, "\\'")}', '${dataKey}', ${i})" onmouseenter="highlightSegment('${canvasId}', ${i}, true)" onmouseleave="highlightSegment('${canvasId}', ${i}, false)"><div class="legend-dot" style="background:${pal[i % pal.length]}"></div><div class="legend-name">${g.name}</div><div class="legend-val">${Math.floor(g.minutes / 60) > 0 ? `${Math.floor(g.minutes / 60)}ч ${g.minutes % 60}м` : `${g.minutes % 60}м`} (${percents[i]}%)</div></div>`).join('');
+    legendEl.innerHTML = top.map((g, i) => `<div class="legend-item" onclick="window.openHistoryLayer('filter', '${g.name.replace(/'/g, "\\'")}', null, null, '${dataKey}', ${i})" onmouseenter="highlightSegment('${canvasId}', ${i}, true)" onmouseleave="highlightSegment('${canvasId}', ${i}, false)"><div class="legend-dot" style="background:${pal[i % pal.length]}"></div><div class="legend-name">${g.name}</div><div class="legend-val">${Math.floor(g.minutes / 60) > 0 ? `${Math.floor(g.minutes / 60)}ч ${g.minutes % 60}м` : `${g.minutes % 60}м`} (${percents[i]}%)</div></div>`).join('');
 }
 window.highlightSegment = function(canvasId, index, active) { const chart = chG[canvasId]; if (!chart) return; if (active) { chart.setActiveElements([{ datasetIndex: 0, index: index }]); chart.tooltip.setActiveElements([{ datasetIndex: 0, index: index }], { x: 0, y: 0 }); } else { chart.setActiveElements([]); chart.tooltip.setActiveElements([], { x: 0, y: 0 }); } chart.update(); };
 window.mainTab = function(t) { 
@@ -579,28 +579,76 @@ let historyObserver = null;
 let isRenderingBatch = false;
 let viewMode = localStorage.getItem('kp_view_mode') || 'grid';
 
+window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, extraIndex) {
+    curHistType = type;
+    
+    if (type === 'all') { curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date)); } 
+    else if (type === 'day') { curHistData =[...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate); } 
+    else if (type === 'binge') { curHistData = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => { if (a.season_number !== b.season_number) return a.season_number - b.season_number; return a.episode_number - b.episode_number; }); } 
+    else if (type === 'ratings') { curHistData = D.ratings.history; } 
+    else if (type === 'movies') { curHistData = D.history_movies; } 
+    else if (type === 'episodes') { curHistData = D.history_episodes; } 
+    else if (type === 'filter') { const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] :[...D.history_movies, ...D.history_episodes]; const allowedIds = D[extraKey][extraIndex].show_ids ||[]; curHistData = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); } 
+    else if (type === 'group_member') { const member = D.group.members[extraIndex]; curHistData =[...D.group.history_movies, ...D.group.history_episodes].filter(item => item.user_ids.includes(member.id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); } 
+    else if (type === 'weekday') { curHistData =[...D.history_movies, ...D.history_episodes].filter(item => { const date = new Date(item.view_date); const jsDay = date.getDay(); return (jsDay === 0 ? 6 : jsDay - 1) === extraIndex; }).sort((a, b) => b.view_date.localeCompare(a.view_date)); } 
+    else if (type === 'rating_filter') { curHistData = D.ratings.history.filter(item => { let b = Math.floor(item.rating); if (b < 1) b = 1; return b === extraIndex; }); curHistType = 'ratings'; }
+
+    const headerHtml = `
+    <div class="layer-header">
+        <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 16px;">
+            <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
+        </button>
+        <span style="font-weight:800; color:var(--text-primary); font-size:16px;">${title}</span>
+        <div class="view-toggle" style="margin:0; padding:2px;">
+            <button class="vt-btn ${viewMode === 'grid' ? 'active' : ''}" onclick="window.App.setViewModeLayer('grid')">${Icons.grid}</button>
+            <button class="vt-btn ${viewMode === 'list' ? 'active' : ''}" onclick="window.App.setViewModeLayer('list')">${Icons.list}</button>
+        </div>
+    </div>`;
+
+    const bodyHtml = `
+        ${headerHtml}
+        <div id="layer-hist-container" style="padding: 16px;"></div>
+        <div id="layer-hist-sentinel" style="height: 40px; width: 100%;"></div>
+    `;
+
+    pushLayer(bodyHtml, { type: 'history' });
+    currentHistoryOffset = 0;
+    renderHistoryBatchLayer();
+};
+
+window.setViewModeLayer = function(mode) {
+    viewMode = mode;
+    localStorage.setItem('kp_view_mode', mode);
+    const top = viewStack[viewStack.length - 1];
+    if (top && top.context.type === 'history') {
+        const btns = top.el.querySelectorAll('.vt-btn');
+        btns[0].classList.toggle('active', mode === 'grid');
+        btns[1].classList.toggle('active', mode === 'list');
+        
+        currentHistoryOffset = 0;
+        top.el.querySelector('#layer-hist-container').innerHTML = '';
+        if (historyObserver) historyObserver.disconnect();
+        renderHistoryBatchLayer();
+    }
+};
+
 function getHistoryItemHtml(item, idx, type, mode) {
-    const delay = 0;
+    const sid = item.show_id;
     if (mode === 'list') {
         if (type === 'ratings') {
             const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
-            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="p" loading="lazy">` : `<div class="hist-poster"></div>`;
+            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy">` : `<div class="hist-poster"></div>`;
             const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
             const rColor = getRatingColor(item.rating);
-            let seHtml = '';
-            if (item.season && item.episode) seHtml = `<span class="hist-badge">s${item.season}e${item.episode.toString().padStart(2,'0')}</span>`;
-            return `<div class="hist-item anim-item clickable" style="display:flex; align-items:center;">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
+            let seHtml = item.season && item.episode ? `<span class="hist-badge">s${item.season}e${item.episode.toString().padStart(2,'0')}</span>` : '';
+            return `<div class="hist-item anim-item clickable" onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
         } else {
-            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" alt="p" loading="lazy">` : `<div class="hist-poster"></div>`;
+            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy">` : `<div class="hist-poster"></div>`;
             let metaHtml = '';
-            if (item.season_number > 0) {
-                metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
-                if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
-            } else if (item.user_rating) {
-                metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
-            }
+            if (item.season_number > 0) metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
+            if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
             const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
-            return `<div class="hist-item anim-item clickable">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
+            return `<div class="hist-item anim-item clickable" onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
         }
     } else {
         const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
@@ -609,8 +657,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
         
         if (type === 'ratings') {
             const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-            const origHtml = (item.original_title && item.original_title !== item.title) ? `<div class="grid-below-orig">${item.original_title}</div>` : '';
-            return `<div class="grid-item-wrap anim-item"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div>${origHtml}</div>`;
+            return `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${sid})"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div></div>`;
         } else {
             let badgesHtml = '';
             if (item.season_number > 0) badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6);border:none;">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
@@ -623,174 +670,239 @@ function getHistoryItemHtml(item, idx, type, mode) {
                     const name = item.user_names[i] || '?';
                     const photo = item.user_photos && item.user_photos[i];
                     const userId = (item.user_ids && item.user_ids[i]);
-
-                    if (photo) {
-                        avatars += `<img src="${photo}" class="grid-user-avatar">`;
-                    } else {
-                        let content;
-                        if (isSharedMode && userId !== undefined) {
-                            content = userId > 0 ? userId : `<div style="font-size:10px; display:flex; align-items:center; justify-content:center;">${Icons.user}</div>`;
-                        } else {
-                            content = name.charAt(0).toUpperCase();
-                        }
-                        avatars += `<div class="grid-user-avatar" style="background:${getUserColor(userId || 0)}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:900;">${content}</div>`;
-                    }
+                    if (photo) avatars += `<img src="${photo}" class="grid-user-avatar">`;
+                    else avatars += `<div class="grid-user-avatar" style="background:${getUserColor(userId || 0)};">${isSharedMode && userId>0 ? userId : name.charAt(0).toUpperCase()}</div>`;
                 }
                 usersHtml = `<div class="grid-users">${avatars}</div>`;
             }
-
-            const origHtml = (item.show__original_title && item.show__original_title !== item.show__title) ? `<div class="grid-below-orig">${item.show__original_title}</div>` : '';
-            return `<div class="grid-item-wrap anim-item"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div>${origHtml}</div>`;
+            return `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${sid})"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
         }
     }
 }
 
-window.renderNextHistoryBatch = function() {
+function renderHistoryBatchLayer() {
     if (isRenderingBatch || currentHistoryOffset >= curHistData.length) return;
     isRenderingBatch = true;
-
-    const container = document.getElementById('hist-list-container');
-    const batch = curHistData.slice(currentHistoryOffset, currentHistoryOffset + historyBatchSize);
     
+    const topLayer = viewStack[viewStack.length - 1];
+    if (!topLayer || topLayer.context.type !== 'history') {
+        isRenderingBatch = false; return;
+    }
+    
+    const container = topLayer.el.querySelector('#layer-hist-container');
+    if (curHistData.length === 0) {
+        container.innerHTML = `<div class="empty"><div class="icon">${Icons.dash}</div>Нет данных</div>`;
+        isRenderingBatch = false; return;
+    }
+
+    const batch = curHistData.slice(currentHistoryOffset, currentHistoryOffset + historyBatchSize);
     let html = batch.map((item, idx) => getHistoryItemHtml(item, currentHistoryOffset + idx, curHistType, viewMode)).join('');
     
-    // Вставляем без перезатирания старого контента
     if (currentHistoryOffset === 0 && viewMode === 'list') {
         container.innerHTML = '<div class="card" style="margin:0; padding:0; overflow:hidden;">' + html + '</div>';
     } else if (currentHistoryOffset === 0 && viewMode === 'grid') {
         container.innerHTML = '<div class="hist-grid">' + html + '</div>';
     } else {
-        const target = viewMode === 'list' ? container.firstChild : container.firstChild;
         container.firstChild.insertAdjacentHTML('beforeend', html);
     }
 
     currentHistoryOffset += historyBatchSize;
     isRenderingBatch = false;
 
-    // Если данные закончились, отключаем обсервер
-    if (currentHistoryOffset >= curHistData.length && historyObserver) {
+    if (currentHistoryOffset < curHistData.length && currentHistoryOffset === historyBatchSize) {
+        const sentinel = topLayer.el.querySelector('#layer-hist-sentinel');
+        historyObserver = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) renderHistoryBatchLayer();
+        }, { rootMargin: '1000px' });
+        if (sentinel) historyObserver.observe(sentinel);
+    } else if (currentHistoryOffset >= curHistData.length && historyObserver) {
         historyObserver.disconnect();
     }
-};
+}
 
-window.initHistoryObserver = function() {
-    if (historyObserver) historyObserver.disconnect();
-    
-    const options = {
-        root: null,
-        rootMargin: '2000px',
-        threshold: 0.1
-    };
+window.openShowLayer = async function(showId) {
+    document.getElementById('loader').classList.remove('hidden');
+    document.getElementById('loader').style.opacity = '1';
 
-    historyObserver = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-            renderNextHistoryBatch();
+    try {
+        const r = await fetch(`/api/webapp/show/${showId}/`);
+        if (!r.ok) throw new Error('Not found');
+        const show = await r.json();
+
+        let actorsHtml = '';
+        if (show.actors && show.actors.length > 0) {
+            actorsHtml = `
+            <div class="label"><div class="icon" style="color:#d29922">${Icons.masks}</div>В ролях</div>
+            <div class="h-scroll-container">
+                ${show.actors.map(a => `
+                    <div class="person-pill" onclick="window.App.openCollectionLayer('actor', ${a.id}, '${a.name.replace(/'/g, "\\'")}')">
+                        <div class="person-avatar">${a.name.charAt(0)}</div>
+                        <div class="person-name">${a.name}</div>
+                    </div>
+                `).join('')}
+            </div>`;
         }
-    }, options);
 
-    const sentinel = document.getElementById('history-sentinel');
-    if (sentinel) historyObserver.observe(sentinel);
-};
+        let genresHtml = '';
+        if (show.genres && show.genres.length > 0) {
+            genresHtml = `
+            <div class="label" style="padding-top:0"><div class="icon" style="color:var(--info)">${Icons.star}</div>Жанры</div>
+            <div class="h-scroll-container">
+                ${show.genres.map(g => `<div class="genre-pill" onclick="window.App.openCollectionLayer('genre', ${g.id}, '${g.name}')">${g.name}</div>`).join('')}
+            </div>`;
+        }
 
-window.setViewMode = function(mode) {
-    viewMode = mode;
-    localStorage.setItem('kp_view_mode', mode);
-    if (document.getElementById('view-history').classList.contains('vis')) {
-        renderHistoryList();
+        let countriesHtml = '';
+        if (show.countries && show.countries.length > 0) {
+            countriesHtml = `
+            <div class="label" style="padding-top:0"><div class="icon" style="color:#39d353">${Icons.globe}</div>Страны</div>
+            <div class="h-scroll-container" style="padding-bottom:30px;">
+                ${show.countries.map(c => `<div class="genre-pill" onclick="window.App.openCollectionLayer('country', ${c.id}, '${c.name}')">${c.emoji ? c.emoji + ' ' : ''}${c.name}</div>`).join('')}
+            </div>`;
+        }
+
+        const fallbackUrl = show.poster_medium || '';
+        const posterUrl = show.poster_large || fallbackUrl;
+        const bgUrl = posterUrl || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+        const html = `
+            ${getLayerHeader('О шоу')}
+            <div class="hero-container">
+                <div class="hero-bg" style="background-image: url('${bgUrl}')"></div>
+                <div class="hero-gradient"></div>
+                ${posterUrl ? `<img src="${posterUrl}" class="hero-poster" alt="poster">` : ''}
+            </div>
+            
+            <div class="show-info">
+                <div class="show-title">${show.title}</div>
+                ${show.original_title && show.original_title !== show.title ? `<div class="show-orig">${show.original_title}</div>` : ''}
+                
+                <div class="show-meta-tags">
+                    <div class="sm-tag">${show.year || '?'}</div>
+                    <div class="sm-tag" style="color: var(--info); border-color: var(--info-dim); background: var(--info-dim)">${show.type || 'Show'}</div>
+                    ${show.status ? `<div class="sm-tag">${show.status}</div>` : ''}
+                </div>
+                
+                <div class="show-meta-tags" style="animation-delay: 0.35s">
+                    ${show.kinopoisk_rating ? `<div class="sm-tag" style="background:rgba(241, 90, 36, 0.15); color:#f15a24; border:none">KP ${show.kinopoisk_rating}</div>` : ''}
+                    ${show.imdb_rating ? `<div class="sm-tag" style="background:rgba(245, 197, 24, 0.15); color:#f5c518; border:none">IMDb ${show.imdb_rating}</div>` : ''}
+                    ${show.internal_rating ? `<div class="sm-tag" style="background:var(--accent-dim); color:var(--accent); border:none">★ ${show.internal_rating.toFixed(1)}</div>` : ''}
+                </div>
+            </div>
+
+            ${show.plot ? `<div class="plot-box">${show.plot}</div>` : ''}
+            
+            ${actorsHtml}
+            ${genresHtml}
+            ${countriesHtml}
+        `;
+
+        pushLayer(html, { type: 'show' });
+    } catch (e) {
+        showToast('Не удалось загрузить данные шоу');
+    } finally {
+        hideLoader();
     }
 };
 
+window.openCollectionLayer = async function(type, id, titleFallback) {
+    document.getElementById('loader').classList.remove('hidden');
+    document.getElementById('loader').style.opacity = '1';
 
-window.renderHistoryList = function() {
-    currentHistoryOffset = 0;
-    const container = document.getElementById('hist-list-container');
-    container.innerHTML = '';
-    
-    document.getElementById('vt-grid').innerHTML = Icons.grid;
-    document.getElementById('vt-list').innerHTML = Icons.list;
-    document.getElementById('vt-grid').classList.toggle('active', viewMode === 'grid');
-    document.getElementById('vt-list').classList.toggle('active', viewMode === 'list');
+    try {
+        const r = await fetch(`/api/webapp/collection/${type}/${id}/`);
+        if (!r.ok) throw new Error('Not found');
+        const data = await r.json();
 
-    if (!curHistData || !curHistData.length) {
-        container.innerHTML = `<div class="empty"><div class="icon">${Icons.dash}</div>Нет просмотров</div>`;
-        return;
+        let gridHtml = data.items.map(item => {
+            const mediumPoster = item.poster_url || '';
+            const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
+            return `
+            <div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${item.id})">
+                <div class="grid-item">
+                    ${posterHtml}
+                    ${item.year ? `<div class="grid-year">${item.year}</div>` : ''}
+                </div>
+                <div class="grid-below-title">${item.title}</div>
+            </div>`;
+        }).join('');
+
+        if (data.items.length === 0) {
+            gridHtml = `<div class="empty" style="grid-column: 1/-1"><div class="icon">${Icons.film}</div>Пусто</div>`;
+        }
+
+        const html = `
+            ${getLayerHeader(data.title || titleFallback)}
+            <div class="label"><div class="icon" style="color:var(--info)">${Icons.star}</div>${data.title || titleFallback}</div>
+            <div class="hist-grid" style="padding: 0 16px;">
+                ${gridHtml}
+            </div>
+        `;
+
+        pushLayer(html, { type: 'collection' });
+    } catch (e) {
+        showToast('Не удалось загрузить данные коллекции');
+    } finally {
+        hideLoader();
     }
-
-    renderNextHistoryBatch();
-    initHistoryObserver();
 };
 
-window.openHistory = function(type, extraId, extraDate, extraTitle, extraKey, extraIndex) {
-    lastScrollPos = window.scrollY;
+let viewStack =[]; 
+
+function pushLayer(htmlContent, contextData = {}) {
+    const layer = document.createElement('div');
+    layer.className = 'layer';
+    layer.innerHTML = htmlContent;
     
-    document.getElementById('view-stats').classList.add('hidden');
-    document.getElementById('view-history').classList.remove('hidden');
+    document.getElementById('dynamic-layers').appendChild(layer);
     
-    if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(window.closeHistory); }
-    
-    curHistType = type;
-    
-    if (type === 'all') {
-        curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = 'Вся история';
-    } else if (type === 'day') {
-        curHistData = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate);
-        document.getElementById('hist-title').textContent = extraDate;
-    } else if (type === 'binge') {
-        curHistData = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => {
-            if (a.season_number !== b.season_number) return a.season_number - b.season_number;
-            return a.episode_number - b.episode_number;
-        });
-        document.getElementById('hist-title').textContent = extraTitle;
-    } else if (type === 'ratings') {
-        curHistData = D.ratings.history;
-        document.getElementById('hist-title').textContent = 'Оценки';
-    } else if (type === 'movies') {
-        curHistData = D.history_movies;
-        document.getElementById('hist-title').textContent = 'Фильмы';
-    } else if (type === 'episodes') {
-        curHistData = D.history_episodes;
-        document.getElementById('hist-title').textContent = 'Эпизоды';
-    } else if (type === 'filter') {
-        const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] : [...D.history_movies, ...D.history_episodes];
-        const allowedIds = D[extraKey][extraIndex].show_ids || [];
-        curHistData = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = extraTitle;
-    } else if (type === 'group_member') {
-        const member = D.group.members[extraIndex];
-        curHistData = [...D.group.history_movies, ...D.group.history_episodes].filter(item => item.user_ids.includes(member.id)).sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = extraTitle;
-    } else if (type === 'weekday') {
-        curHistData = [...D.history_movies, ...D.history_episodes].filter(item => {
-            const date = new Date(item.view_date);
-            const jsDay = date.getDay();
-            return (jsDay === 0 ? 6 : jsDay - 1) === extraIndex;
-        }).sort((a, b) => b.view_date.localeCompare(a.view_date));
-        document.getElementById('hist-title').textContent = extraTitle;
-    } else if (type === 'rating_filter') {
-        curHistData = D.ratings.history.filter(item => {
-            let b = Math.floor(item.rating);
-            if (b < 1) b = 1;
-            return b === extraIndex;
-        });
-        document.getElementById('hist-title').textContent = `Оценка: ${extraIndex}`;
-        curHistType = 'ratings'; 
+    const prevScroll = window.scrollY;
+    if (viewStack.length > 0) {
+        viewStack[viewStack.length - 1].scrollPos = prevScroll;
+        viewStack[viewStack.length - 1].el.style.display = 'none';
+    } else {
+        document.getElementById('view-stats').style.display = 'none';
+        lastScrollPos = prevScroll;
     }
 
-    renderHistoryList();
+    viewStack.push({ el: layer, context: contextData, scrollPos: 0 });
     window.scrollTo(0, 0);
-};
 
-window.closeHistory = function() {
-    if (historyObserver) historyObserver.disconnect();
-    if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(window.closeHistory); }
+    if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(popLayer); }
+}
+
+function popLayer() {
+    if (viewStack.length === 0) return;
     
-    // Скрываем экран истории и возвращаем экран статистики
-    document.getElementById('view-history').classList.add('hidden');
-    document.getElementById('view-stats').classList.remove('hidden');
+    const top = viewStack.pop();
+    top.el.remove();
+
+    let targetScroll = 0;
+    if (viewStack.length > 0) {
+        const prev = viewStack[viewStack.length - 1];
+        prev.el.style.display = 'block';
+        targetScroll = prev.scrollPos;
+    } else {
+        document.getElementById('view-stats').style.display = 'block';
+        targetScroll = lastScrollPos;
+        if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(popLayer); }
+    }
     
-    window.scrollTo(0, lastScrollPos);
-};
+    setTimeout(() => window.scrollTo(0, targetScroll), 10);
+}
+
+window.closeHistory = popLayer;
+
+function getLayerHeader(title) {
+    return `
+    <div class="layer-header">
+        <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 16px;">
+            <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
+        </button>
+        <span style="font-weight:800; color:var(--text-primary); font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:50%;">${title}</span>
+        <div style="width: 80px;"></div>
+    </div>`;
+}
 
 function renderGroup() {
     const el = document.getElementById('group-root');
@@ -817,7 +929,7 @@ function renderGroup() {
     }).join('');
     
     const mx = Math.max(...g.members.map(m=>m.views),1);
-    const mbH = g.members.map((m, idx) => `<div class="mb anim-list-item clickable" onclick="openHistory('group_member', null, null, '${m.name.replace(/'/g, "\\'")}', null, ${idx})" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
+    const mbH = g.members.map((m, idx) => `<div class="mb anim-list-item clickable" onclick="window.openHistoryLayer('group_member', '${m.name.replace(/'/g, "\\'")}', null, null, null, ${idx})" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
     let gGenH = g.genres?.length ? `<div class="card hoverable anim-item" style="animation-delay:0.3s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="chart-box" style="height:380px;"><canvas id="c-group-genre"></canvas></div><div id="legend-group-genre" class="legend-grid"></div></div>` : '';
     const membersLabel = `${g.members_count} ${plural(g.members_count, ['участник', 'участника', 'участников'])}`;
     
@@ -847,7 +959,6 @@ function renderGroup() {
         ${gGenH}`;
 }
 
-// Share Modal Logic
 function openShareModal() {
     const grid = document.getElementById('share-years-grid');
     grid.innerHTML = '';
@@ -935,7 +1046,6 @@ async function submitShare() {
         } else {
             closeShareModal();
             if (tg) {
-                // Trigger Telegram Inline Query to let user share
                 tg.switchInlineQuery("share_" + j.id, ["users", "groups", "channels"]);
             }
         }
@@ -949,14 +1059,18 @@ async function submitShare() {
 
 
 window.App = {
-    toggleTheme: typeof toggleTheme !== 'undefined' ? toggleTheme : null,
-    openShareModal: typeof openShareModal !== 'undefined' ? openShareModal : null,
-    closeShareModal: typeof closeShareModal !== 'undefined' ? closeShareModal : null,
-    toggleGroupOpts: typeof toggleGroupOpts !== 'undefined' ? toggleGroupOpts : null,
-    submitShare: typeof submitShare !== 'undefined' ? submitShare : null,
-    mainTab: typeof window.mainTab !== 'undefined' ? window.mainTab : null,
-    pickYear: typeof window.pickYear !== 'undefined' ? window.pickYear : null,
-    openHistory: typeof window.openHistory !== 'undefined' ? window.openHistory : null,
-    closeHistory: typeof window.closeHistory !== 'undefined' ? window.closeHistory : null,
-    setViewMode: typeof window.setViewMode !== 'undefined' ? window.setViewMode : null
+    toggleTheme: toggleTheme,
+    openShareModal: openShareModal,
+    closeShareModal: closeShareModal,
+    toggleGroupOpts: toggleGroupOpts,
+    submitShare: submitShare,
+    mainTab: mainTab,
+    pickYear: pickYear,
+    openHistory: window.openHistoryLayer,
+    openHistoryLayer: window.openHistoryLayer,
+    closeHistory: popLayer,
+    setViewMode: window.setViewModeLayer,
+    setViewModeLayer: window.setViewModeLayer,
+    openShowLayer: window.openShowLayer,
+    openCollectionLayer: window.openCollectionLayer
 };

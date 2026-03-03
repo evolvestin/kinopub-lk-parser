@@ -33,8 +33,8 @@ class Command(LoggableBaseCommand):
 
         last_log = (
             LogEntry.objects.filter(
-                Q(message__contains='Gap scanner finished successfully up to ID') |
-                Q(message__contains='GapScanner Progress:')
+                Q(message__contains='Gap scanner finished successfully up to ID')
+                | Q(message__contains='GapScanner Progress:')
             )
             .order_by('-created_at')
             .first()

@@ -249,7 +249,6 @@ def run_admin_command(self, task_run_id):
         'updatedetails',
         'updatedurations',
         'scanbyids',
-        'ff',
     }
 
     if task_run.command in selenium_commands:

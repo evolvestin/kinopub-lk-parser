@@ -16,7 +16,10 @@ from django.views.decorators.http import require_http_methods
 
 from app.dashboard import dashboard_callback
 from app.models import (
+    Country,
+    Genre,
     LogEntry,
+    Person,
     SharedStat,
     Show,
     ShowDuration,
@@ -1042,3 +1045,92 @@ def webapp_get_shared_stats(request, stat_id):
     except Exception as e:
         logging.error(f'WebApp Shared Stats Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def webapp_get_show_full(request, show_id):
+    try:
+        show = Show.objects.prefetch_related('countries', 'genres', 'directors', 'actors').get(
+            id=show_id
+        )
+
+        internal_rating, _ = show.get_internal_rating_data()
+
+        data = {
+            'id': show.id,
+            'title': show.title,
+            'original_title': show.original_title,
+            'type': show.type,
+            'year': show.year,
+            'status': show.status,
+            'plot': show.plot,
+            'poster_large': get_poster_url(show.id, 'big'),
+            'poster_medium': get_poster_url(show.id, 'medium'),
+            'kinopoisk_rating': show.kinopoisk_rating,
+            'imdb_rating': show.imdb_rating,
+            'internal_rating': internal_rating,
+            'countries': [
+                {'id': c.id, 'name': c.name, 'emoji': c.emoji_flag} for c in show.countries.all()
+            ],
+            'genres': [{'id': g.id, 'name': g.name} for g in show.genres.all()],
+            'directors': [{'id': d.id, 'name': d.name} for d in show.directors.all()],
+            'actors': [
+                {'id': a.id, 'name': a.name} for a in show.actors.all()[:25]
+            ],  # Лимит для UI
+        }
+        return JsonResponse(data)
+    except Show.DoesNotExist:
+        return JsonResponse({'error': 'Show not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def webapp_get_collection(request, collection_type, item_id):
+    try:
+        shows = Show.objects.all()
+        title = 'Коллекция'
+
+        if collection_type == 'actor':
+            person = Person.objects.get(id=item_id)
+            shows = shows.filter(actors=person)
+            title = person.name
+        elif collection_type == 'director':
+            person = Person.objects.get(id=item_id)
+            shows = shows.filter(directors=person)
+            title = f'Режиссер: {person.name}'
+        elif collection_type == 'genre':
+            genre = Genre.objects.get(id=item_id)
+            shows = shows.filter(genres=genre)
+            title = f'Жанр: {genre.name}'
+        elif collection_type == 'country':
+            country = Country.objects.get(id=item_id)
+            shows = shows.filter(countries=country)
+            title = country.name
+            if country.emoji_flag:
+                title = f'{country.emoji_flag} {title}'
+        else:
+            return JsonResponse({'error': 'Invalid collection type'}, status=400)
+
+        shows = shows.order_by('-year', '-id').distinct()[:50]  # Лимит для производительности
+
+        results = []
+        for show in shows:
+            results.append(
+                {
+                    'id': show.id,
+                    'title': show.title,
+                    'original_title': show.original_title,
+                    'year': show.year,
+                    'type': show.type,
+                    'poster_url': get_poster_url(show.id, 'medium'),
+                }
+            )
+
+        return JsonResponse({'title': title, 'items': results})
+    except (Person.DoesNotExist, Genre.DoesNotExist, Country.DoesNotExist):
+        return JsonResponse({'error': 'Item not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
