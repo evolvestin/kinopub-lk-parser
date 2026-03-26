@@ -160,7 +160,11 @@ def _get_favorites(base_qs, dur_qs):
 
     def get_person_top(field, limit=5):
         qs = (
-            base_qs.values(tid=F(f'show__{field}__id'), name=F(f'show__{field}__name'))
+            base_qs.values(
+                tid=F(f'show__{field}__id'),
+                name=F(f'show__{field}__name'),
+                photo_url=F(f'show__{field}__photo_url'),
+            )
             .filter(tid__isnull=False)
             .annotate(views=Count('id', distinct=True), shows_count=Count('show_id', distinct=True))
             .order_by('-views')[:limit]
@@ -183,6 +187,7 @@ def _get_favorites(base_qs, dur_qs):
             result.append(
                 {
                     'name': p['name'],
+                    'photo_url': p['photo_url'],
                     'shows': p['shows_count'],
                     'views': p['views'],
                     'count': p['views'],

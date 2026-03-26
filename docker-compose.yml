@@ -103,6 +103,8 @@ services:
         condition: service_started
       db:
         condition: service_healthy
+      web:
+        condition: service_healthy
     networks:
       - kinopub-net
     healthcheck:
@@ -126,6 +128,8 @@ services:
         redis:
           condition: service_started
         db:
+          condition: service_healthy
+        web:
           condition: service_healthy
       networks:
         - kinopub-net

@@ -1,7 +1,7 @@
 const Icons = {
-    moon: '<svg viewBox="0 0 512 512"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
-    sun: '<svg viewBox="0 0 512 512"><path d="M256 118a22 22 0 01-22-22V48a22 22 0 0144 0v48a22 22 0 01-22 22zM256 486a22 22 0 01-22-22v-48a22 22 0 0144 0v48a22 22 0 01-22 22zM369.14 164.86a22 22 0 01-15.56-37.55l33.94-33.94a22 22 0 0131.11 31.11l-33.94 33.94a21.93 21.93 0 01-15.55 6.44zM108.92 425.08a22 22 0 01-15.55-37.56l33.94-33.94a22 22 1131.11 31.11l-33.94 33.94a21.94 21.94 0 01-15.56 6.45zM464 278h-48a22 22 0 010-44h48a22 22 0 010 44zM96 278H48a22 22 0 010-44h48a22 22 0 010 44zM403.08 425.08a21.94 21.94 0 01-15.56-6.45l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.55 37.56zM142.86 164.86a21.93 21.93 0 01-15.55-6.44l-33.94-33.94a22 22 0 0131.11-31.11l33.94 33.94a22 22 0 01-15.56 37.55zM256 358a102 102 0 11102-102 102.12 102.12 0 01-102 102z"/></svg>',
-    user: '<svg viewBox="0 0 512 512"><path d="M256 288c79.53 0 144-64.47 144-144S335.53 0 256 0 112 64.47 112 144s64.47 144 144 144zm128 32h-24.1c-30.83 18.66-67.43 28-103.9 28s-73.07-9.34-103.9-28H128c-70.69 0-128 57.31-128 128v56c0 13.25 10.75 24 24 24h464c13.25 0 24-10.75 24-24v-56c0-70.69-57.31-128-128-128z"/></svg>',
+    moon: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
+    sun: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm0 160c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64zM256 128c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16s-16 7.2-16 16v64c0 8.8 7.2 16 16 16zM256 384c-8.8 0-16 7.2-16 16v64c0 8.8 7.2 16 16 16s16-7.2 16-16v-64c0-8.8-7.2-16-16-16zM464 240h-64c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM112 240H48c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM403.1 108.9c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM176.8 335.2c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM403.1 403.1c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0z"/></svg>',
+    user: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 288c79.53 0 144-64.47 144-144S335.53 0 256 0 112 64.47 112 144s64.47 144 144 144zm128 32h-24.1c-30.83 18.66-67.43 28-103.9 28s-73.07-9.34-103.9-28H128c-70.69 0-128 57.31-128 128v56c0 13.25 10.75 24 24 24h464c13.25 0 24-10.75 24-24v-56c0-70.69-57.31-128-128-128z"/></svg>',
     users: '<svg viewBox="0 0 512 512"><path d="M336 256c-20.56 0-40.44-5.06-58.26-14.34-14.73 21-36.42 36.63-61.64 43.68C236.41 298.54 263.26 304 290.5 304h25.4C379.79 304 432 356.21 432 419.86v43.21a20.89 20.89 0 0019.2 20.93h41.6a20.9 20.9 0 0019.2-20.93v-43.21C512 344.21 433.79 256 336 256zM336 224a104 104 0 10-104-104 104.12 104.12 0 00104 104zM201.5 272c-63.53 0-115.2 51.68-115.2 115.21v43.86A20.94 20.94 0 00105.5 452h192a20.94 20.94 0 0019.2-20.93v-43.86C316.7 323.68 265.03 272 201.5 272zM201.5 240A112 112 0 1089.5 128a112.12 112.12 0 00112 112z"/></svg>',
     dash: '<svg viewBox="0 0 512 512"><path d="M200 48H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM424 48H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM200 272H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40zM424 272H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40z"/></svg>',
     time: '<svg viewBox="0 0 512 512"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48zm96 240h-96a16 16 0 01-16-16V128a16 16 0 0132 0v128h80a16 16 0 010 32z"/></svg>',
@@ -469,7 +469,16 @@ function fillList(id, items, ico, unit, categoryKey) {
         const cnt = it.count || it.views || 0, sub = it.sub || (it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
         const lbl = Array.isArray(unit) ? `${cnt} ${plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
         const delay = (i + 1) * 0.05;
-        let visual = it.emoji ? `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>` : (ico ? `<div class="icon" style="color:var(--text-muted)">${ico}</div>` : '');
+        
+        let visual = '';
+        if (it.photo_url) {
+            visual = `<img src="${it.photo_url}" style="width:clamp(24px, 6vw, 32px);height:clamp(24px, 6vw, 32px);border-radius:50%;object-fit:cover;margin-right:6px;vertical-align:middle;display:inline-block;" onerror="this.style.display='none'">`;
+        } else if (it.emoji) {
+            visual = `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>`;
+        } else if (ico) {
+            visual = `<div class="icon" style="color:var(--text-muted);display:inline-block;vertical-align:middle;margin-right:6px;">${ico}</div>`;
+        }
+
         const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         html += `<div class="li li-clickable anim-list-item clickable" onclick="window.openHistoryLayer('filter', '${safeName}', null, null, '${categoryKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
     });
@@ -736,7 +745,7 @@ window.openShowLayer = async function(showId) {
             <div class="h-scroll-container">
                 ${show.actors.map(a => `
                     <div class="person-pill" onclick="window.App.openCollectionLayer('actor', ${a.id}, '${a.name.replace(/'/g, "\\'")}')">
-                        <div class="person-avatar">${a.name.charAt(0)}</div>
+                        ${a.photo_url ? `<img src="${a.photo_url}" class="person-avatar" style="object-fit:cover;">` : `<div class="person-avatar">${a.name.charAt(0)}</div>`}
                         <div class="person-name">${a.name}</div>
                     </div>
                 `).join('')}

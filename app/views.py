@@ -1076,8 +1076,9 @@ def webapp_get_show_full(request, show_id):
             'genres': [{'id': g.id, 'name': g.name} for g in show.genres.all()],
             'directors': [{'id': d.id, 'name': d.name} for d in show.directors.all()],
             'actors': [
-                {'id': a.id, 'name': a.name} for a in show.actors.all()[:25]
-            ],  # Лимит для UI
+                {'id': a.id, 'name': a.name, 'photo_url': a.photo_url}
+                for a in show.actors.all()[:25]
+            ],
         }
         return JsonResponse(data)
     except Show.DoesNotExist:

@@ -16,8 +16,9 @@ from redis import Redis
 
 from app import history_parser
 from app.gdrive_backup import BackupManager
-from app.models import Code, LogEntry, Show, TaskRun, ViewUser
+from app.models import Code, ExternalRating, LogEntry, Show, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
+from app.services.poiskkino_client import PoiskkinoClient
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
 
@@ -436,3 +437,88 @@ def precalculate_all_stats():
 def run_gap_scanner_task():
     logging.info('Starting monthly gap scanner task.')
     call_command('rungapscanner')
+
+
+@shared_task
+@safe_execution
+def fetch_person_photos_task(limit=50):
+    call_command('fetchpersonphotos', limit=limit)
+
+
+@shared_task
+@single_instance_task(lock_name='sync_poiskkino_ratings', timeout=1800)
+def sync_poiskkino_ratings_task():
+    client = PoiskkinoClient()
+    now = timezone.now()
+    today = now.date()
+    yesterday = today - timedelta(days=1)
+
+    data = client.fetch_updated_ratings(yesterday, today)
+
+    missing_ids = list(
+        Show.objects.filter(ext_rating__isnull=True).values_list('id', flat=True)[:10000]
+    )
+
+    if missing_ids:
+        catchup_data = client.fetch_ratings_by_ids(missing_ids)
+        data.extend(catchup_data)
+
+    if not data:
+        return
+
+    data_map = {item['id']: item for item in data if item.get('id')}
+
+    show_ids = list(data_map.keys())
+    existing_shows = Show.objects.filter(id__in=show_ids).in_bulk(field_name='id')
+
+    ext_ratings_to_update = []
+    shows_to_update = []
+
+    for show_id, item in data_map.items():
+        show = existing_shows.get(show_id)
+        if not show:
+            continue
+
+        r_data = item.get('rating') or {}
+        v_data = item.get('votes') or {}
+
+        show.kinopoisk_rating = r_data.get('kp')
+        show.kinopoisk_votes = v_data.get('kp')
+        show.imdb_rating = r_data.get('imdb')
+        show.imdb_votes = v_data.get('imdb')
+        shows_to_update.append(show)
+
+        ext_ratings_to_update.append(
+            ExternalRating(
+                show_id=show_id,
+                kp=r_data.get('kp'),
+                imdb=r_data.get('imdb'),
+                tmdb=r_data.get('tmdb'),
+                film_critics=r_data.get('filmCritics'),
+                russian_film_critics=r_data.get('russianFilmCritics'),
+                await_rating=r_data.get('await'),
+                updated_at=now,
+            )
+        )
+
+    if shows_to_update:
+        Show.objects.bulk_update(
+            shows_to_update,
+            ['kinopoisk_rating', 'kinopoisk_votes', 'imdb_rating', 'imdb_votes']
+        )
+
+    if ext_ratings_to_update:
+        ExternalRating.objects.bulk_create(
+            ext_ratings_to_update,
+            update_conflicts=True,
+            unique_fields=['show_id'],
+            update_fields=[
+                'kp',
+                'imdb',
+                'tmdb',
+                'film_critics',
+                'russian_film_critics',
+                'await_rating',
+                'updated_at',
+            ],
+        )

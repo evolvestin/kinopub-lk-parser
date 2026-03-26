@@ -99,6 +99,17 @@ body {
 }
 .theme-btn:active, .share-btn:active { transform: scale(0.85); }
 .theme-btn .icon, .share-btn .icon { font-size: clamp(18px, 5vw, 22px); line-height: 1; }
+.theme-btn svg, .share-btn svg {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+.light .theme-btn {
+    background: var(--bg-input);
+    color: #f1c40f; /* Солнечный желтый для светлой темы */
+    border-color: var(--border);
+}
 
 .tabs { display: flex; gap: clamp(8px, 2vw, 12px); padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
@@ -402,12 +413,18 @@ body.has-banner #app {
     top: 0; left: 0; right: 0; min-height: 100vh;
     background: var(--bg-main);
     z-index: 10;
-    animation: layerSlideIn 0.35s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    animation: layerFadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
     padding-bottom: clamp(24px, 8vw, 36px);
 }
-@keyframes layerSlideIn {
-    from { transform: translateX(100%); box-shadow: -10px 0 30px rgba(0,0,0,0); }
-    to { transform: translateX(0); box-shadow: -10px 0 30px rgba(0,0,0,0.3); }
+@keyframes layerFadeIn {
+    from { 
+        opacity: 0; 
+        transform: scale(0.96);
+    }
+    to { 
+        opacity: 1; 
+        transform: scale(1);
+    }
 }
 
 .layer-header {
@@ -422,16 +439,63 @@ body.has-banner #app {
 .light .layer-header { background: rgba(246, 248, 250, 0.8); border-bottom-color: rgba(0,0,0,0.05); }
 
 /* SHOW DETAIL VIEW */
-.hero-container { position: relative; width: 100%; height: 50vh; min-height: 350px; overflow: hidden; display: flex; align-items: flex-end; justify-content: center; padding: 20px; animation: zoomIn 0.6s ease-out; }
+.hero-container { 
+    position: relative; 
+    width: 100%; 
+    height: 50vh; 
+    min-height: 350px; 
+    overflow: hidden; 
+    display: flex; 
+    align-items: flex-end; 
+    justify-content: center; 
+    padding: 20px; 
+    animation: zoomIn 0.6s ease-out;
+    /* Мягкое затухание границ контейнера */
+    mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+}
 @keyframes zoomIn { from { transform: scale(1.05); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-.hero-bg { position: absolute; inset: -20px; background-size: cover; background-position: center; filter: blur(20px) brightness(0.4); z-index: 1; transform: scale(1.1); }
-.light .hero-bg { filter: blur(20px) brightness(0.8); }
+.hero-bg { 
+    position: absolute; 
+    inset: -40px; /* Увеличено, чтобы спрятать края размытия */
+    background-size: cover; 
+    background-position: center; 
+    filter: blur(40px) brightness(0.4); 
+    z-index: 1; 
+    transform: scale(1.1); 
+}
+.light .hero-bg { 
+    filter: blur(40px) brightness(0.85); /* Чуть мягче яркость */
+}
 
-.hero-gradient { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(20, 24, 31, 0) 0%, var(--bg-main) 100%); z-index: 2; }
-.light .hero-gradient { background: linear-gradient(to bottom, rgba(246, 248, 250, 0) 0%, var(--bg-main) 100%); }
+.hero-gradient { 
+    position: absolute; 
+    inset: 0; 
+    /* Радиальный градиент в дополнение к линейному для мягких краев по бокам */
+    background: 
+        radial-gradient(circle at center, transparent 30%, var(--bg-main) 100%),
+        linear-gradient(to bottom, var(--bg-main) 0%, transparent 20%, transparent 80%, var(--bg-main) 100%); 
+    z-index: 2; 
+}
 
-.hero-poster { position: relative; z-index: 3; width: auto; max-width: 65%; height: 85%; object-fit: contain; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
+.light .hero-gradient { 
+    background: 
+        radial-gradient(circle at center, transparent 30%, var(--bg-main) 100%),
+        linear-gradient(to bottom, var(--bg-main) 0%, transparent 20%, transparent 80%, var(--bg-main) 100%);
+}
+
+.hero-poster { 
+    position: relative; 
+    z-index: 3; 
+    width: auto; 
+    max-width: 65%; 
+    height: 85%; 
+    object-fit: contain; 
+    border-radius: 12px; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+    border: 1px solid rgba(255,255,255,0.1); 
+}
 
 .show-info { position: relative; z-index: 4; padding: 0 20px; text-align: center; margin-top: -10px; }
 .show-title { font-size: clamp(24px, 7vw, 32px); font-weight: 900; color: var(--text-primary); line-height: 1.1; margin-bottom: 6px; letter-spacing: -0.5px; animation: fadeInUp 0.5s ease-out 0.1s both; }

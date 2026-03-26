@@ -29,6 +29,7 @@ from app.admin_site import admin_site
 from app.models import (
     Code,
     Country,
+    ExternalRating,
     Genre,
     LogEntry,
     Person,
@@ -41,6 +42,7 @@ from app.models import (
     ViewUser,
     ViewUserGroup,
 )
+from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender
 from app.views import sync_user_permissions
 from shared.constants import UserRole
@@ -258,6 +260,12 @@ class AverageRatingFilter(admin.SimpleListFilter):
         return queryset
 
 
+class ExternalRatingInline(admin.StackedInline):
+    model = ExternalRating
+    can_delete = False
+    readonly_fields = ('updated_at', 'created_at')
+
+
 @admin.register(Show, site=admin_site)
 class ShowAdmin(admin.ModelAdmin):
     list_display = (
@@ -274,7 +282,7 @@ class ShowAdmin(admin.ModelAdmin):
     )
     list_filter = ('type', 'status', AverageRatingFilter, 'year')
     search_fields = ('title', 'original_title', 'plot')
-    inlines = [ShowDurationInline, ViewHistoryInline, UserRatingInline]
+    inlines = [ExternalRatingInline, ShowDurationInline, ViewHistoryInline, UserRatingInline]
     readonly_fields = (
         'id',
         'admin_actions',
@@ -758,18 +766,43 @@ class GenreAdmin(BaseNameAdmin):
         )
 
 
+class HasPhotoFilter(admin.SimpleListFilter):
+    title = 'Наличие фото'
+    parameter_name = 'has_photo'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('yes', 'С фотографией'),
+            ('no', 'Без фотографии'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'yes':
+            return queryset.exclude(Q(photo_url__isnull=True) | Q(photo_url=''))
+        if self.value() == 'no':
+            return queryset.filter(Q(photo_url__isnull=True) | Q(photo_url=''))
+        return queryset
+
+
 @admin.register(Person, site=admin_site)
 class PersonAdmin(BaseNameAdmin):
     inlines = [ShowDirectorInline, ShowActorInline]
+    list_display = ('get_photo_display', 'name', 'is_photo_fetched', 'created_at', 'updated_at')
+    list_filter = (HasPhotoFilter, 'is_photo_fetched')
     search_fields = ('name',)
     readonly_fields = BaseNameAdmin.readonly_fields + (
+        'get_photo_display',
+        'refetch_photo_button',
         'related_genres',
         'related_countries',
         'user_stats',
     )
 
     fieldsets = (
-        (None, {'fields': ('name',)}),
+        (
+            None,
+            {'fields': ('get_photo_display', 'name', 'is_photo_fetched', 'refetch_photo_button')},
+        ),
         (
             'Statistics',
             {
@@ -786,7 +819,33 @@ class PersonAdmin(BaseNameAdmin):
         ),
     )
 
-    @admin.display(description='User Stats (Shows watched with this person)')
+    @admin.display(description='Photo', ordering='photo_url')
+    def get_photo_display(self, obj):
+        if obj.photo_url:
+            return format_html(
+                '<img src="{}" '
+                'style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;" />',
+                obj.photo_url,
+            )
+        return format_html(
+            '<div style="width: 50px; height: 50px; border-radius: 50%; background: #eee; '
+            'display: flex; align-items: center; justify-content: center; color: #999; '
+            'font-size: 10px; font-weight: bold;">NO PHOTO</div>'
+        )
+
+    @admin.display(description='Actions')
+    def refetch_photo_button(self, obj):
+        if not obj.id:
+            return '-'
+        url = reverse('admin:person_refetch_photo', args=[obj.id])
+        return format_html(
+            '<a class="button" style="background-color: #3498db; color: white;" href="{}">'
+            'Обновить фото из TMDB'
+            '</a>',
+            url,
+        )
+
+    @admin.display(description='User Stats (Shows watched)')
     def user_stats(self, obj):
         return _get_user_stats_html(Q(history__show__actors=obj) | Q(history__show__directors=obj))
 
@@ -801,6 +860,31 @@ class PersonAdmin(BaseNameAdmin):
         return _get_related_items_html(
             Country, Q(show__actors=obj) | Q(show__directors=obj), 'admin:app_country_change'
         )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                '<int:object_id>/refetch-photo/',
+                self.admin_site.admin_view(self.process_refetch_photo),
+                name='person_refetch_photo',
+            ),
+        ]
+        return custom_urls + urls
+
+    def process_refetch_photo(self, request, object_id):
+        obj = self.get_object(request, object_id)
+        if obj:
+            if fetch_person_photo_from_tmdb(obj):
+                if obj.photo_url:
+                    self.message_user(request, f'Фото для {obj.name} успешно обновлено.')
+                else:
+                    self.message_user(
+                        request, f'Фото для {obj.name} не найдено в TMDB.', level='WARNING'
+                    )
+            else:
+                self.message_user(request, 'Ошибка при обращении к API TMDB.', level='ERROR')
+        return HttpResponseRedirect(reverse('admin:app_person_change', args=[object_id]))
 
 
 class TelegramLogDirectionFilter(admin.SimpleListFilter):

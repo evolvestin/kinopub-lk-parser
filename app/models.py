@@ -57,6 +57,8 @@ class Genre(BaseModel):
 
 class Person(BaseModel):
     name = models.CharField(max_length=255, unique=True)
+    photo_url = models.URLField(max_length=500, null=True, blank=True)
+    is_photo_fetched = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -341,3 +343,20 @@ class SharedStat(BaseModel):
 
     def __str__(self):
         return f'Snapshot {self.id}'
+
+
+class ExternalRating(BaseModel):
+    show = models.OneToOneField(Show, on_delete=models.CASCADE, related_name='ext_rating')
+    kp = models.FloatField(null=True, blank=True)
+    imdb = models.FloatField(null=True, blank=True)
+    tmdb = models.FloatField(null=True, blank=True)
+    film_critics = models.FloatField(null=True, blank=True)
+    russian_film_critics = models.FloatField(null=True, blank=True)
+    await_rating = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'External Rating'
+        verbose_name_plural = 'External Ratings'
+
+    def __str__(self):
+        return f'External Ratings for {self.show.id}'

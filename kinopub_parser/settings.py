@@ -149,7 +149,7 @@ CACHES = {
 
 
 if DEBUG:
-    WEBSOCKET_URL = 'ws://127.0.0.1:8013/ws/logs/'
+    WEBSOCKET_URL = '/ws/logs/'
     WEBSOCKET_PORT = 8013
 else:
     WEBSOCKET_URL = '/ws/logs/'
@@ -198,6 +198,8 @@ KINOPUB_AUX_PASSWORD = os.getenv('KINOPUB_AUX_PASSWORD')
 SITE_AUX_URL = os.getenv('SITE_AUX_URL')
 
 POSTER_BASE_URL = os.getenv('POSTER_BASE_URL', 'https://google.com/')
+TMDB_API_KEY = os.getenv('TMDB_API_KEY')
+POISKKINO_API_KEY = os.getenv('POISKKINO_API_KEY')
 
 # --- App Core Config ---
 REGEX_CODE = r'\d{6}'
@@ -304,6 +306,14 @@ CELERY_BEAT_SCHEDULE = {
     'process_errors': {
         'task': 'app.tasks.process_errors_task',
         'schedule': crontab(minute='*/1'),  # Проверяем каждую минуту (отправка раз в 10 мин)
+    },
+    'fetch_person_photos': {
+        'task': 'app.tasks.fetch_person_photos_task',
+        'schedule': crontab(minute='*/30'),
+    },
+    'sync_poiskkino_ratings': {
+        'task': 'app.tasks.sync_poiskkino_ratings_task',
+        'schedule': crontab(minute=0, hour=5),
     },
 }
 

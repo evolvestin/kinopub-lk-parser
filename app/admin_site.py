@@ -54,7 +54,6 @@ class CustomAdminSite(admin.AdminSite):
         return render(request, 'admin/index.html', context)
 
     def _get_app_commands_details(self):
-        """Инспектирует команды приложения app и возвращает их структуру аргументов."""
         commands_dict = {}
         sys_commands = get_commands()
 
@@ -77,6 +76,7 @@ class CustomAdminSite(admin.AdminSite):
             'runemail_listener',
             'runparserlocal',
             'createsuperuserifneeded',
+            'restorebackup',
         ]
 
         target_commands = [
