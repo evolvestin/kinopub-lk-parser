@@ -503,8 +503,7 @@ def sync_poiskkino_ratings_task():
 
     if shows_to_update:
         Show.objects.bulk_update(
-            shows_to_update,
-            ['kinopoisk_rating', 'kinopoisk_votes', 'imdb_rating', 'imdb_votes']
+            shows_to_update, ['kinopoisk_rating', 'kinopoisk_votes', 'imdb_rating', 'imdb_votes']
         )
 
     if ext_ratings_to_update:

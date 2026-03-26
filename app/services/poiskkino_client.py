@@ -18,11 +18,7 @@ class PoiskkinoClient:
         date_str = f'{start_date.strftime("%d.%m.%Y")}-{end_date.strftime("%d.%m.%Y")}'
         headers = {'X-API-KEY': self.api_key}
 
-        params = {
-            'limit': 250,
-            'updatedAt': date_str,
-            'selectFields': ['id', 'rating', 'votes']
-        }
+        params = {'limit': 250, 'updatedAt': date_str, 'selectFields': ['id', 'rating', 'votes']}
 
         results = []
         next_cursor = None
@@ -55,11 +51,11 @@ class PoiskkinoClient:
         chunk_size = 250
 
         for i in range(0, len(show_ids), chunk_size):
-            chunk = show_ids[i:i + chunk_size]
+            chunk = show_ids[i : i + chunk_size]
             params = {
                 'limit': chunk_size,
                 'id': ','.join(str(x) for x in chunk),
-                'selectFields': ['id', 'rating', 'votes']
+                'selectFields': ['id', 'rating', 'votes'],
             }
 
             try:
