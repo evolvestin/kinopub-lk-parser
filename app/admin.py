@@ -36,6 +36,7 @@ from app.models import (
     SharedStat,
     Show,
     ShowDuration,
+    TaskRun,
     TelegramLog,
     UserRating,
     ViewHistory,
@@ -1258,3 +1259,40 @@ class SharedStatAdmin(admin.ModelAdmin):
     @admin.display(description='Data')
     def formatted_data(self, obj):
         return format_html('<pre>{}</pre>', json.dumps(obj.data, indent=2, ensure_ascii=False))
+
+
+@admin.register(TaskRun, site=admin_site)
+class TaskRunAdmin(admin.ModelAdmin):
+    list_display = ('command', 'status', 'created_at', 'updated_at')
+    list_filter = ('status', 'command', 'created_at')
+    search_fields = ('command', 'arguments', 'output', 'error_message')
+    readonly_fields = (
+        'command',
+        'arguments',
+        'status',
+        'output',
+        'error_message',
+        'celery_task_id',
+        'created_at',
+        'updated_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(UserRating, site=admin_site)
+class UserRatingAdmin(admin.ModelAdmin):
+    list_display = ('user', 'show', 'season_number', 'episode_number', 'rating', 'updated_at')
+    list_filter = ('rating', 'updated_at')
+    search_fields = ('user__name', 'user__username', 'show__title', 'show__original_title')
+    autocomplete_fields = ('user', 'show')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(ExternalRating, site=admin_site)
+class ExternalRatingAdmin(admin.ModelAdmin):
+    list_display = ('show', 'kp', 'imdb', 'tmdb', 'updated_at')
+    search_fields = ('show__title', 'show__original_title')
+    autocomplete_fields = ('show',)
+    readonly_fields = ('created_at', 'updated_at')

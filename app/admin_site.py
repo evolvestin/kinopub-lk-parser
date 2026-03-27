@@ -24,25 +24,62 @@ class CustomAdminSite(admin.AdminSite):
         ]
         return custom_urls + urls
 
-    def custom_index(self, request, extra_context=None):
-        app_list = self.get_app_list(request)
+    def get_app_list(self, request, app_label=None):
+        app_list = super().get_app_list(request)
+
+        log_models = []
+        system_models = [
+            {
+                'name': 'Task Control',
+                'object_name': 'task_control',
+                'admin_url': reverse('admin:task_control'),
+                'add_url': None,
+                'view_only': True,
+            }
+        ]
+
+        app_models_kept = []
+
+        for app in app_list:
+            if app['app_label'] == 'app':
+                for m in app['models']:
+                    if m['object_name'] in ('LogEntry', 'TelegramLog'):
+                        log_models.append(m)
+                    elif m['object_name'] == 'TaskRun':
+                        system_models.append(m)
+                    else:
+                        app_models_kept.append(m)
+                app['models'] = app_models_kept
+
+        if log_models:
+            app_list.append(
+                {
+                    'name': 'Логи',
+                    'app_label': 'logs',
+                    'app_url': '',
+                    'has_module_perms': True,
+                    'models': log_models,
+                }
+            )
 
         app_list.insert(
             0,
             {
                 'name': 'System',
                 'app_label': 'system',
-                'models': [
-                    {
-                        'name': 'Task Control',
-                        'object_name': 'task_control',
-                        'admin_url': reverse('admin:task_control'),
-                        'add_url': None,
-                        'view_only': True,
-                    }
-                ],
+                'app_url': '',
+                'has_module_perms': True,
+                'models': system_models,
             },
         )
+
+        if app_label:
+            return [app for app in app_list if app['app_label'] == app_label]
+
+        return app_list
+
+    def custom_index(self, request, extra_context=None):
+        app_list = self.get_app_list(request)
 
         context = {
             **self.each_context(request),
