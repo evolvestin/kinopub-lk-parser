@@ -41,15 +41,26 @@ class PoiskkinoClient:
             if next_cursor:
                 params['next'] = next_cursor
 
-            response = requests.get(self.BASE_URL, headers=headers, params=params, timeout=20)
-            response.raise_for_status()
-            data = response.json()
+            try:
+                response = requests.get(self.BASE_URL, headers=headers, params=params, timeout=20)
 
-            results.extend(data.get('docs', []))
-            request_count += 1
+                if response.status_code == 403:
+                    logging.warning(
+                        'Poiskkino API daily limit reached (403). Returning partial results.'
+                    )
+                    break
 
-            next_cursor = data.get('next')
-            if not data.get('hasNext') or not next_cursor:
+                response.raise_for_status()
+                data = response.json()
+
+                results.extend(data.get('docs', []))
+                request_count += 1
+
+                next_cursor = data.get('next')
+                if not data.get('hasNext') or not next_cursor:
+                    break
+            except requests.RequestException as e:
+                logging.error(f'Poiskkino fetch_updated_ratings error: {e}')
                 break
 
         return results
@@ -72,10 +83,15 @@ class PoiskkinoClient:
 
             try:
                 response = requests.get(self.BASE_URL, headers=headers, params=params, timeout=20)
+
+                if response.status_code == 403:
+                    logging.warning('Poiskkino API limit reached (403) during ID fetch. Stopping.')
+                    break
+
                 response.raise_for_status()
                 data = response.json()
                 results.extend(data.get('docs', []))
-            except Exception as e:
+            except requests.RequestException as e:
                 logging.error(f'Poiskkino fetch_ratings_by_ids error: {e}')
                 break
 
