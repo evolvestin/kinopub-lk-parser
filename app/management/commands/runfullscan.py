@@ -144,6 +144,7 @@ def run_full_scan_session(headless=True, target_type=None, process_all_pages=Fal
     last_processing_log = (
         LogEntry.objects.filter(
             module='runfullscan',
+            level='INFO',
             message__contains='Processing',
             created_at__gte=resume_window,
         )
@@ -154,6 +155,7 @@ def run_full_scan_session(headless=True, target_type=None, process_all_pages=Fal
     last_success_log = (
         LogEntry.objects.filter(
             module='runfullscan',
+            level='INFO',
             message__contains='Full catalog scan session finished successfully',
             created_at__gte=resume_window,
         )
