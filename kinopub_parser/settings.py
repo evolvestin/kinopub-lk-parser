@@ -29,9 +29,10 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-for-de
 DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = ['*']
 
+_web_port = os.getenv('WEB_PORT', '8012')
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8012',
-    'http://127.0.0.1:8012',
+    f'http://localhost:{_web_port}',
+    f'http://127.0.0.1:{_web_port}',
     'https://*.trycloudflare.com',
 ]
 

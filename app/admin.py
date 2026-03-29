@@ -788,7 +788,7 @@ class HasPhotoFilter(admin.SimpleListFilter):
 @admin.register(Person, site=admin_site)
 class PersonAdmin(BaseNameAdmin):
     inlines = [ShowDirectorInline, ShowActorInline]
-    list_display = ('get_photo_display', 'name', 'is_photo_fetched', 'created_at', 'updated_at')
+    list_display = ('get_photo_display', 'name', 'get_is_photo_fetched', 'created_at', 'updated_at')
     list_filter = (HasPhotoFilter, 'is_photo_fetched')
     search_fields = ('name',)
     readonly_fields = BaseNameAdmin.readonly_fields + (
@@ -820,6 +820,12 @@ class PersonAdmin(BaseNameAdmin):
         ),
     )
 
+    @admin.display(description='Is photo fetched', boolean=True, ordering='is_photo_fetched')
+    def get_is_photo_fetched(self, obj):
+        if not obj.is_photo_fetched:
+            return None
+        return bool(obj.photo_url)
+
     @admin.display(description='Photo', ordering='photo_url')
     def get_photo_display(self, obj):
         if obj.photo_url:
@@ -829,9 +835,24 @@ class PersonAdmin(BaseNameAdmin):
                 obj.photo_url,
             )
         return format_html(
-            '<div style="width: 50px; height: 50px; border-radius: 50%; background: #eee; '
-            'display: flex; align-items: center; justify-content: center; color: #999; '
-            'font-size: 10px; font-weight: bold;">NO PHOTO</div>'
+            """
+            <div style="
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                background: var(--secondary, #eee);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                color: var(--body-fg, #999);
+                font-size: 10px;
+                font-weight: bold;
+                line-height: 1;
+            ">
+                NO<br>PHOTO
+            </div>
+            """
         )
 
     @admin.display(description='Actions')

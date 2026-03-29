@@ -51,11 +51,33 @@ class Command(LoggableBaseCommand):
             logging.info('No data to process.')
             return
 
+        # Убираем дубликаты (один и тот же сериал может быть и в обнове, и в поиске по ID)
+        unique_data = {item['id']: item for item in data if item.get('id')}.values()
+        data_list = list(unique_data)
+        
+        logging.info(f'Total unique records to process and save: {len(data_list)}')
+
+        # Бьем на батчи, чтобы не убить память и БД
+        batch_size = 1000
+        total_processed = 0
+
+        for i in range(0, len(data_list), batch_size):
+            batch = data_list[i : i + batch_size]
+            self._process_batch(batch, kp_mapping, now)
+            total_processed += len(batch)
+            logging.info(f'Saved batch {total_processed}/{len(data_list)} to database.')
+
+        logging.info(f'Successfully synchronized {total_processed} shows in total.')
+
+    def _process_batch(self, batch_data, kp_mapping, now):
         data_map = {}
-        for item in data:
+        for item in batch_data:
             kp_id = item.get('id')
             if kp_id and kp_id in kp_mapping:
                 data_map[kp_mapping[kp_id]] = item
+
+        if not data_map:
+            return
 
         show_ids = list(data_map.keys())
         existing_shows = Show.objects.filter(id__in=show_ids).in_bulk(field_name='id')
@@ -70,14 +92,14 @@ class Command(LoggableBaseCommand):
 
         new_genres = [Genre(name=name) for name in all_genre_names if name not in existing_genres]
         if new_genres:
-            created_genres = Genre.objects.bulk_create(new_genres)
+            created_genres = Genre.objects.bulk_create(new_genres, batch_size=500)
             existing_genres.update({g.name: g for g in created_genres})
 
         new_countries = [
             Country(name=name) for name in all_country_names if name not in existing_countries
         ]
         if new_countries:
-            created_countries = Country.objects.bulk_create(new_countries)
+            created_countries = Country.objects.bulk_create(new_countries, batch_size=500)
             existing_countries.update({c.name: c for c in created_countries})
 
         shows_to_update = []
@@ -135,6 +157,7 @@ class Command(LoggableBaseCommand):
                     'plot',
                     'status',
                 ],
+                batch_size=500
             )
 
             Show.genres.through.objects.filter(show_id__in=show_ids).delete()
@@ -147,6 +170,7 @@ class Command(LoggableBaseCommand):
                     for genre_id in genre_ids
                 ],
                 ignore_conflicts=True,
+                batch_size=2000
             )
 
             Show.countries.through.objects.bulk_create(
@@ -156,6 +180,7 @@ class Command(LoggableBaseCommand):
                     for country_id in country_ids
                 ],
                 ignore_conflicts=True,
+                batch_size=2000
             )
 
         if ext_ratings_to_update:
@@ -172,6 +197,7 @@ class Command(LoggableBaseCommand):
                     'await_rating',
                     'updated_at',
                 ],
+                batch_size=500
             )
 
         logging.info(f'Successfully synchronized {len(shows_to_update)} shows.')
