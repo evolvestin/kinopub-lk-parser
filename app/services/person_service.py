@@ -49,7 +49,7 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
             try:
                 resp = requests.get(base_url, params=search_params, timeout=5)
             except requests.RequestException as e:
-                logger.error(f'TMDB network error for {person_instance.name}: {e}')
+                logger.warning(f'TMDB network error for {person_instance.name}: {e}')
                 time.sleep(5)
                 return False
 

@@ -788,9 +788,16 @@ class HasPhotoFilter(admin.SimpleListFilter):
 @admin.register(Person, site=admin_site)
 class PersonAdmin(BaseNameAdmin):
     inlines = [ShowDirectorInline, ShowActorInline]
-    list_display = ('get_photo_display', 'name', 'get_is_photo_fetched', 'created_at', 'updated_at')
+    list_display = (
+        'get_photo_display',
+        'name',
+        'en_name',
+        'get_is_photo_fetched',
+        'created_at',
+        'updated_at',
+    )
     list_filter = (HasPhotoFilter, 'is_photo_fetched')
-    search_fields = ('name',)
+    search_fields = ('name', 'en_name')
     readonly_fields = BaseNameAdmin.readonly_fields + (
         'get_photo_display',
         'refetch_photo_button',
@@ -798,11 +805,20 @@ class PersonAdmin(BaseNameAdmin):
         'related_countries',
         'user_stats',
     )
+    ordering = ('-updated_at',)
 
     fieldsets = (
         (
             None,
-            {'fields': ('get_photo_display', 'name', 'is_photo_fetched', 'refetch_photo_button')},
+            {
+                'fields': (
+                    'get_photo_display',
+                    'name',
+                    'en_name',
+                    'is_photo_fetched',
+                    'refetch_photo_button',
+                )
+            },
         ),
         (
             'Statistics',
