@@ -13,6 +13,7 @@ class PoiskkinoClient:
         'description',
         'genres',
         'countries',
+        'persons',
         'poster',
         'type',
         'status',

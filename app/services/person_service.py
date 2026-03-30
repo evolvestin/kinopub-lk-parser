@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 
 import requests
 from django.conf import settings
@@ -13,16 +14,17 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
         logger.error('TMDB_API_KEY is not set.')
         return False
 
-    raw_name = person_instance.name.replace('\xa0', ' ').strip()
+    search_scenarios = []
 
+    if person_instance.en_name:
+        search_scenarios.append({'query': person_instance.en_name, 'params': {'language': 'en-US'}})
+
+    raw_name = person_instance.name.replace('\xa0', ' ').strip()
     bracket_match = re.search(r'\((.*?)\)', raw_name)
     en_name_candidate = bracket_match.group(1).strip() if bracket_match else None
-
     ru_name_candidate = re.sub(r'\(.*?\)', '', raw_name).strip()
 
-    search_scenarios = [
-        {'query': ru_name_candidate, 'params': {'language': 'ru-RU'}},
-    ]
+    search_scenarios.append({'query': ru_name_candidate, 'params': {'language': 'ru-RU'}})
 
     if en_name_candidate:
         search_scenarios.append({'query': en_name_candidate, 'params': {'language': 'en-US'}})
@@ -44,7 +46,13 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
                 **scenario['params'],
             }
 
-            resp = requests.get(base_url, params=search_params, timeout=5)
+            try:
+                resp = requests.get(base_url, params=search_params, timeout=5)
+            except requests.RequestException as e:
+                logger.error(f'TMDB network error for {person_instance.name}: {e}')
+                time.sleep(5)
+                return False
+
             if resp.status_code == 200:
                 data = resp.json()
                 results = data.get('results', [])
@@ -64,7 +72,7 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
             person_instance.photo_url = None
 
         person_instance.is_photo_fetched = True
-        person_instance.save(update_fields=['photo_url', 'is_photo_fetched'])
+        person_instance.save(update_fields=['photo_url', 'is_photo_fetched', 'updated_at'])
         return True
 
     except DatabaseError:

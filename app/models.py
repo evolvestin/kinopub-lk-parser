@@ -57,6 +57,7 @@ class Genre(BaseModel):
 
 class Person(BaseModel):
     name = models.CharField(max_length=255, unique=True)
+    en_name = models.CharField(max_length=255, null=True, blank=True)
     photo_url = models.URLField(max_length=500, null=True, blank=True)
     is_photo_fetched = models.BooleanField(default=False)
 

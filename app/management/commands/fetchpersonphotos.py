@@ -1,6 +1,7 @@
 import logging
 
 from django.db import DatabaseError
+from django.db.models import Q
 
 from app.management.base import LoggableBaseCommand
 from app.models import Person
@@ -18,7 +19,10 @@ class Command(LoggableBaseCommand):
     def handle(self, *args, **options):
         limit = options.get('limit')
 
-        persons = Person.objects.filter(is_photo_fetched=False)[:limit]
+        persons = Person.objects.filter(
+            Q(is_photo_fetched=False) | Q(photo_url__isnull=True) | Q(photo_url='')
+        ).order_by('updated_at')[:limit]
+
         if not persons:
             logging.info('No persons need photo fetching.')
             return

@@ -54,7 +54,7 @@ class Command(LoggableBaseCommand):
         # Убираем дубликаты (один и тот же сериал может быть и в обнове, и в поиске по ID)
         unique_data = {item['id']: item for item in data if item.get('id')}.values()
         data_list = list(unique_data)
-        
+
         logging.info(f'Total unique records to process and save: {len(data_list)}')
 
         # Бьем на батчи, чтобы не убить память и БД
@@ -106,6 +106,7 @@ class Command(LoggableBaseCommand):
         ext_ratings_to_update = []
         show_genres_map = defaultdict(list)
         show_countries_map = defaultdict(list)
+        person_updates = {}
 
         for show_id, item in data_map.items():
             show = existing_shows.get(show_id)
@@ -145,6 +146,12 @@ class Command(LoggableBaseCommand):
                 if country := existing_countries.get(country_data['name']):
                     show_countries_map[show_id].append(country.id)
 
+            for person_data in item.get('persons', []):
+                p_name = person_data.get('name')
+                p_en_name = person_data.get('enName')
+                if p_name and p_en_name:
+                    person_updates[p_name] = p_en_name
+
         if shows_to_update:
             Show.objects.bulk_update(
                 shows_to_update,
@@ -157,7 +164,7 @@ class Command(LoggableBaseCommand):
                     'plot',
                     'status',
                 ],
-                batch_size=500
+                batch_size=500,
             )
 
             Show.genres.through.objects.filter(show_id__in=show_ids).delete()
@@ -170,7 +177,7 @@ class Command(LoggableBaseCommand):
                     for genre_id in genre_ids
                 ],
                 ignore_conflicts=True,
-                batch_size=2000
+                batch_size=2000,
             )
 
             Show.countries.through.objects.bulk_create(
@@ -180,7 +187,7 @@ class Command(LoggableBaseCommand):
                     for country_id in country_ids
                 ],
                 ignore_conflicts=True,
-                batch_size=2000
+                batch_size=2000,
             )
 
         if ext_ratings_to_update:
@@ -197,7 +204,24 @@ class Command(LoggableBaseCommand):
                     'await_rating',
                     'updated_at',
                 ],
-                batch_size=500
+                batch_size=500,
             )
+
+        if person_updates:
+            from app.models import Person
+
+            existing_persons = Person.objects.filter(name__in=person_updates.keys())
+            persons_to_update = []
+            for p in existing_persons:
+                new_en_name = person_updates[p.name]
+                if p.en_name != new_en_name:
+                    p.en_name = new_en_name
+                    if not p.photo_url:
+                        p.is_photo_fetched = False
+                    persons_to_update.append(p)
+            if persons_to_update:
+                Person.objects.bulk_update(
+                    persons_to_update, ['en_name', 'is_photo_fetched'], batch_size=500
+                )
 
         logging.info(f'Successfully synchronized {len(shows_to_update)} shows.')
