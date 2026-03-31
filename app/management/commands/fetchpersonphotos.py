@@ -1,5 +1,6 @@
 import logging
 
+import requests
 from django.db import DatabaseError
 from django.db.models import Q
 
@@ -20,7 +21,7 @@ class Command(LoggableBaseCommand):
         limit = options.get('limit')
 
         persons = Person.objects.filter(
-            Q(is_photo_fetched=False) | Q(photo_url__isnull=True) | Q(photo_url='')
+            Q(is_photo_fetched=False) | Q(tmdb_photo_url__isnull=True) | Q(tmdb_photo_url='')
         ).order_by('updated_at')[:limit]
 
         if not persons:
@@ -35,7 +36,10 @@ class Command(LoggableBaseCommand):
             except DatabaseError as e:
                 logging.critical(f'Fatal database error on person {person.name}: {e}')
                 return
+            except (requests.ConnectionError, requests.Timeout) as e:
+                logging.error(f'Aborting batch: TMDB API is unreachable. Error: {e}')
+                break
             except Exception as e:
-                logging.error(f'Unexpected error on {person.name}: {e}')
+                logging.error(f'Skipping {person.name} due to unexpected error: {e}')
 
         logging.info(f'Successfully processed {count} persons.')

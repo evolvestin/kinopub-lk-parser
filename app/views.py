@@ -1051,11 +1051,29 @@ def webapp_get_shared_stats(request, stat_id):
 @require_http_methods(['GET'])
 def webapp_get_show_full(request, show_id):
     try:
-        show = Show.objects.prefetch_related('countries', 'genres', 'directors', 'actors').get(
+        show = Show.objects.prefetch_related('countries', 'genres', 'showcrew_set__person').get(
             id=show_id
         )
 
         internal_rating, _ = show.get_internal_rating_data()
+
+        directors = []
+        actors = []
+
+        for crew_member in show.showcrew_set.all():
+            prof_ru = (crew_member.profession or '').lower()
+            prof_en = (crew_member.en_profession or '').lower()
+
+            person_data = {
+                'id': crew_member.person.id,
+                'name': crew_member.person.name,
+                'photo_url': crew_member.person.photo_url,
+            }
+
+            if 'режисс' in prof_ru or 'director' in prof_en or 'создатель' in prof_ru:
+                directors.append({'id': crew_member.person.id, 'name': crew_member.person.name})
+            elif 'актер' in prof_ru or 'actor' in prof_en or 'в ролях' in prof_ru:
+                actors.append(person_data)
 
         data = {
             'id': show.id,
@@ -1074,11 +1092,8 @@ def webapp_get_show_full(request, show_id):
                 {'id': c.id, 'name': c.name, 'emoji': c.emoji_flag} for c in show.countries.all()
             ],
             'genres': [{'id': g.id, 'name': g.name} for g in show.genres.all()],
-            'directors': [{'id': d.id, 'name': d.name} for d in show.directors.all()],
-            'actors': [
-                {'id': a.id, 'name': a.name, 'photo_url': a.photo_url}
-                for a in show.actors.all()[:25]
-            ],
+            'directors': directors,
+            'actors': actors[:25],
         }
         return JsonResponse(data)
     except Show.DoesNotExist:
@@ -1096,11 +1111,23 @@ def webapp_get_collection(request, collection_type, item_id):
 
         if collection_type == 'actor':
             person = Person.objects.get(id=item_id)
-            shows = shows.filter(actors=person)
+            shows = shows.filter(
+                showcrew__person=person,
+                showcrew__profession__in=['Актер', 'актер', 'Actor', 'actor', 'В ролях'],
+            )
             title = person.name
         elif collection_type == 'director':
             person = Person.objects.get(id=item_id)
-            shows = shows.filter(directors=person)
+            shows = shows.filter(
+                showcrew__person=person,
+                showcrew__profession__in=[
+                    'Режиссер',
+                    'режиссер',
+                    'Director',
+                    'director',
+                    'Создатель',
+                ],
+            )
             title = f'Режиссер: {person.name}'
         elif collection_type == 'genre':
             genre = Genre.objects.get(id=item_id)
@@ -1115,7 +1142,7 @@ def webapp_get_collection(request, collection_type, item_id):
         else:
             return JsonResponse({'error': 'Invalid collection type'}, status=400)
 
-        shows = shows.order_by('-year', '-id').distinct()[:50]  # Лимит для производительности
+        shows = shows.order_by('-year', '-id').distinct()[:50]
 
         results = []
         for show in shows:

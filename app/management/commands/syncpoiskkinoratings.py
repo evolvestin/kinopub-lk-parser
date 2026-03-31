@@ -121,8 +121,6 @@ class Command(LoggableBaseCommand):
 
         show_genres_map = defaultdict(set)
         show_countries_map = defaultdict(set)
-        show_actors_map = defaultdict(set)
-        show_directors_map = defaultdict(set)
         show_crew_map = defaultdict(list)
 
         persons_to_update = {}
@@ -181,10 +179,14 @@ class Command(LoggableBaseCommand):
                     needs_update = True
 
                 p_photo = person_data.get('photo')
-                if p_photo and not person.photo_url:
-                    person.photo_url = p_photo
-                    person.is_photo_fetched = True
-                    needs_update = True
+                if p_photo:
+                    if not any(
+                        s in p_photo
+                        for s in ('iphone360_0.jpeg', 'no-poster', 'no-photo', 'avatar_empty')
+                    ):
+                        if person.kp_photo_url != p_photo:
+                            person.kp_photo_url = p_photo
+                            needs_update = True
 
                 if needs_update:
                     persons_to_update[person.id] = person
@@ -193,14 +195,6 @@ class Command(LoggableBaseCommand):
                 raw_prof_en = person_data.get('enProfession')
 
                 show_crew_map[show_id].append((person.id, raw_prof_ru, raw_prof_en))
-
-                prof_ru = str(raw_prof_ru or '').lower()
-                prof_en = str(raw_prof_en or '').lower()
-
-                if 'актер' in prof_ru or 'actor' in prof_en:
-                    show_actors_map[show_id].add(person.id)
-                elif 'режисс' in prof_ru or 'director' in prof_en:
-                    show_directors_map[show_id].add(person.id)
 
         if shows_to_update:
             Show.objects.bulk_update(
@@ -219,8 +213,6 @@ class Command(LoggableBaseCommand):
 
             Show.genres.through.objects.filter(show_id__in=show_ids).delete()
             Show.countries.through.objects.filter(show_id__in=show_ids).delete()
-            Show.actors.through.objects.filter(show_id__in=show_ids).delete()
-            Show.directors.through.objects.filter(show_id__in=show_ids).delete()
             ShowCrew.objects.filter(show_id__in=show_ids).delete()
 
             Show.genres.through.objects.bulk_create(
@@ -238,26 +230,6 @@ class Command(LoggableBaseCommand):
                     Show.countries.through(show_id=s_id, country_id=c_id)
                     for s_id, c_ids in show_countries_map.items()
                     for c_id in c_ids
-                ],
-                ignore_conflicts=True,
-                batch_size=2000,
-            )
-
-            Show.actors.through.objects.bulk_create(
-                [
-                    Show.actors.through(show_id=s_id, person_id=p_id)
-                    for s_id, p_ids in show_actors_map.items()
-                    for p_id in p_ids
-                ],
-                ignore_conflicts=True,
-                batch_size=2000,
-            )
-
-            Show.directors.through.objects.bulk_create(
-                [
-                    Show.directors.through(show_id=s_id, person_id=p_id)
-                    for s_id, p_ids in show_directors_map.items()
-                    for p_id in p_ids
                 ],
                 ignore_conflicts=True,
                 batch_size=2000,
@@ -292,7 +264,7 @@ class Command(LoggableBaseCommand):
         if persons_to_update:
             Person.objects.bulk_update(
                 persons_to_update.values(),
-                ['en_name', 'photo_url', 'is_photo_fetched'],
+                ['en_name', 'kp_photo_url'],
                 batch_size=500,
             )
 

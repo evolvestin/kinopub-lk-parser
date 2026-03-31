@@ -58,8 +58,13 @@ class Genre(BaseModel):
 class Person(BaseModel):
     name = models.CharField(max_length=255, unique=True)
     en_name = models.CharField(max_length=255, null=True, blank=True)
-    photo_url = models.URLField(max_length=500, null=True, blank=True)
+    tmdb_photo_url = models.URLField(max_length=500, null=True, blank=True)
+    kp_photo_url = models.URLField(max_length=500, null=True, blank=True)
     is_photo_fetched = models.BooleanField(default=False)
+
+    @property
+    def photo_url(self):
+        return self.tmdb_photo_url or self.kp_photo_url
 
     def __str__(self):
         return self.name
@@ -178,8 +183,6 @@ class Show(BaseModel):
     plot = models.TextField(null=True, blank=True)
     countries = models.ManyToManyField(Country, blank=True)
     genres = models.ManyToManyField(Genre, blank=True)
-    directors = models.ManyToManyField(Person, related_name='directed_shows', blank=True)
-    actors = models.ManyToManyField(Person, related_name='acted_in_shows', blank=True)
     crew = models.ManyToManyField(
         Person, through='ShowCrew', related_name='shows_as_crew', blank=True
     )

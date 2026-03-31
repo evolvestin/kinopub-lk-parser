@@ -19,7 +19,7 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.gdrive_backup import BackupManager
-from app.models import Code, Country, Genre, Person, Show, ShowDuration, ViewHistory
+from app.models import Code, Country, Genre, Show, ShowDuration, ViewHistory
 from app.signals import view_history_created
 from kinopub_parser import celery_app
 from shared.constants import (
@@ -218,9 +218,6 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         for label, model, relation in [
             ('Страна', Country, show.countries),
             ('Жанр', Genre, show.genres),
-            ('Создатель', Person, show.directors),
-            ('Режиссёр', Person, show.directors),
-            ('В ролях', Person, show.actors),
         ]:
             elements_data = get_row_data(label)
             if elements_data:
@@ -230,6 +227,20 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
                     if name:
                         obj, _ = model.objects.update_or_create(name=name)
                         relation.add(obj)
+
+        for label in ['Создатель', 'Режиссёр', 'В ролях']:
+            elements_data = get_row_data(label)
+            if elements_data:
+                from app.models import Person, ShowCrew
+
+                elements = elements_data.find_elements(By.TAG_NAME, 'a')
+                for link_element in elements:
+                    name = link_element.text.strip()
+                    if name:
+                        person, _ = Person.objects.update_or_create(name=name)
+                        ShowCrew.objects.update_or_create(
+                            show=show, person=person, profession=label
+                        )
 
         show.save()
 

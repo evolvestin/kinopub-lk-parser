@@ -84,11 +84,8 @@ def _get_user_stats_html(queryset_filter_q):
     return format_html(html)
 
 
-def _get_related_items_html(model, query_filter, url_name):
+def _get_related_items_html(model, query_filter, url_name, relation_field='show'):
     """Генерирует HTML список связанных объектов (актеров, жанров, стран)."""
-    # Для Person поле называется acted_in_shows, для остальных - show
-    relation_field = 'acted_in_shows' if model == Person else 'show'
-
     items = (
         model.objects.filter(query_filter)
         .distinct()
@@ -316,7 +313,6 @@ class ShowAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
     )
-    autocomplete_fields = ('directors', 'actors')
     filter_horizontal = ('countries', 'genres')
     actions = ['action_update_details', 'action_update_durations']
 
@@ -685,20 +681,6 @@ class ShowGenreInline(BaseReadonlyInline):
     autocomplete_fields = ('show',)
 
 
-class ShowDirectorInline(BaseReadonlyInline):
-    model = Show.directors.through
-    verbose_name = 'Directed Show'
-    verbose_name_plural = 'Directed Shows'
-    autocomplete_fields = ('show',)
-
-
-class ShowActorInline(BaseReadonlyInline):
-    model = Show.actors.through
-    verbose_name = 'Acted In Show'
-    verbose_name_plural = 'Acted In Shows'
-    autocomplete_fields = ('show',)
-
-
 class BaseNameAdmin(admin.ModelAdmin):
     list_display = ('name', 'created_at', 'updated_at')
     search_fields = ('name',)
@@ -743,7 +725,13 @@ class CountryAdmin(BaseNameAdmin):
     @admin.display(description='Actors')
     def related_actors(self, obj):
         return _get_related_items_html(
-            Person, Q(acted_in_shows__countries=obj), 'admin:app_person_change'
+            Person,
+            Q(
+                shows_as_crew__countries=obj,
+                showcrew__profession__in=['Актер', 'актер', 'Actor', 'actor', 'В ролях'],
+            ),
+            'admin:app_person_change',
+            relation_field='shows_as_crew',
         )
 
 
@@ -777,7 +765,13 @@ class GenreAdmin(BaseNameAdmin):
     @admin.display(description='Actors')
     def related_actors(self, obj):
         return _get_related_items_html(
-            Person, Q(acted_in_shows__genres=obj), 'admin:app_person_change'
+            Person,
+            Q(
+                shows_as_crew__genres=obj,
+                showcrew__profession__in=['Актер', 'актер', 'Actor', 'actor', 'В ролях'],
+            ),
+            'admin:app_person_change',
+            relation_field='shows_as_crew',
         )
 
 
@@ -799,9 +793,16 @@ class HasPhotoFilter(admin.SimpleListFilter):
         return queryset
 
 
+class PersonShowCrewInline(BaseReadonlyInline):
+    model = ShowCrew
+    verbose_name = 'Acted / Directed In Show'
+    verbose_name_plural = 'Shows Roles'
+    autocomplete_fields = ('show',)
+
+
 @admin.register(Person, site=admin_site)
 class PersonAdmin(BaseNameAdmin):
-    inlines = [ShowDirectorInline, ShowActorInline]
+    inlines = [PersonShowCrewInline]
     list_display = (
         'get_photo_display',
         'name',
@@ -854,7 +855,7 @@ class PersonAdmin(BaseNameAdmin):
     def get_is_photo_fetched(self, obj):
         if not obj.is_photo_fetched:
             return None
-        return bool(obj.photo_url)
+        return bool(obj.tmdb_photo_url)
 
     @admin.display(description='Photo', ordering='photo_url')
     def get_photo_display(self, obj):
@@ -899,19 +900,15 @@ class PersonAdmin(BaseNameAdmin):
 
     @admin.display(description='User Stats (Shows watched)')
     def user_stats(self, obj):
-        return _get_user_stats_html(Q(history__show__actors=obj) | Q(history__show__directors=obj))
+        return _get_user_stats_html(Q(history__show__crew=obj))
 
     @admin.display(description='Genres')
     def related_genres(self, obj):
-        return _get_related_items_html(
-            Genre, Q(show__actors=obj) | Q(show__directors=obj), 'admin:app_genre_change'
-        )
+        return _get_related_items_html(Genre, Q(show__crew=obj), 'admin:app_genre_change')
 
     @admin.display(description='Countries')
     def related_countries(self, obj):
-        return _get_related_items_html(
-            Country, Q(show__actors=obj) | Q(show__directors=obj), 'admin:app_country_change'
-        )
+        return _get_related_items_html(Country, Q(show__crew=obj), 'admin:app_country_change')
 
     def get_urls(self):
         urls = super().get_urls()

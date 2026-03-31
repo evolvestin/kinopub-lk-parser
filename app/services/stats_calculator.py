@@ -123,7 +123,6 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
 
 
 def _get_favorites(base_qs, dur_qs):
-    # Используем первичный ключ жанра для корректной группировки
     genres_qs = (
         base_qs.values(tid=F('show__genres__id'), name=F('show__genres__name'))
         .filter(tid__isnull=False)
@@ -133,15 +132,13 @@ def _get_favorites(base_qs, dur_qs):
     total_mentions = sum(g['count'] for g in genres_qs)
 
     genres = []
-    # Предварительно считаем суммы минут по жанрам отдельно, чтобы избежать JOIN-коллизий
-    # Группируем dur_qs, который уже содержит уникальные записи ViewHistory
     genre_mins_map = {}
     genre_durations = dur_qs.values('show__genres__name').annotate(m=Sum('final_duration'))
     for gd in genre_durations:
         if gd['show__genres__name']:
             genre_mins_map[gd['show__genres__name']] = int((gd['m'] or 0) / 60)
 
-    for g in genres_qs[:20]:  # Увеличиваем лимит до 20 для полноты картины
+    for g in genres_qs[:20]:
         name = g['name']
         show_ids = list(
             base_qs.filter(show__genres__id=g['tid']).values_list('show_id', flat=True).distinct()
@@ -158,12 +155,13 @@ def _get_favorites(base_qs, dur_qs):
             }
         )
 
-    def get_person_top(field, limit=5):
+    def get_person_top(professions, limit=5):
         qs = (
-            base_qs.values(
-                tid=F(f'show__{field}__id'),
-                name=F(f'show__{field}__name'),
-                photo_url=F(f'show__{field}__photo_url'),
+            base_qs.filter(show__showcrew__profession__in=professions)
+            .values(
+                tid=F('show__showcrew__person__id'),
+                name=F('show__showcrew__person__name'),
+                photo_url=F('show__showcrew__person__photo_url'),
             )
             .filter(tid__isnull=False)
             .annotate(views=Count('id', distinct=True), shows_count=Count('show_id', distinct=True))
@@ -172,13 +170,13 @@ def _get_favorites(base_qs, dur_qs):
         result = []
         for p in qs:
             show_ids = list(
-                base_qs.filter(**{f'show__{field}__id': p['tid']})
+                base_qs.filter(show__showcrew__person__id=p['tid'])
                 .values_list('show_id', flat=True)
                 .distinct()
             )
 
             show_titles = list(
-                base_qs.filter(**{f'show__{field}__id': p['tid']})
+                base_qs.filter(show__showcrew__person__id=p['tid'])
                 .order_by('show__original_title')
                 .values_list('show__original_title', flat=True)
                 .distinct()
@@ -226,7 +224,7 @@ def _get_favorites(base_qs, dur_qs):
 
     return {
         'genres': genres,
-        'actors': get_person_top('actors'),
+        'actors': get_person_top(['Актер', 'актер', 'Actor', 'actor', 'В ролях']),
         'countries': countries,
     }
 

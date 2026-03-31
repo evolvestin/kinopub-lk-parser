@@ -1,12 +1,31 @@
 import logging
 import re
-import time
 
 import requests
 from django.conf import settings
 from django.db import DatabaseError
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
+
+_tmdb_session = None
+
+
+def get_tmdb_session():
+    global _tmdb_session
+    if _tmdb_session is None:
+        _tmdb_session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=['GET'],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        _tmdb_session.mount('http://', adapter)
+        _tmdb_session.mount('https://', adapter)
+    return _tmdb_session
 
 
 def fetch_person_photo_from_tmdb(person_instance) -> bool:
@@ -15,7 +34,6 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
         return False
 
     search_scenarios = []
-
     if person_instance.en_name:
         search_scenarios.append({'query': person_instance.en_name, 'params': {'language': 'en-US'}})
 
@@ -25,14 +43,13 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
     ru_name_candidate = re.sub(r'\(.*?\)', '', raw_name).strip()
 
     search_scenarios.append({'query': ru_name_candidate, 'params': {'language': 'ru-RU'}})
-
     if en_name_candidate:
         search_scenarios.append({'query': en_name_candidate, 'params': {'language': 'en-US'}})
-
     search_scenarios.append({'query': ru_name_candidate, 'params': {}})
 
     base_url = 'https://api.themoviedb.org/3/search/person'
     found_path = None
+    session = get_tmdb_session()
 
     try:
         for scenario in search_scenarios:
@@ -47,36 +64,31 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
             }
 
             try:
-                resp = requests.get(base_url, params=search_params, timeout=5)
-            except requests.RequestException as e:
-                logger.warning(f'TMDB network error for {person_instance.name}: {e}')
-                time.sleep(5)
-                return False
-
-            if resp.status_code == 200:
-                data = resp.json()
-                results = data.get('results', [])
-
-                for res in results:
-                    path = res.get('profile_path')
-                    if path:
-                        found_path = path
+                resp = session.get(base_url, params=search_params, timeout=10)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    results = data.get('results', [])
+                    for res in results:
+                        path = res.get('profile_path')
+                        if path:
+                            found_path = path
+                            break
+                    if found_path:
                         break
+            except (requests.ConnectionError, requests.Timeout) as e:
+                logger.warning(f'TMDB connectivity issue for {person_instance.name}: {e}')
+                raise
 
-                if found_path:
-                    break
-
-        if found_path:
-            person_instance.photo_url = f'https://image.tmdb.org/t/p/w200{found_path}'
-        else:
-            person_instance.photo_url = None
-
+        person_instance.tmdb_photo_url = (
+            f'https://image.tmdb.org/t/p/w200{found_path}' if found_path else None
+        )
         person_instance.is_photo_fetched = True
-        person_instance.save(update_fields=['photo_url', 'is_photo_fetched', 'updated_at'])
+        person_instance.save(update_fields=['tmdb_photo_url', 'is_photo_fetched', 'updated_at'])
         return True
 
     except DatabaseError:
         raise
     except Exception as e:
-        logger.error(f'Failed to fetch photo for {person_instance.name}: {e}')
+        if not isinstance(e, requests.RequestException):
+            logger.error(f'Unexpected error on {person_instance.name}: {e}')
         return False
