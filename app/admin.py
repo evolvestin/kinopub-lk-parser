@@ -35,6 +35,7 @@ from app.models import (
     Person,
     SharedStat,
     Show,
+    ShowCrew,
     ShowDuration,
     TaskRun,
     TelegramLog,
@@ -267,6 +268,13 @@ class ExternalRatingInline(admin.StackedInline):
     readonly_fields = ('updated_at', 'created_at')
 
 
+class ShowCrewInline(admin.TabularInline):
+    model = ShowCrew
+    extra = 0
+    autocomplete_fields = ('person',)
+    readonly_fields = ('created_at', 'updated_at')
+
+
 @admin.register(Show, site=admin_site)
 class ShowAdmin(admin.ModelAdmin):
     list_display = (
@@ -283,7 +291,13 @@ class ShowAdmin(admin.ModelAdmin):
     )
     list_filter = ('type', 'status', AverageRatingFilter, 'year')
     search_fields = ('title', 'original_title', 'plot')
-    inlines = [ExternalRatingInline, ShowDurationInline, ViewHistoryInline, UserRatingInline]
+    inlines = [
+        ExternalRatingInline,
+        ShowDurationInline,
+        ViewHistoryInline,
+        UserRatingInline,
+        ShowCrewInline,
+    ]
     readonly_fields = (
         'id',
         'admin_actions',
@@ -1333,3 +1347,16 @@ class ExternalRatingAdmin(admin.ModelAdmin):
     search_fields = ('show__title', 'show__original_title')
     autocomplete_fields = ('show',)
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(ShowCrew, site=admin_site)
+class ShowCrewAdmin(admin.ModelAdmin):
+    list_display = ('show', 'person', 'profession', 'en_profession', 'created_at')
+    search_fields = ('show__title', 'show__original_title', 'person__name', 'profession')
+    list_filter = ('profession',)
+    autocomplete_fields = ('show', 'person')
+    readonly_fields = ('created_at', 'updated_at')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('show', 'person')

@@ -5,7 +5,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from app.management.base import LoggableBaseCommand
-from app.models import Country, ExternalRating, Genre, Show
+from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew
 from app.services.poiskkino_client import PoiskkinoClient
 from app.tasks import get_kp_mapping
 
@@ -86,9 +86,16 @@ class Command(LoggableBaseCommand):
         all_country_names = {
             c['name'] for item in data_map.values() for c in item.get('countries', [])
         }
+        all_person_names = {
+            p['name']
+            for item in data_map.values()
+            for p in item.get('persons', [])
+            if p.get('name')
+        }
 
         existing_genres = {g.name: g for g in Genre.objects.filter(name__in=all_genre_names)}
         existing_countries = {c.name: c for c in Country.objects.filter(name__in=all_country_names)}
+        existing_persons = {p.name: p for p in Person.objects.filter(name__in=all_person_names)}
 
         new_genres = [Genre(name=name) for name in all_genre_names if name not in existing_genres]
         if new_genres:
@@ -102,11 +109,23 @@ class Command(LoggableBaseCommand):
             created_countries = Country.objects.bulk_create(new_countries, batch_size=500)
             existing_countries.update({c.name: c for c in created_countries})
 
+        new_persons = [
+            Person(name=name) for name in all_person_names if name not in existing_persons
+        ]
+        if new_persons:
+            created_persons = Person.objects.bulk_create(new_persons, batch_size=500)
+            existing_persons.update({p.name: p for p in created_persons})
+
         shows_to_update = []
         ext_ratings_to_update = []
-        show_genres_map = defaultdict(list)
-        show_countries_map = defaultdict(list)
-        person_updates = {}
+
+        show_genres_map = defaultdict(set)
+        show_countries_map = defaultdict(set)
+        show_actors_map = defaultdict(set)
+        show_directors_map = defaultdict(set)
+        show_crew_map = defaultdict(list)
+
+        persons_to_update = {}
 
         for show_id, item in data_map.items():
             show = existing_shows.get(show_id)
@@ -140,17 +159,48 @@ class Command(LoggableBaseCommand):
 
             for genre_data in item.get('genres', []):
                 if genre := existing_genres.get(genre_data['name']):
-                    show_genres_map[show_id].append(genre.id)
+                    show_genres_map[show_id].add(genre.id)
 
             for country_data in item.get('countries', []):
                 if country := existing_countries.get(country_data['name']):
-                    show_countries_map[show_id].append(country.id)
+                    show_countries_map[show_id].add(country.id)
 
             for person_data in item.get('persons', []):
                 p_name = person_data.get('name')
+                if not p_name:
+                    continue
+
+                person = existing_persons.get(p_name)
+                if not person:
+                    continue
+
+                needs_update = False
                 p_en_name = person_data.get('enName')
-                if p_name and p_en_name:
-                    person_updates[p_name] = p_en_name
+                if p_en_name and person.en_name != p_en_name:
+                    person.en_name = p_en_name
+                    needs_update = True
+
+                p_photo = person_data.get('photo')
+                if p_photo and not person.photo_url:
+                    person.photo_url = p_photo
+                    person.is_photo_fetched = True
+                    needs_update = True
+
+                if needs_update:
+                    persons_to_update[person.id] = person
+
+                raw_prof_ru = person_data.get('profession')
+                raw_prof_en = person_data.get('enProfession')
+
+                show_crew_map[show_id].append((person.id, raw_prof_ru, raw_prof_en))
+
+                prof_ru = str(raw_prof_ru or '').lower()
+                prof_en = str(raw_prof_en or '').lower()
+
+                if 'актер' in prof_ru or 'actor' in prof_en:
+                    show_actors_map[show_id].add(person.id)
+                elif 'режисс' in prof_ru or 'director' in prof_en:
+                    show_directors_map[show_id].add(person.id)
 
         if shows_to_update:
             Show.objects.bulk_update(
@@ -169,12 +219,15 @@ class Command(LoggableBaseCommand):
 
             Show.genres.through.objects.filter(show_id__in=show_ids).delete()
             Show.countries.through.objects.filter(show_id__in=show_ids).delete()
+            Show.actors.through.objects.filter(show_id__in=show_ids).delete()
+            Show.directors.through.objects.filter(show_id__in=show_ids).delete()
+            ShowCrew.objects.filter(show_id__in=show_ids).delete()
 
             Show.genres.through.objects.bulk_create(
                 [
-                    Show.genres.through(show_id=show_id, genre_id=genre_id)
-                    for show_id, genre_ids in show_genres_map.items()
-                    for genre_id in genre_ids
+                    Show.genres.through(show_id=s_id, genre_id=g_id)
+                    for s_id, g_ids in show_genres_map.items()
+                    for g_id in g_ids
                 ],
                 ignore_conflicts=True,
                 batch_size=2000,
@@ -182,13 +235,42 @@ class Command(LoggableBaseCommand):
 
             Show.countries.through.objects.bulk_create(
                 [
-                    Show.countries.through(show_id=show_id, country_id=country_id)
-                    for show_id, country_ids in show_countries_map.items()
-                    for country_id in country_ids
+                    Show.countries.through(show_id=s_id, country_id=c_id)
+                    for s_id, c_ids in show_countries_map.items()
+                    for c_id in c_ids
                 ],
                 ignore_conflicts=True,
                 batch_size=2000,
             )
+
+            Show.actors.through.objects.bulk_create(
+                [
+                    Show.actors.through(show_id=s_id, person_id=p_id)
+                    for s_id, p_ids in show_actors_map.items()
+                    for p_id in p_ids
+                ],
+                ignore_conflicts=True,
+                batch_size=2000,
+            )
+
+            Show.directors.through.objects.bulk_create(
+                [
+                    Show.directors.through(show_id=s_id, person_id=p_id)
+                    for s_id, p_ids in show_directors_map.items()
+                    for p_id in p_ids
+                ],
+                ignore_conflicts=True,
+                batch_size=2000,
+            )
+
+            crew_objects = []
+            for s_id, crew_list in show_crew_map.items():
+                for p_id, p_ru, p_en in crew_list:
+                    crew_objects.append(
+                        ShowCrew(show_id=s_id, person_id=p_id, profession=p_ru, en_profession=p_en)
+                    )
+
+            ShowCrew.objects.bulk_create(crew_objects, ignore_conflicts=True, batch_size=2000)
 
         if ext_ratings_to_update:
             ExternalRating.objects.bulk_create(
@@ -207,21 +289,11 @@ class Command(LoggableBaseCommand):
                 batch_size=500,
             )
 
-        if person_updates:
-            from app.models import Person
-
-            existing_persons = Person.objects.filter(name__in=person_updates.keys())
-            persons_to_update = []
-            for p in existing_persons:
-                new_en_name = person_updates[p.name]
-                if p.en_name != new_en_name:
-                    p.en_name = new_en_name
-                    if not p.photo_url:
-                        p.is_photo_fetched = False
-                    persons_to_update.append(p)
-            if persons_to_update:
-                Person.objects.bulk_update(
-                    persons_to_update, ['en_name', 'is_photo_fetched'], batch_size=500
-                )
+        if persons_to_update:
+            Person.objects.bulk_update(
+                persons_to_update.values(),
+                ['en_name', 'photo_url', 'is_photo_fetched'],
+                batch_size=500,
+            )
 
         logging.info(f'Successfully synchronized {len(shows_to_update)} shows.')

@@ -69,6 +69,21 @@ class Person(BaseModel):
         verbose_name_plural = 'Persons'
 
 
+class ShowCrew(BaseModel):
+    show = models.ForeignKey('Show', on_delete=models.CASCADE)
+    person = models.ForeignKey('Person', on_delete=models.CASCADE)
+    profession = models.CharField(max_length=255, null=True, blank=True)
+    en_profession = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Show Crew Member'
+        verbose_name_plural = 'Show Crew Members'
+        unique_together = ('show', 'person', 'profession')
+
+    def __str__(self):
+        return f'{self.person.name} - {self.profession}'
+
+
 class ViewUser(BaseModel):
     telegram_id = models.BigIntegerField(unique=True, null=True, blank=True)
     username = models.CharField(max_length=255, null=True, blank=True)
@@ -165,6 +180,9 @@ class Show(BaseModel):
     genres = models.ManyToManyField(Genre, blank=True)
     directors = models.ManyToManyField(Person, related_name='directed_shows', blank=True)
     actors = models.ManyToManyField(Person, related_name='acted_in_shows', blank=True)
+    crew = models.ManyToManyField(
+        Person, through='ShowCrew', related_name='shows_as_crew', blank=True
+    )
 
     def get_internal_rating_data(self):
         ratings = self.ratings.select_related('user').all()

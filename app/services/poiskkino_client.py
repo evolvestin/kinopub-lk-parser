@@ -3,6 +3,8 @@ from datetime import date
 
 import requests
 from django.conf import settings
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 class PoiskkinoClient:
@@ -23,6 +25,17 @@ class PoiskkinoClient:
 
     def __init__(self):
         self.api_key = settings.POISKKINO_API_KEY
+        self.session = requests.Session()
+
+        retry_strategy = Retry(
+            total=5,
+            backoff_factor=1.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=['GET'],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
 
     def fetch_updated_ratings(self, start_date: date, end_date: date) -> list[dict]:
         if not self.api_key:
@@ -43,7 +56,9 @@ class PoiskkinoClient:
                 params['next'] = next_cursor
 
             try:
-                response = requests.get(self.BASE_URL, headers=headers, params=params, timeout=20)
+                response = self.session.get(
+                    self.BASE_URL, headers=headers, params=params, timeout=20
+                )
 
                 if response.status_code == 403:
                     logging.warning(
@@ -83,7 +98,9 @@ class PoiskkinoClient:
             }
 
             try:
-                response = requests.get(self.BASE_URL, headers=headers, params=params, timeout=20)
+                response = self.session.get(
+                    self.BASE_URL, headers=headers, params=params, timeout=20
+                )
 
                 if response.status_code == 403:
                     logging.warning('Poiskkino API limit reached (403) during ID fetch. Stopping.')
