@@ -8,6 +8,7 @@ from app.management.base import LoggableBaseCommand
 from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew
 from app.services.poiskkino_client import PoiskkinoClient
 from app.tasks import get_kp_mapping
+from shared.constants import SHOW_STATUS_MAPPING
 
 
 class Command(LoggableBaseCommand):
@@ -139,7 +140,7 @@ class Command(LoggableBaseCommand):
             show.imdb_votes = v_data.get('imdb')
             show.year = item.get('year')
             show.plot = item.get('description')
-            show.status = item.get('status')
+            show.status = SHOW_STATUS_MAPPING.get(item.get('status'), item.get('status'))
             shows_to_update.append(show)
 
             ext_ratings_to_update.append(

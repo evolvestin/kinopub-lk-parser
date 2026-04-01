@@ -115,12 +115,25 @@ class Command(LoggableBaseCommand):
 
                         is_valid_show = False
                         content_title = f'ID {show_id}'
+
                         try:
                             title_el = driver.find_element(By.TAG_NAME, 'h3')
                             title_text = title_el.text.strip().split('\n')[0]
-                            if title_text and title_text != 'Авторизация':
-                                is_valid_show = True
-                                content_title = title_text
+
+                            # Проверяем заголовок на "мусорные" значения
+                            if title_text and title_text not in ('Авторизация', 'Browser', 'Error'):
+                                # Дополнительная проверка на наличие таблицы данных
+                                has_info_table = (
+                                    len(
+                                        driver.find_elements(By.CSS_SELECTOR, 'table.table-striped')
+                                    )
+                                    > 0
+                                )
+                                has_player_id = 'window.PLAYER_ITEM_ID' in driver.page_source
+
+                                if has_info_table or has_player_id:
+                                    is_valid_show = True
+                                    content_title = title_text
                         except NoSuchElementException:
                             if 'window.PLAYER_ITEM_ID' in driver.page_source:
                                 is_valid_show = True
@@ -128,13 +141,18 @@ class Command(LoggableBaseCommand):
                         if is_valid_show:
                             logging.info(f'GapScanner: FOUND [{show_id}] - {content_title}')
                             update_show_details(driver, show_id, force=True, session_type='aux')
+
+                            # Проверяем, создалось ли шоу на самом деле
                             try:
                                 show = Show.objects.get(id=show_id)
                                 process_show_durations(driver, show, session_type='aux')
+                                processed_count += 1
+                                found_count += 1
                             except Show.DoesNotExist:
-                                pass
-                            processed_count += 1
-                            found_count += 1
+                                logging.warning(
+                                    f'GapScanner: Show {show_id} was marked '
+                                    f'valid but update_show_details aborted.'
+                                )
 
                         success = True
 

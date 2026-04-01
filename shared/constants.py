@@ -43,6 +43,10 @@ SERIES_TYPES = [SHOW_TYPE_MAPPING[t] for t in SHOW_TYPES_TRACKED_VIA_NEW_EPISODE
 SHOW_STATUS_MAPPING = {
     'окончен': 'Finished',
     'в эфире': 'Ongoing',
+    'COMPLETED': 'Finished',
+    'FILMING': 'Filming',
+    'POST_PRODUCTION': 'Post Production',
+    'UNKNOWN': None,
 }
 
 

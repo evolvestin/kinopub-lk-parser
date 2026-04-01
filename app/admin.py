@@ -786,10 +786,14 @@ class HasPhotoFilter(admin.SimpleListFilter):
         )
 
     def queryset(self, request, queryset):
+        no_photo_condition = (Q(tmdb_photo_url__isnull=True) | Q(tmdb_photo_url='')) & (
+            Q(kp_photo_url__isnull=True) | Q(kp_photo_url='')
+        )
+
         if self.value() == 'yes':
-            return queryset.exclude(Q(photo_url__isnull=True) | Q(photo_url=''))
+            return queryset.exclude(no_photo_condition)
         if self.value() == 'no':
-            return queryset.filter(Q(photo_url__isnull=True) | Q(photo_url=''))
+            return queryset.filter(no_photo_condition)
         return queryset
 
 
@@ -807,11 +811,12 @@ class PersonAdmin(BaseNameAdmin):
         'get_photo_display',
         'name',
         'en_name',
+        'get_en_profession',
         'get_is_photo_fetched',
         'created_at',
         'updated_at',
     )
-    list_filter = (HasPhotoFilter, 'is_photo_fetched')
+    list_filter = (HasPhotoFilter, 'is_photo_fetched', 'showcrew__en_profession')
     search_fields = ('name', 'en_name')
     readonly_fields = BaseNameAdmin.readonly_fields + (
         'get_photo_display',
@@ -822,34 +827,21 @@ class PersonAdmin(BaseNameAdmin):
     )
     ordering = ('-updated_at',)
 
-    fieldsets = (
-        (
-            None,
-            {
-                'fields': (
-                    'get_photo_display',
-                    'name',
-                    'en_name',
-                    'is_photo_fetched',
-                    'refetch_photo_button',
-                )
-            },
-        ),
-        (
-            'Statistics',
-            {
-                'fields': ('user_stats', 'related_genres', 'related_countries'),
-                'classes': ('collapse',),
-            },
-        ),
-        (
-            'Timestamps',
-            {
-                'fields': ('created_at', 'updated_at'),
-                'classes': ('collapse',),
-            },
-        ),
-    )
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+
+        profession_subquery = (
+            ShowCrew.objects.filter(person=OuterRef('pk'))
+            .exclude(en_profession__isnull=True)
+            .exclude(en_profession='')
+            .values('en_profession')[:1]
+        )
+
+        return qs.annotate(_primary_en_prof=Subquery(profession_subquery))
+
+    @admin.display(description='Profession (EN)', ordering='_primary_en_prof')
+    def get_en_profession(self, obj):
+        return obj._primary_en_prof or '-'
 
     @admin.display(description='Is photo fetched', boolean=True, ordering='is_photo_fetched')
     def get_is_photo_fetched(self, obj):
@@ -1349,8 +1341,14 @@ class ExternalRatingAdmin(admin.ModelAdmin):
 @admin.register(ShowCrew, site=admin_site)
 class ShowCrewAdmin(admin.ModelAdmin):
     list_display = ('show', 'person', 'profession', 'en_profession', 'created_at')
-    search_fields = ('show__title', 'show__original_title', 'person__name', 'profession')
-    list_filter = ('profession',)
+    search_fields = (
+        'show__title',
+        'show__original_title',
+        'person__name',
+        'profession',
+        'en_profession',
+    )
+    list_filter = ('profession', 'en_profession')
     autocomplete_fields = ('show', 'person')
     readonly_fields = ('created_at', 'updated_at')
 

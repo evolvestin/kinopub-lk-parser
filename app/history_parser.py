@@ -107,6 +107,33 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         return
 
     try:
+        # 1. Проверяем наличие таблицы данных ДО начала создания/обновления объекта в БД
+        wait = WebDriverWait(driver, 10)
+        try:
+            info_table = wait.until(
+                expected_conditions.presence_of_element_located(
+                    (By.CSS_SELECTOR, 'table.table-striped')
+                )
+            )
+        except TimeoutException:
+            logging.warning(f'Info table not found for show {show_id}. Metadata update aborted.')
+            return
+
+        # 2. Извлекаем заголовок и проверяем его на валидность
+        try:
+            h3_elem = driver.find_element(By.TAG_NAME, 'h3')
+            title_text = h3_elem.text.split('\n')[0].strip()
+        except NoSuchElementException:
+            title_text = ''
+
+        forbidden_titles = {'Авторизация', 'Browser', '404 Not Found', 'Error', 'Cloudflare'}
+        if not title_text or title_text in forbidden_titles:
+            logging.error(
+                f'Detected invalid header "{title_text}" for ID {show_id}. Aborting save.'
+            )
+            return
+
+        # 3. Только теперь получаем или создаем объект Show
         try:
             show = Show.objects.get(id=show_id)
             if not force:
@@ -117,50 +144,25 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
             show = Show(
                 id=show_id,
                 type='Unknown',
-                title=f'Show {show_id}',
-                original_title=f'Show {show_id}',
+                title=title_text,
+                original_title=title_text,
             )
 
         logging.info(f'Fetching extended details for show id={show_id}')
 
+        show.title = title_text
         try:
-            h3_elem = driver.find_element(By.TAG_NAME, 'h3')
-            title_text = h3_elem.text.split('\n')[0].strip()
-
-            if title_text == 'Авторизация':
-                logging.error('Detected login header instead of show title. Aborting save.')
-                return
-
-            if title_text:
-                show.title = title_text
-
-            try:
-                small_elem = h3_elem.find_element(By.TAG_NAME, 'small')
-                raw_orig = small_elem.text.replace('HD', '').replace('+ AC3', '').strip()
-                show.original_title = raw_orig if raw_orig else show.title
-            except NoSuchElementException:
-                show.original_title = show.title
+            small_elem = h3_elem.find_element(By.TAG_NAME, 'small')
+            raw_orig = small_elem.text.replace('HD', '').replace('+ AC3', '').strip()
+            show.original_title = raw_orig if raw_orig else show.title
         except NoSuchElementException:
-            pass
+            show.original_title = show.title
 
         try:
             plot_elem = driver.find_element(By.ID, 'plot')
             show.plot = plot_elem.text.strip()
         except NoSuchElementException:
             pass
-
-        show.save()
-
-        wait = WebDriverWait(driver, 10)
-        try:
-            info_table = wait.until(
-                expected_conditions.presence_of_element_located(
-                    (By.CSS_SELECTOR, 'table.table-striped')
-                )
-            )
-        except TimeoutException:
-            logging.warning(f'Info table not found for show {show_id}. Metadata update skipped.')
-            return
 
         def get_row_data(text_label):
             try:
@@ -244,11 +246,6 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
 
         show.save()
 
-    except (NoSuchElementException, TimeoutException, Show.DoesNotExist) as e:
-        logging.error(
-            f'Could not fetch extended details for show id={show_id}. Info table may be missing.',
-            exc_info=e,
-        )
     except Exception as e:
         logging.error(f'An error occurred while updating show details for id={show_id}: {e}')
         raise
