@@ -843,11 +843,18 @@ class PersonAdmin(BaseNameAdmin):
     def get_en_profession(self, obj):
         return obj._primary_en_prof or '-'
 
-    @admin.display(description='Is photo fetched', boolean=True, ordering='is_photo_fetched')
+    @admin.display(description='Photo Source / Status', ordering='is_photo_fetched')
     def get_is_photo_fetched(self, obj):
-        if not obj.is_photo_fetched:
-            return None
-        return bool(obj.tmdb_photo_url)
+        if obj.tmdb_photo_url:
+            return format_html('<span style="color: #2ecc71;">TMDB</span>')
+
+        if obj.kp_photo_url:
+            return format_html('<span style="color: #d9db14;">Кинопоиск</span>')
+
+        if obj.is_photo_fetched:
+            return format_html('<span style="color: #e74c3c;">Не найдено</span>')
+
+        return format_html('<span style="color: #95a5a6;">В ожидании</span>')
 
     @admin.display(description='Photo', ordering='photo_url')
     def get_photo_display(self, obj):

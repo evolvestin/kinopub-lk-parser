@@ -118,7 +118,14 @@ class Command(LoggableBaseCommand):
 
                         try:
                             title_el = driver.find_element(By.TAG_NAME, 'h3')
-                            title_text = title_el.text.strip().split('\n')[0]
+                            title_text = driver.execute_script(
+                                'return Array.from(arguments[0].childNodes)'
+                                '.filter(n => n.nodeType === Node.TEXT_NODE)'
+                                ".map(n => n.textContent).join('').trim();",
+                                title_el,
+                            )
+                            if not title_text:
+                                title_text = title_el.text.strip().split('\n')[0]
 
                             # Проверяем заголовок на "мусорные" значения
                             if title_text and title_text not in ('Авторизация', 'Browser', 'Error'):

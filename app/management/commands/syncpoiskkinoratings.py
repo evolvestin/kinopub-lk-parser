@@ -2,6 +2,7 @@ import logging
 from collections import defaultdict
 from datetime import timedelta
 
+from django.db.models import Q
 from django.utils import timezone
 
 from app.management.base import LoggableBaseCommand
@@ -38,13 +39,18 @@ class Command(LoggableBaseCommand):
         data = client.fetch_updated_ratings(yesterday, today)
         logging.info(f'Fetched {len(data)} daily updates.')
 
+        stale_cutoff = now - timedelta(days=7)
+
+        # Выбираем ID, где рейтинга нет ВООБЩЕ или он не обновлялся дольше 7 дней
         missing_show_ids = set(
-            Show.objects.filter(ext_rating__isnull=True).values_list('id', flat=True)[:limit]
+            Show.objects.filter(
+                Q(ext_rating__isnull=True) | Q(ext_rating__updated_at__lt=stale_cutoff)
+            ).values_list('id', flat=True)[:limit]
         )
         missing_kp_ids = [kp for kp, sid in kp_mapping.items() if sid in missing_show_ids]
 
         if missing_kp_ids:
-            logging.info(f'Fetching {len(missing_kp_ids)} missing records by IDs...')
+            logging.info(f'Fetching {len(missing_kp_ids)} missing/stale records by IDs...')
             catchup_data = client.fetch_ratings_by_ids(missing_kp_ids)
             data.extend(catchup_data)
 
@@ -52,13 +58,11 @@ class Command(LoggableBaseCommand):
             logging.info('No data to process.')
             return
 
-        # Убираем дубликаты (один и тот же сериал может быть и в обнове, и в поиске по ID)
         unique_data = {item['id']: item for item in data if item.get('id')}.values()
         data_list = list(unique_data)
 
         logging.info(f'Total unique records to process and save: {len(data_list)}')
 
-        # Бьем на батчи, чтобы не убить память и БД
         batch_size = 1000
         total_processed = 0
 

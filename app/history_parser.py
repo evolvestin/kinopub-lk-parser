@@ -122,7 +122,14 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         # 2. Извлекаем заголовок и проверяем его на валидность
         try:
             h3_elem = driver.find_element(By.TAG_NAME, 'h3')
-            title_text = h3_elem.text.split('\n')[0].strip()
+            title_text = driver.execute_script(
+                'return Array.from(arguments[0].childNodes)'
+                '.filter(n => n.nodeType === Node.TEXT_NODE)'
+                ".map(n => n.textContent).join('').trim();",
+                h3_elem,
+            )
+            if not title_text:
+                title_text = h3_elem.text.split('\n')[0].strip()
         except NoSuchElementException:
             title_text = ''
 
