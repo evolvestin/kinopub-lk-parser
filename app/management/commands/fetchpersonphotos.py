@@ -2,7 +2,6 @@ import logging
 
 import requests
 from django.db import DatabaseError
-from django.db.models import Q
 
 from app.management.base import LoggableBaseCommand
 from app.models import Person
@@ -16,13 +15,18 @@ class Command(LoggableBaseCommand):
         parser.add_argument(
             '--limit', type=int, default=50, help='Limit number of persons to process'
         )
+        parser.add_argument(
+            '--force', action='store_true', help='Reset is_photo_fetched flag and retry everyone'
+        )
 
     def handle(self, *args, **options):
         limit = options.get('limit')
 
-        persons = Person.objects.filter(
-            Q(is_photo_fetched=False) | Q(tmdb_photo_url__isnull=True) | Q(tmdb_photo_url='')
-        ).order_by('updated_at')[:limit]
+        if options.get('force'):
+            logging.info('Force flag detected. Resetting is_photo_fetched for all persons without photos.')
+            Person.objects.filter(tmdb_photo_url__isnull=True, kp_photo_url__isnull=True).update(is_photo_fetched=False)
+
+        persons = Person.objects.filter(is_photo_fetched=False).order_by('updated_at')[:limit]
 
         if not persons:
             logging.info('No persons need photo fetching.')

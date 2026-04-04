@@ -33,62 +33,79 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
         logger.error('TMDB_API_KEY is not set.')
         return False
 
+    def clean_name(n):
+        if not n:
+            return None
+        return n.replace('\xa0', ' ').replace('  ', ' ').strip()
+
     search_scenarios = []
-    if person_instance.en_name:
-        search_scenarios.append({'query': person_instance.en_name, 'params': {'language': 'en-US'}})
+    
+    en_name = clean_name(person_instance.en_name)
+    if en_name:
+        search_scenarios.append(en_name)
 
-    raw_name = person_instance.name.replace('\xa0', ' ').strip()
-    bracket_match = re.search(r'\((.*?)\)', raw_name)
-    en_name_candidate = bracket_match.group(1).strip() if bracket_match else None
-    ru_name_candidate = re.sub(r'\(.*?\)', '', raw_name).strip()
-
-    search_scenarios.append({'query': ru_name_candidate, 'params': {'language': 'ru-RU'}})
-    if en_name_candidate:
-        search_scenarios.append({'query': en_name_candidate, 'params': {'language': 'en-US'}})
-    search_scenarios.append({'query': ru_name_candidate, 'params': {}})
+    raw_name = clean_name(person_instance.name)
+    if raw_name:
+        bracket_match = re.search(r'\((.*?)\)', raw_name)
+        if bracket_match:
+            en_candidate = clean_name(bracket_match.group(1))
+            if en_candidate and en_candidate != en_name:
+                search_scenarios.append(en_candidate)
+        
+        ru_candidate = clean_name(re.sub(r'\(.*?\)', '', raw_name))
+        if ru_candidate:
+            search_scenarios.append(ru_candidate)
 
     base_url = 'https://api.themoviedb.org/3/search/person'
     found_path = None
     session = get_tmdb_session()
 
+    api_key = settings.TMDB_API_KEY
+    headers = {}
+    default_params = {'include_adult': 'false'}
+
+    if api_key.startswith('ey'):
+        headers['Authorization'] = f'Bearer {api_key}'
+    else:
+        default_params['api_key'] = api_key
+
     try:
-        for scenario in search_scenarios:
-            if not scenario['query']:
+        for query in search_scenarios:
+            if not query:
                 continue
 
-            search_params = {
-                'api_key': settings.TMDB_API_KEY,
-                'query': scenario['query'],
-                'include_adult': 'false',
-                **scenario['params'],
-            }
+            search_params = {**default_params, 'query': query}
 
-            try:
-                resp = session.get(base_url, params=search_params, timeout=10)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    results = data.get('results', [])
-                    for res in results:
-                        path = res.get('profile_path')
-                        if path:
-                            found_path = path
-                            break
-                    if found_path:
+            resp = session.get(base_url, params=search_params, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                results = data.get('results', [])
+                for res in results:
+                    path = res.get('profile_path')
+                    if path:
+                        found_path = path
                         break
-            except (requests.ConnectionError, requests.Timeout) as e:
-                logger.warning(f'TMDB connectivity issue for {person_instance.name}: {e}')
-                raise
+                if found_path:
+                    break
 
         person_instance.tmdb_photo_url = (
             f'https://image.tmdb.org/t/p/w200{found_path}' if found_path else None
         )
         person_instance.is_photo_fetched = True
         person_instance.save(update_fields=['tmdb_photo_url', 'is_photo_fetched', 'updated_at'])
+        
+        if found_path:
+            logger.info(f'Fetched photo for {person_instance.name}')
+        else:
+            logger.debug(f'No photo found for {person_instance.name} after all scenarios')
+            
         return True
 
+    except (requests.ConnectionError, requests.Timeout) as e:
+        logger.warning(f'TMDB connectivity issue for {person_instance.name}: {e}')
+        raise
     except DatabaseError:
         raise
     except Exception as e:
-        if not isinstance(e, requests.RequestException):
-            logger.error(f'Unexpected error on {person_instance.name}: {e}')
+        logger.error(f'Unexpected error on {person_instance.name}: {e}')
         return False
