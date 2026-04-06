@@ -23,8 +23,12 @@ class Command(LoggableBaseCommand):
         limit = options.get('limit')
 
         if options.get('force'):
-            logging.info('Force flag detected. Resetting is_photo_fetched for all persons without photos.')
-            Person.objects.filter(tmdb_photo_url__isnull=True, kp_photo_url__isnull=True).update(is_photo_fetched=False)
+            logging.info(
+                'Force flag detected. Resetting is_photo_fetched for all persons without photos.'
+            )
+            Person.objects.filter(tmdb_photo_url__isnull=True, kp_photo_url__isnull=True).update(
+                is_photo_fetched=False
+            )
 
         persons = Person.objects.filter(is_photo_fetched=False).order_by('updated_at')[:limit]
 

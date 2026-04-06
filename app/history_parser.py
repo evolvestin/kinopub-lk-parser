@@ -107,7 +107,6 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         return
 
     try:
-        # 1. Проверяем наличие таблицы данных ДО начала создания/обновления объекта в БД
         wait = WebDriverWait(driver, 10)
         try:
             info_table = wait.until(
@@ -119,7 +118,6 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
             logging.warning(f'Info table not found for show {show_id}. Metadata update aborted.')
             return
 
-        # 2. Извлекаем заголовок и проверяем его на валидность
         try:
             h3_elem = driver.find_element(By.TAG_NAME, 'h3')
             title_text = driver.execute_script(
@@ -129,18 +127,30 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
                 h3_elem,
             )
             if not title_text:
-                title_text = h3_elem.text.split('\n')[0].strip()
+                full_h3_text = h3_elem.text
+                try:
+                    small_text = h3_elem.find_element(By.TAG_NAME, 'small').text
+                    title_text = full_h3_text.replace(small_text, '').strip()
+                except NoSuchElementException:
+                    title_text = full_h3_text.split('\n')[0].strip()
         except NoSuchElementException:
             title_text = ''
 
-        forbidden_titles = {'Авторизация', 'Browser', '404 Not Found', 'Error', 'Cloudflare'}
+        forbidden_titles = {
+            'Авторизация',
+            'Browser',
+            '404 Not Found',
+            'Error',
+            'Cloudflare',
+            'Один момент',
+            'Just a moment',
+        }
         if not title_text or title_text in forbidden_titles:
             logging.error(
                 f'Detected invalid header "{title_text}" for ID {show_id}. Aborting save.'
             )
             return
 
-        # 3. Только теперь получаем или создаем объект Show
         try:
             show = Show.objects.get(id=show_id)
             if not force:
@@ -160,8 +170,12 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         show.title = title_text
         try:
             small_elem = h3_elem.find_element(By.TAG_NAME, 'small')
-            raw_orig = small_elem.text.replace('HD', '').replace('+ AC3', '').strip()
-            show.original_title = raw_orig if raw_orig else show.title
+            raw_orig = small_elem.text
+            clean_orig = re.sub(
+                r'\+?\s*(?:HD|4K|UHD|3D|AC3|5\.1|7\.1)\b', '', raw_orig, flags=re.IGNORECASE
+            )
+            clean_orig = ' '.join(clean_orig.split()).strip()
+            show.original_title = clean_orig if clean_orig else show.title
         except NoSuchElementException:
             show.original_title = show.title
 

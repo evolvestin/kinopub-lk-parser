@@ -46,9 +46,13 @@ def get_show_control_buttons(
     episodes_rated: int = 0,
     channel_url: str = None,
     is_notify: bool = False,
+    webapp_url: str = None,
 ) -> list[list[dict]]:
     suffix = '_n' if is_notify else ''
     buttons = []
+
+    if webapp_url:
+        buttons.append([{'text': '📱 Подробнее', 'web_app': {'url': webapp_url}}])
 
     if show_type in SERIES_TYPES:
         buttons.append([get_rate_main_button_data(show_id, show_type, user_rating, is_notify)])

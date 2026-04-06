@@ -79,8 +79,9 @@ async function init() {
     const startParam = tg?.initDataUnsafe?.start_param || '';
     const urlParams = new URLSearchParams(window.location.search);
     const sharedIdFromUrl = urlParams.get('shared_id');
+    const showIdFromUrl = urlParams.get('show_id') || (startParam.startsWith('show_') ? startParam.replace('show_', '') : null);
 
-        if (sharedIdFromUrl || startParam.startsWith('stat_')) {
+    if (sharedIdFromUrl || startParam.startsWith('stat_')) {
         isSharedMode = true;
         document.body.classList.add('has-banner');
         
@@ -91,7 +92,10 @@ async function init() {
         const sid = sharedIdFromUrl || startParam.replace('stat_', '');
         await loadShared(sid);
     } else {
-        await load();
+        await load(null, !!showIdFromUrl);
+        if (showIdFromUrl) {
+            window.App.openShowLayer(showIdFromUrl);
+        }
     }
 }
 
@@ -118,7 +122,7 @@ async function loadShared(statId) {
     }
 }
 
-async function load(year) {
+async function load(year, isGuestModeForShow = false) {
     if (year === undefined || year === null) year = curYear;
     curYear = year;
     document.getElementById('loader').classList.remove('hidden');
@@ -136,7 +140,17 @@ async function load(year) {
         render();
     } catch(e) { 
         console.error('Load error:', e); 
-        document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Ошибка загрузки данных:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
+        if (isGuestModeForShow) {
+            document.getElementById('views-container').innerHTML = `
+                <div class="empty" style="height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+                    <div class="icon" style="font-size:48px; opacity:0.3; margin-bottom:16px;">${Icons.film}</div>
+                    <div>Авторизуйтесь в боте для просмотра своей статистики.</div>
+                </div>
+                <div id="dynamic-layers"></div>
+            `;
+        } else {
+            document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Ошибка загрузки данных:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
+        }
         document.getElementById('app').classList.remove('hidden');
     } finally { 
         hideLoader();

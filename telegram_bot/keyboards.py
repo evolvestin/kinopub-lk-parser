@@ -1,4 +1,7 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+import os
+
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from services.url_store import URLStore
 
 from shared.buttons import (
     get_rate_episodes_button_data,
@@ -96,9 +99,15 @@ def get_show_card_keyboard(
     has_any_ratings: bool = False,
     channel_url: str = None,
 ):
-    # Получаем структуру кнопок из общего модуля
-    # В боте обычно is_notify=False, если это прямой просмотр, но
-    # если это пришло из уведомления, логика навигации обрабатывается в handlers
+    dynamic_url = URLStore().get_url()
+    base_url = (
+        dynamic_url
+        or os.getenv('WEBAPP_PUBLIC_URL')
+        or os.getenv('BACKEND_URL')
+        or 'http://localhost:8000'
+    ).rstrip('/')
+    webapp_url = f'{base_url}/webapp/?show_id={show_id}'
+
     raw_buttons = get_show_control_buttons(
         show_id=show_id,
         show_type=show_type,
@@ -108,14 +117,20 @@ def get_show_card_keyboard(
         episodes_rated=episodes_rated,
         channel_url=channel_url,
         is_notify=False,
+        webapp_url=webapp_url,
     )
 
-    # Конвертируем словари в объекты Aiogram InlineKeyboardButton
     aiogram_buttons = []
     for row in raw_buttons:
         aiogram_row = []
         for btn_data in row:
-            if 'url' in btn_data:
+            if 'web_app' in btn_data:
+                aiogram_row.append(
+                    InlineKeyboardButton(
+                        text=btn_data['text'], web_app=WebAppInfo(url=btn_data['web_app']['url'])
+                    )
+                )
+            elif 'url' in btn_data:
                 aiogram_row.append(InlineKeyboardButton(text=btn_data['text'], url=btn_data['url']))
             else:
                 aiogram_row.append(

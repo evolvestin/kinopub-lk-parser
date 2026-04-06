@@ -39,7 +39,7 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
         return n.replace('\xa0', ' ').replace('  ', ' ').strip()
 
     search_scenarios = []
-    
+
     en_name = clean_name(person_instance.en_name)
     if en_name:
         search_scenarios.append(en_name)
@@ -51,7 +51,7 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
             en_candidate = clean_name(bracket_match.group(1))
             if en_candidate and en_candidate != en_name:
                 search_scenarios.append(en_candidate)
-        
+
         ru_candidate = clean_name(re.sub(r'\(.*?\)', '', raw_name))
         if ru_candidate:
             search_scenarios.append(ru_candidate)
@@ -93,12 +93,12 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
         )
         person_instance.is_photo_fetched = True
         person_instance.save(update_fields=['tmdb_photo_url', 'is_photo_fetched', 'updated_at'])
-        
+
         if found_path:
             logger.info(f'Fetched photo for {person_instance.name}')
         else:
             logger.debug(f'No photo found for {person_instance.name} after all scenarios')
-            
+
         return True
 
     except (requests.ConnectionError, requests.Timeout) as e:

@@ -161,7 +161,9 @@ def _get_favorites(base_qs, dur_qs):
             .values(
                 tid=F('show__showcrew__person__id'),
                 name=F('show__showcrew__person__name'),
-                photo_url=F('show__showcrew__person__photo_url'),
+                photo_url=Coalesce(
+                    'show__showcrew__person__tmdb_photo_url', 'show__showcrew__person__kp_photo_url'
+                ),
             )
             .filter(tid__isnull=False)
             .annotate(views=Count('id', distinct=True), shows_count=Count('show_id', distinct=True))

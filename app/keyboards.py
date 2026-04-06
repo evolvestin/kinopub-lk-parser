@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from shared.buttons import get_rating_label_text, get_show_control_buttons
 from shared.constants import UserRole
 
@@ -61,6 +63,14 @@ def get_history_notification_keyboard(
 
         return buttons
 
+    base_url = (
+        getattr(settings, 'WEBAPP_PUBLIC_URL', None)
+        or getattr(settings, 'BACKEND_URL', None)
+        or 'http://localhost:8000'
+    )
+    base_url = base_url.rstrip('/') if base_url else 'http://localhost:8000'
+    webapp_url = f'{base_url}/webapp/?show_id={show_id}'
+
     return get_show_control_buttons(
         show_id=show_id,
         show_type=show_type,
@@ -70,4 +80,5 @@ def get_history_notification_keyboard(
         episodes_rated=episodes_rated,
         channel_url=channel_url,
         is_notify=True,
+        webapp_url=webapp_url,
     )
