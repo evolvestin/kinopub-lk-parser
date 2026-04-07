@@ -14,6 +14,12 @@ urlpatterns = [
     ),
     # WebApp Endpoints
     path('webapp/', views.webapp_index, name='webapp_index'),
+    path(
+        'api/webapp/collection/<str:collection_type>/<int:item_id>/',
+        views.webapp_get_collection,
+        name='webapp_get_collection',
+    ),
+    path('api/webapp/search/', views.webapp_search, name='webapp_search'),
     path('api/webapp/stats/', views.webapp_get_stats, name='webapp_get_stats'),
     path(
         'api/webapp/detailed_stats/',

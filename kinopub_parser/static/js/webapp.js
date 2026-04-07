@@ -1,6 +1,6 @@
 const Icons = {
     moon: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
-    sun: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm0 160c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64zM256 128c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16s-16 7.2-16 16v64c0 8.8 7.2 16 16 16zM256 384c-8.8 0-16 7.2-16 16v64c0 8.8 7.2 16 16 16s16-7.2 16-16v-64c0-8.8-7.2-16-16-16zM464 240h-64c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM112 240H48c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM403.1 108.9c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM176.8 335.2c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM403.1 403.1c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0z"/></svg>',
+    sun: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm0 160c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64zM256 128c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16s-16 7.2-16 16v64c0 8.8 7.2 16 16 16zM256 384c-8.8 0-16 7.2-16 16v64c0 8.8 7.2 16 16 16s16-7.2 16-16v-64c0-8.8-7.2-16-16-16zM464 240h-64c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM112 240H48c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM403.1 108.9c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM176.8 335.2c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM403.1 403.1c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0z"/></svg>',
     user: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 288c79.53 0 144-64.47 144-144S335.53 0 256 0 112 64.47 112 144s64.47 144 144 144zm128 32h-24.1c-30.83 18.66-67.43 28-103.9 28s-73.07-9.34-103.9-28H128c-70.69 0-128 57.31-128 128v56c0 13.25 10.75 24 24 24h464c13.25 0 24-10.75 24-24v-56c0-70.69-57.31-128-128-128z"/></svg>',
     users: '<svg viewBox="0 0 512 512"><path d="M336 256c-20.56 0-40.44-5.06-58.26-14.34-14.73 21-36.42 36.63-61.64 43.68C236.41 298.54 263.26 304 290.5 304h25.4C379.79 304 432 356.21 432 419.86v43.21a20.89 20.89 0 0019.2 20.93h41.6a20.9 20.9 0 0019.2-20.93v-43.21C512 344.21 433.79 256 336 256zM336 224a104 104 0 10-104-104 104.12 104.12 0 00104 104zM201.5 272c-63.53 0-115.2 51.68-115.2 115.21v43.86A20.94 20.94 0 00105.5 452h192a20.94 20.94 0 0019.2-20.93v-43.86C316.7 323.68 265.03 272 201.5 272zM201.5 240A112 112 0 1089.5 128a112.12 112.12 0 00112 112z"/></svg>',
     dash: '<svg viewBox="0 0 512 512"><path d="M200 48H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM424 48H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM200 272H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40zM424 272H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40z"/></svg>',
@@ -17,7 +17,9 @@ const Icons = {
     check: '<svg viewBox="0 0 512 512"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29l-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg>',
     days: '<svg viewBox="0 0 512 512"><path d="M400 48V16h-64v32H176V16h-64v32H48v448h416V48h-64zM112 432H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32z"/></svg>',
     grid: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
-    list: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>'
+    list: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>',
+    search: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
+    nav_stats: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>'
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -29,6 +31,7 @@ function initIcons() {
     i('it-gen-internal', 'masks'); i('it-act-internal', 'masks'); 
     i('it-cou-internal', 'globe'); i('it-bin-internal', 'bolt');
     i('it-star-internal', 'star'); i('ic-weekday-internal', 'days');
+    i('ic-search-nav', 'search'); i('ic-stats-nav', 'nav_stats');
 }
 
 if (document.readyState === 'loading') {
@@ -50,11 +53,12 @@ let chM = null, chW = null, chG = {}, lastScrollPos = 0;
 let isSharedMode = false;
 let SharedDataMap = {};
 let availableYears = [];
+let activeMainView = 'search';
 
 function toggleTheme() {
     isDark = !isDark;
     document.body.classList.toggle('light', !isDark);
-    document.getElementById('theme-btn').innerHTML = isDark ? Icons.moon : Icons.sun;
+    document.querySelectorAll('.theme-btn').forEach(btn => btn.innerHTML = isDark ? Icons.moon : Icons.sun);
     localStorage.setItem('kt', isDark ? 'd' : 'l');
     if (D) renderCharts();
 }
@@ -65,7 +69,9 @@ function toggleTheme() {
     if (stored === 'd') isDark = true;
     
     if (!isDark) document.body.classList.add('light');
-    document.addEventListener("DOMContentLoaded", () => document.getElementById('theme-btn').innerHTML = isDark ? Icons.moon : Icons.sun);
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll('.theme-btn').forEach(btn => btn.innerHTML = isDark ? Icons.moon : Icons.sun);
+    });
 })();
 
 function cc() {
@@ -80,23 +86,106 @@ async function init() {
     const urlParams = new URLSearchParams(window.location.search);
     const sharedIdFromUrl = urlParams.get('shared_id');
     const showIdFromUrl = urlParams.get('show_id') || (startParam.startsWith('show_') ? startParam.replace('show_', '') : null);
+    const viewFromUrl = urlParams.get('view');
 
     if (sharedIdFromUrl || startParam.startsWith('stat_')) {
         isSharedMode = true;
         document.body.classList.add('has-banner');
         
         document.getElementById('share-btn').classList.add('hidden');
+        document.getElementById('bottom-nav').style.display = 'none';
+        activeMainView = 'stats';
+        switchMainView('stats');
+        
         const bannerContainer = document.getElementById('shared-banner-container');
         bannerContainer.innerHTML = `<div class="shared-banner"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> Вы просматриваете чужую статистику</div>`;
         
         const sid = sharedIdFromUrl || startParam.replace('stat_', '');
         await loadShared(sid);
     } else {
-        await load(null, !!showIdFromUrl);
+        await load();
+        
+        const role = D?.meta?.role || 'guest';
+        if (role === 'guest') {
+            document.getElementById('bn-stats').classList.add('hidden');
+            document.getElementById('bottom-nav').style.display = 'none';
+        } else {
+            document.getElementById('bottom-nav').style.display = 'flex';
+        }
+        
+        switchMainView(viewFromUrl === 'stats' ? 'stats' : 'search');
+
         if (showIdFromUrl) {
             window.App.openShowLayer(showIdFromUrl);
         }
     }
+}
+
+function switchMainView(view) {
+    activeMainView = view;
+    document.getElementById('view-search').style.display = view === 'search' ? 'block' : 'none';
+    document.getElementById('view-stats').style.display = view === 'stats' ? 'block' : 'none';
+    
+    document.getElementById('bn-search').classList.toggle('active', view === 'search');
+    document.getElementById('bn-stats').classList.toggle('active', view === 'stats');
+    window.scrollTo(0, 0);
+}
+
+let searchTimer = null;
+async function doSearch(q) {
+    clearTimeout(searchTimer);
+    const resEl = document.getElementById('search-results');
+    if (q.length < 2) { 
+        resEl.innerHTML = `<div class="empty"><div class="icon" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px;">${Icons.search}</div>Введите название для поиска</div>`;
+        return; 
+    }
+    
+    resEl.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
+    
+    searchTimer = setTimeout(async () => {
+        try {
+            const r = await fetch('/api/webapp/search/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ query: q, init_data: tg?.initData || '' })
+            });
+            if (!r.ok) throw new Error('Ошибка сервера');
+            const data = await r.json();
+            renderSearchResults(data);
+        } catch(e) {
+            resEl.innerHTML = '<div class="empty">Ошибка при поиске</div>';
+        }
+    }, 500);
+}
+
+function renderSearchResults(data) {
+    let html = '';
+    
+    if (data.persons?.length) {
+        html += `<div class="label"><div class="icon" style="color:#d29922">${Icons.users}</div>Актеры и Режиссеры</div>`;
+        html += '<div class="h-scroll-container" style="padding-bottom:16px;">';
+        data.persons.forEach(p => {
+            const img = p.photo_url ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;">` : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
+            html += `<div class="person-pill" onclick="window.App.openCollectionLayer('actor', ${p.id}, '${p.name.replace(/'/g, "\\'")}')">${img}<div class="person-name">${p.name}</div></div>`;
+        });
+        html += '</div>';
+    }
+    
+    if (data.shows?.length) {
+        html += `<div class="label"><div class="icon" style="color:var(--info)">${Icons.film}</div>Фильмы и Сериалы</div>`;
+        html += '<div class="hist-grid" style="padding:0 16px;">';
+        data.shows.forEach(s => {
+            const poster = s.poster_url ? `<img src="${s.poster_url}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
+            html += `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${s.id})"><div class="grid-item">${poster}${s.year ? `<div class="grid-year">${s.year}</div>` : ''}</div><div class="grid-below-title">${s.title}</div></div>`;
+        });
+        html += '</div>';
+    }
+    
+    if (!data.shows?.length && !data.persons?.length) {
+        html = `<div class="empty"><div class="icon">${Icons.dash}</div>Ничего не найдено</div>`;
+    }
+    
+    document.getElementById('search-results').innerHTML = html;
 }
 
 async function loadShared(statId) {
@@ -122,7 +211,7 @@ async function loadShared(statId) {
     }
 }
 
-async function load(year, isGuestModeForShow = false) {
+async function load(year) {
     if (year === undefined || year === null) year = curYear;
     curYear = year;
     document.getElementById('loader').classList.remove('hidden');
@@ -140,17 +229,7 @@ async function load(year, isGuestModeForShow = false) {
         render();
     } catch(e) { 
         console.error('Load error:', e); 
-        if (isGuestModeForShow) {
-            document.getElementById('views-container').innerHTML = `
-                <div class="empty" style="height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column;">
-                    <div class="icon" style="font-size:48px; opacity:0.3; margin-bottom:16px;">${Icons.film}</div>
-                    <div>Авторизуйтесь в боте для просмотра своей статистики.</div>
-                </div>
-                <div id="dynamic-layers"></div>
-            `;
-        } else {
-            document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Ошибка загрузки данных:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
-        }
+        document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Ошибка загрузки данных:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
         document.getElementById('app').classList.remove('hidden');
     } finally { 
         hideLoader();
@@ -788,6 +867,26 @@ window.openShowLayer = async function(showId) {
         const posterUrl = show.poster_large || fallbackUrl;
         const bgUrl = posterUrl || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
+        const preloadUrls = [];
+        if (posterUrl) preloadUrls.push(posterUrl);
+        if (show.actors && show.actors.length > 0) {
+            show.actors.slice(0, 6).forEach(a => {
+                if (a.photo_url) preloadUrls.push(a.photo_url);
+            });
+        }
+
+        if (preloadUrls.length > 0) {
+            await Promise.race([
+                Promise.all(preloadUrls.map(url => new Promise(res => {
+                    const img = new Image();
+                    img.onload = res;
+                    img.onerror = res;
+                    img.src = url;
+                }))),
+                new Promise(res => setTimeout(res, 1500))
+            ]);
+        }
+
         const html = `
             ${getLayerHeader('О шоу')}
             <div class="hero-container">
@@ -884,7 +983,8 @@ function pushLayer(htmlContent, contextData = {}) {
         viewStack[viewStack.length - 1].scrollPos = prevScroll;
         viewStack[viewStack.length - 1].el.style.display = 'none';
     } else {
-        document.getElementById('view-stats').style.display = 'none';
+        document.getElementById('view-' + activeMainView).style.display = 'none';
+        document.getElementById('bottom-nav').style.display = 'none';
         lastScrollPos = prevScroll;
     }
 
@@ -906,7 +1006,8 @@ function popLayer() {
         prev.el.style.display = 'block';
         targetScroll = prev.scrollPos;
     } else {
-        document.getElementById('view-stats').style.display = 'block';
+        document.getElementById('view-' + activeMainView).style.display = 'block';
+        if (!isSharedMode) document.getElementById('bottom-nav').style.display = 'flex';
         targetScroll = lastScrollPos;
         if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(popLayer); }
     }
@@ -1080,7 +1181,6 @@ async function submitShare() {
     }
 }
 
-
 window.App = {
     toggleTheme: toggleTheme,
     openShareModal: openShareModal,
@@ -1095,5 +1195,7 @@ window.App = {
     setViewMode: window.setViewModeLayer,
     setViewModeLayer: window.setViewModeLayer,
     openShowLayer: window.openShowLayer,
-    openCollectionLayer: window.openCollectionLayer
+    openCollectionLayer: window.openCollectionLayer,
+    doSearch: doSearch,
+    switchMainView: switchMainView
 };

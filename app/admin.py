@@ -869,7 +869,7 @@ class PersonAdmin(BaseNameAdmin):
                 'color: var(--body-fg, #666); text-transform: uppercase;">{}</div>'
                 '</div>',
                 url,
-                label
+                label,
             )
 
         tmdb_block = _render_photo(obj.tmdb_photo_url, 'TMDB')
@@ -888,7 +888,7 @@ class PersonAdmin(BaseNameAdmin):
         return format_html(
             '<div style="display: flex; align-items: flex-start; padding: 5px 0;">{}{}</div>',
             tmdb_block,
-            kp_block
+            kp_block,
         )
 
     @admin.display(description='Actions')

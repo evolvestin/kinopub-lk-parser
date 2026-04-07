@@ -892,7 +892,13 @@ def webapp_get_detailed_stats(request):
                 photo_url=tg_user.get('photo_url'),
             )
         except ViewUser.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
+            view_user = ViewUser.objects.create(
+                telegram_id=tg_user.get('id'),
+                username=tg_user.get('username'),
+                name=tg_user.get('first_name'),
+                language=tg_user.get('language_code', 'ru'),
+                role=UserRole.GUEST,
+            )
 
         stats = generate_user_stats(view_user, year=year)
 
@@ -1162,3 +1168,56 @@ def webapp_get_collection(request, collection_type, item_id):
         return JsonResponse({'error': 'Item not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_search(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+        query = body.get('query', '').strip()
+
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        if len(query) < 2:
+            return JsonResponse({'shows': [], 'persons': []})
+
+        shows = Show.objects.filter(
+            Q(title__icontains=query) | Q(original_title__icontains=query)
+        ).order_by('-year', '-id')[:15]
+
+        persons = Person.objects.filter(
+            Q(name__icontains=query) | Q(en_name__icontains=query)
+        ).order_by('-updated_at')[:10]
+
+        show_results = []
+        for s in shows:
+            show_results.append(
+                {
+                    'id': s.id,
+                    'title': s.title,
+                    'original_title': s.original_title,
+                    'year': s.year,
+                    'type': s.type,
+                    'poster_url': get_poster_url(s.id, 'medium'),
+                }
+            )
+
+        person_results = []
+        for p in persons:
+            person_results.append(
+                {
+                    'id': p.id,
+                    'name': p.name,
+                    'en_name': p.en_name,
+                    'photo_url': p.photo_url,
+                }
+            )
+
+        return JsonResponse({'shows': show_results, 'persons': person_results})
+    except Exception as e:
+        logging.error(f'WebApp Search Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)

@@ -503,7 +503,7 @@ async def handle_stats_command(message: Message, bot: Bot):
     )
 
     base_url = base_url.rstrip('/')
-    web_app_url = f'{base_url}/webapp/'
+    web_app_url = f'{base_url}/webapp/?view=stats'
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
