@@ -856,33 +856,39 @@ class PersonAdmin(BaseNameAdmin):
 
         return format_html('<span style="color: #95a5a6;">В ожидании</span>')
 
-    @admin.display(description='Photo', ordering='photo_url')
+    @admin.display(description='Photos (TMDB / KP)', ordering='tmdb_photo_url')
     def get_photo_display(self, obj):
-        if obj.photo_url:
+        def _render_photo(url, label):
+            if not url:
+                return ''
             return format_html(
-                '<img src="{}" '
-                'style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;" />',
-                obj.photo_url,
+                '<div style="text-align: center; margin-right: 15px;">'
+                '<img src="{}" style="width: 60px; height: 60px; border-radius: 50%; '
+                'object-fit: cover; border: 2px solid var(--border-color, #ccc);" />'
+                '<div style="font-size: 9px; font-weight: bold; margin-top: 3px; '
+                'color: var(--body-fg, #666); text-transform: uppercase;">{}</div>'
+                '</div>',
+                url,
+                label
             )
+
+        tmdb_block = _render_photo(obj.tmdb_photo_url, 'TMDB')
+        kp_block = _render_photo(obj.kp_photo_url, 'Кинопоиск')
+
+        if not tmdb_block and not kp_block:
+            return format_html(
+                '<div style="width: 60px; height: 60px; border-radius: 50%; '
+                'background: var(--secondary, #eee); display: flex; align-items: center; '
+                'justify-content: center; text-align: center; color: var(--body-fg, #999); '
+                'font-size: 10px; font-weight: bold; line-height: 1;">'
+                'NO<br>PHOTO'
+                '</div>'
+            )
+
         return format_html(
-            """
-            <div style="
-                width: 50px;
-                height: 50px;
-                border-radius: 50%;
-                background: var(--secondary, #eee);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                color: var(--body-fg, #999);
-                font-size: 10px;
-                font-weight: bold;
-                line-height: 1;
-            ">
-                NO<br>PHOTO
-            </div>
-            """
+            '<div style="display: flex; align-items: flex-start; padding: 5px 0;">{}{}</div>',
+            tmdb_block,
+            kp_block
         )
 
     @admin.display(description='Actions')
