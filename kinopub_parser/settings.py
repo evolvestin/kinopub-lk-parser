@@ -316,6 +316,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.tasks.sync_poiskkino_ratings_task',
         'schedule': crontab(minute=0, hour=5),
     },
+    'update_site_metrics': {
+        'task': 'app.tasks.update_site_metrics_task',
+        'schedule': crontab(minute=0, hour=0),
+    },
 }
 
 if ENVIRONMENT == 'PROD':

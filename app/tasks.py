@@ -21,6 +21,8 @@ from app.models import Code, LogEntry, Show, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
+from app.services.metrics import calculate_missing_kp_metric
+from app.models import SiteMetric
 
 
 @contextmanager
@@ -461,3 +463,11 @@ def get_kp_mapping():
 @single_instance_task(lock_name='sync_poiskkino_ratings', timeout=1800)
 def sync_poiskkino_ratings_task():
     call_command('syncpoiskkinoratings')
+
+
+@shared_task
+@safe_execution
+def update_site_metrics_task():    
+    data = calculate_missing_kp_metric()
+    SiteMetric.objects.create(key='missing_kp', data=data)
+    logging.info("Site metrics updated successfully.")

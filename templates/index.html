@@ -3,142 +3,157 @@
 <html lang="ru" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KinoPub Observer - Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KinoPub Observer - Метрики</title>
     <link rel="stylesheet" href="{% static 'css/kp_theme.css' %}">
+    <link rel="stylesheet" href="{% static 'css/webapp.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #1f2937; }
-        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        body { background: var(--bg-main); overflow-x: hidden; }
+        .dashboard-container { max-width: 1000px; margin: 0 auto; padding-top: 20px; }
+        .layer-header { position: sticky; top: 0; z-index: 50; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(20, 24, 31, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+        .header-title { font-size: 20px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
+        .nav-btn { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); padding: 8px 16px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; transition: transform var(--transition-bounce), background var(--transition-smooth); }
+        .nav-btn:hover { background: var(--border); transform: translateY(-2px); }
     </style>
 </head>
-<body class="min-h-screen">
-    <nav class="bg-gray-800 border-b border-gray-700">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <h1 class="text-xl font-bold text-white">KinoPub Observer</h1>
+<body>
+    <div class="layer-header">
+        <div class="header-title">KinoPub Observer</div>
+        <a href="/admin/" class="nav-btn">Admin Panel</a>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="tabs" id="metric-tabs">
+            <button class="tab on" data-period="now" onclick="switchPeriod('now')">Сейчас</button>
+            <button class="tab" data-period="yesterday" onclick="switchPeriod('yesterday')">Вчера</button>
+            <button class="tab" data-period="week_ago" onclick="switchPeriod('week_ago')">7 дней назад</button>
+        </div>
+
+        <div style="padding: 16px;">
+            <div class="card hoverable anim-item">
+                <div class="label">
+                    <div class="icon" style="color:var(--danger)">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    </div>
+                    Нет рейтинга из Кинопоиска (ожидают парсинга)
                 </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/" class="text-white font-bold">Dashboard</a>
-                    <a href="/admin/" class="text-gray-300 hover:text-white">Admin Panel</a>
-                    <a href="/admin/tasks/" class="text-gray-300 hover:text-white">Tasks</a>
-                    <a href="/admin/logout/" class="text-gray-300 hover:text-white">Выход</a>
+                <div class="chart-box" style="height:320px;">
+                    <canvas id="missingKpChart"></canvas>
                 </div>
+                <div id="legend-missing-kp" class="legend-grid"></div>
             </div>
         </div>
-    </nav>
+    </div>
 
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div class="px-4 py-6 sm:px-0">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
-                    <h3 class="text-lg font-semibold text-gray-100 mb-4">Статистика</h3>
-                    <ul class="space-y-3 text-gray-300">
-                        <li class="flex justify-between">
-                            <span>Общее время просмотра:</span>
-                            <span class="font-medium">{{ stats.duration }}</span>
-                        </li>
-                        <li class="flex justify-between">
-                            <span>Просмотрено эпизодов:</span>
-                            <span class="font-medium">{{ stats.episodes }}</span>
-                        </li>
-                        <li class="flex justify-between">
-                            <span>Просмотрено фильмов:</span>
-                            <span class="font-medium">{{ stats.movies }}</span>
-                        </li>
-                        <li class="flex justify-between">
-                            <span>Просмотрено сериалов:</span>
-                            <span class="font-medium">{{ stats.series }}</span>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
-                    <h3 class="text-lg font-semibold text-gray-100 mb-4">Топ-5 сериалов</h3>
-                    <ul class="space-y-2 text-gray-300">
-                        {% for series in top_series %}
-                            <li class="flex justify-between">
-                                <span class="truncate mr-2">{{ series.show__title }}</span>
-                                <span class="font-medium whitespace-nowrap">({{ series.episode_count }})</span>
-                            </li>
-                        {% empty %}
-                            <li class="text-gray-400">Недостаточно данных</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-
-                <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
-                    <h3 class="text-lg font-semibold text-gray-100 mb-4">Топ-5 фильмов</h3>
-                    <ul class="space-y-2 text-gray-300">
-                        {% for movie in top_movies %}
-                            <li class="flex justify-between">
-                                <span class="truncate mr-2">{{ movie.show__title }}</span>
-                                <span class="font-medium whitespace-nowrap">({{ movie.view_count }})</span>
-                            </li>
-                        {% empty %}
-                            <li class="text-gray-400">Недостаточно данных</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-
-                <div class="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
-                    <h3 class="text-lg font-semibold text-gray-100 mb-4">Активность просмотров</h3>
-                    <canvas id="viewsChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
-        const ctx = document.getElementById('viewsChart');
+        const metricsData = {{ metrics_json|safe }};
+        let currentChart = null;
+        const palette = ['#e74c3c', '#d29922', '#388bfd', '#a371f7', '#1abc9c', '#e67e22', '#9b59b6', '#2ea043'];
 
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: {{ chart_labels|safe }},
-                datasets: [{
-                    label: 'Просмотры по месяцам',
-                    data: {{ chart_data|safe }},
-                    borderColor: 'rgb(75, 192, 192)',
-                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                    tension: 0.3,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: '#e5e7eb'
-                        }
-                    }
+        const centerTextPlugin = {
+            id: 'centerText',
+            afterDraw: (chart) => {
+                const { ctx, chartArea: { top, height, left, width } } = chart;
+                ctx.save();
+                const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                const centerX = left + width / 2;
+                const centerY = top + height / 2;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = '900 34px system-ui';
+                ctx.fillStyle = '#e5e7eb';
+                ctx.fillText(total.toLocaleString('ru-RU'), centerX, centerY - 8);
+                ctx.font = 'bold 10px system-ui';
+                ctx.fillStyle = '#6e7681';
+                ctx.letterSpacing = '1px';
+                ctx.fillText('ШОУ ВСЕГО', centerX, centerY + 22);
+                ctx.restore();
+            }
+        };
+
+        function renderChart(period) {
+            const data = metricsData[period] || [];
+            const canvas = document.getElementById('missingKpChart');
+            const ctx = canvas.getContext('2d');
+            const legendEl = document.getElementById('legend-missing-kp');
+
+            if (currentChart) {
+                currentChart.destroy();
+            }
+
+            if (data.length === 0) {
+                legendEl.innerHTML = '<div class="empty">Нет данных за этот период</div>';
+                return;
+            }
+
+            const total = data.reduce((acc, item) => acc + item.value, 0);
+
+            currentChart = new Chart(ctx, {
+                type: 'doughnut',
+                plugins: [centerTextPlugin],
+                data: {
+                    labels: data.map(i => i.name),
+                    datasets: [{
+                        data: data.map(i => i.value),
+                        backgroundColor: data.map((_, i) => palette[i % palette.length]),
+                        borderWidth: 0,
+                        hoverOffset: 15,
+                        borderRadius: 6,
+                        spacing: 3,
+                        weight: 1
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            color: '#9ca3af'
-                        },
-                        grid: {
-                            color: '#374151'
-                        }
-                    },
-                    x: {
-                        ticks: {
-                            color: '#9ca3af'
-                        },
-                        grid: {
-                            color: '#374151'
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '55%',
+                    layout: { padding: 15 },
+                    animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(22, 27, 34, 0.95)',
+                            titleColor: '#f0f6fc',
+                            bodyColor: '#8b949e',
+                            borderColor: '#2d333b',
+                            borderWidth: 1,
+                            cornerRadius: 10,
+                            padding: 12,
+                            displayColors: true,
+                            callbacks: {
+                                label: (context) => {
+                                    const val = context.parsed;
+                                    const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                    return ` ${val.toLocaleString('ru-RU')} шт. (${pct}%)`;
+                                }
+                            }
                         }
                     }
                 }
-            }
+            });
+
+            legendEl.innerHTML = data.map((item, i) => {
+                const color = palette[i % palette.length];
+                const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                return `
+                <div class="legend-item">
+                    <div class="legend-dot" style="background:${color}"></div>
+                    <div class="legend-name">${item.name}</div>
+                    <div class="legend-val">${item.value.toLocaleString('ru-RU')} (${pct}%)</div>
+                </div>`;
+            }).join('');
+        }
+
+        function switchPeriod(period) {
+            document.querySelectorAll('.tab').forEach(btn => {
+                btn.classList.toggle('on', btn.dataset.period === period);
+            });
+            renderChart(period);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            switchPeriod('now');
         });
     </script>
 </body>

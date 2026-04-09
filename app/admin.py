@@ -43,6 +43,7 @@ from app.models import (
     ViewHistory,
     ViewUser,
     ViewUserGroup,
+    SiteMetric,
 )
 from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender
@@ -1368,3 +1369,16 @@ class ShowCrewAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('show', 'person')
+
+
+@admin.register(SiteMetric, site=admin_site)
+class SiteMetricAdmin(admin.ModelAdmin):
+    list_display = ('key', 'created_at')
+    list_filter = ('key', 'created_at')
+    readonly_fields = ('key', 'data', 'created_at', 'updated_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

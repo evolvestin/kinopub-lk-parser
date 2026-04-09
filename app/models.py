@@ -5,6 +5,7 @@ from django.db import models
 
 from shared.constants import DATETIME_FORMAT, RATING_VALUES, UserRole
 from shared.formatters import format_se
+from django.db.models import JSONField
 
 
 class BaseModel(models.Model):
@@ -382,3 +383,19 @@ class ExternalRating(BaseModel):
 
     def __str__(self):
         return f'External Ratings for {self.show.id}'
+
+
+class SiteMetric(BaseModel):
+    key = models.CharField(max_length=100, db_index=True)
+    data = JSONField()
+
+    class Meta:
+        verbose_name = 'Site Metric'
+        verbose_name_plural = 'Site Metrics'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['key', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.key} at {self.created_at.strftime(DATETIME_FORMAT)}"

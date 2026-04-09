@@ -12,6 +12,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from app.services.metrics import get_or_update_metric, calculate_missing_kp_metric
 from django.views.decorators.http import require_http_methods
 
 from app.dashboard import dashboard_callback
@@ -121,7 +122,10 @@ def _serialize_show_details(show, user=None):
 
 
 def index(request):
-    context = dashboard_callback({})
+    metrics_data = get_or_update_metric('missing_kp', calculate_missing_kp_metric)
+    context = {
+        'metrics_json': json.dumps(metrics_data)
+    }
     return render(request, 'index.html', context)
 
 
