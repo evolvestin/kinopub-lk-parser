@@ -12,10 +12,8 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from app.services.metrics import get_or_update_metric, calculate_missing_kp_metric
 from django.views.decorators.http import require_http_methods
 
-from app.dashboard import dashboard_callback
 from app.models import (
     Country,
     Genre,
@@ -29,6 +27,11 @@ from app.models import (
     ViewHistory,
     ViewUser,
     ViewUserGroup,
+)
+from app.services.metrics import (
+    calculate_missing_kp_metric,
+    calculate_title_collision_metric,
+    get_or_update_metric,
 )
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
@@ -122,9 +125,11 @@ def _serialize_show_details(show, user=None):
 
 
 def index(request):
-    metrics_data = get_or_update_metric('missing_kp', calculate_missing_kp_metric)
+    missing_kp = get_or_update_metric('missing_kp', calculate_missing_kp_metric)
+    title_collision = get_or_update_metric('title_collision', calculate_title_collision_metric)
+
     context = {
-        'metrics_json': json.dumps(metrics_data)
+        'metrics_json': json.dumps({'missing_kp': missing_kp, 'title_collision': title_collision})
     }
     return render(request, 'index.html', context)
 

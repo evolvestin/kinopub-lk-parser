@@ -37,13 +37,13 @@ from app.models import (
     Show,
     ShowCrew,
     ShowDuration,
+    SiteMetric,
     TaskRun,
     TelegramLog,
     UserRating,
     ViewHistory,
     ViewUser,
     ViewUserGroup,
-    SiteMetric,
 )
 from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender

@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0032_rename_photo_url_person_tmdb_photo_url_and_more'),
     ]
@@ -13,7 +12,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='SiteMetric',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name='ID'
+                    ),
+                ),
                 ('created_at', models.DateTimeField(auto_now_add=True, db_index=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('key', models.CharField(db_index=True, max_length=100)),
@@ -23,7 +27,9 @@ class Migration(migrations.Migration):
                 'verbose_name': 'Site Metric',
                 'verbose_name_plural': 'Site Metrics',
                 'ordering': ['-created_at'],
-                'indexes': [models.Index(fields=['key', 'created_at'], name='app_sitemet_key_23efb8_idx')],
+                'indexes': [
+                    models.Index(fields=['key', 'created_at'], name='app_sitemet_key_23efb8_idx')
+                ],
             },
         ),
     ]

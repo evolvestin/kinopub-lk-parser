@@ -2,10 +2,10 @@ import uuid
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import JSONField
 
 from shared.constants import DATETIME_FORMAT, RATING_VALUES, UserRole
 from shared.formatters import format_se
-from django.db.models import JSONField
 
 
 class BaseModel(models.Model):
@@ -398,4 +398,4 @@ class SiteMetric(BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.key} at {self.created_at.strftime(DATETIME_FORMAT)}"
+        return f'{self.key} at {self.created_at.strftime(DATETIME_FORMAT)}'

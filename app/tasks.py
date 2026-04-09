@@ -17,12 +17,11 @@ from redis import Redis
 
 from app import history_parser
 from app.gdrive_backup import BackupManager
-from app.models import Code, LogEntry, Show, TaskRun, ViewUser
+from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
+from app.services.metrics import calculate_missing_kp_metric, calculate_title_collision_metric
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
-from app.services.metrics import calculate_missing_kp_metric
-from app.models import SiteMetric
 
 
 @contextmanager
@@ -467,7 +466,13 @@ def sync_poiskkino_ratings_task():
 
 @shared_task
 @safe_execution
-def update_site_metrics_task():    
-    data = calculate_missing_kp_metric()
-    SiteMetric.objects.create(key='missing_kp', data=data)
-    logging.info("Site metrics updated successfully.")
+def update_site_metrics_task():
+    # Missing KP metric
+    kp_data = calculate_missing_kp_metric()
+    SiteMetric.objects.create(key='missing_kp', data=kp_data)
+
+    # Title collision metric
+    collision_data = calculate_title_collision_metric()
+    SiteMetric.objects.create(key='title_collision', data=collision_data)
+
+    logging.info('Site metrics updated successfully.')
