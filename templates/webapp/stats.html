@@ -18,10 +18,6 @@
         <div id="views-container">
             
             <div class="view active-view" id="view-search" style="display: none;">
-                <div class="search-container" style="display: flex; gap: 12px; align-items: center;">
-                    <input type="text" id="search-input" class="search-input" style="flex: 1;" placeholder="Фильмы, сериалы, актеры..." oninput="window.App.doSearch(this.value)">
-                    <button class="theme-btn" onclick="window.App.toggleTheme()"></button>
-                </div>
                 <div id="search-results">
                     <div class="empty">
                         <div class="icon" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px;">
@@ -29,6 +25,10 @@
                         </div>
                         Введите название для поиска
                     </div>
+                </div>
+                <div class="search-container" style="display: flex; gap: 12px; align-items: center;">
+                    <input type="text" id="search-input" class="search-input" style="flex: 1;" placeholder="Фильмы, сериалы, актеры..." oninput="window.App.doSearch(this.value)">
+                    <button class="theme-btn" onclick="window.App.toggleTheme()"></button>
                 </div>
             </div>
 

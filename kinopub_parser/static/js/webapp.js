@@ -111,6 +111,7 @@ async function init() {
             document.getElementById('bottom-nav').style.display = 'none';
         } else {
             document.getElementById('bottom-nav').style.display = 'flex';
+            document.body.classList.add('has-nav');
         }
         
         switchMainView(viewFromUrl === 'stats' ? 'stats' : 'search');
