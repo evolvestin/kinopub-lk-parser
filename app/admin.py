@@ -776,25 +776,30 @@ class GenreAdmin(BaseNameAdmin):
         )
 
 
-class HasPhotoFilter(admin.SimpleListFilter):
-    title = 'Наличие фото'
-    parameter_name = 'has_photo'
+class PhotoSourceFilter(admin.SimpleListFilter):
+    title = 'Источник фото'
+    parameter_name = 'photo_source'
 
     def lookups(self, request, model_admin):
         return (
-            ('yes', 'С фотографией'),
-            ('no', 'Без фотографии'),
+            ('tmdb', 'Только TMDB'),
+            ('kp', 'Только Кинопоиск'),
+            ('both', 'Оба источника'),
+            ('none', 'Нет фотографий'),
         )
 
     def queryset(self, request, queryset):
-        no_photo_condition = (Q(tmdb_photo_url__isnull=True) | Q(tmdb_photo_url='')) & (
-            Q(kp_photo_url__isnull=True) | Q(kp_photo_url='')
-        )
+        has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
+        has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
 
-        if self.value() == 'yes':
-            return queryset.exclude(no_photo_condition)
-        if self.value() == 'no':
-            return queryset.filter(no_photo_condition)
+        if self.value() == 'tmdb':
+            return queryset.filter(has_tmdb).exclude(has_kp)
+        if self.value() == 'kp':
+            return queryset.filter(has_kp).exclude(has_tmdb)
+        if self.value() == 'both':
+            return queryset.filter(has_tmdb, has_kp)
+        if self.value() == 'none':
+            return queryset.exclude(has_tmdb | has_kp)
         return queryset
 
 
@@ -817,7 +822,7 @@ class PersonAdmin(BaseNameAdmin):
         'created_at',
         'updated_at',
     )
-    list_filter = (HasPhotoFilter, 'is_photo_fetched', 'showcrew__en_profession')
+    list_filter = (PhotoSourceFilter, 'is_photo_fetched', 'showcrew__en_profession')
     search_fields = ('name', 'en_name')
     readonly_fields = BaseNameAdmin.readonly_fields + (
         'get_photo_display',
@@ -844,18 +849,20 @@ class PersonAdmin(BaseNameAdmin):
     def get_en_profession(self, obj):
         return obj._primary_en_prof or '-'
 
-    @admin.display(description='Photo Source / Status', ordering='is_photo_fetched')
+    @admin.display(description='Sources', ordering='is_photo_fetched')
     def get_is_photo_fetched(self, obj):
+        sources = []
         if obj.tmdb_photo_url:
-            return format_html('<span style="color: #2ecc71;">TMDB</span>')
-
+            sources.append('<span style="color: #2ecc71;">TMDB</span>')
         if obj.kp_photo_url:
-            return format_html('<span style="color: #d9db14;">Кинопоиск</span>')
+            sources.append('<span style="color: #d9db14;">КП</span>')
 
-        if obj.is_photo_fetched:
-            return format_html('<span style="color: #e74c3c;">Не найдено</span>')
+        if not sources:
+            if obj.is_photo_fetched:
+                return format_html('<span style="color: #e74c3c;">Не найдено</span>')
+            return format_html('<span style="color: #95a5a6;">В ожидании</span>')
 
-        return format_html('<span style="color: #95a5a6;">В ожидании</span>')
+        return format_html(', '.join(sources))
 
     @admin.display(description='Photos (TMDB / KP)', ordering='tmdb_photo_url')
     def get_photo_display(self, obj):
@@ -874,7 +881,7 @@ class PersonAdmin(BaseNameAdmin):
             )
 
         tmdb_block = _render_photo(obj.tmdb_photo_url, 'TMDB')
-        kp_block = _render_photo(obj.kp_photo_url, 'Кинопоиск')
+        kp_block = _render_photo(obj.kp_photo_url, 'КП')
 
         if not tmdb_block and not kp_block:
             return format_html(
@@ -899,7 +906,7 @@ class PersonAdmin(BaseNameAdmin):
         url = reverse('admin:person_refetch_photo', args=[obj.id])
         return format_html(
             '<a class="button" style="background-color: #3498db; color: white;" href="{}">'
-            'Обновить фото из TMDB'
+            'Обновить из TMDB'
             '</a>',
             url,
         )
@@ -931,12 +938,7 @@ class PersonAdmin(BaseNameAdmin):
         obj = self.get_object(request, object_id)
         if obj:
             if fetch_person_photo_from_tmdb(obj):
-                if obj.photo_url:
-                    self.message_user(request, f'Фото для {obj.name} успешно обновлено.')
-                else:
-                    self.message_user(
-                        request, f'Фото для {obj.name} не найдено в TMDB.', level='WARNING'
-                    )
+                self.message_user(request, f'Фото для {obj.name} успешно обновлено.')
             else:
                 self.message_user(request, 'Ошибка при обращении к API TMDB.', level='ERROR')
         return HttpResponseRedirect(reverse('admin:app_person_change', args=[object_id]))

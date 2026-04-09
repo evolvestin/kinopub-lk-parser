@@ -11,16 +11,25 @@
     <style>
         body { background: var(--bg-main); overflow-x: hidden; }
         .dashboard-container { max-width: 1000px; margin: 0 auto; padding-top: 20px; }
-        .layer-header { position: sticky; top: 0; z-index: 50; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(20, 24, 31, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+        .layer-header { position: sticky; top: 0; z-index: 50; display: flex; justify-content: center; background: rgba(20, 24, 31, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+        .header-container { max-width: 1000px; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; }
         .header-title { font-size: 20px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.5px; }
+        .nav-links { display: flex; gap: 12px; flex-wrap: wrap; }
         .nav-btn { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); padding: 8px 16px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; transition: transform var(--transition-bounce), background var(--transition-smooth); }
         .nav-btn:hover { background: var(--border); transform: translateY(-2px); }
+        .nav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
     </style>
 </head>
 <body>
     <div class="layer-header">
-        <div class="header-title">KinoPub Observer</div>
-        <a href="/admin/" class="nav-btn">Admin Panel</a>
+        <div class="header-container">
+            <div class="header-title">KinoPub Observer</div>
+            <div class="nav-links">
+                <a href="/" class="nav-btn active">Метрики</a>
+                <a href="/admin/" class="nav-btn">Админка</a>
+                <a href="/admin/tasks/" class="nav-btn">Задачи</a>
+            </div>
+        </div>
     </div>
 
     <div class="dashboard-container">

@@ -138,6 +138,8 @@ body {
     display: flex; align-items: center; gap: clamp(6px, 2vw, 8px);
     font-size: clamp(12px, 3.5vw, 14px); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
     color: var(--text-secondary); padding: clamp(12px, 3vw, 16px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px);
+    background: none;
+    border-radius: 0;
 }
 .card .label { padding: 0; font-size: clamp(14px, 4vw, 16px); color: var(--text-primary); }
 .card .label.more-pad { padding: 0 0 clamp(4px, 4vw, 8px) 0; }
