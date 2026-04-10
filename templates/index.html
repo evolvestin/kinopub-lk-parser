@@ -19,15 +19,33 @@
         .nav-btn:hover { background: var(--border); transform: translateY(-2px); }
         .nav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         
-        .metrics-grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); 
-            gap: 20px; 
-            padding: 16px; 
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; padding: 16px; }
+        @media (max-width: 500px) { .metrics-grid { grid-template-columns: 1fr; } }
+
+        .metric-desc { 
+            display: none; 
+            font-size: 13px; 
+            color: var(--text-muted); 
+            line-height: 1.5; 
+            margin: 10px 0 20px; 
+            padding: 12px; 
+            background: var(--bg-main); 
+            border-radius: 10px; 
+            border-left: 3px solid var(--accent); 
         }
-        @media (max-width: 500px) {
-            .metrics-grid { grid-template-columns: 1fr; }
-        }
+        .metric-desc.visible { display: block; animation: fadeIn 0.3s ease; }
+        
+        .modal-body-list { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
+        .modal-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; text-decoration: none; transition: all 0.2s; }
+        .modal-item:hover { border-color: var(--accent); background: var(--bg-main); transform: translateX(4px); }
+        .modal-item-title { font-size: 14px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .modal-item-orig { font-size: 11px; color: var(--text-muted); }
+        .admin-link-icon { color: var(--accent); font-size: 18px; margin-left: 10px; }
+
+        .legend-item.clickable { cursor: pointer; }
+        .legend-item.clickable:hover { border-color: var(--accent); background: var(--bg-main); }
+        .label-clickable { cursor: pointer; transition: opacity 0.2s; }
+        .label-clickable:hover { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -51,11 +69,15 @@
 
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
-                <div class="label">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
                     <div class="icon" style="color:var(--danger)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                     </div>
                     Нет рейтинга Кинопоиска
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                </div>
+                <div class="metric-desc">
+                    Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствуют данные о внешнем рейтинге. Это указывает на необходимость синхронизации или на то, что страница на Кинопоиске не отдаёт данные.
                 </div>
                 <div class="chart-box" style="height:320px;">
                     <canvas id="missingKpChart"></canvas>
@@ -64,17 +86,34 @@
             </div>
 
             <div class="card hoverable anim-item">
-                <div class="label">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
                     <div class="icon" style="color:var(--info)">
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     </div>
                     Коллизии названий
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                </div>
+                <div class="metric-desc">
+                    Случаи, когда основное название шоу содержит в себе оригинальное (например, "Interstellar Интерстеллар"). Это признак некорректного парсинга метаданных с источника, требующий ручной или автоматической очистки.
                 </div>
                 <div class="chart-box" style="height:320px;">
                     <canvas id="collisionsChart"></canvas>
                 </div>
                 <div id="legend-collisions" class="legend-grid"></div>
             </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="details-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modal-title">Детализация</div>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div id="modal-loader" class="hidden" style="text-align:center; padding: 20px;">
+                <div class="spinner" style="width:30px; height:30px; display:inline-block;"></div>
+            </div>
+            <div class="modal-body-list" id="modal-list"></div>
         </div>
     </div>
 
@@ -103,6 +142,52 @@
                 ctx.restore();
             }
         });
+
+        async function openDetails(key, typeLabel) {
+            const modal = document.getElementById('details-modal');
+            const list = document.getElementById('modal-list');
+            const loader = document.getElementById('modal-loader');
+            const title = document.getElementById('modal-title');
+
+            title.innerText = `${typeLabel}: список`;
+            list.innerHTML = '';
+            loader.classList.remove('hidden');
+            modal.classList.add('show');
+
+            try {
+                const resp = await fetch(`/api/metrics/details/${key}/?type=${encodeURIComponent(typeLabel)}`);
+                const data = await resp.json();
+                
+                if (data.items && data.items.length) {
+                    list.innerHTML = data.items.map(item => `
+                        <a href="/admin/app/show/${item.id}/change/" target="_blank" class="modal-item">
+                            <div>
+                                <div class="modal-item-title">${item.title}</div>
+                                <div class="modal-item-orig">${item.original_title || ''}</div>
+                            </div>
+                            <span class="material-icons admin-link-icon">open_in_new</span>
+                        </a>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<div class="empty">Ничего не найдено</div>';
+                }
+            } catch (e) {
+                list.innerHTML = '<div class="empty" style="color:var(--danger)">Ошибка загрузки</div>';
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('details-modal').classList.remove('show');
+        }
+
+        function toggleMetricDesc(labelEl) {
+            const desc = labelEl.nextElementSibling;
+            if (desc && desc.classList.contains('metric-desc')) {
+                desc.classList.toggle('visible');
+            }
+        }
 
         function renderDoughnut(chartKey, canvasId, legendId, rawData, centerLabel, valueField) {
             const data = rawData.filter(i => i[valueField] > 0);
@@ -140,6 +225,16 @@
                     cutout: '55%',
                     layout: { padding: 15 },
                     animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' },
+                    onHover: (evt, elements) => {
+                        evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                    },
+                    onClick: (evt, elements) => {
+                        if (elements.length) {
+                            const index = elements[0].index;
+                            const label = data[index].name || data[index].type;
+                            openDetails(chartKey === 'missing' ? 'missing_kp' : 'title_collision', label);
+                        }
+                    },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -165,10 +260,12 @@
             legendEl.innerHTML = data.map((item, i) => {
                 const color = palette[i % palette.length];
                 const pct = total > 0 ? Math.round((item[valueField] / total) * 100) : 0;
+                const label = item.name || item.type;
+                const metricKey = chartKey === 'missing' ? 'missing_kp' : 'title_collision';
                 return `
-                <div class="legend-item">
+                <div class="legend-item clickable" onclick="openDetails('${metricKey}', '${label}')">
                     <div class="legend-dot" style="background:${color}"></div>
-                    <div class="legend-name">${item.name || item.type}</div>
+                    <div class="legend-name">${label}</div>
                     <div class="legend-val">${item[valueField].toLocaleString('ru-RU')} (${pct}%)</div>
                 </div>`;
             }).join('');
@@ -184,7 +281,7 @@
                 'missingKpChart', 
                 'legend-missing-kp', 
                 allMetrics.missing_kp[period] || [], 
-                'БЕЗ КП', 
+                'БЕЗ РЕЙТИНГА', 
                 'value'
             );
             
@@ -200,6 +297,9 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             switchPeriod('now');
+            document.getElementById('details-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'details-modal') closeModal();
+            });
         });
     </script>
 </body>

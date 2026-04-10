@@ -12,6 +12,7 @@ urlpatterns = [
     path(
         'favicon.ico', RedirectView.as_view(url=settings.STATIC_URL + 'favicon.ico', permanent=True)
     ),
+    path('api/metrics/details/<str:key>/', views.get_metric_details, name='get_metric_details'),
     # WebApp Endpoints
     path('webapp/', views.webapp_index, name='webapp_index'),
     path(

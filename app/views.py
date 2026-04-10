@@ -35,6 +35,7 @@ from app.services.metrics import (
 )
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
+from app.services.metrics import get_missing_kp_list, get_title_collision_list
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
 from shared.formatters import format_se
@@ -1230,3 +1231,20 @@ def webapp_search(request):
     except Exception as e:
         logging.error(f'WebApp Search Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def get_metric_details(request, key):
+    show_type = request.GET.get('type')
+    if not show_type:
+        return JsonResponse({'error': 'Type required'}, status=400)
+
+    if key == 'missing_kp':
+        items = list(get_missing_kp_list(show_type))
+    elif key == 'title_collision':
+        items = list(get_title_collision_list(show_type))
+    else:
+        return JsonResponse({'error': 'Invalid key'}, status=400)
+
+    return JsonResponse({'items': items})

@@ -73,3 +73,25 @@ def calculate_title_collision_metric():
         for item in stats
     ]
     return data
+
+
+def get_missing_kp_list(show_type: str):
+    return Show.objects.filter(
+        type=show_type,
+        kinopoisk_url__isnull=False,
+        ext_rating__isnull=True
+    ).exclude(kinopoisk_url='').values('id', 'title', 'original_title')
+
+
+def get_title_collision_list(show_type: str):
+    qs = Show.objects.filter(type=show_type, original_title__isnull=False).exclude(original_title='')
+    return qs.annotate(
+        low_title=Lower('title'),
+        low_orig=Lower('original_title')
+    ).annotate(
+        pos=StrIndex('low_title', F('low_orig'))
+    ).filter(
+        pos__gt=0
+    ).exclude(
+        low_title=F('low_orig')
+    ).values('id', 'title', 'original_title')
