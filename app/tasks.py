@@ -19,7 +19,7 @@ from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
-from app.services.metrics import calculate_missing_kp_metric, calculate_title_collision_metric
+from app.services.metrics import calculate_missing_kp_metric, calculate_title_collision_metric, calculate_missing_plot_metric, calculate_missing_year_metric, calculate_no_countries_metric, calculate_no_genres_metric
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
 
@@ -467,12 +467,22 @@ def sync_poiskkino_ratings_task():
 @shared_task
 @safe_execution
 def update_site_metrics_task():
-    # Missing KP metric
     kp_data = calculate_missing_kp_metric()
     SiteMetric.objects.create(key='missing_kp', data=kp_data)
 
-    # Title collision metric
     collision_data = calculate_title_collision_metric()
     SiteMetric.objects.create(key='title_collision', data=collision_data)
+
+    year_data = calculate_missing_year_metric()
+    SiteMetric.objects.create(key='missing_year', data=year_data)
+
+    plot_data = calculate_missing_plot_metric()
+    SiteMetric.objects.create(key='missing_plot', data=plot_data)
+
+    genres_data = calculate_no_genres_metric()
+    SiteMetric.objects.create(key='no_genres', data=genres_data)
+
+    countries_data = calculate_no_countries_metric()
+    SiteMetric.objects.create(key='no_countries', data=countries_data)
 
     logging.info('Site metrics updated successfully.')

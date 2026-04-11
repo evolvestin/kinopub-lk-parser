@@ -103,3 +103,39 @@ def get_title_collision_list(show_type: str):
     ).exclude(
         low_title=F('low_orig')
     ).values('id', 'title', 'original_title')
+
+
+def calculate_missing_year_metric():
+    stats = Show.objects.filter(year__isnull=True).values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_missing_year_list(show_type: str):
+    return Show.objects.filter(type=show_type, year__isnull=True).values('id', 'title', 'original_title')
+
+
+def calculate_missing_plot_metric():
+    stats = Show.objects.filter(Q(plot__isnull=True) | Q(plot='')).values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_missing_plot_list(show_type: str):
+    return Show.objects.filter(type=show_type).filter(Q(plot__isnull=True) | Q(plot='')).values('id', 'title', 'original_title')
+
+
+def calculate_no_genres_metric():
+    stats = Show.objects.filter(genres__isnull=True).values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_no_genres_list(show_type: str):
+    return Show.objects.filter(type=show_type, genres__isnull=True).values('id', 'title', 'original_title')
+
+
+def calculate_no_countries_metric():
+    stats = Show.objects.filter(countries__isnull=True).values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_no_countries_list(show_type: str):
+    return Show.objects.filter(type=show_type, countries__isnull=True).values('id', 'title', 'original_title')

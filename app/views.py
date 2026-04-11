@@ -32,12 +32,21 @@ from app.models import (
 )
 from app.services.metrics import (
     calculate_missing_kp_metric,
+    calculate_missing_plot_metric,
+    calculate_missing_year_metric,
+    calculate_no_countries_metric,
+    calculate_no_genres_metric,
     calculate_title_collision_metric,
+    get_missing_kp_list,
+    get_missing_plot_list,
+    get_missing_year_list,
+    get_no_countries_list,
+    get_no_genres_list,
     get_or_update_metric,
+    get_title_collision_list,
 )
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
-from app.services.metrics import get_missing_kp_list, get_title_collision_list
 from app.telegram_bot import TelegramSender
 from shared.constants import UserRole
 from shared.formatters import format_se
@@ -130,9 +139,20 @@ def _serialize_show_details(show, user=None):
 def index(request):
     missing_kp = get_or_update_metric('missing_kp', calculate_missing_kp_metric)
     title_collision = get_or_update_metric('title_collision', calculate_title_collision_metric)
+    missing_year = get_or_update_metric('missing_year', calculate_missing_year_metric)
+    missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
+    no_genres = get_or_update_metric('no_genres', calculate_no_genres_metric)
+    no_countries = get_or_update_metric('no_countries', calculate_no_countries_metric)
 
     context = {
-        'metrics_json': json.dumps({'missing_kp': missing_kp, 'title_collision': title_collision})
+        'metrics_json': json.dumps({
+            'missing_kp': missing_kp, 
+            'title_collision': title_collision,
+            'missing_year': missing_year,
+            'missing_plot': missing_plot,
+            'no_genres': no_genres,
+            'no_countries': no_countries
+        })
     }
     return render(request, 'index.html', context)
 
@@ -1247,6 +1267,14 @@ def get_metric_details(request, key):
         items = list(get_missing_kp_list(show_type))
     elif key == 'title_collision':
         items = list(get_title_collision_list(show_type))
+    elif key == 'missing_year':
+        items = list(get_missing_year_list(show_type))
+    elif key == 'missing_plot':
+        items = list(get_missing_plot_list(show_type))
+    elif key == 'no_genres':
+        items = list(get_no_genres_list(show_type))
+    elif key == 'no_countries':
+        items = list(get_no_countries_list(show_type))
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
 
