@@ -19,52 +19,13 @@
         .nav-btn:hover { background: var(--border); transform: translateY(-2px); }
         .nav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         
-        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; padding: 16px; }
-        @media (max-width: 500px) { .metrics-grid { grid-template-columns: 1fr; } }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; padding: 16px; }
 
-        #data-timestamp {
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 10px;
-            color: var(--text-muted);
-            font-weight: 500;
-            padding: 8px 16px;
-            letter-spacing: -0.3px;
-            opacity: 0.5;
-            text-transform: uppercase;
-        }
+        #data-timestamp { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 10px; color: var(--text-muted); font-weight: 500; padding: 8px 16px; letter-spacing: -0.3px; opacity: 0.5; text-transform: uppercase; }
+        .chart-box { position: relative; width: 100%; display: flex; align-items: center; justify-content: center; }
 
-        .chart-box { 
-            position: relative; 
-            width: 100%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-        }
-
-        .metric-desc { 
-            max-height: 0;
-            opacity: 0;
-            overflow: hidden;
-            margin: 0;
-            padding: 0 12px;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            font-size: 13px; 
-            color: var(--text-muted); 
-            line-height: 1.5; 
-            background: var(--bg-main); 
-            border-radius: 10px; 
-            border-left: 3px solid var(--accent);
-            pointer-events: none;
-        }
-        
-        .metric-desc.visible {
-            max-height: 300px;
-            opacity: 1;
-            margin: 10px 0 20px;
-            padding: 12px;
-            pointer-events: auto;
-        }
-
+        .metric-desc { max-height: 0; opacity: 0; overflow: hidden; margin: 0; padding: 0 12px; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); font-size: 13px; color: var(--text-muted); line-height: 1.5; background: var(--bg-main); border-radius: 10px; border-left: 3px solid var(--accent); pointer-events: none; }
+        .metric-desc.visible { max-height: 300px; opacity: 1; margin: 10px 0 20px; padding: 12px; pointer-events: auto; }
         .label-clickable { cursor: pointer; user-select: none; }
         .modal-overlay { align-items: center !important; }
         .modal-content { max-width: 1200px; width: 90vw; max-height: 85vh; display: flex; flex-direction: column; border-radius: 24px !important; transform: scale(0.95) !important; opacity: 0; transition: all 0.3s ease !important; }
@@ -90,8 +51,12 @@
         .add-all-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .add-all-btn .spinner { width: 16px; height: 16px; border-width: 2px; border-top-color: #fff; margin: 0; }
 
-        .legend-item.clickable { cursor: pointer; }
-        .legend-item.clickable:hover { border-color: var(--accent); background: var(--bg-main); }
+        .legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 16px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-input, #232830); border: 1px solid var(--border, #2d333b); border-radius: 8px; cursor: pointer; transition: all 0.2s; height: 100%; box-sizing: border-box; }
+        .legend-item:hover { border-color: var(--accent, #2ecc71); background: var(--bg-main, #14181f); }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .legend-name { font-size: clamp(11px, 1.5vw, 13px); font-weight: 700; color: var(--text-primary, #e5e7eb); word-break: break-word; flex: 1; line-height: 1.2; }
+        .legend-val { font-size: clamp(11px, 1.5vw, 12px); color: var(--text-muted, #9ca3af); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -134,7 +99,7 @@
                 <div class="metric-desc">
                     Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.
                 </div>
-                <div class="chart-box" style="height:320px;">
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
                     <canvas id="missingKpChart"></canvas>
                 </div>
                 <div id="legend-missing-kp" class="legend-grid"></div>
@@ -155,7 +120,7 @@
                 <div class="metric-desc">
                     Случаи, когда основное название шоу содержит в себе оригинальное (например, "Интерстеллар Interstellar").
                 </div>
-                <div class="chart-box" style="height:320px;">
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
                     <canvas id="collisionsChart"></canvas>
                 </div>
                 <div id="legend-collisions" class="legend-grid"></div>
@@ -176,7 +141,7 @@
                 <div class="metric-desc">
                     Шоу, у которых в нашей базе не заполнен год выхода.
                 </div>
-                <div class="chart-box" style="height:320px;">
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
                     <canvas id="missingYearChart"></canvas>
                 </div>
                 <div id="legend-missing-year" class="legend-grid"></div>
@@ -197,7 +162,7 @@
                 <div class="metric-desc">
                     Шоу, у которых в базе отсутствует или пустое текстовое описание.
                 </div>
-                <div class="chart-box" style="height:320px;">
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
                     <canvas id="missingPlotChart"></canvas>
                 </div>
                 <div id="legend-missing-plot" class="legend-grid"></div>
@@ -218,7 +183,7 @@
                 <div class="metric-desc">
                     Шоу, к которым не привязан ни один жанр.
                 </div>
-                <div class="chart-box" style="height:320px;">
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
                     <canvas id="noGenresChart"></canvas>
                 </div>
                 <div id="legend-no-genres" class="legend-grid"></div>
@@ -239,7 +204,7 @@
                 <div class="metric-desc">
                     Шоу, к которым не привязана ни одна страна производства.
                 </div>
-                <div class="chart-box" style="height:320px;">
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
                     <canvas id="noCountriesChart"></canvas>
                 </div>
                 <div id="legend-no-countries" class="legend-grid"></div>
@@ -289,15 +254,39 @@
                 const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
                 const centerX = left + width / 2;
                 const centerY = top + height / 2;
+                
+                const innerRadius = chart.innerRadius || (Math.min(width, height) / 2 * 0.55);
+                const maxTextWidth = innerRadius * 1.6;
+                
+                let numFontSize = Math.max(16, Math.min(34, innerRadius * 0.6));
+                ctx.font = `900 ${numFontSize}px system-ui`;
+                const textStr = total.toLocaleString('ru-RU');
+                let textWidth = ctx.measureText(textStr).width;
+                if (textWidth > maxTextWidth) {
+                    numFontSize = numFontSize * (maxTextWidth / textWidth);
+                    ctx.font = `900 ${numFontSize}px system-ui`;
+                }
+                
+                let lblFontSize = Math.max(9, Math.min(11, innerRadius * 0.2));
+                ctx.font = `bold ${lblFontSize}px system-ui`;
+                let lblWidth = ctx.measureText(label).width;
+                if (lblWidth > maxTextWidth) {
+                    lblFontSize = lblFontSize * (maxTextWidth / lblWidth);
+                    ctx.font = `bold ${lblFontSize}px system-ui`;
+                }
+                
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.font = '900 34px system-ui';
+                
                 ctx.fillStyle = '#e5e7eb';
-                ctx.fillText(total.toLocaleString('ru-RU'), centerX, centerY - 8);
-                ctx.font = 'bold 10px system-ui';
+                ctx.font = `900 ${numFontSize}px system-ui`;
+                ctx.fillText(textStr, centerX, centerY - (numFontSize * 0.2));
+                
                 ctx.fillStyle = '#6e7681';
+                ctx.font = `bold ${lblFontSize}px system-ui`;
                 ctx.letterSpacing = '1px';
-                ctx.fillText(label, centerX, centerY + 22);
+                ctx.fillText(label, centerX, centerY + (numFontSize * 0.4) + (lblFontSize * 0.5));
+                
                 ctx.restore();
             }
         });
