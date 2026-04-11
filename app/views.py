@@ -5,6 +5,7 @@ import logging
 import uuid
 
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
@@ -13,6 +14,7 @@ from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from redis import Redis
 
 from app.models import (
     Country,
@@ -1234,6 +1236,7 @@ def webapp_search(request):
 
 
 @csrf_exempt
+@staff_member_required
 @require_http_methods(['GET'])
 def get_metric_details(request, key):
     show_type = request.GET.get('type')
@@ -1247,4 +1250,31 @@ def get_metric_details(request, key):
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
 
+    try:
+        r = Redis.from_url(settings.CELERY_BROKER_URL)
+        queued_ids = {int(x) for x in r.smembers('queue:update_details')}
+    except Exception:
+        queued_ids = set()
+
+    for item in items:
+        item['in_queue'] = item['id'] in queued_ids
+
     return JsonResponse({'items': items})
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def queue_update_details(request):
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    try:
+        data = json.loads(request.body)
+        ids = data.get('ids', [])
+        if not ids:
+            return JsonResponse({'status': 'ok', 'added': 0})
+
+        r = Redis.from_url(settings.CELERY_BROKER_URL)
+        added = r.sadd('queue:update_details', *ids)
+        return JsonResponse({'status': 'ok', 'added': added})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

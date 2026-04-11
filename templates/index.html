@@ -22,30 +22,76 @@
         .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; padding: 16px; }
         @media (max-width: 500px) { .metrics-grid { grid-template-columns: 1fr; } }
 
+        #data-timestamp {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 500;
+            padding: 8px 16px;
+            letter-spacing: -0.3px;
+            opacity: 0.5;
+            text-transform: uppercase;
+        }
+
+        .chart-box { 
+            position: relative; 
+            width: 100%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+        }
+
         .metric-desc { 
-            display: none; 
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            margin: 0;
+            padding: 0 12px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             font-size: 13px; 
             color: var(--text-muted); 
             line-height: 1.5; 
-            margin: 10px 0 20px; 
-            padding: 12px; 
             background: var(--bg-main); 
             border-radius: 10px; 
-            border-left: 3px solid var(--accent); 
+            border-left: 3px solid var(--accent);
+            pointer-events: none;
         }
-        .metric-desc.visible { display: block; animation: fadeIn 0.3s ease; }
         
-        .modal-body-list { display: flex; flex-direction: column; gap: 8px; margin-top: 15px; }
-        .modal-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; text-decoration: none; transition: all 0.2s; }
-        .modal-item:hover { border-color: var(--accent); background: var(--bg-main); transform: translateX(4px); }
-        .modal-item-title { font-size: 14px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .modal-item-orig { font-size: 11px; color: var(--text-muted); }
-        .admin-link-icon { color: var(--accent); font-size: 18px; margin-left: 10px; }
+        .metric-desc.visible {
+            max-height: 300px;
+            opacity: 1;
+            margin: 10px 0 20px;
+            padding: 12px;
+            pointer-events: auto;
+        }
+
+        .label-clickable { cursor: pointer; user-select: none; }
+        .modal-overlay { align-items: center !important; }
+        .modal-content { max-width: 1200px; width: 90vw; max-height: 85vh; display: flex; flex-direction: column; border-radius: 24px !important; transform: scale(0.95) !important; opacity: 0; transition: all 0.3s ease !important; }
+        .modal-overlay.show .modal-content { transform: scale(1) !important; opacity: 1; }
+        .modal-header { flex-shrink: 0; }
+        .modal-body-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); grid-auto-rows: min-content; align-content: start; gap: 12px; margin-top: 15px; overflow-y: auto; padding: 5px 10px 30px 5px; flex-grow: 1; min-height: 0; }
+        .modal-item { display: flex; flex-direction: column; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; transition: all 0.2s; overflow: hidden; min-height: 90px; flex-shrink: 0; }
+        .modal-item-info { padding: 12px 14px; flex-grow: 1; display: flex; flex-direction: column; justify-content: center; min-height: 60px; }
+        .modal-item-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
+        .modal-item-orig { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .modal-item-actions { display: flex; border-top: 1px solid var(--border); background: rgba(0,0,0,0.15); }
+        
+        .queue-btn { flex-grow: 1; padding: 12px 10px; background: transparent; border: none; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; transition: background 0.2s; border-right: 1px solid var(--border); }
+        .queue-btn:hover:not(:disabled) { background: rgba(46, 204, 113, 0.1); color: var(--accent); }
+        .queue-btn:disabled { color: var(--accent); cursor: default; }
+        
+        .admin-link-btn { padding: 12px 16px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; text-decoration: none; font-size: 14px; font-weight: 700; }
+        .admin-link-btn:hover { background: rgba(96, 165, 250, 0.1); color: var(--info); }
+        
+        .modal-footer { padding: 15px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; background: var(--bg-card); border-radius: 0 0 24px 24px; margin: 0 -24px -24px -24px; margin-top: 15px; flex-shrink: 0; }
+        .add-all-btn { background: var(--accent); color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s; }
+        .add-all-btn:hover:not(:disabled) { transform: scale(0.98); }
+        .add-all-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .add-all-btn .spinner { width: 16px; height: 16px; border-width: 2px; border-top-color: #fff; margin: 0; }
 
         .legend-item.clickable { cursor: pointer; }
         .legend-item.clickable:hover { border-color: var(--accent); background: var(--bg-main); }
-        .label-clickable { cursor: pointer; transition: opacity 0.2s; }
-        .label-clickable:hover { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -61,10 +107,15 @@
     </div>
 
     <div class="dashboard-container">
-        <div class="tabs" id="metric-tabs">
-            <button class="tab on" data-period="now" onclick="switchPeriod('now')">Сейчас</button>
-            <button class="tab" data-period="yesterday" onclick="switchPeriod('yesterday')">Вчера</button>
-            <button class="tab" data-period="week_ago" onclick="switchPeriod('week_ago')">7 дней назад</button>
+        <div class="tabs" id="metric-tabs" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+            <div style="display: flex; gap: 8px;">
+                <button class="tab on" data-period="now" onclick="switchPeriod('now')">Сейчас</button>
+                <button class="tab" data-period="yesterday" onclick="switchPeriod('yesterday')">Вчера</button>
+                <button class="tab" data-period="week_ago" onclick="switchPeriod('week_ago')">7 дней назад</button>
+            </div>
+            <div id="data-timestamp" style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding: 8px 16px;">
+                Загрузка...
+            </div>
         </div>
 
         <div class="metrics-grid">
@@ -74,10 +125,14 @@
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                     </div>
                     Нет рейтинга Кинопоиска
-                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
                 </div>
                 <div class="metric-desc">
-                    Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствуют данные о внешнем рейтинге. Это указывает на необходимость синхронизации или на то, что страница на Кинопоиске не отдаёт данные.
+                    Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.
                 </div>
                 <div class="chart-box" style="height:320px;">
                     <canvas id="missingKpChart"></canvas>
@@ -91,10 +146,14 @@
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     </div>
                     Коллизии названий
-                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
                 </div>
                 <div class="metric-desc">
-                    Случаи, когда основное название шоу содержит в себе оригинальное (например, "Interstellar Интерстеллар"). Это признак некорректного парсинга метаданных с источника, требующий ручной или автоматической очистки.
+                    Случаи, когда основное название шоу содержит в себе оригинальное (например, "Интерстеллар Interstellar").
                 </div>
                 <div class="chart-box" style="height:320px;">
                     <canvas id="collisionsChart"></canvas>
@@ -114,13 +173,25 @@
                 <div class="spinner" style="width:30px; height:30px; display:inline-block;"></div>
             </div>
             <div class="modal-body-list" id="modal-list"></div>
+            <div class="modal-footer hidden" id="modal-footer">
+                <button class="add-all-btn" id="add-all-btn" onclick="addAllToQueue()">
+                    В очередь все отсутствующие
+                </button>
+            </div>
         </div>
     </div>
 
     <script>
+        const METRIC_CONFIG = {
+            'missing_kp': 'Нет рейтинга Кинопоиска',
+            'title_collision': 'Коллизии названий'
+        };
         const allMetrics = {{ metrics_json|safe }};
         const charts = {};
         const palette = ['#e74c3c', '#d29922', '#388bfd', '#a371f7', '#1abc9c', '#e67e22', '#9b59b6', '#2ea043'];
+        
+        // Переменная для проверки прав доступа во фронтенде
+        const IS_AUTHENTICATED = {{ user.is_authenticated|yesno:"true,false" }};
 
         const createCenterTextPlugin = (label) => ({
             id: 'centerText_' + label,
@@ -143,38 +214,149 @@
             }
         });
 
+        let currentModalItems = [];
+
         async function openDetails(key, typeLabel) {
             const modal = document.getElementById('details-modal');
             const list = document.getElementById('modal-list');
             const loader = document.getElementById('modal-loader');
             const title = document.getElementById('modal-title');
+            const footer = document.getElementById('modal-footer');
 
-            title.innerText = `${typeLabel}: список`;
+            const metricName = METRIC_CONFIG[key] || 'Детализация';
+            title.innerText = `${metricName}: ${typeLabel}`;
+            
             list.innerHTML = '';
-            loader.classList.remove('hidden');
+            footer.classList.add('hidden');
             modal.classList.add('show');
+
+            /* 
+               КРИТИЧЕСКОЕ ПРАВИЛО ДОСТУПА: (этот коммент не удалять и не изменять)
+               Детализация списков (ID/Titles) и функции управления очередью разрешены 
+               только сотрудникам. Анонимам выводится заглушка для входа.
+            */
+            if (!IS_AUTHENTICATED) {
+                list.innerHTML = `
+                    <div class="empty" style="grid-column: 1/-1; padding: 40px 20px;">
+                        <div class="icon" style="font-size: 48px; margin-bottom: 20px; color: var(--danger);">
+                            <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        </div>
+                        <p style="font-size: 16px; margin-bottom: 20px; color: var(--text-primary);">
+                            Для просмотра деталей необходимо авторизоваться
+                        </p>
+                        <a href="/admin/login/?next=/" class="nav-btn active" style="padding: 12px 24px;">
+                            Войти в панель управления
+                        </a>
+                    </div>`;
+                return;
+            }
+
+            loader.classList.remove('hidden');
 
             try {
                 const resp = await fetch(`/api/metrics/details/${key}/?type=${encodeURIComponent(typeLabel)}`);
                 const data = await resp.json();
                 
                 if (data.items && data.items.length) {
-                    list.innerHTML = data.items.map(item => `
-                        <a href="/admin/app/show/${item.id}/change/" target="_blank" class="modal-item">
-                            <div>
+                    currentModalItems = data.items;
+                    list.innerHTML = data.items.map(item => {
+                        const qText = item.in_queue ? 'В очереди' : 'Обновить детали';
+                        const qDisabled = item.in_queue ? 'disabled' : '';
+                        
+                        return `
+                        <div class="modal-item" id="mi-${item.id}">
+                            <div class="modal-item-info">
                                 <div class="modal-item-title">${item.title}</div>
                                 <div class="modal-item-orig">${item.original_title || ''}</div>
                             </div>
-                            <span class="material-icons admin-link-icon">open_in_new</span>
-                        </a>
-                    `).join('');
+                            <div class="modal-item-actions">
+                                <button class="queue-btn" id="qb-${item.id}" onclick="addToQueue([${item.id}], this)" ${qDisabled}>
+                                    <span>${qText}</span>
+                                </button>
+                                <a href="/admin/app/show/${item.id}/change/" target="_blank" class="admin-link-btn" title="Открыть в админке">
+                                    В админке
+                                </a>
+                            </div>
+                        </div>`;
+                    }).join('');
+                    
+                    updateAddAllButtonState();
+                    footer.classList.remove('hidden');
                 } else {
+                    currentModalItems = [];
                     list.innerHTML = '<div class="empty">Ничего не найдено</div>';
                 }
             } catch (e) {
+                currentModalItems = [];
                 list.innerHTML = '<div class="empty" style="color:var(--danger)">Ошибка загрузки</div>';
             } finally {
                 loader.classList.add('hidden');
+            }
+        }
+
+        async function addToQueue(ids, btnElement) {
+            const originalContent = btnElement.innerHTML;
+            btnElement.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;"></div> <span>Отправка...</span>';
+            btnElement.disabled = true;
+
+            try {
+                const response = await fetch('/api/metrics/queue_update/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: ids })
+                });
+                
+                if (!response.ok) throw new Error('Network error');
+                
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+
+                btnElement.innerHTML = '<span>В очереди</span>';
+                
+                ids.forEach(id => {
+                    const item = currentModalItems.find(i => i.id === id);
+                    if (item) item.in_queue = true;
+                    
+                    const el = document.getElementById(`qb-${id}`);
+                    if (el && el !== btnElement) {
+                        el.innerHTML = '<span>В очереди</span>';
+                        el.disabled = true;
+                    }
+                });
+
+                updateAddAllButtonState();
+            } catch (e) {
+                btnElement.innerHTML = originalContent;
+                btnElement.disabled = false;
+                alert('Ошибка добавления в очередь: ' + e.message);
+            }
+        }
+
+        async function addAllToQueue() {
+            const btn = document.getElementById('add-all-btn');
+            const pendingIds = currentModalItems.filter(i => !i.in_queue).map(i => i.id);
+            
+            if (pendingIds.length === 0) return;
+
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;"></div> Обработка...';
+            btn.disabled = true;
+
+            await addToQueue(pendingIds, btn);
+            
+            btn.innerHTML = 'Все добавлены';
+        }
+
+        function updateAddAllButtonState() {
+            const btn = document.getElementById('add-all-btn');
+            const pendingIds = currentModalItems.filter(i => !i.in_queue);
+            
+            if (pendingIds.length === 0) {
+                btn.disabled = true;
+                btn.innerHTML = 'Все добавлены';
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = 'В очередь отсутствующие (' + pendingIds.length + ')';
             }
         }
 
@@ -193,16 +375,26 @@
             const data = rawData.filter(i => i[valueField] > 0);
             const canvas = document.getElementById(canvasId);
             const legendEl = document.getElementById(legendId);
+            const wrapper = canvas.parentElement;
 
             if (charts[chartKey]) charts[chartKey].destroy();
 
+            const existingEmpty = wrapper.querySelector('.empty-overlay');
+            if (existingEmpty) existingEmpty.remove();
+
             if (data.length === 0) {
-                legendEl.innerHTML = '<div class="empty">Нет данных за этот период</div>';
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                canvas.style.display = 'none';
+                legendEl.innerHTML = '';
+                
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'empty empty-overlay';
+                emptyDiv.style.height = '100%';
+                emptyDiv.innerHTML = 'Нет данных за этот период';
+                wrapper.appendChild(emptyDiv);
                 return;
             }
 
+            canvas.style.display = 'block';
             const total = data.reduce((acc, item) => acc + item[valueField], 0);
 
             charts[chartKey] = new Chart(canvas.getContext('2d'), {
@@ -276,11 +468,15 @@
                 btn.classList.toggle('on', btn.dataset.period === period);
             });
             
+            const timestampEl = document.getElementById('data-timestamp');
+            const ts = allMetrics.missing_kp[period].timestamp;
+            timestampEl.innerText = ts ? `${ts} UTC` : 'Данные отсутствуют';
+
             renderDoughnut(
                 'missing', 
                 'missingKpChart', 
                 'legend-missing-kp', 
-                allMetrics.missing_kp[period] || [], 
+                allMetrics.missing_kp[period].data || [], 
                 'БЕЗ РЕЙТИНГА', 
                 'value'
             );
@@ -289,7 +485,7 @@
                 'collisions', 
                 'collisionsChart', 
                 'legend-collisions', 
-                allMetrics.title_collision[period] || [], 
+                allMetrics.title_collision[period].data || [], 
                 'КОЛЛИЗИЙ', 
                 'collisions'
             );

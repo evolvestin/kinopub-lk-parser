@@ -41,10 +41,18 @@ def get_or_update_metric(key: str, calc_func) -> dict:
         .first()
     )
 
+    def _format_entry(entry):
+        if not entry:
+            return {'data': [], 'timestamp': None}
+        return {
+            'data': entry.data,
+            'timestamp': entry.created_at.strftime('%d.%m.%Y %H:%M:%S')
+        }
+
     return {
-        'now': latest.data if latest else [],
-        'yesterday': yesterday.data if yesterday else [],
-        'week_ago': week_ago.data if week_ago else [],
+        'now': _format_entry(latest),
+        'yesterday': _format_entry(yesterday),
+        'week_ago': _format_entry(week_ago),
     }
 
 
