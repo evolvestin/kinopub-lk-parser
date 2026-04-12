@@ -46,7 +46,7 @@ def get_or_update_metric(key: str, calc_func) -> dict:
             return {'data': [], 'timestamp': None}
         return {
             'data': entry.data,
-            'timestamp': entry.created_at.strftime('%d.%m.%Y %H:%M:%S')
+            'timestamp': entry.created_at.strftime('%Y-%m-%d %H:%M:%S')
         }
 
     return {

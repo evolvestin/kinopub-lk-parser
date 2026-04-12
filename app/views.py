@@ -1286,6 +1286,8 @@ def get_metric_details(request, key):
 
     for item in items:
         item['in_queue'] = item['id'] in queued_ids
+        item['poster_url'] = get_poster_url(item['id'], 'small')
+        item['kinopub_url'] = f"{settings.SITE_AUX_URL.rstrip('/')}/item/view/{item['id']}"
 
     return JsonResponse({'items': items})
 
