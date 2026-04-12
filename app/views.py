@@ -31,12 +31,14 @@ from app.models import (
     ViewUserGroup,
 )
 from app.services.metrics import (
+    calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
     calculate_missing_plot_metric,
     calculate_missing_year_metric,
     calculate_no_countries_metric,
     calculate_no_genres_metric,
     calculate_title_collision_metric,
+    get_missing_imdb_list,
     get_missing_kp_list,
     get_missing_plot_list,
     get_missing_year_list,
@@ -138,6 +140,7 @@ def _serialize_show_details(show, user=None):
 
 def index(request):
     missing_kp = get_or_update_metric('missing_kp', calculate_missing_kp_metric)
+    missing_imdb = get_or_update_metric('missing_imdb', calculate_missing_imdb_metric)
     title_collision = get_or_update_metric('title_collision', calculate_title_collision_metric)
     missing_year = get_or_update_metric('missing_year', calculate_missing_year_metric)
     missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
@@ -145,14 +148,17 @@ def index(request):
     no_countries = get_or_update_metric('no_countries', calculate_no_countries_metric)
 
     context = {
-        'metrics_json': json.dumps({
-            'missing_kp': missing_kp, 
-            'title_collision': title_collision,
-            'missing_year': missing_year,
-            'missing_plot': missing_plot,
-            'no_genres': no_genres,
-            'no_countries': no_countries
-        })
+        'metrics_json': json.dumps(
+            {
+                'missing_kp': missing_kp,
+                'missing_imdb': missing_imdb,
+                'title_collision': title_collision,
+                'missing_year': missing_year,
+                'missing_plot': missing_plot,
+                'no_genres': no_genres,
+                'no_countries': no_countries,
+            }
+        )
     }
     return render(request, 'index.html', context)
 
@@ -1265,6 +1271,8 @@ def get_metric_details(request, key):
 
     if key == 'missing_kp':
         items = list(get_missing_kp_list(show_type))
+    elif key == 'missing_imdb':
+        items = list(get_missing_imdb_list(show_type))
     elif key == 'title_collision':
         items = list(get_title_collision_list(show_type))
     elif key == 'missing_year':
@@ -1287,7 +1295,7 @@ def get_metric_details(request, key):
     for item in items:
         item['in_queue'] = item['id'] in queued_ids
         item['poster_url'] = get_poster_url(item['id'], 'small')
-        item['kinopub_url'] = f"{settings.SITE_AUX_URL.rstrip('/')}/item/view/{item['id']}"
+        item['kinopub_url'] = f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{item["id"]}'
 
     return JsonResponse({'items': items})
 

@@ -19,7 +19,15 @@ from app import history_parser
 from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
-from app.services.metrics import calculate_missing_kp_metric, calculate_title_collision_metric, calculate_missing_plot_metric, calculate_missing_year_metric, calculate_no_countries_metric, calculate_no_genres_metric
+from app.services.metrics import (
+    calculate_missing_imdb_metric,
+    calculate_missing_kp_metric,
+    calculate_missing_plot_metric,
+    calculate_missing_year_metric,
+    calculate_no_countries_metric,
+    calculate_no_genres_metric,
+    calculate_title_collision_metric,
+)
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
 
@@ -469,6 +477,9 @@ def sync_poiskkino_ratings_task():
 def update_site_metrics_task():
     kp_data = calculate_missing_kp_metric()
     SiteMetric.objects.create(key='missing_kp', data=kp_data)
+
+    imdb_data = calculate_missing_imdb_metric()
+    SiteMetric.objects.create(key='missing_imdb', data=imdb_data)
 
     collision_data = calculate_title_collision_metric()
     SiteMetric.objects.create(key='title_collision', data=collision_data)

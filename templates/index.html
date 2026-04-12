@@ -60,6 +60,40 @@
         .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
         .legend-name { font-size: clamp(11px, 1.5vw, 13px); font-weight: 700; color: var(--text-primary, #e5e7eb); white-space: nowrap; flex: 1; line-height: 1.2; text-align: left; }
         .legend-val { font-size: clamp(11px, 1.5vw, 12px); color: var(--text-muted, #9ca3af); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+        
+        @keyframes pulseGlowRed {
+            0% { box-shadow: 0 4px 12px rgba(231, 76, 60, 0.05); border-color: var(--border); }
+            50% { box-shadow: 0 4px 24px rgba(231, 76, 60, 0.25); border-color: rgba(231, 76, 60, 0.5); }
+            100% { box-shadow: 0 4px 12px rgba(231, 76, 60, 0.05); border-color: var(--border); }
+        }
+        .critical-glow {
+            animation: pulseGlowRed 10s infinite;
+        }
+        .empty-success {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+        .empty-success-icon {
+            font-size: 36px;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 0 8px rgba(46, 204, 113, 0.3));
+        }
+        .empty-success-title {
+            color: var(--accent);
+            font-weight: 800;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .empty-success-sub {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -107,6 +141,27 @@
                     <canvas id="missingKpChart"></canvas>
                 </div>
                 <div id="legend-missing-kp" class="legend-grid"></div>
+            </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:#f1c40f">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                    </div>
+                    Нет рейтинга IMDb
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Шоу, у которых указана ссылка на IMDb, но в таблице внешних рейтингов данные отсутствуют.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="missingImdbChart"></canvas>
+                </div>
+                <div id="legend-missing-imdb" class="legend-grid"></div>
             </div>
 
             <div class="card hoverable anim-item">
@@ -237,28 +292,64 @@
     <script>
         const METRIC_CONFIG = {
             'missing_kp': 'Нет рейтинга Кинопоиска',
+            'missing_imdb': 'Нет рейтинга IMDb',
             'title_collision': 'Коллизии названий',
             'missing_year': 'Год не указан',
             'missing_plot': 'Нет описания (сюжета)',
             'no_genres': 'Нет жанров',
             'no_countries': 'Нет стран'
         };
+
+        const METRIC_SEVERITY = {
+            'missing_kp': 'critical',
+            'missing_imdb': 'warning',
+            'missing_year': 'critical',
+            'title_collision': 'warning',
+            'missing_plot': 'info',
+            'no_genres': 'info',
+            'no_countries': 'info'
+        };
+
+        const PALETTES = {
+            critical: [
+                ['#ff4b4b', '#c92a2a'],
+                ['#ff7b72', '#d2544e'],
+                ['#e67e22', '#b35d18'],
+                ['#d29922', '#a07416'],
+                ['#a371f7', '#7b4bc6'],
+                ['#ef1960', '#b31248']
+            ],
+            warning: [
+                ['#e67e22', '#b35d18'],
+                ['#d29922', '#a07416'],
+                ['#f1c40f', '#b7950b'],
+                ['#388bfd', '#1f6feb'],
+                ['#a371f7', '#7b4bc6'],
+                ['#1abc9c', '#117a65']
+            ],
+            info: [
+                ['#388bfd', '#1f6feb'],
+                ['#1abc9c', '#117a65'],
+                ['#2ea043', '#238636'],
+                ['#a371f7', '#7b4bc6'],
+                ['#60a5fa', '#3b82f6'],
+                ['#9b59b6', '#71368a']
+            ]
+        };
+
         const allMetrics = {{ metrics_json|safe }};
         const charts = {};
-        const palette = ['#e74c3c', '#d29922', '#388bfd', '#a371f7', '#1abc9c', '#e67e22', '#9b59b6', '#2ea043'];
         
-        // Переменная для проверки прав доступа во фронтенде
         const IS_AUTHENTICATED = {{ user.is_authenticated|yesno:"true,false" }};
 
-        const createCenterTextPlugin = (label) => ({
+        const createCenterTextPlugin = (label, severity, total) => ({
             id: 'centerText_' + label,
             afterDraw: (chart) => {
                 const { ctx, chartArea: { top, height, left, width } } = chart;
                 ctx.save();
-                const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                
                 const centerX = left + width / 2;
                 const centerY = top + height / 2;
-                
                 const innerRadius = chart.innerRadius || (Math.min(width, height) / 2 * 0.55);
                 const maxTextWidth = innerRadius * 1.6;
                 
@@ -282,7 +373,14 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
-                ctx.fillStyle = '#e5e7eb';
+                let numColor = '#e5e7eb';
+                if (total > 0) {
+                    if (severity === 'critical') numColor = '#ff4b4b';
+                    else if (severity === 'warning') numColor = '#f1c40f';
+                    else numColor = '#60a5fa';
+                }
+                
+                ctx.fillStyle = numColor;
                 ctx.font = `900 ${numFontSize}px system-ui`;
                 ctx.fillText(textStr, centerX, centerY - (numFontSize * 0.2));
                 
@@ -472,35 +570,60 @@
             const canvas = document.getElementById(canvasId);
             const legendEl = document.getElementById(legendId);
             const wrapper = canvas.parentElement;
+            const cardEl = wrapper.closest('.card');
+            const severity = METRIC_SEVERITY[chartKey] || 'info';
+            const currentPalette = PALETTES[severity];
 
             if (charts[chartKey]) charts[chartKey].destroy();
 
             const existingEmpty = wrapper.querySelector('.empty-overlay');
             if (existingEmpty) existingEmpty.remove();
 
+            const total = data.reduce((acc, item) => acc + item[valueField], 0);
+
+            if (cardEl) {
+                if (total > 0 && severity === 'critical') {
+                    cardEl.classList.add('critical-glow');
+                } else {
+                    cardEl.classList.remove('critical-glow');
+                }
+            }
+
             if (data.length === 0) {
                 canvas.style.display = 'none';
                 legendEl.innerHTML = '';
                 
                 const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'empty empty-overlay';
-                emptyDiv.style.height = '100%';
-                emptyDiv.innerHTML = 'Нет данных за этот период';
+                emptyDiv.className = 'empty-overlay empty-success';
+                emptyDiv.innerHTML = `
+                    <div class="empty-success-icon">✨</div>
+                    <div class="empty-success-title">Идеально</div>
+                    <div class="empty-success-sub">Проблем не найдено</div>
+                `;
                 wrapper.appendChild(emptyDiv);
                 return;
             }
 
             canvas.style.display = 'block';
-            const total = data.reduce((acc, item) => acc + item[valueField], 0);
 
-            charts[chartKey] = new Chart(canvas.getContext('2d'), {
+            const ctx = canvas.getContext('2d');
+            const bgGradients = data.map((_, i) => {
+                const pair = currentPalette[i % currentPalette.length];
+                const grad = ctx.createLinearGradient(0, 0, 0, canvas.height || 200);
+                grad.addColorStop(0, pair[0]);
+                grad.addColorStop(1, pair[1]);
+                return grad;
+            });
+            const legendColors = data.map((_, i) => currentPalette[i % currentPalette.length][0]);
+
+            charts[chartKey] = new Chart(ctx, {
                 type: 'doughnut',
-                plugins: [createCenterTextPlugin(centerLabel)],
+                plugins: [createCenterTextPlugin(centerLabel, severity, total)],
                 data: {
                     labels: data.map(i => i.name || i.type),
                     datasets: [{
                         data: data.map(i => i[valueField]),
-                        backgroundColor: data.map((_, i) => palette[i % palette.length]),
+                        backgroundColor: bgGradients,
                         borderWidth: 0,
                         hoverOffset: 15,
                         borderRadius: 6,
@@ -546,7 +669,7 @@
             });
 
             legendEl.innerHTML = data.map((item, i) => {
-                const color = palette[i % palette.length];
+                const color = legendColors[i];
                 const pct = total > 0 ? Math.round((item[valueField] / total) * 100) : 0;
                 const label = item.name || item.type;
                 return `
@@ -573,6 +696,15 @@
                 'legend-missing-kp', 
                 allMetrics.missing_kp[period].data || [], 
                 'БЕЗ РЕЙТИНГА', 
+                'value'
+            );
+
+            renderDoughnut(
+                'missing_imdb', 
+                'missingImdbChart', 
+                'legend-missing-imdb', 
+                allMetrics.missing_imdb[period].data || [], 
+                'БЕЗ IMDB', 
                 'value'
             );
             
