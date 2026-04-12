@@ -31,9 +31,9 @@
         .modal-content { max-width: 95vw; width: 90vw; max-height: 85vh; display: flex; flex-direction: column; border-radius: 24px !important; transform: scale(0.95) !important; opacity: 0; transition: all 0.3s ease !important; margin: 0 auto; }
         .modal-overlay.show .modal-content { transform: scale(1) !important; opacity: 1; }
         .modal-header { flex-shrink: 0; }
-        .modal-body-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); grid-auto-rows: min-content; align-content: start; gap: 12px; margin-top: 15px; overflow-y: auto; padding: 5px 10px 30px 5px; flex-grow: 1; min-height: 0; }
+        .modal-body-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 450px)); grid-auto-rows: min-content; align-content: start; justify-content: center; gap: 16px; margin-top: 15px; overflow-y: auto; padding: 5px 10px 30px 5px; flex-grow: 1; min-height: 0; }
         
-        .modal-item { display: flex; flex-direction: row; align-items: stretch; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; transition: all 0.2s; overflow: hidden; min-height: 110px; flex-shrink: 0; }
+        .modal-item { display: flex; flex-direction: row; align-items: stretch; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; transition: all 0.2s; overflow: hidden; min-height: 110px; width: 100%; max-width: 450px; flex-shrink: 0; }
         .modal-item-poster { width: 80px; height: auto; object-fit: cover; background: var(--bg-main); flex-shrink: 0; border-right: 1px solid var(--border); }
         .modal-item-content { display: flex; flex-direction: column; justify-content: space-between; flex-grow: 1; min-width: 0; }
         .modal-item-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; flex-grow: 1; padding: 12px 14px; }
@@ -41,11 +41,11 @@
         .modal-item-orig { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .modal-item-actions { display: flex; border-top: 1px solid var(--border); background: rgba(0,0,0,0.15); flex-wrap: nowrap; }
 
-        .queue-btn { flex-grow: 1; padding: 12px 10px; background: transparent; border: none; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; transition: background 0.2s; border-right: 1px solid var(--border); white-space: nowrap; }
+        .queue-btn { flex-grow: 1; flex-shrink: 0; min-width: 140px; padding: 12px 10px; background: transparent; border: none; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; transition: background 0.2s; border-right: 1px solid var(--border); white-space: nowrap; }
         .queue-btn:hover:not(:disabled) { background: rgba(46, 204, 113, 0.1); color: var(--accent); }
         .queue-btn:disabled { color: var(--accent); cursor: default; }
         
-        .admin-link-btn { padding: 12px 12px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; text-decoration: none; font-size: 14px; font-weight: 700; white-space: nowrap; }
+        .admin-link-btn { flex-shrink: 0; padding: 12px 12px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; text-decoration: none; font-size: 14px; font-weight: 700; white-space: nowrap; }
         .admin-link-btn:hover { background: rgba(96, 165, 250, 0.1); color: var(--info); }
         
         .modal-footer { padding: 15px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; background: var(--bg-card); border-radius: 0 0 24px 24px; margin: 0 -24px -24px -24px; margin-top: 15px; flex-shrink: 0; }
@@ -308,8 +308,8 @@
             const metricName = METRIC_CONFIG[key] || 'Детализация';
             title.innerText = `${metricName}: ${typeLabel}`;
             
-            // Сбрасываем на дефолтную ширину для состояния загрузки
-            mContent.style.width = '90vw';
+            mContent.style.width = '95vw';
+            mContent.style.maxWidth = '100vw';
             
             list.innerHTML = '';
             footer.classList.add('hidden');
@@ -341,13 +341,10 @@
                 if (data.items && data.items.length) {
                     currentModalItems = data.items;
                     
-                    // Подстраиваем ширину модалки под малое число элементов
-                    if (data.items.length === 1) {
-                        mContent.style.width = 'min(95vw, 460px)';
-                    } else if (data.items.length === 2) {
-                        mContent.style.width = 'min(95vw, 890px)';
+                    if ([2, 3, 4, 5].includes(data.items.length)) {
+                        mContent.style.width = 'min(95vw, 500px)';
                     } else {
-                        mContent.style.width = '90vw';
+                        mContent.style.width = '95vw';
                     }
 
                     list.innerHTML = data.items.map(item => {
