@@ -1282,45 +1282,73 @@ def get_metric_details(request, key):
     if not show_type:
         return JsonResponse({'error': 'Type required'}, status=400)
 
-    summary_keys = {'has_kp', 'has_imdb', 'total_shows'}
-    
-    if key in summary_keys:
-        admin_base_url = reverse('admin:app_show_changelist')
-        return JsonResponse({
-            'is_summary': True,
-            'admin_url': f'{admin_base_url}?type__exact={show_type}',
-            'items': []
-        })
+    admin_base_url = reverse('admin:app_show_changelist')
+    params = [f'type={show_type}']
+
+    items = []
+    is_summary = False
+    target_task = 'details'
 
     if key == 'missing_kp':
         items = list(get_missing_kp_list(show_type))
+        params.extend(['kinopoisk_url__isnull=False', 'ext_rating__isnull=True'])
+        target_task = 'priority_sync'
     elif key == 'missing_imdb':
         items = list(get_missing_imdb_list(show_type))
+        params.extend(['imdb_url__isnull=False', 'ext_rating__isnull=True'])
+        target_task = 'priority_sync'
     elif key == 'title_collision':
         items = list(get_title_collision_list(show_type))
     elif key == 'missing_year':
         items = list(get_missing_year_list(show_type))
+        params.append('year__isnull=True')
     elif key == 'missing_plot':
         items = list(get_missing_plot_list(show_type))
+        params.append('plot__isnull=True')
     elif key == 'no_genres':
         items = list(get_no_genres_list(show_type))
+        params.append('genres__isnull=True')
     elif key == 'no_countries':
         items = list(get_no_countries_list(show_type))
+        params.append('countries__isnull=True')
+    elif key == 'has_kp':
+        is_summary = True
+        params.append('ext_rating__kp__isnull=False')
+    elif key == 'has_imdb':
+        is_summary = True
+        params.append('ext_rating__imdb__isnull=False')
+    elif key == 'total_shows':
+        is_summary = True
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
 
+    admin_url = f"{admin_base_url}?{'&'.join(params)}"
+
+    if is_summary:
+        return JsonResponse({
+            'is_summary': True,
+            'admin_url': admin_url,
+            'items': []
+        })
+
     try:
         r = Redis.from_url(settings.CELERY_BROKER_URL)
-        queued_ids = {int(x) for x in r.smembers('queue:update_details')}
+        queued_details = {int(x) for x in r.smembers('queue:update_details')}
+        queued_sync = {int(x) for x in r.smembers('queue:priority_ratings_sync')}
+        all_queued = queued_details | queued_sync
     except Exception:
-        queued_ids = set()
+        all_queued = set()
 
     for item in items:
-        item['in_queue'] = item['id'] in queued_ids
+        item['in_queue'] = item['id'] in all_queued
         item['poster_url'] = get_poster_url(item['id'], 'small')
         item['kinopub_url'] = f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{item["id"]}'
 
-    return JsonResponse({'items': items})
+    return JsonResponse({
+        'items': items,
+        'admin_url': admin_url,
+        'target_task': target_task
+    })
 
 
 @csrf_exempt
@@ -1331,11 +1359,15 @@ def queue_update_details(request):
     try:
         data = json.loads(request.body)
         ids = data.get('ids', [])
+        target = data.get('target', 'details')
+        
         if not ids:
             return JsonResponse({'status': 'ok', 'added': 0})
 
+        redis_key = 'queue:priority_ratings_sync' if target == 'priority_sync' else 'queue:update_details'
+        
         r = Redis.from_url(settings.CELERY_BROKER_URL)
-        added = r.sadd('queue:update_details', *ids)
+        added = r.sadd(redis_key, *ids)
         return JsonResponse({'status': 'ok', 'added': added})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

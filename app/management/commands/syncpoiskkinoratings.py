@@ -39,18 +39,33 @@ class Command(LoggableBaseCommand):
         data = client.fetch_updated_ratings(yesterday, today)
         logging.info(f'Fetched {len(data)} daily updates.')
 
+        # Извлечение приоритетных ID из Redis
+        priority_show_ids = set()
+        try:
+            from django.conf import settings
+            from redis import Redis
+            r = Redis.from_url(settings.CELERY_BROKER_URL)
+            priority_raw = r.spop('queue:priority_ratings_sync', count=limit)
+            if priority_raw:
+                priority_show_ids = {int(x) for x in priority_raw}
+                logging.info(f'Found {len(priority_show_ids)} priority shows in Redis queue.')
+        except Exception as e:
+            logging.error(f'Redis priority queue error: {e}')
+
         stale_cutoff = now - timedelta(days=7)
 
-        # Выбираем ID, где рейтинга нет ВООБЩЕ или он не обновлялся дольше 7 дней
         missing_show_ids = set(
             Show.objects.filter(
                 Q(ext_rating__isnull=True) | Q(ext_rating__updated_at__lt=stale_cutoff)
             ).values_list('id', flat=True)[:limit]
         )
-        missing_kp_ids = [kp for kp, sid in kp_mapping.items() if sid in missing_show_ids]
+        
+        # Объединяем приоритетные и плановые ID, сохраняя лимит
+        combined_show_ids = list(priority_show_ids | missing_show_ids)[:limit]
+        missing_kp_ids = [kp for kp, sid in kp_mapping.items() if sid in combined_show_ids]
 
         if missing_kp_ids:
-            logging.info(f'Fetching {len(missing_kp_ids)} missing/stale records by IDs...')
+            logging.info(f'Fetching {len(missing_kp_ids)} missing/stale/priority records by IDs...')
             catchup_data = client.fetch_ratings_by_ids(missing_kp_ids)
             data.extend(catchup_data)
 

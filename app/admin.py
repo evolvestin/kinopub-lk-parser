@@ -317,6 +317,22 @@ class ShowAdmin(admin.ModelAdmin):
     filter_horizontal = ('countries', 'genres')
     actions = ['action_update_details', 'action_update_durations']
 
+    def lookup_allowed(self, lookup, value):
+        allowed_lookups = [
+            'ext_rating__kp__isnull',
+            'ext_rating__imdb__isnull',
+            'ext_rating__isnull',
+            'kinopoisk_url__isnull',
+            'imdb_url__isnull',
+            'year__isnull',
+            'plot__isnull',
+            'genres__isnull',
+            'countries__isnull',
+        ]
+        if lookup in allowed_lookups:
+            return True
+        return super().lookup_allowed(lookup, value)
+
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
 

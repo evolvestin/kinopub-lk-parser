@@ -478,6 +478,7 @@
         });
 
         let currentModalItems = [];
+        let currentTargetTask = 'details';
 
         async function openDetails(key, typeLabel) {
             const modal = document.getElementById('details-modal');
@@ -520,6 +521,8 @@
                 const resp = await fetch(`/api/metrics/details/${key}/?type=${encodeURIComponent(typeLabel)}`);
                 const data = await resp.json();
                 
+                currentTargetTask = data.target_task || 'details';
+                
                 if (data.is_summary) {
                     mContent.style.width = 'min(95vw, 460px)';
                     list.innerHTML = `
@@ -548,8 +551,13 @@
                     }
 
                     list.innerHTML = data.items.map(item => {
-                        const qText = item.in_queue ? 'В очереди' : 'Обновить детали';
                         const qDisabled = item.in_queue ? 'disabled' : '';
+                        let btnText = 'Обновить детали';
+                        if (item.in_queue) {
+                            btnText = 'В очереди';
+                        } else if (currentTargetTask === 'priority_sync') {
+                            btnText = 'Синхронизировать (API)';
+                        }
                         
                         return `
                         <div class="modal-item" id="mi-${item.id}">
@@ -561,7 +569,7 @@
                                 </div>
                                 <div class="modal-item-actions">
                                     <button class="queue-btn" id="qb-${item.id}" onclick="addToQueue([${item.id}], this)" ${qDisabled}>
-                                        <span>${qText}</span>
+                                        <span>${btnText}</span>
                                     </button>
                                     <a href="${item.kinopub_url}" target="_blank" class="admin-link-btn" style="color: var(--accent); border-right: 1px solid var(--border);" title="Открыть на Кинопабе">
                                         На Кинопабе
@@ -599,7 +607,10 @@
                 const response = await fetch('/api/metrics/queue_update/', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids: ids })
+                    body: JSON.stringify({ 
+                        ids: ids,
+                        target: currentTargetTask 
+                    })
                 });
                 
                 if (!response.ok) throw new Error('Network error');
@@ -628,21 +639,6 @@
             }
         }
 
-        async function addAllToQueue() {
-            const btn = document.getElementById('add-all-btn');
-            const pendingIds = currentModalItems.filter(i => !i.in_queue).map(i => i.id);
-            
-            if (pendingIds.length === 0) return;
-
-            const originalContent = btn.innerHTML;
-            btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;"></div> Обработка...';
-            btn.disabled = true;
-
-            await addToQueue(pendingIds, btn);
-            
-            btn.innerHTML = 'Все добавлены';
-        }
-
         function updateAddAllButtonState() {
             const btn = document.getElementById('add-all-btn');
             const pendingIds = currentModalItems.filter(i => !i.in_queue);
@@ -652,7 +648,8 @@
                 btn.innerHTML = 'Все добавлены в очередь';
             } else {
                 btn.disabled = false;
-                btn.innerHTML = 'В очередь на обновление (' + pendingIds.length + ')';
+                const actionText = currentTargetTask === 'priority_sync' ? 'на синхронизацию' : 'на обновление';
+                btn.innerHTML = `В очередь ${actionText} (${pendingIds.length})`;
             }
         }
 
@@ -710,8 +707,7 @@
                 } else {
                     emptyDiv.innerHTML = `
                         <div style="font-size:36px;margin-bottom:8px;filter:drop-shadow(0 0 8px rgba(46, 204, 113, 0.3));">✅</div>
-                        <div style="color:var(--accent);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Чисто</div>
-                        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Проблем этой категории не найдено</div>
+                        <div style="color:var(--accent);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Проблем не найдено</div>
                     `;
                 }
                 wrapper.appendChild(emptyDiv);
