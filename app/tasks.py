@@ -455,7 +455,7 @@ def run_gap_scanner_task():
 
 @shared_task
 @safe_execution
-def fetch_person_photos_task(limit=50):
+def fetch_person_photos_task(limit=2500):
     call_command('fetchpersonphotos', limit=limit)
 
 

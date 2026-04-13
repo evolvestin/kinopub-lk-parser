@@ -1,5 +1,6 @@
 import logging
 import re
+from time import sleep
 
 import requests
 from django.conf import settings
@@ -77,6 +78,9 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
             search_params = {**default_params, 'query': query}
 
             resp = session.get(base_url, params=search_params, headers=headers, timeout=10)
+
+            sleep(0.25)
+
             if resp.status_code == 200:
                 data = resp.json()
                 results = data.get('results', [])
