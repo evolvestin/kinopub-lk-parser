@@ -27,6 +27,10 @@ from app.services.metrics import (
     calculate_no_countries_metric,
     calculate_no_genres_metric,
     calculate_title_collision_metric,
+    calculate_has_imdb_metric,
+    calculate_has_kp_metric,
+    calculate_missing_country_meta_metric,
+    calculate_total_countries_with_shows_metric
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
@@ -495,5 +499,11 @@ def update_site_metrics_task():
 
     countries_data = calculate_no_countries_metric()
     SiteMetric.objects.create(key='no_countries', data=countries_data)
+
+    country_meta_data = calculate_missing_country_meta_metric()
+    SiteMetric.objects.create(key='missing_country_meta', data=country_meta_data)
+
+    total_countries_data = calculate_total_countries_with_shows_metric()
+    SiteMetric.objects.create(key='total_countries', data=total_countries_data)
 
     logging.info('Site metrics updated successfully.')

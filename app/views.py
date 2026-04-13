@@ -42,6 +42,8 @@ from app.services.metrics import (
     calculate_has_kp_metric,
     calculate_has_imdb_metric,
     calculate_total_shows_metric,
+    calculate_missing_country_meta_metric,
+    calculate_total_countries_with_shows_metric,
     get_missing_imdb_list,
     get_missing_kp_list,
     get_missing_plot_list,
@@ -52,6 +54,8 @@ from app.services.metrics import (
     get_has_kp_list,
     get_has_imdb_list,
     get_total_shows_list,
+    get_missing_country_meta_list,
+    get_total_countries_with_shows_list,
     get_or_update_metric,
 )
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
@@ -156,6 +160,8 @@ def index(request):
     missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
     no_genres = get_or_update_metric('no_genres', calculate_no_genres_metric)
     no_countries = get_or_update_metric('no_countries', calculate_no_countries_metric)
+    missing_country_meta = get_or_update_metric('missing_country_meta', calculate_missing_country_meta_metric)
+    total_countries = get_or_update_metric('total_countries', calculate_total_countries_with_shows_metric)
 
     context = {
         'metrics_json': json.dumps(
@@ -170,6 +176,8 @@ def index(request):
                 'missing_plot': missing_plot,
                 'no_genres': no_genres,
                 'no_countries': no_countries,
+                'missing_country_meta': missing_country_meta,
+                'total_countries': total_countries,
             }
         )
     }
@@ -1279,14 +1287,13 @@ def webapp_search(request):
 @require_http_methods(['GET'])
 def get_metric_details(request, key):
     show_type = request.GET.get('type')
-    if not show_type:
-        return JsonResponse({'error': 'Type required'}, status=400)
-
+    
     admin_base_url = reverse('admin:app_show_changelist')
-    params = [f'type={show_type}']
+    params = [f'type={show_type}'] if show_type else []
 
     items = []
     is_summary = False
+    is_country = False
     target_task = 'details'
 
     if key == 'missing_kp':
@@ -1319,10 +1326,18 @@ def get_metric_details(request, key):
         params.append('ext_rating__imdb__isnull=False')
     elif key == 'total_shows':
         is_summary = True
+    elif key == 'missing_country_meta':
+        is_country = True
+        items = list(get_missing_country_meta_list())
+        admin_base_url = reverse('admin:app_country_changelist')
+    elif key == 'total_countries':
+        is_country = True
+        items = list(get_total_countries_with_shows_list())
+        admin_base_url = reverse('admin:app_country_changelist')
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
 
-    admin_url = f"{admin_base_url}?{'&'.join(params)}"
+    admin_url = f"{admin_base_url}?{'&'.join(params)}" if params else admin_base_url
 
     if is_summary:
         return JsonResponse({
@@ -1340,14 +1355,20 @@ def get_metric_details(request, key):
         all_queued = set()
 
     for item in items:
-        item['in_queue'] = item['id'] in all_queued
-        item['poster_url'] = get_poster_url(item['id'], 'small')
-        item['kinopub_url'] = f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{item["id"]}'
+        if not is_country:
+            item['in_queue'] = item['id'] in all_queued
+            item['poster_url'] = get_poster_url(item['id'], 'small')
+            item['kinopub_url'] = f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{item["id"]}'
+            item['admin_url'] = reverse('admin:app_show_change', args=[item['id']])
+        else:
+            item['is_country'] = True
+            item['admin_url'] = reverse('admin:app_country_change', args=[item['id']])
 
     return JsonResponse({
         'items': items,
         'admin_url': admin_url,
-        'target_task': target_task
+        'target_task': target_task,
+        'is_country': is_country
     })
 
 
