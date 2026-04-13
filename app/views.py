@@ -2,6 +2,7 @@ import functools
 import hashlib
 import json
 import logging
+import urllib.parse
 import uuid
 
 from django.conf import settings
@@ -32,6 +33,7 @@ from app.models import (
     ViewUserGroup,
 )
 from app.services.metrics import (
+    calculate_duplicate_photo_urls_metric,
     calculate_has_imdb_metric,
     calculate_has_kp_metric,
     calculate_missing_country_meta_metric,
@@ -48,6 +50,7 @@ from app.services.metrics import (
     calculate_total_countries_with_shows_metric,
     calculate_total_persons_by_show_type_metric,
     calculate_total_shows_metric,
+    get_duplicate_photo_urls_list,
     get_missing_country_meta_list,
     get_missing_imdb_list,
     get_missing_kp_list,
@@ -177,6 +180,9 @@ def index(request):
     professions_stats = get_or_update_metric(
         'professions_stats', calculate_professions_stats_metric
     )
+    duplicate_photo_urls = get_or_update_metric(
+        'duplicate_photo_urls', calculate_duplicate_photo_urls_metric
+    )
 
     context = {
         'metrics_json': json.dumps(
@@ -197,6 +203,7 @@ def index(request):
                 'total_persons_by_show_type': total_persons_by_show_type,
                 'persons_avatar_stats': persons_avatar_stats,
                 'professions_stats': professions_stats,
+                'duplicate_photo_urls': duplicate_photo_urls,
             }
         )
     }
@@ -1308,13 +1315,18 @@ def get_metric_details(request, key):
     show_type = request.GET.get('type')
     admin_base_url = reverse(
         'admin:app_person_changelist'
-        if any(x in key for x in ['person', 'avatar', 'professions'])
+        if any(x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo'])
         else 'admin:app_country_changelist'
         if 'country' in key
         else 'admin:app_show_changelist'
     )
     params = (
-        [f'type={show_type}'] if show_type and 'person' not in key and 'avatar' not in key else []
+        [f'type={show_type}']
+        if show_type
+        and 'person' not in key
+        and 'avatar' not in key
+        and 'duplicate_photo' not in key
+        else []
     )
 
     items, is_summary, is_country, is_person, target_task = [], False, False, False, 'details'
@@ -1375,6 +1387,9 @@ def get_metric_details(request, key):
     elif key == 'professions_stats':
         is_summary = True
         params = [f'showcrew__profession__exact={show_type}']
+    elif key == 'duplicate_photo_urls':
+        is_person, items = True, list(get_duplicate_photo_urls_list(show_type))
+        params.append(f'q={urllib.parse.quote(show_type)}')
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
 
@@ -1397,10 +1412,10 @@ def get_metric_details(request, key):
             item.update(
                 {
                     'is_person': True,
-                    'title': item['name'],
+                    'title': item['title'],
                     'original_title': item['en_name'],
                     'poster_url': item.get('tmdb_photo_url') or item.get('kp_photo_url') or '',
-                    'admin_url': reverse('admin:app_person_change', args=[item['id']]),
+                    'admin_url': f'{reverse("admin:app_person_changelist")}?q={item["title"]}',
                 }
             )
         elif is_country:

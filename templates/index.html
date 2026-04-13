@@ -423,6 +423,27 @@
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:#ef1960">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    </div>
+                    Дубликаты по фото
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Выявляет разные записи людей, у которых совпадают ссылки на аватарки. Это признак того, что один и тот же человек записан под разными именами.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="duplicatePhotoChart"></canvas>
+                </div>
+                <div id="legend-duplicate-photo" class="legend-grid"></div>
+            </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
                     <div class="icon" style="color:#388bfd">
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                     </div>
@@ -522,7 +543,8 @@
             'total_countries': 'Всего стран',
             'total_persons_by_show_type': 'Люди по типам шоу',
             'persons_avatar_stats': 'Фото людей',
-            'professions_stats': 'Роли (профессии)'
+            'professions_stats': 'Роли (профессии)',
+            'duplicate_photo_urls': 'Одинаковые фото (дубли)'
         };
 
         const METRIC_SEVERITY = {
@@ -541,7 +563,8 @@
             'total_countries': 'info',
             'total_persons_by_show_type': 'info',
             'persons_avatar_stats': 'warning',
-            'professions_stats': 'info'
+            'professions_stats': 'info',
+            'duplicate_photo_urls': 'critical'
         };
 
         const PALETTES = {
@@ -1164,6 +1187,15 @@
                 'legend-professions', 
                 allMetrics.professions_stats[period], 
                 'ЗАНЯТОСТЕЙ', 
+                'value'
+            );
+
+            renderDoughnut(
+                'duplicate_photo_urls', 
+                'duplicatePhotoChart', 
+                'legend-duplicate-photo', 
+                allMetrics.duplicate_photo_urls[period], 
+                'ДУБЛЕЙ URL', 
                 'value'
             );
         }

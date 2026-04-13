@@ -20,10 +20,12 @@ from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
+    calculate_duplicate_photo_urls_metric,
     calculate_missing_country_meta_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
     calculate_missing_plot_metric,
+    calculate_missing_status_metric,
     calculate_missing_year_metric,
     calculate_no_countries_metric,
     calculate_no_genres_metric,
@@ -32,7 +34,6 @@ from app.services.metrics import (
     calculate_title_collision_metric,
     calculate_total_countries_with_shows_metric,
     calculate_total_persons_by_show_type_metric,
-    calculate_missing_status_metric,
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
@@ -519,5 +520,8 @@ def update_site_metrics_task():
 
     professions_data = calculate_professions_stats_metric()
     SiteMetric.objects.create(key='professions_stats', data=professions_data)
+
+    duplicate_photo_data = calculate_duplicate_photo_urls_metric()
+    SiteMetric.objects.create(key='duplicate_photo_urls', data=duplicate_photo_data)
 
     logging.info('Site metrics updated successfully.')

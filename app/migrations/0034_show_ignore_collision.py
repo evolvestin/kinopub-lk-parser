@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0033_sitemetric'),
     ]
@@ -13,6 +12,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='show',
             name='ignore_collision',
-            field=models.BooleanField(default=False, verbose_name='Игнорировать коллизию в названии'),
+            field=models.BooleanField(
+                default=False, verbose_name='Игнорировать коллизию в названии'
+            ),
         ),
     ]

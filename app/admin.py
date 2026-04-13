@@ -865,7 +865,7 @@ class PersonAdmin(BaseNameAdmin):
         'updated_at',
     )
     list_filter = (PhotoSourceFilter, 'is_photo_fetched', 'showcrew__en_profession')
-    search_fields = ('name', 'en_name')
+    search_fields = ('name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
     readonly_fields = BaseNameAdmin.readonly_fields + (
         'get_photo_display',
         'refetch_photo_button',

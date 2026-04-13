@@ -137,10 +137,9 @@ def get_or_update_metric(key: str, calc_func) -> dict:
 
 
 def calculate_title_collision_metric():
-    qs = Show.objects.filter(
-        original_title__isnull=False,
-        ignore_collision=False
-    ).exclude(original_title='')
+    qs = Show.objects.filter(original_title__isnull=False, ignore_collision=False).exclude(
+        original_title=''
+    )
 
     stats = (
         qs.annotate(low_title=Lower('title'), low_orig=Lower('original_title'))
@@ -176,12 +175,8 @@ def get_missing_kp_list(show_type: str):
 
 def get_title_collision_list(show_type: str):
     qs = Show.objects.filter(
-        type=show_type,
-        original_title__isnull=False,
-        ignore_collision=False
-    ).exclude(
-        original_title=''
-    )
+        type=show_type, original_title__isnull=False, ignore_collision=False
+    ).exclude(original_title='')
     return (
         qs.annotate(low_title=Lower('title'), low_orig=Lower('original_title'))
         .annotate(pos=StrIndex('low_title', F('low_orig')))
@@ -365,3 +360,58 @@ def get_missing_status_list(show_type: str):
         .filter(Q(status__isnull=True) | Q(status=''))
         .values('id', 'title', 'original_title')
     )
+
+
+def calculate_duplicate_photo_urls_metric():
+    tmdb_dupes = (
+        Person.objects.exclude(tmdb_photo_url='')
+        .filter(tmdb_photo_url__isnull=False)
+        .values('tmdb_photo_url')
+        .annotate(cnt=Count('id'))
+        .filter(cnt__gt=1)
+        .count()
+    )
+    kp_dupes = (
+        Person.objects.exclude(kp_photo_url='')
+        .filter(kp_photo_url__isnull=False)
+        .values('kp_photo_url')
+        .annotate(cnt=Count('id'))
+        .filter(cnt__gt=1)
+        .count()
+    )
+    return [
+        {'name': 'TMDB дубликаты', 'value': tmdb_dupes},
+        {'name': 'KP дубликаты', 'value': kp_dupes},
+    ]
+
+
+def get_duplicate_photo_urls_list(source_type: str):
+    field = 'tmdb_photo_url' if 'TMDB' in source_type else 'kp_photo_url'
+
+    dupe_urls = (
+        Person.objects.exclude(**{field: ''})
+        .filter(**{f'{field}__isnull': False})
+        .values(field)
+        .annotate(cnt=Count('id'))
+        .filter(cnt__gt=1)
+        .order_by('-cnt')[:250]
+    )
+
+    results = []
+    for entry in dupe_urls:
+        url = entry[field]
+        persons = Person.objects.filter(**{field: url}).values('id', 'name')
+        names = [p['name'] for p in persons]
+
+        results.append(
+            {
+                'id': persons[0]['id'],
+                'title': url,
+                'name': url,
+                'en_name': f'Используют: {", ".join(names[:5])}{"..." if len(names) > 5 else ""}',
+                'usage_count': entry['cnt'],
+                'tmdb_photo_url': url if field == 'tmdb_photo_url' else None,
+                'kp_photo_url': url if field == 'kp_photo_url' else None,
+            }
+        )
+    return results
