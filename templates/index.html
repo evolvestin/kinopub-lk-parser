@@ -66,8 +66,9 @@
             50% { box-shadow: 0 4px 24px rgba(231, 76, 60, 0.25); border-color: rgba(231, 76, 60, 0.5); }
             100% { box-shadow: 0 4px 12px rgba(231, 76, 60, 0.05); border-color: var(--border); }
         }
-        .critical-glow {
-            animation: pulseGlowRed 10s infinite;
+        .anim-item.critical-glow {
+            animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both, 
+                       pulseGlowRed 10s infinite;
         }
         .empty-success {
             display: flex;
@@ -302,7 +303,7 @@
 
         const METRIC_SEVERITY = {
             'missing_kp': 'critical',
-            'missing_imdb': 'warning',
+            'missing_imdb': 'critical',
             'missing_year': 'critical',
             'title_collision': 'warning',
             'missing_plot': 'info',
@@ -565,7 +566,9 @@
             }
         }
 
-        function renderDoughnut(chartKey, canvasId, legendId, rawData, centerLabel, valueField) {
+        function renderDoughnut(chartKey, canvasId, legendId, periodInfo, centerLabel, valueField) {
+            const rawData = periodInfo.data || [];
+            const timestamp = periodInfo.timestamp;
             const data = rawData.filter(i => i[valueField] > 0);
             const canvas = document.getElementById(canvasId);
             const legendEl = document.getElementById(legendId);
@@ -589,17 +592,27 @@
                 }
             }
 
-            if (data.length === 0) {
+            if (!timestamp || data.length === 0 && total === 0) {
                 canvas.style.display = 'none';
                 legendEl.innerHTML = '';
                 
                 const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'empty-overlay empty-success';
-                emptyDiv.innerHTML = `
-                    <div class="empty-success-icon">✨</div>
-                    <div class="empty-success-title">Идеально</div>
-                    <div class="empty-success-sub">Проблем не найдено</div>
-                `;
+                emptyDiv.className = 'empty-overlay';
+                emptyDiv.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;';
+                
+                if (!timestamp) {
+                    emptyDiv.innerHTML = `
+                        <div style="font-size:36px;margin-bottom:8px;opacity:0.5;">⏳</div>
+                        <div style="color:var(--text-muted);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Нет данных</div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;opacity:0.7;">Метрика еще не рассчитывалась</div>
+                    `;
+                } else {
+                    emptyDiv.innerHTML = `
+                        <div style="font-size:36px;margin-bottom:8px;filter:drop-shadow(0 0 8px rgba(46, 204, 113, 0.3));">✅</div>
+                        <div style="color:var(--accent);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Чисто</div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">Проблем этой категории не найдено</div>
+                    `;
+                }
                 wrapper.appendChild(emptyDiv);
                 return;
             }
@@ -694,7 +707,7 @@
                 'missing_kp', 
                 'missingKpChart', 
                 'legend-missing-kp', 
-                allMetrics.missing_kp[period].data || [], 
+                allMetrics.missing_kp[period], 
                 'БЕЗ РЕЙТИНГА', 
                 'value'
             );
@@ -703,7 +716,7 @@
                 'missing_imdb', 
                 'missingImdbChart', 
                 'legend-missing-imdb', 
-                allMetrics.missing_imdb[period].data || [], 
+                allMetrics.missing_imdb[period], 
                 'БЕЗ IMDB', 
                 'value'
             );
@@ -712,7 +725,7 @@
                 'title_collision', 
                 'collisionsChart', 
                 'legend-collisions', 
-                allMetrics.title_collision[period].data || [], 
+                allMetrics.title_collision[period], 
                 'КОЛЛИЗИЙ', 
                 'collisions'
             );
@@ -721,7 +734,7 @@
                 'missing_year', 
                 'missingYearChart', 
                 'legend-missing-year', 
-                allMetrics.missing_year[period].data || [], 
+                allMetrics.missing_year[period], 
                 'БЕЗ ГОДА', 
                 'value'
             );
@@ -730,7 +743,7 @@
                 'missing_plot', 
                 'missingPlotChart', 
                 'legend-missing-plot', 
-                allMetrics.missing_plot[period].data || [], 
+                allMetrics.missing_plot[period], 
                 'БЕЗ СЮЖЕТА', 
                 'value'
             );
@@ -739,7 +752,7 @@
                 'no_genres', 
                 'noGenresChart', 
                 'legend-no-genres', 
-                allMetrics.no_genres[period].data || [], 
+                allMetrics.no_genres[period], 
                 'БЕЗ ЖАНРА', 
                 'value'
             );
@@ -748,7 +761,7 @@
                 'no_countries', 
                 'noCountriesChart', 
                 'legend-no-countries', 
-                allMetrics.no_countries[period].data || [], 
+                allMetrics.no_countries[period], 
                 'БЕЗ СТРАНЫ', 
                 'value'
             );
