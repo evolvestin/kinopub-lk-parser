@@ -8,16 +8,14 @@ from app.models import Show, SiteMetric, Country
 
 def calculate_missing_country_meta_metric():
     count = Country.objects.filter(
-        Q(iso_code__isnull=True) | Q(iso_code='') | 
-        Q(emoji_flag__isnull=True) | Q(emoji_flag='')
+        Q(iso_code__isnull=True) | Q(iso_code='')
     ).count()
     return [{'name': 'Страны', 'value': count}]
 
 
 def get_missing_country_meta_list():
     return Country.objects.filter(
-        Q(iso_code__isnull=True) | Q(iso_code='') | 
-        Q(emoji_flag__isnull=True) | Q(emoji_flag='')
+        Q(iso_code__isnull=True) | Q(iso_code='')
     ).values('id', 'name')
 
 

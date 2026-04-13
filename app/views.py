@@ -1331,8 +1331,7 @@ def get_metric_details(request, key):
         items = list(get_missing_country_meta_list())
         admin_base_url = reverse('admin:app_country_changelist')
     elif key == 'total_countries':
-        is_country = True
-        items = list(get_total_countries_with_shows_list())
+        is_summary = True
         admin_base_url = reverse('admin:app_country_changelist')
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
