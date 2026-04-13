@@ -708,6 +708,21 @@
             }
         }
 
+        async function addAllToQueue() {
+            const btn = document.getElementById('add-all-btn');
+            const pendingIds = currentModalItems.filter(i => !i.in_queue).map(i => i.id);
+            
+            if (pendingIds.length === 0) return;
+
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;"></div> Обработка...';
+            btn.disabled = true;
+
+            await addToQueue(pendingIds, btn);
+            
+            btn.innerHTML = 'Все добавлены';
+        }
+
         function updateAddAllButtonState() {
             const btn = document.getElementById('add-all-btn');
             const pendingIds = currentModalItems.filter(i => !i.in_queue);
