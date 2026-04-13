@@ -4,7 +4,7 @@ from django.db.models import Count, F, Q
 from django.db.models.functions import Lower, StrIndex
 from django.utils import timezone
 
-from app.models import Country, Show, SiteMetric
+from app.models import Country, Person, Show, ShowCrew, SiteMetric
 
 
 def calculate_missing_country_meta_metric():
@@ -69,7 +69,7 @@ def calculate_total_shows_metric():
 
 
 def get_total_shows_list(show_type: str):
-    return Show.objects.filter(type=show_type).values('id', 'title', 'original_title')[:100]
+    return Show.objects.filter(type=show_type).values('id', 'title', 'original_title')
 
 
 def calculate_missing_imdb_metric():
@@ -246,4 +246,100 @@ def calculate_no_countries_metric():
 def get_no_countries_list(show_type: str):
     return Show.objects.filter(type=show_type, countries__isnull=True).values(
         'id', 'title', 'original_title'
+    )
+
+
+def calculate_total_persons_by_show_type_metric():
+    stats = (
+        ShowCrew.objects.values('show__type')
+        .annotate(total=Count('person', distinct=True))
+        .order_by('-total')
+    )
+    return [{'name': item['show__type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_total_persons_by_show_type_list(show_type: str):
+    return (
+        Person.objects.filter(showcrew__show__type=show_type)
+        .distinct()
+        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
+    )
+
+
+def calculate_persons_avatar_stats_metric():
+    has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
+    has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
+    tmdb_done = Q(is_photo_fetched=True)
+    kp_done = Q(showcrew__show__ext_rating__isnull=False)
+
+    return [
+        {'name': 'Есть фото (TMDB)', 'value': Person.objects.filter(has_tmdb).count()},
+        {
+            'name': 'Есть фото (KP)',
+            'value': Person.objects.filter(has_kp).exclude(has_tmdb).count(),
+        },
+        {
+            'name': 'TMDB не найдено',
+            'value': Person.objects.filter(tmdb_done).exclude(has_tmdb).count(),
+        },
+        {
+            'name': 'KP не найдено',
+            'value': Person.objects.filter(kp_done).exclude(has_kp).distinct().count(),
+        },
+        {'name': 'В ожидании TMDB', 'value': Person.objects.exclude(tmdb_done | has_tmdb).count()},
+        {
+            'name': 'В ожидании КП',
+            'value': Person.objects.exclude(kp_done | has_kp).distinct().count(),
+        },
+        {
+            'name': 'Не найдено вообще',
+            'value': Person.objects.filter(tmdb_done, kp_done)
+            .exclude(has_tmdb | has_kp)
+            .distinct()
+            .count(),
+        },
+    ]
+
+
+def get_persons_avatar_stats_list(category: str):
+    has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
+    has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
+    tmdb_done = Q(is_photo_fetched=True)
+    kp_done = Q(showcrew__show__ext_rating__isnull=False)
+
+    qs = Person.objects.all()
+    if category == 'Есть фото (TMDB)':
+        qs = qs.filter(has_tmdb)
+    elif category == 'Есть фото (KP)':
+        qs = qs.filter(has_kp).exclude(has_tmdb)
+    elif category == 'TMDB не найдено':
+        qs = qs.filter(tmdb_done).exclude(has_tmdb)
+    elif category == 'KP не найдено':
+        qs = qs.filter(kp_done).exclude(has_kp)
+    elif category == 'В ожидании TMDB':
+        qs = qs.exclude(tmdb_done | has_tmdb)
+    elif category == 'В ожидании КП':
+        qs = qs.exclude(kp_done | has_kp)
+    elif category == 'Не найдено вообще':
+        qs = qs.filter(tmdb_done, kp_done).exclude(has_tmdb | has_kp)
+
+    return qs.distinct().values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
+
+
+def calculate_professions_stats_metric():
+    stats = (
+        ShowCrew.objects.exclude(profession__isnull=True)
+        .exclude(profession='')
+        .values('profession')
+        .annotate(total=Count('person', distinct=True))
+        .order_by('-total')
+    )
+    return [{'name': item['profession'], 'value': item['total']} for item in stats]
+
+
+def get_professions_stats_list(profession: str):
+    return (
+        Person.objects.filter(showcrew__profession=profession)
+        .distinct()
+        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
     )

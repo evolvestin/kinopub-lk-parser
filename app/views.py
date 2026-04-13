@@ -41,8 +41,11 @@ from app.services.metrics import (
     calculate_missing_year_metric,
     calculate_no_countries_metric,
     calculate_no_genres_metric,
+    calculate_persons_avatar_stats_metric,
+    calculate_professions_stats_metric,
     calculate_title_collision_metric,
     calculate_total_countries_with_shows_metric,
+    calculate_total_persons_by_show_type_metric,
     calculate_total_shows_metric,
     get_missing_country_meta_list,
     get_missing_imdb_list,
@@ -162,6 +165,15 @@ def index(request):
     total_countries = get_or_update_metric(
         'total_countries', calculate_total_countries_with_shows_metric
     )
+    total_persons_by_show_type = get_or_update_metric(
+        'total_persons_by_show_type', calculate_total_persons_by_show_type_metric
+    )
+    persons_avatar_stats = get_or_update_metric(
+        'persons_avatar_stats', calculate_persons_avatar_stats_metric
+    )
+    professions_stats = get_or_update_metric(
+        'professions_stats', calculate_professions_stats_metric
+    )
 
     context = {
         'metrics_json': json.dumps(
@@ -178,6 +190,9 @@ def index(request):
                 'no_countries': no_countries,
                 'missing_country_meta': missing_country_meta,
                 'total_countries': total_countries,
+                'total_persons_by_show_type': total_persons_by_show_type,
+                'persons_avatar_stats': persons_avatar_stats,
+                'professions_stats': professions_stats,
             }
         )
     }
@@ -1287,14 +1302,18 @@ def webapp_search(request):
 @require_http_methods(['GET'])
 def get_metric_details(request, key):
     show_type = request.GET.get('type')
+    admin_base_url = reverse(
+        'admin:app_person_changelist'
+        if any(x in key for x in ['person', 'avatar', 'professions'])
+        else 'admin:app_country_changelist'
+        if 'country' in key
+        else 'admin:app_show_changelist'
+    )
+    params = (
+        [f'type={show_type}'] if show_type and 'person' not in key and 'avatar' not in key else []
+    )
 
-    admin_base_url = reverse('admin:app_show_changelist')
-    params = [f'type={show_type}'] if show_type else []
-
-    items = []
-    is_summary = False
-    is_country = False
-    target_task = 'details'
+    items, is_summary, is_country, is_person, target_task = [], False, False, False, 'details'
 
     if key == 'missing_kp':
         items = list(get_missing_kp_list(show_type))
@@ -1327,37 +1346,69 @@ def get_metric_details(request, key):
     elif key == 'total_shows':
         is_summary = True
     elif key == 'missing_country_meta':
-        is_country = True
-        items = list(get_missing_country_meta_list())
-        admin_base_url = reverse('admin:app_country_changelist')
-    elif key == 'total_countries':
+        is_country, items = True, list(get_missing_country_meta_list())
+    elif key == 'total_countries' or key == 'total_persons_by_show_type':
         is_summary = True
-        admin_base_url = reverse('admin:app_country_changelist')
+    elif key == 'persons_avatar_stats':
+        is_summary = True
+        mapping = {
+            'Есть фото (TMDB)': 'has_tmdb',
+            'Есть фото (KP)': 'kp',
+            'TMDB не найдено': 'tmdb_none',
+            'KP не найдено': 'kp_none',
+            'В ожидании TMDB': 'tmdb_wait',
+            'В ожидании КП': 'kp_wait',
+            'Не найдено вообще': 'all_none',
+        }
+        if show_type in mapping:
+            params.append(f'photo_source={mapping[show_type]}')
+    elif key == 'professions_stats':
+        is_summary = True
+        params = [f'showcrew__profession__exact={show_type}']
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
 
     admin_url = f'{admin_base_url}?{"&".join(params)}' if params else admin_base_url
-
     if is_summary:
         return JsonResponse({'is_summary': True, 'admin_url': admin_url, 'items': []})
 
     try:
+        from redis import Redis
+
         r = Redis.from_url(settings.CELERY_BROKER_URL)
-        queued_details = {int(x) for x in r.smembers('queue:update_details')}
-        queued_sync = {int(x) for x in r.smembers('queue:priority_ratings_sync')}
-        all_queued = queued_details | queued_sync
+        all_queued = {int(x) for x in r.smembers('queue:update_details')} | {
+            int(x) for x in r.smembers('queue:priority_ratings_sync')
+        }
     except Exception:
         all_queued = set()
 
     for item in items:
-        if not is_country:
-            item['in_queue'] = item['id'] in all_queued
-            item['poster_url'] = get_poster_url(item['id'], 'small')
-            item['kinopub_url'] = f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{item["id"]}'
-            item['admin_url'] = reverse('admin:app_show_change', args=[item['id']])
+        if is_person:
+            item.update(
+                {
+                    'is_person': True,
+                    'title': item['name'],
+                    'original_title': item['en_name'],
+                    'poster_url': item.get('tmdb_photo_url') or item.get('kp_photo_url') or '',
+                    'admin_url': reverse('admin:app_person_change', args=[item['id']]),
+                }
+            )
+        elif is_country:
+            item.update(
+                {
+                    'is_country': True,
+                    'admin_url': reverse('admin:app_country_change', args=[item['id']]),
+                }
+            )
         else:
-            item['is_country'] = True
-            item['admin_url'] = reverse('admin:app_country_change', args=[item['id']])
+            item.update(
+                {
+                    'in_queue': item['id'] in all_queued,
+                    'poster_url': get_poster_url(item['id'], 'small'),
+                    'kinopub_url': f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{item["id"]}',
+                    'admin_url': reverse('admin:app_show_change', args=[item['id']]),
+                }
+            )
 
     return JsonResponse(
         {
@@ -1365,6 +1416,7 @@ def get_metric_details(request, key):
             'admin_url': admin_url,
             'target_task': target_task,
             'is_country': is_country,
+            'is_person': is_person,
         }
     )
 

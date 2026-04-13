@@ -802,20 +802,44 @@ class PhotoSourceFilter(admin.SimpleListFilter):
             ('kp', 'Только Кинопоиск'),
             ('both', 'Оба источника'),
             ('none', 'Нет фотографий'),
+            ('has_tmdb', 'Есть TMDB (любое)'),
+            ('has_kp', 'Есть КП (любое)'),
+            ('tmdb_none', 'TMDB не найдено'),
+            ('kp_none', 'КП не найдено'),
+            ('tmdb_wait', 'В ожидании TMDB'),
+            ('kp_wait', 'В ожидании КП'),
+            ('all_none', 'Не найдено нигде'),
         )
 
     def queryset(self, request, queryset):
         has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
         has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
+        tmdb_done = Q(is_photo_fetched=True)
+        kp_done = Q(showcrew__show__ext_rating__isnull=False)
 
-        if self.value() == 'tmdb':
+        val = self.value()
+        if val == 'tmdb':
             return queryset.filter(has_tmdb).exclude(has_kp)
-        if self.value() == 'kp':
+        if val == 'kp':
             return queryset.filter(has_kp).exclude(has_tmdb)
-        if self.value() == 'both':
+        if val == 'both':
             return queryset.filter(has_tmdb, has_kp)
-        if self.value() == 'none':
+        if val == 'none':
             return queryset.exclude(has_tmdb | has_kp)
+        if val == 'has_tmdb':
+            return queryset.filter(has_tmdb)
+        if val == 'has_kp':
+            return queryset.filter(has_kp)
+        if val == 'tmdb_none':
+            return queryset.filter(tmdb_done).exclude(has_tmdb)
+        if val == 'kp_none':
+            return queryset.filter(kp_done).exclude(has_kp).distinct()
+        if val == 'tmdb_wait':
+            return queryset.exclude(tmdb_done | has_tmdb)
+        if val == 'kp_wait':
+            return queryset.exclude(kp_done | has_kp).distinct()
+        if val == 'all_none':
+            return queryset.filter(tmdb_done, kp_done).exclude(has_tmdb | has_kp).distinct()
         return queryset
 
 

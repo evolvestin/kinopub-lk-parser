@@ -325,13 +325,12 @@
         </div>
 
         <!-- БЛОК 3: -->
-         <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
+        <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
             <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: #388bfd"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
             География
         </div>
 
         <div class="metrics-grid">
-
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
                     <div class="icon" style="color:#2ea043">
@@ -394,6 +393,76 @@
                 <div id="legend-total-countries" class="legend-grid"></div>
             </div>
         </div>
+
+        <!-- БЛОК 4: Люди -->
+        <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: #9b59b6"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            Люди и роли
+        </div>
+        <div class="metrics-grid">
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:#388bfd">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    </div>
+                    Уникальные люди
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Количество уникальных людей (актеров, режиссеров и т.д.), задействованных в различных типах шоу.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="personsByTypeChart"></canvas>
+                </div>
+                <div id="legend-persons-by-type" class="legend-grid"></div>
+            </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:#e67e22">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                    </div>
+                    Фото людей
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Соотношение загруженных фото для людей
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="personsAvatarChart"></canvas>
+                </div>
+                <div id="legend-persons-avatar" class="legend-grid"></div>
+            </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:#1abc9c">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    </div>
+                    Роли в кино
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Топ уникальных профессий людей, которые встречаются в базе.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="professionsChart"></canvas>
+                </div>
+                <div id="legend-professions" class="legend-grid"></div>
+            </div>
+        </div>
         
     </div>
 
@@ -428,7 +497,10 @@
             'no_genres': 'Нет жанров',
             'no_countries': 'Нет стран',
             'missing_country_meta': 'Страны без ISO кода',
-            'total_countries': 'Всего стран'
+            'total_countries': 'Всего стран',
+            'total_persons_by_show_type': 'Люди по типам шоу',
+            'persons_avatar_stats': 'Фото людей',
+            'professions_stats': 'Роли (профессии)'
         };
 
         const METRIC_SEVERITY = {
@@ -443,7 +515,10 @@
             'has_kp': 'info',
             'has_imdb': 'info',
             'total_shows': 'info',
-            'total_countries': 'info'
+            'total_countries': 'info',
+            'total_persons_by_show_type': 'info',
+            'persons_avatar_stats': 'warning',
+            'professions_stats': 'info'
         };
 
         const PALETTES = {
@@ -597,12 +672,32 @@
                     currentModalItems = data.items;
                     
                     if ([1, 2, 3, 4, 5].includes(data.items.length)) {
-                        mContent.style.width = 'min(95vw, 500px)';
+                        mContent.style.width = 'min(95vw, 550px)';
                     } else {
                         mContent.style.width = '95vw';
                     }
 
                     list.innerHTML = data.items.map(item => {
+                        if (data.is_person) {
+                            const fallbackIcon = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239ca3af"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+                            const poster = item.poster_url ? item.poster_url : fallbackIcon;
+                            const objectFit = item.poster_url ? 'cover' : 'none';
+                            
+                            return `
+                            <div class="modal-item" style="min-height: 80px;">
+                                <img src="${poster}" class="modal-item-poster" alt="avatar" loading="lazy" style="object-fit: ${objectFit}; background: var(--bg-card);">
+                                <div class="modal-item-content">
+                                    <div class="modal-item-info" style="flex-direction:row; justify-content:space-between; align-items:center; padding: 15px 20px;">
+                                        <div style="min-width: 0; padding-right: 15px;">
+                                            <div class="modal-item-title" style="margin:0; font-size: 15px;">${item.title}</div>
+                                            <div class="modal-item-orig" style="margin-top: 4px;">${item.original_title || ''}</div>
+                                        </div>
+                                        <a href="${item.admin_url}" target="_blank" class="nav-btn" style="padding:8px 16px; font-size:13px; height:auto; background: var(--bg-card); flex-shrink: 0;">Правка</a>
+                                    </div>
+                                </div>
+                            </div>`;
+                        }
+
                         if (data.is_country) {
                             const flag = item.emoji_flag ? `<span style="margin-right:10px; font-size: 1.2em;">${item.emoji_flag}</span>` : '';
                             return `
@@ -649,10 +744,19 @@
                         </div>`;
                     }).join('');
                     
-                    if (!data.is_country) {
+                    const adminBtnHtml = `
+                        <a href="${data.admin_url}" target="_blank" class="nav-btn active" style="margin-right:auto; background: var(--secondary); border-color: var(--border); color: var(--text-primary); padding: 12px 20px; display: inline-flex; align-items: center; gap: 8px;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            Весь список в админке
+                        </a>
+                    `;
+
+                    footer.innerHTML = adminBtnHtml;
+                    if (!data.is_country && !data.is_person) {
+                        footer.innerHTML += `<button class="add-all-btn" id="add-all-btn" onclick="addAllToQueue()">В очередь на обновление</button>`;
                         updateAddAllButtonState();
-                        footer.classList.remove('hidden');
                     }
+                    footer.classList.remove('hidden');
                 } else {
                     currentModalItems = [];
                     mContent.style.width = 'min(95vw, 460px)';
@@ -993,6 +1097,42 @@
                 'legend-total-countries', 
                 allMetrics.total_countries[period], 
                 'СТРАН', 
+                'value'
+            );
+
+            renderDoughnut(
+                'total_countries', 
+                'totalCountriesChart', 
+                'legend-total-countries', 
+                allMetrics.total_countries[period], 
+                'СТРАН', 
+                'value'
+            );
+
+            renderDoughnut(
+                'total_persons_by_show_type', 
+                'personsByTypeChart', 
+                'legend-persons-by-type', 
+                allMetrics.total_persons_by_show_type[period], 
+                'ЛЮДЕЙ', 
+                'value'
+            );
+
+            renderDoughnut(
+                'persons_avatar_stats', 
+                'personsAvatarChart', 
+                'legend-persons-avatar', 
+                allMetrics.persons_avatar_stats[period], 
+                'ФОТО', 
+                'value'
+            );
+
+            renderDoughnut(
+                'professions_stats', 
+                'professionsChart', 
+                'legend-professions', 
+                allMetrics.professions_stats[period], 
+                'ЗАНЯТОСТЕЙ', 
                 'value'
             );
         }
