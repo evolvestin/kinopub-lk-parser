@@ -187,6 +187,7 @@ class Show(BaseModel):
     crew = models.ManyToManyField(
         Person, through='ShowCrew', related_name='shows_as_crew', blank=True
     )
+    ignore_collision = models.BooleanField(default=False, verbose_name='Игнорировать коллизию в названии')
 
     def get_internal_rating_data(self):
         ratings = self.ratings.select_related('user').all()

@@ -44,7 +44,7 @@ class Command(LoggableBaseCommand):
             except DatabaseError as e:
                 logging.critical(f'Fatal database error on person {person.name}: {e}')
                 return
-            except (requests.ConnectionError, requests.Timeout) as e:
+            except requests.RequestException as e:
                 logging.error(f'Aborting batch: TMDB API is unreachable. Error: {e}')
                 break
             except Exception as e:

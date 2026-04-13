@@ -5,6 +5,7 @@ from django.db.models.functions import Lower, StrIndex
 from django.utils import timezone
 
 from app.models import Country, Person, Show, ShowCrew, SiteMetric
+from shared.constants import SERIES_TYPES
 
 
 def calculate_missing_country_meta_metric():
@@ -136,7 +137,10 @@ def get_or_update_metric(key: str, calc_func) -> dict:
 
 
 def calculate_title_collision_metric():
-    qs = Show.objects.filter(original_title__isnull=False).exclude(original_title='')
+    qs = Show.objects.filter(
+        original_title__isnull=False,
+        ignore_collision=False
+    ).exclude(original_title='')
 
     stats = (
         qs.annotate(low_title=Lower('title'), low_orig=Lower('original_title'))
@@ -171,7 +175,11 @@ def get_missing_kp_list(show_type: str):
 
 
 def get_title_collision_list(show_type: str):
-    qs = Show.objects.filter(type=show_type, original_title__isnull=False).exclude(
+    qs = Show.objects.filter(
+        type=show_type,
+        original_title__isnull=False,
+        ignore_collision=False
+    ).exclude(
         original_title=''
     )
     return (
@@ -288,7 +296,7 @@ def calculate_persons_avatar_stats_metric():
         },
         {'name': 'В ожидании TMDB', 'value': Person.objects.exclude(tmdb_done | has_tmdb).count()},
         {
-            'name': 'В ожидании КП',
+            'name': 'В ожидании KP',
             'value': Person.objects.exclude(kp_done | has_kp).distinct().count(),
         },
         {
@@ -318,7 +326,7 @@ def get_persons_avatar_stats_list(category: str):
         qs = qs.filter(kp_done).exclude(has_kp)
     elif category == 'В ожидании TMDB':
         qs = qs.exclude(tmdb_done | has_tmdb)
-    elif category == 'В ожидании КП':
+    elif category == 'В ожидании KP':
         qs = qs.exclude(kp_done | has_kp)
     elif category == 'Не найдено вообще':
         qs = qs.filter(tmdb_done, kp_done).exclude(has_tmdb | has_kp)
@@ -342,4 +350,18 @@ def get_professions_stats_list(profession: str):
         Person.objects.filter(showcrew__profession=profession)
         .distinct()
         .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
+    )
+
+
+def calculate_missing_status_metric():
+    qs = Show.objects.filter(type__in=SERIES_TYPES).filter(Q(status__isnull=True) | Q(status=''))
+    stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_missing_status_list(show_type: str):
+    return (
+        Show.objects.filter(type=show_type)
+        .filter(Q(status__isnull=True) | Q(status=''))
+        .values('id', 'title', 'original_title')
     )

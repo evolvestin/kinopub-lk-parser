@@ -105,7 +105,7 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
 
         return True
 
-    except (requests.ConnectionError, requests.Timeout) as e:
+    except requests.RequestException as e:
         logger.warning(f'TMDB connectivity issue for {person_instance.name}: {e}')
         raise
     except DatabaseError:

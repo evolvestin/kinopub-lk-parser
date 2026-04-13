@@ -38,6 +38,7 @@ from app.services.metrics import (
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
     calculate_missing_plot_metric,
+    calculate_missing_status_metric,
     calculate_missing_year_metric,
     calculate_no_countries_metric,
     calculate_no_genres_metric,
@@ -51,6 +52,7 @@ from app.services.metrics import (
     get_missing_imdb_list,
     get_missing_kp_list,
     get_missing_plot_list,
+    get_missing_status_list,
     get_missing_year_list,
     get_no_countries_list,
     get_no_genres_list,
@@ -156,6 +158,7 @@ def index(request):
     total_shows = get_or_update_metric('total_shows', calculate_total_shows_metric)
     title_collision = get_or_update_metric('title_collision', calculate_title_collision_metric)
     missing_year = get_or_update_metric('missing_year', calculate_missing_year_metric)
+    missing_status = get_or_update_metric('missing_status', calculate_missing_status_metric)
     missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
     no_genres = get_or_update_metric('no_genres', calculate_no_genres_metric)
     no_countries = get_or_update_metric('no_countries', calculate_no_countries_metric)
@@ -185,6 +188,7 @@ def index(request):
                 'total_shows': total_shows,
                 'title_collision': title_collision,
                 'missing_year': missing_year,
+                'missing_status': missing_status,
                 'missing_plot': missing_plot,
                 'no_genres': no_genres,
                 'no_countries': no_countries,
@@ -1328,6 +1332,9 @@ def get_metric_details(request, key):
     elif key == 'missing_year':
         items = list(get_missing_year_list(show_type))
         params.append('year__isnull=True')
+    elif key == 'missing_status':
+        items = list(get_missing_status_list(show_type))
+        params.append('status__isnull=True')
     elif key == 'missing_plot':
         items = list(get_missing_plot_list(show_type))
         params.append('plot__isnull=True')
@@ -1345,6 +1352,9 @@ def get_metric_details(request, key):
         params.append('ext_rating__imdb__isnull=False')
     elif key == 'total_shows':
         is_summary = True
+        params.append('ext_rating__imdb__isnull=False')
+    elif key == 'total_shows':
+        is_summary = True
     elif key == 'missing_country_meta':
         is_country, items = True, list(get_missing_country_meta_list())
     elif key == 'total_countries' or key == 'total_persons_by_show_type':
@@ -1357,7 +1367,7 @@ def get_metric_details(request, key):
             'TMDB не найдено': 'tmdb_none',
             'KP не найдено': 'kp_none',
             'В ожидании TMDB': 'tmdb_wait',
-            'В ожидании КП': 'kp_wait',
+            'В ожидании KP': 'kp_wait',
             'Не найдено вообще': 'all_none',
         }
         if show_type in mapping:

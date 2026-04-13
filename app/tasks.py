@@ -32,6 +32,7 @@ from app.services.metrics import (
     calculate_title_collision_metric,
     calculate_total_countries_with_shows_metric,
     calculate_total_persons_by_show_type_metric,
+    calculate_missing_status_metric,
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
@@ -491,6 +492,9 @@ def update_site_metrics_task():
 
     year_data = calculate_missing_year_metric()
     SiteMetric.objects.create(key='missing_year', data=year_data)
+
+    status_data = calculate_missing_status_metric()
+    SiteMetric.objects.create(key='missing_status', data=status_data)
 
     plot_data = calculate_missing_plot_metric()
     SiteMetric.objects.create(key='missing_plot', data=plot_data)

@@ -281,13 +281,15 @@ class ShowAdmin(admin.ModelAdmin):
         'type',
         'status',
         'year',
+        'ignore_collision',
         'view_count',
         'total_duration_hours',
         'get_avg_rating',
         'created_at',
         'updated_at',
     )
-    list_filter = ('type', 'status', AverageRatingFilter, 'year')
+    list_editable = ('ignore_collision',)
+    list_filter = ('type', 'status', AverageRatingFilter, 'year', 'ignore_collision')
     search_fields = ('title', 'original_title', 'plot')
     inlines = [
         ExternalRatingInline,
@@ -803,11 +805,11 @@ class PhotoSourceFilter(admin.SimpleListFilter):
             ('both', 'Оба источника'),
             ('none', 'Нет фотографий'),
             ('has_tmdb', 'Есть TMDB (любое)'),
-            ('has_kp', 'Есть КП (любое)'),
+            ('has_kp', 'Есть KP (любое)'),
             ('tmdb_none', 'TMDB не найдено'),
-            ('kp_none', 'КП не найдено'),
+            ('kp_none', 'KP не найдено'),
             ('tmdb_wait', 'В ожидании TMDB'),
-            ('kp_wait', 'В ожидании КП'),
+            ('kp_wait', 'В ожидании KP'),
             ('all_none', 'Не найдено нигде'),
         )
 
@@ -895,7 +897,7 @@ class PersonAdmin(BaseNameAdmin):
         if obj.tmdb_photo_url:
             sources.append('<span style="color: #2ecc71;">TMDB</span>')
         if obj.kp_photo_url:
-            sources.append('<span style="color: #d9db14;">КП</span>')
+            sources.append('<span style="color: #d9db14;">KP</span>')
 
         if not sources:
             if obj.is_photo_fetched:
@@ -921,7 +923,7 @@ class PersonAdmin(BaseNameAdmin):
             )
 
         tmdb_block = _render_photo(obj.tmdb_photo_url, 'TMDB')
-        kp_block = _render_photo(obj.kp_photo_url, 'КП')
+        kp_block = _render_photo(obj.kp_photo_url, 'KP')
 
         if not tmdb_block and not kp_block:
             return format_html(
