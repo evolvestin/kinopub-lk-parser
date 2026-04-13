@@ -197,7 +197,8 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         def get_row_data(text_label):
             try:
                 row = info_table.find_element(
-                    By.XPATH, f".//tr[td[1][descendant-or-self::*[contains(text(), '{text_label}')]]]"
+                    By.XPATH,
+                    f".//tr[td[1][descendant-or-self::*[contains(text(), '{text_label}')]]]",
                 )
                 return row.find_element(By.CSS_SELECTOR, 'td:nth-child(2)')
             except NoSuchElementException:

@@ -4,19 +4,16 @@ from django.db.models import Count, F, Q
 from django.db.models.functions import Lower, StrIndex
 from django.utils import timezone
 
-from app.models import Show, SiteMetric, Country
+from app.models import Country, Show, SiteMetric
+
 
 def calculate_missing_country_meta_metric():
-    count = Country.objects.filter(
-        Q(iso_code__isnull=True) | Q(iso_code='')
-    ).count()
+    count = Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code='')).count()
     return [{'name': 'Страны', 'value': count}]
 
 
 def get_missing_country_meta_list():
-    return Country.objects.filter(
-        Q(iso_code__isnull=True) | Q(iso_code='')
-    ).values('id', 'name')
+    return Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code='')).values('id', 'name')
 
 
 def calculate_total_countries_with_shows_metric():
@@ -32,6 +29,7 @@ def get_total_countries_with_shows_list():
         .order_by('-num_shows')
         .values('id', 'name', 'iso_code', 'emoji_flag')
     )
+
 
 def calculate_has_kp_metric():
     stats = (

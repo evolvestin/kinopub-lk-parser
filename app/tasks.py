@@ -20,6 +20,7 @@ from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
+    calculate_missing_country_meta_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
     calculate_missing_plot_metric,
@@ -27,10 +28,7 @@ from app.services.metrics import (
     calculate_no_countries_metric,
     calculate_no_genres_metric,
     calculate_title_collision_metric,
-    calculate_has_imdb_metric,
-    calculate_has_kp_metric,
-    calculate_missing_country_meta_metric,
-    calculate_total_countries_with_shows_metric
+    calculate_total_countries_with_shows_metric,
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender

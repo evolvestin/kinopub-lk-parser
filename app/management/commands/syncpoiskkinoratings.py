@@ -44,6 +44,7 @@ class Command(LoggableBaseCommand):
         try:
             from django.conf import settings
             from redis import Redis
+
             r = Redis.from_url(settings.CELERY_BROKER_URL)
             priority_raw = r.spop('queue:priority_ratings_sync', count=limit)
             if priority_raw:
@@ -59,7 +60,7 @@ class Command(LoggableBaseCommand):
                 Q(ext_rating__isnull=True) | Q(ext_rating__updated_at__lt=stale_cutoff)
             ).values_list('id', flat=True)[:limit]
         )
-        
+
         # Объединяем приоритетные и плановые ID, сохраняя лимит
         combined_show_ids = list(priority_show_ids | missing_show_ids)[:limit]
         missing_kp_ids = [kp for kp, sid in kp_mapping.items() if sid in combined_show_ids]

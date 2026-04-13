@@ -10,8 +10,8 @@ from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.http import JsonResponse
-from django.urls import path, reverse
 from django.shortcuts import render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -32,6 +32,9 @@ from app.models import (
     ViewUserGroup,
 )
 from app.services.metrics import (
+    calculate_has_imdb_metric,
+    calculate_has_kp_metric,
+    calculate_missing_country_meta_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
     calculate_missing_plot_metric,
@@ -39,24 +42,17 @@ from app.services.metrics import (
     calculate_no_countries_metric,
     calculate_no_genres_metric,
     calculate_title_collision_metric,
-    calculate_has_kp_metric,
-    calculate_has_imdb_metric,
-    calculate_total_shows_metric,
-    calculate_missing_country_meta_metric,
     calculate_total_countries_with_shows_metric,
+    calculate_total_shows_metric,
+    get_missing_country_meta_list,
     get_missing_imdb_list,
     get_missing_kp_list,
     get_missing_plot_list,
     get_missing_year_list,
     get_no_countries_list,
     get_no_genres_list,
-    get_title_collision_list,
-    get_has_kp_list,
-    get_has_imdb_list,
-    get_total_shows_list,
-    get_missing_country_meta_list,
-    get_total_countries_with_shows_list,
     get_or_update_metric,
+    get_title_collision_list,
 )
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
@@ -160,8 +156,12 @@ def index(request):
     missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
     no_genres = get_or_update_metric('no_genres', calculate_no_genres_metric)
     no_countries = get_or_update_metric('no_countries', calculate_no_countries_metric)
-    missing_country_meta = get_or_update_metric('missing_country_meta', calculate_missing_country_meta_metric)
-    total_countries = get_or_update_metric('total_countries', calculate_total_countries_with_shows_metric)
+    missing_country_meta = get_or_update_metric(
+        'missing_country_meta', calculate_missing_country_meta_metric
+    )
+    total_countries = get_or_update_metric(
+        'total_countries', calculate_total_countries_with_shows_metric
+    )
 
     context = {
         'metrics_json': json.dumps(
@@ -1287,7 +1287,7 @@ def webapp_search(request):
 @require_http_methods(['GET'])
 def get_metric_details(request, key):
     show_type = request.GET.get('type')
-    
+
     admin_base_url = reverse('admin:app_show_changelist')
     params = [f'type={show_type}'] if show_type else []
 
@@ -1336,14 +1336,10 @@ def get_metric_details(request, key):
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
 
-    admin_url = f"{admin_base_url}?{'&'.join(params)}" if params else admin_base_url
+    admin_url = f'{admin_base_url}?{"&".join(params)}' if params else admin_base_url
 
     if is_summary:
-        return JsonResponse({
-            'is_summary': True,
-            'admin_url': admin_url,
-            'items': []
-        })
+        return JsonResponse({'is_summary': True, 'admin_url': admin_url, 'items': []})
 
     try:
         r = Redis.from_url(settings.CELERY_BROKER_URL)
@@ -1363,12 +1359,14 @@ def get_metric_details(request, key):
             item['is_country'] = True
             item['admin_url'] = reverse('admin:app_country_change', args=[item['id']])
 
-    return JsonResponse({
-        'items': items,
-        'admin_url': admin_url,
-        'target_task': target_task,
-        'is_country': is_country
-    })
+    return JsonResponse(
+        {
+            'items': items,
+            'admin_url': admin_url,
+            'target_task': target_task,
+            'is_country': is_country,
+        }
+    )
 
 
 @csrf_exempt
@@ -1380,12 +1378,14 @@ def queue_update_details(request):
         data = json.loads(request.body)
         ids = data.get('ids', [])
         target = data.get('target', 'details')
-        
+
         if not ids:
             return JsonResponse({'status': 'ok', 'added': 0})
 
-        redis_key = 'queue:priority_ratings_sync' if target == 'priority_sync' else 'queue:update_details'
-        
+        redis_key = (
+            'queue:priority_ratings_sync' if target == 'priority_sync' else 'queue:update_details'
+        )
+
         r = Redis.from_url(settings.CELERY_BROKER_URL)
         added = r.sadd(redis_key, *ids)
         return JsonResponse({'status': 'ok', 'added': added})
