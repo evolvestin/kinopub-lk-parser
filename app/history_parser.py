@@ -19,7 +19,16 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.gdrive_backup import BackupManager
-from app.models import Code, Country, Genre, Show, ShowDuration, ViewHistory
+from app.models import (
+    Code,
+    Country,
+    Genre,
+    Person,
+    Show,
+    ShowCrew,
+    ShowDuration,
+    ViewHistory,
+)
 from app.signals import view_history_created
 from kinopub_parser import celery_app
 from shared.constants import (
@@ -187,7 +196,9 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
 
         def get_row_data(text_label):
             try:
-                row = info_table.find_element(By.XPATH, f".//tr[td[contains(., '{text_label}')]]")
+                row = info_table.find_element(
+                    By.XPATH, f".//tr[td[1][descendant-or-self::*[contains(text(), '{text_label}')]]]"
+                )
                 return row.find_element(By.CSS_SELECTOR, 'td:nth-child(2)')
             except NoSuchElementException:
                 return None
@@ -244,21 +255,23 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         ]:
             elements_data = get_row_data(label)
             if elements_data:
+                relation.clear()
                 elements = elements_data.find_elements(By.TAG_NAME, 'a')
                 for link_element in elements:
-                    name = link_element.text.strip()
+                    name = link_element.get_attribute('textContent').strip()
                     if name:
                         obj, _ = model.objects.update_or_create(name=name)
                         relation.add(obj)
 
-        for label in ['Создатель', 'Режиссёр', 'В ролях']:
+        crew_labels = ['Создатель', 'Режиссёр', 'В ролях']
+        ShowCrew.objects.filter(show=show, profession__in=crew_labels).delete()
+
+        for label in crew_labels:
             elements_data = get_row_data(label)
             if elements_data:
-                from app.models import Person, ShowCrew
-
                 elements = elements_data.find_elements(By.TAG_NAME, 'a')
                 for link_element in elements:
-                    name = link_element.text.strip()
+                    name = link_element.get_attribute('textContent').strip()
                     if name:
                         person, _ = Person.objects.update_or_create(name=name)
                         ShowCrew.objects.update_or_create(

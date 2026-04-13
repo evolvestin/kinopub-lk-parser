@@ -323,7 +323,7 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
                 _ = driver.current_url
 
                 if session_type == 'aux':
-                    process_func(driver, show_id, session_type=session_type)
+                    process_func(driver, show_id, force=True, session_type=session_type)
                 else:
                     try:
                         show = Show.objects.get(id=show_id)
