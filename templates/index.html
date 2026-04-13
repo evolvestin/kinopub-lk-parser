@@ -122,13 +122,17 @@
             </div>
         </div>
 
+        <div style="padding-left: 35px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: var(--info)"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            Метаданные
+        </div>
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--danger)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <div class="icon" style="color:#9b59b6">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
                     </div>
-                    Нет рейтинга Кинопоиска
+                    Всего шоу
                     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
                         <circle cx="12" cy="12" r="10"></circle>
                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -136,54 +140,12 @@
                     </svg>
                 </div>
                 <div class="metric-desc">
-                    Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.
+                    Общее количество фильмов, сериалов и других типов шоу в базе данных.
                 </div>
                 <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
-                    <canvas id="missingKpChart"></canvas>
+                    <canvas id="totalShowsChart"></canvas>
                 </div>
-                <div id="legend-missing-kp" class="legend-grid"></div>
-            </div>
-
-            <div class="card hoverable anim-item">
-                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#f1c40f">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
-                    </div>
-                    Нет рейтинга IMDb
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                </div>
-                <div class="metric-desc">
-                    Шоу, у которых указана ссылка на IMDb, но в таблице внешних рейтингов данные отсутствуют.
-                </div>
-                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
-                    <canvas id="missingImdbChart"></canvas>
-                </div>
-                <div id="legend-missing-imdb" class="legend-grid"></div>
-            </div>
-
-            <div class="card hoverable anim-item">
-                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--info)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                    </div>
-                    Коллизии названий
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                </div>
-                <div class="metric-desc">
-                    Случаи, когда основное название шоу содержит в себе оригинальное (например, "Интерстеллар Interstellar").
-                </div>
-                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
-                    <canvas id="collisionsChart"></canvas>
-                </div>
-                <div id="legend-collisions" class="legend-grid"></div>
+                <div id="legend-total-shows" class="legend-grid"></div>
             </div>
 
             <div class="card hoverable anim-item">
@@ -209,6 +171,27 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:var(--info)">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </div>
+                    Коллизии названий
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Случаи, когда основное название шоу содержит в себе оригинальное (например, "Интерстеллар Interstellar").
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="collisionsChart"></canvas>
+                </div>
+                <div id="legend-collisions" class="legend-grid"></div>
+            </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
                     <div class="icon" style="color:#1abc9c">
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                     </div>
@@ -230,7 +213,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#9b59b6">
+                    <div class="icon" style="color:#f1c40f">
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
                     </div>
                     Нет жанра
@@ -270,6 +253,100 @@
                 <div id="legend-no-countries" class="legend-grid"></div>
             </div>
         </div>
+
+        <!-- БЛОК 1: РЕЙТИНГИ -->
+        <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: var(--accent)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            Статистика рейтингов
+        </div>
+        <div class="metrics-grid">
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:var(--danger)">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    </div>
+                    Нет рейтинга КП
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="missingKpChart"></canvas>
+                </div>
+                <div id="legend-missing-kp" class="legend-grid"></div>
+            </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:var(--info)">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    </div>
+                    Есть рейтинг КП
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Шоу, у которых успешно собран и сохранен рейтинг Кинопоиска.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="hasKpChart"></canvas>
+                </div>
+                <div id="legend-has-kp" class="legend-grid"></div>
+            </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:#f1c40f">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+                    </div>
+                    Нет рейтинга IMDb
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Шоу, у которых указана ссылка на IMDb, но в таблице внешних рейтингов данные отсутствуют.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="missingImdbChart"></canvas>
+                </div>
+                <div id="legend-missing-imdb" class="legend-grid"></div>
+            </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:var(--accent)">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    </div>
+                    Есть рейтинг IMDb
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Шоу, у которых успешно собран и сохранен рейтинг IMDb.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="hasImdbChart"></canvas>
+                </div>
+                <div id="legend-has-imdb" class="legend-grid"></div>
+            </div>
+        </div>
+
+        <!-- БЛОК 2: КАТАЛОГ И МЕТАДАННЫЕ -->
+        
     </div>
 
     <div class="modal-overlay" id="details-modal">
@@ -294,6 +371,9 @@
         const METRIC_CONFIG = {
             'missing_kp': 'Нет рейтинга Кинопоиска',
             'missing_imdb': 'Нет рейтинга IMDb',
+            'has_kp': 'Есть рейтинг Кинопоиска',
+            'has_imdb': 'Есть рейтинг IMDb',
+            'total_shows': 'Всего шоу',
             'title_collision': 'Коллизии названий',
             'missing_year': 'Год не указан',
             'missing_plot': 'Нет описания (сюжета)',
@@ -308,7 +388,10 @@
             'title_collision': 'warning',
             'missing_plot': 'info',
             'no_genres': 'info',
-            'no_countries': 'info'
+            'no_countries': 'info',
+            'has_kp': 'info',
+            'has_imdb': 'info',
+            'total_shows': 'info'
         };
 
         const PALETTES = {
@@ -437,6 +520,24 @@
                 const resp = await fetch(`/api/metrics/details/${key}/?type=${encodeURIComponent(typeLabel)}`);
                 const data = await resp.json();
                 
+                if (data.is_summary) {
+                    mContent.style.width = 'min(95vw, 460px)';
+                    list.innerHTML = `
+                        <div class="empty" style="grid-column: 1/-1; padding: 40px 20px;">
+                            <div class="icon" style="font-size: 48px; margin-bottom: 20px; color: var(--accent);">
+                                <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                            </div>
+                            <p style="font-size: 15px; margin-bottom: 24px; color: var(--text-secondary); text-align: center; line-height: 1.5;">
+                                Вы можете просмотреть полный список в панели управления.
+                            </p>
+                            <a href="${data.admin_url}" class="nav-btn active" style="padding: 12px 24px; display: inline-flex; align-items: center; gap: 8px;">
+                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                Открыть в админке
+                            </a>
+                        </div>`;
+                    return;
+                }
+
                 if (data.items && data.items.length) {
                     currentModalItems = data.items;
                     
@@ -713,11 +814,38 @@
             );
 
             renderDoughnut(
+                'has_kp', 
+                'hasKpChart', 
+                'legend-has-kp', 
+                allMetrics.has_kp[period], 
+                'ЕСТЬ РЕЙТИНГ', 
+                'value'
+            );
+
+            renderDoughnut(
                 'missing_imdb', 
                 'missingImdbChart', 
                 'legend-missing-imdb', 
                 allMetrics.missing_imdb[period], 
                 'БЕЗ IMDB', 
+                'value'
+            );
+
+            renderDoughnut(
+                'has_imdb', 
+                'hasImdbChart', 
+                'legend-has-imdb', 
+                allMetrics.has_imdb[period], 
+                'ЕСТЬ РЕЙТИНГ', 
+                'value'
+            );
+
+            renderDoughnut(
+                'total_shows', 
+                'totalShowsChart', 
+                'legend-total-shows', 
+                allMetrics.total_shows[period], 
+                'ВСЕГО ШОУ', 
                 'value'
             );
             

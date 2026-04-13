@@ -10,6 +10,7 @@ from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.http import JsonResponse
+from django.urls import path, reverse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -38,14 +39,20 @@ from app.services.metrics import (
     calculate_no_countries_metric,
     calculate_no_genres_metric,
     calculate_title_collision_metric,
+    calculate_has_kp_metric,
+    calculate_has_imdb_metric,
+    calculate_total_shows_metric,
     get_missing_imdb_list,
     get_missing_kp_list,
     get_missing_plot_list,
     get_missing_year_list,
     get_no_countries_list,
     get_no_genres_list,
-    get_or_update_metric,
     get_title_collision_list,
+    get_has_kp_list,
+    get_has_imdb_list,
+    get_total_shows_list,
+    get_or_update_metric,
 )
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
@@ -141,6 +148,9 @@ def _serialize_show_details(show, user=None):
 def index(request):
     missing_kp = get_or_update_metric('missing_kp', calculate_missing_kp_metric)
     missing_imdb = get_or_update_metric('missing_imdb', calculate_missing_imdb_metric)
+    has_kp = get_or_update_metric('has_kp', calculate_has_kp_metric)
+    has_imdb = get_or_update_metric('has_imdb', calculate_has_imdb_metric)
+    total_shows = get_or_update_metric('total_shows', calculate_total_shows_metric)
     title_collision = get_or_update_metric('title_collision', calculate_title_collision_metric)
     missing_year = get_or_update_metric('missing_year', calculate_missing_year_metric)
     missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
@@ -152,6 +162,9 @@ def index(request):
             {
                 'missing_kp': missing_kp,
                 'missing_imdb': missing_imdb,
+                'has_kp': has_kp,
+                'has_imdb': has_imdb,
+                'total_shows': total_shows,
                 'title_collision': title_collision,
                 'missing_year': missing_year,
                 'missing_plot': missing_plot,
@@ -1268,6 +1281,16 @@ def get_metric_details(request, key):
     show_type = request.GET.get('type')
     if not show_type:
         return JsonResponse({'error': 'Type required'}, status=400)
+
+    summary_keys = {'has_kp', 'has_imdb', 'total_shows'}
+    
+    if key in summary_keys:
+        admin_base_url = reverse('admin:app_show_changelist')
+        return JsonResponse({
+            'is_summary': True,
+            'admin_url': f'{admin_base_url}?type__exact={show_type}',
+            'items': []
+        })
 
     if key == 'missing_kp':
         items = list(get_missing_kp_list(show_type))

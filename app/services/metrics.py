@@ -6,6 +6,46 @@ from django.utils import timezone
 
 from app.models import Show, SiteMetric
 
+def calculate_has_kp_metric():
+    stats = (
+        Show.objects.filter(ext_rating__kp__isnull=False)
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_has_kp_list(show_type: str):
+    return Show.objects.filter(type=show_type, ext_rating__kp__isnull=False).values(
+        'id', 'title', 'original_title'
+    )
+
+
+def calculate_has_imdb_metric():
+    stats = (
+        Show.objects.filter(ext_rating__imdb__isnull=False)
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_has_imdb_list(show_type: str):
+    return Show.objects.filter(type=show_type, ext_rating__imdb__isnull=False).values(
+        'id', 'title', 'original_title'
+    )
+
+
+def calculate_total_shows_metric():
+    stats = Show.objects.values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_total_shows_list(show_type: str):
+    return Show.objects.filter(type=show_type).values('id', 'title', 'original_title')[:100]
+
 
 def calculate_missing_imdb_metric():
     qs = Show.objects.filter(imdb_url__isnull=False, ext_rating__isnull=True).exclude(imdb_url='')
