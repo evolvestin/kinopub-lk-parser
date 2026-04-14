@@ -72,6 +72,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file: .env
+    command: postgres -c 'max_connections=200'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

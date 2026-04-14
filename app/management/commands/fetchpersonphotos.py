@@ -37,10 +37,18 @@ class Command(LoggableBaseCommand):
             return
 
         count = 0
-        for person in persons:
+        total = len(persons)
+        
+        logging.info(f'Starting photo fetch for {total} persons...')
+
+        for idx, person in enumerate(persons, start=1):
             try:
                 if fetch_person_photo_from_tmdb(person):
                     count += 1
+                
+                if idx % 100 == 0:
+                    logging.info(f'Progress: {idx}/{total} processed...')
+                    
             except DatabaseError as e:
                 logging.critical(f'Fatal database error on person {person.name}: {e}')
                 return

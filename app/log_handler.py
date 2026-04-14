@@ -14,15 +14,27 @@ class DatabaseLogHandler(logging.Handler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._log_entry_model = None
+        self._is_writing = False
 
     @property
     def log_entry_model(self):
         if self._log_entry_model is None:
-            self._log_entry_model = apps.get_model('app', 'LogEntry')
+            try:
+                self._log_entry_model = apps.get_model('app', 'LogEntry')
+            except (ImportError, LookupError):
+                return None
         return self._log_entry_model
 
     def emit(self, record):
+        if self._is_writing:
+            return
+
+        model = self.log_entry_model
+        if not model:
+            return
+
         try:
+            self._is_writing = True
             now = timezone.now()
             msg = record.getMessage()
 
@@ -32,7 +44,7 @@ class DatabaseLogHandler(logging.Handler):
 
             def _save_and_send():
                 try:
-                    self.log_entry_model.objects.create(
+                    model.objects.create(
                         level=record.levelname[:10],
                         module=record.module[:100],
                         message=msg,
@@ -50,7 +62,10 @@ class DatabaseLogHandler(logging.Handler):
                             'module': record.module,
                             'message': msg,
                         }
-                        async_to_sync(channel_layer.group_send)('logs', event_data)
+                        try:
+                            async_to_sync(channel_layer.group_send)('logs', event_data)
+                        except Exception:
+                            pass
 
                     if record.levelno >= logging.ERROR:
                         TelegramSender().send_dev_log(
@@ -71,3 +86,5 @@ class DatabaseLogHandler(logging.Handler):
 
         except Exception:
             self.handleError(record)
+        finally:
+            self._is_writing = False
