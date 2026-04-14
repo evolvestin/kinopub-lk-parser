@@ -151,7 +151,7 @@ CACHES = {
 
 if DEBUG:
     WEBSOCKET_URL = '/ws/logs/'
-    WEBSOCKET_PORT = 8013
+    WEBSOCKET_PORT = ''
 else:
     WEBSOCKET_URL = '/ws/logs/'
     WEBSOCKET_PORT = ''
@@ -274,14 +274,12 @@ class MultiSchedule:
     def is_due(self, last_run_at):
         due_results = []
         delays = []
-
         for s in self.schedules:
             if s is None:
                 continue
             is_due, delay = s.is_due(last_run_at)
             due_results.append(is_due)
             delays.append(delay)
-
         return any(due_results), min(delays)
 
     def remaining_estimate(self, last_run_at):
@@ -311,14 +309,6 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.tasks.process_errors_task',
         'schedule': crontab(minute='*/1'),  # Проверяем каждую минуту (отправка раз в 10 мин)
     },
-    'fetch_person_photos': {
-        'task': 'app.tasks.fetch_person_photos_task',
-        'schedule': crontab(minute='*/30'),
-    },
-    'sync_poiskkino_ratings': {
-        'task': 'app.tasks.sync_poiskkino_ratings_task',
-        'schedule': crontab(minute=0, hour=5),
-    },
     'update_site_metrics': {
         'task': 'app.tasks.update_site_metrics_task',
         'schedule': crontab(minute=0, hour=0),
@@ -341,6 +331,14 @@ if ENVIRONMENT == 'PROD':
             'run_gap_scanner': {
                 'task': 'app.tasks.run_gap_scanner_task',
                 'schedule': crontab(minute=0, hour=3, day_of_month='1'),
+            },
+            'fetch_person_photos': {
+                'task': 'app.tasks.fetch_person_photos_task',
+                'schedule': crontab(minute='*/30'),
+            },
+            'sync_poiskkino_ratings': {
+                'task': 'app.tasks.sync_poiskkino_ratings_task',
+                'schedule': crontab(minute=0, hour=5),
             },
         }
     )

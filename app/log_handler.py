@@ -62,19 +62,19 @@ class DatabaseLogHandler(logging.Handler):
                         updated_at=now,
                     )
 
-                    channel_layer = get_channel_layer()
-                    if channel_layer:
-                        event_data = {
-                            'type': 'log_message',
-                            'created_at': now.strftime('%H:%M:%S'),
-                            'level': record.levelname,
-                            'module': record.module,
-                            'message': msg,
-                        }
-                        try:
+                    try:
+                        channel_layer = get_channel_layer()
+                        if channel_layer:
+                            event_data = {
+                                'type': 'log_message',
+                                'created_at': now.strftime('%H:%M:%S'),
+                                'level': record.levelname,
+                                'module': record.module,
+                                'message': msg,
+                            }
                             async_to_sync(channel_layer.group_send)('logs', event_data)
-                        except Exception:
-                            pass
+                    except Exception:
+                        pass
 
                     if record.levelno >= logging.ERROR:
                         TelegramSender().send_dev_log(

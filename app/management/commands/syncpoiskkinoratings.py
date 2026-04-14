@@ -63,12 +63,42 @@ class Command(LoggableBaseCommand):
 
         # Объединяем приоритетные и плановые ID, сохраняя лимит
         combined_show_ids = list(priority_show_ids | missing_show_ids)[:limit]
-        missing_kp_ids = [kp for kp, sid in kp_mapping.items() if sid in combined_show_ids]
+
+        # Инвертируем маппинг для обратного поиска: SID -> KP_ID
+        reverse_mapping = {sid: kp for kp, sid in kp_mapping.items()}
+
+        missing_kp_ids = []
+        skipped_priority_ids = []
+
+        for sid in combined_show_ids:
+            kp_id = reverse_mapping.get(sid)
+            if kp_id:
+                missing_kp_ids.append(kp_id)
+            else:
+                if sid in priority_show_ids:
+                    skipped_priority_ids.append(sid)
+
+        if skipped_priority_ids:
+            logging.warning(
+                f'Priority IDs without valid Kinopoisk URL: {skipped_priority_ids}. '
+                f'Check if URLs are correct and contain /film/ID or /series/ID.'
+            )
 
         if missing_kp_ids:
             logging.info(f'Fetching {len(missing_kp_ids)} missing/stale/priority records by IDs...')
             catchup_data = client.fetch_ratings_by_ids(missing_kp_ids)
             data.extend(catchup_data)
+
+            # Проверяем, что API вернуло для приоритетных задач
+            received_kp_ids = {item['id'] for item in catchup_data if item.get('id')}
+            not_found_kp_ids = set(missing_kp_ids) - received_kp_ids
+
+            if not_found_kp_ids:
+                not_found_sids = [kp_mapping[kp] for kp in not_found_kp_ids if kp in kp_mapping]
+                logging.warning(
+                    f'Poiskkino API returned NO data for these Show IDs: {not_found_sids}. '
+                    f'Possible reasons: item missing in Poiskkino DB or invalid KP ID.'
+                )
 
         if not data:
             logging.info('No data to process.')

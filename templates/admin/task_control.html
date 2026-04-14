@@ -217,19 +217,36 @@
 
             if (wsUrl.startsWith('/')) {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                // Если порт не задан (пустая строка), используем текущий порт страницы или стандартный
-                const port = wsPort ? wsPort : window.location.port;
-                const portPart = port ? ':' + port : '';
-                wsUrl = protocol + '//' + window.location.hostname + portPart + wsUrl;
+                const host = window.location.hostname;
+                
+                // Если порт явно задан в настройках и это не туннель - используем его.
+                // Если мы на туннеле (*.trycloudflare.com), порт ВСЕГДА должен отсутствовать.
+                let port = '';
+                if (host.includes('trycloudflare.com')) {
+                    port = '';
+                } else if (wsPort) {
+                    port = ':' + wsPort;
+                } else if (window.location.port && window.location.port !== '80' && window.location.port !== '443') {
+                    port = ':' + window.location.port;
+                }
+
+                wsUrl = protocol + '//' + host + port + wsUrl;
             }
 
+            console.log("[WS] Connecting to:", wsUrl);
             socket = new WebSocket(wsUrl);
 
-            socket.onopen = function(e) {};
+            socket.onopen = function(e) {
+                console.log("[WS] Connected");
+            };
 
             socket.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                if (data.type === 'log_message') {
+                if (data.type === 'connected') {
+                    if (logsContainer.children.length === 1 && logsContainer.children[0].textContent.includes('Ожидание')) {
+                        logsContainer.innerHTML = '<div class="text-gray-500 italic">Соединение установлено. Жду логов...</div>';
+                    }
+                } else if (data.type === 'log_message') {
                     appendLog(data);
                 } else if (data.type === 'task_update') {
                     updateTaskRow(data);
@@ -239,12 +256,17 @@
             };
 
             socket.onclose = function(event) {
+                console.log("[WS] Disconnected. Retry in 3s...");
                 setTimeout(connectWebSocket, 3000);
+            };
+
+            socket.onerror = function(err) {
+                console.error("[WS] Error:", err);
             };
         }
 
         function appendLog(log) {
-            if (logsContainer.children.length === 1 && logsContainer.children[0].textContent.includes('Ожидание')) {
+            if (logsContainer.children.length === 1 && (logsContainer.children[0].textContent.includes('Ожидание') || logsContainer.children[0].classList.contains('italic'))) {
                 logsContainer.innerHTML = '';
             }
 
@@ -258,11 +280,11 @@
             
             logsContainer.appendChild(div);
             
-            if (logsContainer.scrollHeight - logsContainer.scrollTop - logsContainer.clientHeight < 100) {
+            if (logsContainer.scrollHeight - logsContainer.scrollTop - logsContainer.clientHeight < 150) {
                 logsContainer.scrollTop = logsContainer.scrollHeight;
             }
             
-            if (logsContainer.children.length > 200) {
+            if (logsContainer.children.length > 300) {
                 logsContainer.removeChild(logsContainer.firstChild);
             }
         }
@@ -291,11 +313,11 @@
             } else {
                 row = document.createElement('tr');
                 row.id = `task-row-${task.id}`;
-                row.className = "border-b border-gray-700 hover:bg-gray-700 animate-pulse-once";
+                row.className = "border-b border-gray-700 hover:bg-gray-700";
                 row.innerHTML = rowHTML;
                 tasksBody.prepend(row);
                 
-                if (tasksBody.children.length > 10) {
+                if (tasksBody.children.length > 15) {
                     tasksBody.lastElementChild.remove();
                 }
             }
@@ -317,20 +339,7 @@
                     <form method="post" action="" class="inline">
                         <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
                         <input type="hidden" name="stop_task_id" value="${task.id}">
-                        <button type="submit" class="bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm transition-colors" title="Остановить">STOP</button>
-                    </form>
-                `;
-            }
-            return '';
-        }
-
-        function getActionButton(task) {
-            if (task.status === 'RUNNING') {
-                return `
-                    <form method="post" action="" class="inline ml-2">
-                        <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken}">
-                        <input type="hidden" name="stop_task_id" value="${task.id}">
-                        <button type="submit" class="bg-red-700 hover:bg-red-600 text-white text-xs px-2 py-0.5 rounded" title="Безопасно остановить">Stop</button>
+                        <button type="submit" class="bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm transition-colors">STOP</button>
                     </form>
                 `;
             }
@@ -431,8 +440,8 @@
             // только первые 5 секунд, затем показываем время перевыполнения, 
             // чтобы было видно, что процесс не завис.
             if (seconds < 0) {
-                 if (seconds > -5) return "Запущено";
-                 return "Запущено (" + Math.abs(Math.ceil(seconds)) + "с)";
+                if (seconds > -5) return "Запущено";
+                return "Запущено (" + Math.abs(Math.ceil(seconds)) + "с)";
             }
             
             seconds = Math.ceil(seconds);
@@ -445,16 +454,6 @@
             const sec = seconds % 60;
             const time = [hours, minutes, sec].map(v => v.toString().padStart(2, '0')).join(':');
             return days > 0 ? `${days}д ${time}` : time;
-        }
-
-        function getStatusBadge(status, display) {
-            let colorClass = "bg-gray-600 text-gray-200";
-            if (status === 'RUNNING') colorClass = "bg-blue-900 text-blue-200 animate-pulse";
-            else if (status === 'SUCCESS') colorClass = "bg-green-900 text-green-200";
-            else if (status === 'FAILURE') colorClass = "bg-red-900 text-red-200";
-            else if (status === 'STOPPED') colorClass = "bg-orange-900 text-orange-200"; 
-            else if (status === 'QUEUED') colorClass = "bg-yellow-900 text-yellow-200";
-            return `<span class="px-2 py-0.5 rounded text-xs ${colorClass}">${display}</span>`;
         }
 
         function getLogLevelColor(level) {
@@ -481,22 +480,6 @@
                     }
                 }
             });
-        }
-
-        async function fetchInitialData() {
-            try {
-                const url = new URL(window.location.href);
-                url.searchParams.set('_ts', new Date().getTime());
-                
-                const response = await fetch(url.toString(), {
-                    headers: {'X-Requested-With': 'XMLHttpRequest'}
-                });
-                
-                if (!response.ok) return;
-                
-                const data = await response.json();
-                renderDashboard(data);
-            } catch (e) {}
         }
 
         function renderDashboard(data) {
@@ -527,7 +510,6 @@
         }
 
         connectWebSocket();
-        
         setInterval(updateTimers, 250);
     </script>
 </body>
