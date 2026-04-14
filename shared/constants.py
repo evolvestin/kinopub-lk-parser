@@ -46,6 +46,7 @@ SHOW_STATUS_MAPPING = {
     'COMPLETED': 'Finished',
     'FILMING': 'Filming',
     'POST_PRODUCTION': 'Post Production',
+    'PRE_PRODUCTION': 'Pre Production',
     'UNKNOWN': None,
 }
 

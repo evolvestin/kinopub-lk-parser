@@ -186,6 +186,9 @@ DEV_CHANNEL_ID = os.getenv('DEV_CHANNEL_ID')
 LOG_IGNORE_PATTERNS = [
     'Connection reset by peer',
     'RemoteDisconnected',
+    'over capacity',
+    'Application instance',
+    'took too long to shut down',
 ]
 
 # --- History Parser Config (Main Account) ---

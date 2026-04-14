@@ -5,6 +5,7 @@ import traceback
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.apps import apps
+from django.conf import settings
 from django.utils import timezone
 
 from app.telegram_bot import TelegramSender
@@ -34,9 +35,17 @@ class DatabaseLogHandler(logging.Handler):
             return
 
         try:
+            msg = record.getMessage()
+
+            if 'over capacity' in msg.lower():
+                return
+
+            for pattern in getattr(settings, 'LOG_IGNORE_PATTERNS', []):
+                if pattern in msg:
+                    return
+
             self._is_writing = True
             now = timezone.now()
-            msg = record.getMessage()
 
             tb_str = None
             if record.exc_info:

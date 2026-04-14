@@ -240,8 +240,8 @@ class Show(BaseModel):
 class ViewHistory(BaseModel):
     show = models.ForeignKey(Show, on_delete=models.CASCADE)
     view_date = models.DateField()
-    season_number = models.IntegerField(default=0)
-    episode_number = models.IntegerField(default=0)
+    season_number = models.IntegerField(default=0, null=True, blank=True)
+    episode_number = models.IntegerField(default=0, null=True, blank=True)
     users = models.ManyToManyField(ViewUser, related_name='history', blank=True)
     is_checked = models.BooleanField(default=True, verbose_name='Учтено')
     telegram_message_id = models.IntegerField(null=True, blank=True)
@@ -260,8 +260,8 @@ class ViewHistory(BaseModel):
 
 class ShowDuration(BaseModel):
     show = models.ForeignKey(Show, on_delete=models.CASCADE)
-    season_number = models.IntegerField(null=True)
-    episode_number = models.IntegerField(null=True)
+    season_number = models.IntegerField(null=True, blank=True)
+    episode_number = models.IntegerField(null=True, blank=True)
     duration_seconds = models.IntegerField()
 
     class Meta:
