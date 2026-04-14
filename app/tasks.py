@@ -358,9 +358,14 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
         history_parser.close_driver(driver)
 
 
-@shared_task
 @safe_execution
-def process_queues_task():
+@shared_task(
+    bind=True,
+    time_limit=2400,      # Жесткий лимит 40 мин
+    soft_time_limit=1100  # Мягкий лимит
+)
+@single_instance_task(lock_name='process_queues_lock', timeout=1200)
+def process_queues_task(self):
     """
     Объединенная задача для последовательной обработки очередей Redis.
     Блокировка занимается ТОЛЬКО если в очередях есть задачи.
