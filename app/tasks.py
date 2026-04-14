@@ -44,6 +44,10 @@ def _redis_lock(lock_name, timeout):
     redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
     lock = redis_client.lock(lock_name, timeout=timeout)
     acquired = lock.acquire(blocking=False)
+
+    if not acquired:
+        logging.warning(f'Lock acquisition failed for "{lock_name}". Resource is busy.')
+
     try:
         yield acquired
     finally:
