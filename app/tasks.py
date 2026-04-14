@@ -261,6 +261,10 @@ def run_admin_command(self, task_run_id):
     except TaskRun.DoesNotExist:
         return
 
+    if task_run.command == 'resetlocks':
+        _execute_admin_command_process(self.request.id, task_run)
+        return
+
     selenium_commands = {
         'runfullscan',
         'rungapscanner',
@@ -273,7 +277,7 @@ def run_admin_command(self, task_run_id):
     }
 
     if task_run.command in selenium_commands:
-        with _redis_lock('selenium_global_lock', timeout=21600) as acquired:
+        with _redis_lock('selenium_global_lock', timeout=14400) as acquired:
             if not acquired:
                 task_run.status = 'FAILURE'
                 task_run.output = (
