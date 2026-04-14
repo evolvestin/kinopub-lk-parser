@@ -38,23 +38,36 @@ class Command(LoggableBaseCommand):
 
         count = 0
         total = len(persons)
-        
+        consecutive_errors = 0
+        error_threshold = 5
+
         logging.info(f'Starting photo fetch for {total} persons...')
 
         for idx, person in enumerate(persons, start=1):
             try:
                 if fetch_person_photo_from_tmdb(person):
                     count += 1
-                
+                    consecutive_errors = 0
+
                 if idx % 100 == 0:
                     logging.info(f'Progress: {idx}/{total} processed...')
-                    
+
             except DatabaseError as e:
                 logging.critical(f'Fatal database error on person {person.name}: {e}')
                 return
             except requests.RequestException as e:
-                logging.error(f'Aborting batch: TMDB API is unreachable. Error: {e}')
-                break
+                consecutive_errors += 1
+                logging.warning(
+                    f'TMDB request failed for '
+                    f'{person.name} ({consecutive_errors}/{error_threshold}): {e}'
+                )
+                if consecutive_errors >= error_threshold:
+                    logging.error(
+                        f'Aborting batch: '
+                        f'TMDB API is unreachable after {error_threshold} consecutive errors.'
+                    )
+                    break
+                continue
             except Exception as e:
                 logging.error(f'Skipping {person.name} due to unexpected error: {e}')
 
