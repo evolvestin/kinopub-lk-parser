@@ -24,6 +24,9 @@ DB_BACKUP_FILENAME = os.getenv('DB_BACKUP_FILENAME', 'data.json')
 COOKIES_BACKUP_FILENAME_MAIN = os.getenv('COOKIES_BACKUP_FILENAME_MAIN', 'cookies_main.json')
 COOKIES_BACKUP_FILENAME_AUX = os.getenv('COOKIES_BACKUP_FILENAME_AUX', 'cookies_aux.json')
 
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760
+
 LOCAL_RUN = False
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-for-dev')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'

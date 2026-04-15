@@ -21,6 +21,7 @@ from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
     calculate_duplicate_photo_urls_metric,
+    calculate_en_professions_stats_metric,
     calculate_missing_country_meta_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
@@ -361,8 +362,8 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
 @safe_execution
 @shared_task(
     bind=True,
-    time_limit=2400,      # Жесткий лимит 40 мин
-    soft_time_limit=1100  # Мягкий лимит
+    time_limit=2400,  # Жесткий лимит 40 мин
+    soft_time_limit=1100,  # Мягкий лимит
 )
 @single_instance_task(lock_name='process_queues_lock', timeout=1200)
 def process_queues_task(self):
@@ -533,6 +534,9 @@ def update_site_metrics_task():
 
     professions_data = calculate_professions_stats_metric()
     SiteMetric.objects.create(key='professions_stats', data=professions_data)
+
+    en_professions_data = calculate_en_professions_stats_metric()
+    SiteMetric.objects.create(key='en_professions_stats', data=en_professions_data)
 
     duplicate_photo_data = calculate_duplicate_photo_urls_metric()
     SiteMetric.objects.create(key='duplicate_photo_urls', data=duplicate_photo_data)

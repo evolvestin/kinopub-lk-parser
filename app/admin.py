@@ -330,6 +330,7 @@ class ShowAdmin(admin.ModelAdmin):
             'plot__isnull',
             'genres__isnull',
             'countries__isnull',
+            'type',
         ]
         if lookup in allowed_lookups:
             return True
@@ -864,7 +865,13 @@ class PersonAdmin(BaseNameAdmin):
         'created_at',
         'updated_at',
     )
-    list_filter = (PhotoSourceFilter, 'is_photo_fetched', 'showcrew__en_profession')
+    list_filter = (
+        PhotoSourceFilter,
+        'is_photo_fetched',
+        'showcrew__en_profession',
+        'showcrew__profession',
+        'showcrew__show__type',
+    )
     search_fields = ('name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
     readonly_fields = BaseNameAdmin.readonly_fields + (
         'get_photo_display',
@@ -886,6 +893,19 @@ class PersonAdmin(BaseNameAdmin):
         )
 
         return qs.annotate(_primary_en_prof=Subquery(profession_subquery))
+
+    def lookup_allowed(self, lookup, value):
+        allowed_related = [
+            'showcrew__profession',
+            'showcrew__en_profession',
+            'showcrew__profession__exact',
+            'showcrew__en_profession__exact',
+            'showcrew__show__type',
+            'showcrew__show__type__exact',
+        ]
+        if lookup in allowed_related:
+            return True
+        return super().lookup_allowed(lookup, value)
 
     @admin.display(description='Profession (EN)', ordering='_primary_en_prof')
     def get_en_profession(self, obj):

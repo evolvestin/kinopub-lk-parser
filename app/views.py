@@ -34,6 +34,7 @@ from app.models import (
 )
 from app.services.metrics import (
     calculate_duplicate_photo_urls_metric,
+    calculate_en_professions_stats_metric,
     calculate_has_imdb_metric,
     calculate_has_kp_metric,
     calculate_missing_country_meta_metric,
@@ -180,6 +181,9 @@ def index(request):
     professions_stats = get_or_update_metric(
         'professions_stats', calculate_professions_stats_metric
     )
+    en_professions_stats = get_or_update_metric(
+        'en_professions_stats', calculate_en_professions_stats_metric
+    )
     duplicate_photo_urls = get_or_update_metric(
         'duplicate_photo_urls', calculate_duplicate_photo_urls_metric
     )
@@ -203,6 +207,7 @@ def index(request):
                 'total_persons_by_show_type': total_persons_by_show_type,
                 'persons_avatar_stats': persons_avatar_stats,
                 'professions_stats': professions_stats,
+                'en_professions_stats': en_professions_stats,
                 'duplicate_photo_urls': duplicate_photo_urls,
             }
         )
@@ -1313,64 +1318,67 @@ def webapp_search(request):
 @require_http_methods(['GET'])
 def get_metric_details(request, key):
     show_type = request.GET.get('type')
+    is_person_metric = any(x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo'])
+    is_country_metric = 'country' in key
+
     admin_base_url = reverse(
         'admin:app_person_changelist'
-        if any(x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo'])
+        if is_person_metric
         else 'admin:app_country_changelist'
-        if 'country' in key
+        if is_country_metric
         else 'admin:app_show_changelist'
     )
-    params = (
-        [f'type={show_type}']
-        if show_type
-        and 'person' not in key
-        and 'avatar' not in key
-        and 'duplicate_photo' not in key
-        else []
-    )
 
+    query_params = {}
     items, is_summary, is_country, is_person, target_task = [], False, False, False, 'details'
 
     if key == 'missing_kp':
         items = list(get_missing_kp_list(show_type))
-        params.extend(['kinopoisk_url__isnull=False', 'ext_rating__isnull=True'])
+        query_params.update(
+            {'type': show_type, 'kinopoisk_url__isnull': 'False', 'ext_rating__isnull': 'True'}
+        )
         target_task = 'priority_sync'
     elif key == 'missing_imdb':
         items = list(get_missing_imdb_list(show_type))
-        params.extend(['imdb_url__isnull=False', 'ext_rating__isnull=True'])
+        query_params.update(
+            {'type': show_type, 'imdb_url__isnull': 'False', 'ext_rating__isnull': 'True'}
+        )
         target_task = 'priority_sync'
     elif key == 'title_collision':
         items = list(get_title_collision_list(show_type))
+        query_params['type'] = show_type
     elif key == 'missing_year':
         items = list(get_missing_year_list(show_type))
-        params.append('year__isnull=True')
+        query_params.update({'type': show_type, 'year__isnull': 'True'})
     elif key == 'missing_status':
         items = list(get_missing_status_list(show_type))
-        params.append('status__isnull=True')
+        query_params.update({'type': show_type, 'status__isnull': 'True'})
     elif key == 'missing_plot':
         items = list(get_missing_plot_list(show_type))
-        params.append('plot__isnull=True')
+        query_params.update({'type': show_type, 'plot__isnull': 'True'})
     elif key == 'no_genres':
         items = list(get_no_genres_list(show_type))
-        params.append('genres__isnull=True')
+        query_params.update({'type': show_type, 'genres__isnull': 'True'})
     elif key == 'no_countries':
         items = list(get_no_countries_list(show_type))
-        params.append('countries__isnull=True')
+        query_params.update({'type': show_type, 'countries__isnull': 'True'})
     elif key == 'has_kp':
         is_summary = True
-        params.append('ext_rating__kp__isnull=False')
+        query_params.update({'type': show_type, 'ext_rating__kp__isnull': 'False'})
     elif key == 'has_imdb':
         is_summary = True
-        params.append('ext_rating__imdb__isnull=False')
+        query_params.update({'type': show_type, 'ext_rating__imdb__isnull': 'False'})
     elif key == 'total_shows':
         is_summary = True
-        params.append('ext_rating__imdb__isnull=False')
-    elif key == 'total_shows':
-        is_summary = True
+        if show_type:
+            query_params['type'] = show_type
     elif key == 'missing_country_meta':
         is_country, items = True, list(get_missing_country_meta_list())
-    elif key == 'total_countries' or key == 'total_persons_by_show_type':
+    elif key == 'total_countries':
         is_summary = True
+    elif key == 'total_persons_by_show_type':
+        is_summary = True
+        query_params['showcrew__show__type'] = show_type
     elif key == 'persons_avatar_stats':
         is_summary = True
         mapping = {
@@ -1383,23 +1391,26 @@ def get_metric_details(request, key):
             'Не найдено вообще': 'all_none',
         }
         if show_type in mapping:
-            params.append(f'photo_source={mapping[show_type]}')
+            query_params['photo_source'] = mapping[show_type]
     elif key == 'professions_stats':
         is_summary = True
-        params = [f'showcrew__profession__exact={show_type}']
+        query_params['showcrew__profession__exact'] = show_type
+    elif key == 'en_professions_stats':
+        is_summary = True
+        query_params['showcrew__en_profession__exact'] = show_type
     elif key == 'duplicate_photo_urls':
         is_person, items = True, list(get_duplicate_photo_urls_list(show_type))
-        params.append(f'q={urllib.parse.quote(show_type)}')
+        query_params['q'] = show_type
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
 
-    admin_url = f'{admin_base_url}?{"&".join(params)}' if params else admin_base_url
+    query_string = urllib.parse.urlencode(query_params)
+    admin_url = f'{admin_base_url}?{query_string}' if query_string else admin_base_url
+
     if is_summary:
         return JsonResponse({'is_summary': True, 'admin_url': admin_url, 'items': []})
 
     try:
-        from redis import Redis
-
         r = Redis.from_url(settings.CELERY_BROKER_URL)
         all_queued = {int(x) for x in r.smembers('queue:update_details')} | {
             int(x) for x in r.smembers('queue:priority_ratings_sync')
@@ -1415,7 +1426,10 @@ def get_metric_details(request, key):
                     'title': item['title'],
                     'original_title': item['en_name'],
                     'poster_url': item.get('tmdb_photo_url') or item.get('kp_photo_url') or '',
-                    'admin_url': f'{reverse("admin:app_person_changelist")}?q={item["title"]}',
+                    'admin_url': (
+                        f'{reverse("admin:app_person_changelist")}'
+                        f'?q={urllib.parse.quote(item["title"])}'
+                    ),
                 }
             )
         elif is_country:

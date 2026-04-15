@@ -37,14 +37,16 @@ class Command(LoggableBaseCommand):
                 for key in keys:
                     if r.delete(key):
                         removed_locks_count += 1
-                        logging.info(f'Lock "{key.decode() if isinstance(key, bytes) else key}" has been reset.')
+                        logging.info(
+                            f'Lock "{key.decode() if isinstance(key, bytes) else key}" '
+                            'has been reset.'
+                        )
 
             stuck_tasks = TaskRun.objects.filter(status__in=['RUNNING', 'QUEUED'])
             stuck_count = stuck_tasks.count()
             if stuck_count > 0:
                 stuck_tasks.update(
-                    status='FAILURE',
-                    error_message='Forced reset via resetlocks command.'
+                    status='FAILURE', error_message='Forced reset via resetlocks command.'
                 )
                 logging.info(f'Marked {stuck_count} stuck tasks as FAILURE in database.')
 
@@ -56,7 +58,10 @@ class Command(LoggableBaseCommand):
             if removed_locks_count == 0 and stuck_count == 0:
                 logging.info('No active locks or stuck tasks found.')
             else:
-                logging.info(f'Cleanup finished. Locks reset: {removed_locks_count}. Tasks reset: {stuck_count}.')
+                logging.info(
+                    f'Cleanup finished. Locks reset: {removed_locks_count}. '
+                    f'Tasks reset: {stuck_count}.'
+                )
 
         except Exception as e:
             logging.error(f'Failed to perform full reset: {e}')

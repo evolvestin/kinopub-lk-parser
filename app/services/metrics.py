@@ -415,3 +415,22 @@ def get_duplicate_photo_urls_list(source_type: str):
             }
         )
     return results
+
+
+def calculate_en_professions_stats_metric():
+    stats = (
+        ShowCrew.objects.exclude(en_profession__isnull=True)
+        .exclude(en_profession='')
+        .values('en_profession')
+        .annotate(total=Count('person', distinct=True))
+        .order_by('-total')
+    )
+    return [{'name': item['en_profession'], 'value': item['total']} for item in stats]
+
+
+def get_en_professions_stats_list(en_profession: str):
+    return (
+        Person.objects.filter(showcrew__en_profession=en_profession)
+        .distinct()
+        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
+    )
