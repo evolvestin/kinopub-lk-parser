@@ -66,7 +66,13 @@ from app.services.metrics import (
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
 from app.telegram_bot import TelegramSender
-from shared.constants import UserRole
+from shared.constants import (
+    ACTOR_ROLES,
+    DIRECTOR_ROLES,
+    RAW_TO_NORMALIZED_EN,
+    RAW_TO_NORMALIZED_RU,
+    UserRole,
+)
 from shared.formatters import format_se
 from shared.media import get_poster_url
 
@@ -1157,8 +1163,8 @@ def webapp_get_show_full(request, show_id):
         actors = []
 
         for crew_member in show.showcrew_set.all():
-            prof_ru = (crew_member.profession or '').lower()
-            prof_en = (crew_member.en_profession or '').lower()
+            norm_ru = RAW_TO_NORMALIZED_RU.get(crew_member.profession, crew_member.profession)
+            norm_en = RAW_TO_NORMALIZED_EN.get(crew_member.en_profession, crew_member.en_profession)
 
             person_data = {
                 'id': crew_member.person.id,
@@ -1166,9 +1172,9 @@ def webapp_get_show_full(request, show_id):
                 'photo_url': crew_member.person.photo_url,
             }
 
-            if 'режисс' in prof_ru or 'director' in prof_en or 'создатель' in prof_ru:
+            if norm_ru == 'Режиссер' or norm_en == 'Director':
                 directors.append({'id': crew_member.person.id, 'name': crew_member.person.name})
-            elif 'актер' in prof_ru or 'actor' in prof_en or 'в ролях' in prof_ru:
+            elif norm_ru == 'Актер' or norm_en == 'Actor':
                 actors.append(person_data)
 
         data = {
@@ -1209,20 +1215,14 @@ def webapp_get_collection(request, collection_type, item_id):
             person = Person.objects.get(id=item_id)
             shows = shows.filter(
                 showcrew__person=person,
-                showcrew__profession__in=['Актер', 'актер', 'Actor', 'actor', 'В ролях'],
+                showcrew__profession__in=ACTOR_ROLES,
             )
             title = person.name
         elif collection_type == 'director':
             person = Person.objects.get(id=item_id)
             shows = shows.filter(
                 showcrew__person=person,
-                showcrew__profession__in=[
-                    'Режиссер',
-                    'режиссер',
-                    'Director',
-                    'director',
-                    'Создатель',
-                ],
+                showcrew__profession__in=DIRECTOR_ROLES,
             )
             title = f'Режиссер: {person.name}'
         elif collection_type == 'genre':
@@ -1394,10 +1394,10 @@ def get_metric_details(request, key):
             query_params['photo_source'] = mapping[show_type]
     elif key == 'professions_stats':
         is_summary = True
-        query_params['showcrew__profession__exact'] = show_type
+        query_params['profession_norm'] = show_type
     elif key == 'en_professions_stats':
         is_summary = True
-        query_params['showcrew__en_profession__exact'] = show_type
+        query_params['en_profession_norm'] = show_type
     elif key == 'duplicate_photo_urls':
         is_person, items = True, list(get_duplicate_photo_urls_list(show_type))
         query_params['q'] = show_type
@@ -1420,18 +1420,27 @@ def get_metric_details(request, key):
 
     for item in items:
         if is_person:
-            item.update(
-                {
-                    'is_person': True,
-                    'title': item['title'],
-                    'original_title': item['en_name'],
-                    'poster_url': item.get('tmdb_photo_url') or item.get('kp_photo_url') or '',
-                    'admin_url': (
-                        f'{reverse("admin:app_person_changelist")}'
-                        f'?q={urllib.parse.quote(item["title"])}'
-                    ),
-                }
-            )
+            if 'persons' in item:
+                item.update(
+                    {
+                        'is_person': True,
+                        'is_duplicate_group': True,
+                        'poster_url': item.get('tmdb_photo_url') or item.get('kp_photo_url') or '',
+                    }
+                )
+            else:
+                item.update(
+                    {
+                        'is_person': True,
+                        'title': item['title'],
+                        'original_title': item['en_name'],
+                        'poster_url': item.get('tmdb_photo_url') or item.get('kp_photo_url') or '',
+                        'admin_url': (
+                            f'{reverse("admin:app_person_changelist")}'
+                            f'?q={urllib.parse.quote(item["title"])}'
+                        ),
+                    }
+                )
         elif is_country:
             item.update(
                 {

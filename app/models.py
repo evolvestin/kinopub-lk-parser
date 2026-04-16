@@ -4,7 +4,13 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import JSONField
 
-from shared.constants import DATETIME_FORMAT, RATING_VALUES, UserRole
+from shared.constants import (
+    DATETIME_FORMAT,
+    RATING_VALUES,
+    RAW_TO_NORMALIZED_EN,
+    RAW_TO_NORMALIZED_RU,
+    UserRole,
+)
 from shared.formatters import format_se
 
 
@@ -86,8 +92,22 @@ class ShowCrew(BaseModel):
         verbose_name_plural = 'Show Crew Members'
         unique_together = ('show', 'person', 'profession')
 
+    @property
+    def normalized_profession(self):
+        return (
+            RAW_TO_NORMALIZED_RU.get(self.profession, self.profession) if self.profession else '-'
+        )
+
+    @property
+    def normalized_en_profession(self):
+        return (
+            RAW_TO_NORMALIZED_EN.get(self.en_profession, self.en_profession)
+            if self.en_profession
+            else '-'
+        )
+
     def __str__(self):
-        return f'{self.person.name} - {self.profession}'
+        return f'{self.person.name} - {self.normalized_profession}'
 
 
 class ViewUser(BaseModel):

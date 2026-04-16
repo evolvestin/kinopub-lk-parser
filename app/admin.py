@@ -48,7 +48,13 @@ from app.models import (
 from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender
 from app.views import sync_user_permissions
-from shared.constants import UserRole
+from shared.constants import (
+    ACTOR_ROLES,
+    PROFESSIONS_MAPPING_EN,
+    PROFESSIONS_MAPPING_RU,
+    RAW_TO_NORMALIZED_EN,
+    UserRole,
+)
 
 
 def _format_object_list_html(queryset, url_name, count_attr='show_count'):
@@ -748,7 +754,7 @@ class CountryAdmin(BaseNameAdmin):
             Person,
             Q(
                 shows_as_crew__countries=obj,
-                showcrew__profession__in=['Актер', 'актер', 'Actor', 'actor', 'В ролях'],
+                showcrew__profession__in=ACTOR_ROLES,
             ),
             'admin:app_person_change',
             relation_field='shows_as_crew',
@@ -788,7 +794,7 @@ class GenreAdmin(BaseNameAdmin):
             Person,
             Q(
                 shows_as_crew__genres=obj,
-                showcrew__profession__in=['Актер', 'актер', 'Actor', 'actor', 'В ролях'],
+                showcrew__profession__in=ACTOR_ROLES,
             ),
             'admin:app_person_change',
             relation_field='shows_as_crew',
@@ -853,6 +859,36 @@ class PersonShowCrewInline(BaseReadonlyInline):
     autocomplete_fields = ('show',)
 
 
+class PersonProfessionFilter(admin.SimpleListFilter):
+    title = 'Profession (RU)'
+    parameter_name = 'profession_norm'
+
+    def lookups(self, request, model_admin):
+        return [(k, k) for k in PROFESSIONS_MAPPING_RU.keys()]
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val:
+            return queryset.filter(showcrew__profession__in=PROFESSIONS_MAPPING_RU.get(val, [val]))
+        return queryset
+
+
+class PersonEnProfessionFilter(admin.SimpleListFilter):
+    title = 'Profession (EN)'
+    parameter_name = 'en_profession_norm'
+
+    def lookups(self, request, model_admin):
+        return [(k, k) for k in PROFESSIONS_MAPPING_EN.keys()]
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val:
+            return queryset.filter(
+                showcrew__en_profession__in=PROFESSIONS_MAPPING_EN.get(val, [val])
+            )
+        return queryset
+
+
 @admin.register(Person, site=admin_site)
 class PersonAdmin(BaseNameAdmin):
     inlines = [PersonShowCrewInline]
@@ -868,8 +904,8 @@ class PersonAdmin(BaseNameAdmin):
     list_filter = (
         PhotoSourceFilter,
         'is_photo_fetched',
-        'showcrew__en_profession',
-        'showcrew__profession',
+        PersonEnProfessionFilter,
+        PersonProfessionFilter,
         'showcrew__show__type',
     )
     search_fields = ('name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
@@ -909,7 +945,8 @@ class PersonAdmin(BaseNameAdmin):
 
     @admin.display(description='Profession (EN)', ordering='_primary_en_prof')
     def get_en_profession(self, obj):
-        return obj._primary_en_prof or '-'
+        val = obj._primary_en_prof
+        return RAW_TO_NORMALIZED_EN.get(val, val) if val else '-'
 
     @admin.display(description='Sources', ordering='is_photo_fetched')
     def get_is_photo_fetched(self, obj):
@@ -1416,9 +1453,37 @@ class ExternalRatingAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at', 'updated_at')
 
 
+class ShowCrewProfessionFilter(admin.SimpleListFilter):
+    title = 'Profession (RU)'
+    parameter_name = 'profession_norm'
+
+    def lookups(self, request, model_admin):
+        return [(k, k) for k in PROFESSIONS_MAPPING_RU.keys()]
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val:
+            return queryset.filter(profession__in=PROFESSIONS_MAPPING_RU.get(val, [val]))
+        return queryset
+
+
+class ShowCrewEnProfessionFilter(admin.SimpleListFilter):
+    title = 'Profession (EN)'
+    parameter_name = 'en_profession_norm'
+
+    def lookups(self, request, model_admin):
+        return [(k, k) for k in PROFESSIONS_MAPPING_EN.keys()]
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val:
+            return queryset.filter(en_profession__in=PROFESSIONS_MAPPING_EN.get(val, [val]))
+        return queryset
+
+
 @admin.register(ShowCrew, site=admin_site)
 class ShowCrewAdmin(admin.ModelAdmin):
-    list_display = ('show', 'person', 'profession', 'en_profession', 'created_at')
+    list_display = ('show', 'person', 'get_profession', 'get_en_profession', 'created_at')
     search_fields = (
         'show__title',
         'show__original_title',
@@ -1426,13 +1491,21 @@ class ShowCrewAdmin(admin.ModelAdmin):
         'profession',
         'en_profession',
     )
-    list_filter = ('profession', 'en_profession')
+    list_filter = (ShowCrewProfessionFilter, ShowCrewEnProfessionFilter)
     autocomplete_fields = ('show', 'person')
     readonly_fields = ('created_at', 'updated_at')
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('show', 'person')
+
+    @admin.display(description='Profession (RU)', ordering='profession')
+    def get_profession(self, obj):
+        return obj.normalized_profession
+
+    @admin.display(description='Profession (EN)', ordering='en_profession')
+    def get_en_profession(self, obj):
+        return obj.normalized_en_profession
 
 
 @admin.register(SiteMetric, site=admin_site)

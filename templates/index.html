@@ -36,7 +36,7 @@
         .modal-header { flex-shrink: 0; }
         .modal-body-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 450px)); grid-auto-rows: min-content; align-content: start; justify-content: center; gap: 16px; margin-top: 15px; overflow-y: auto; padding: 5px 10px 30px 5px; flex-grow: 1; min-height: 0; }
         
-        .modal-item { display: flex; flex-direction: row; align-items: stretch; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; transition: all 0.2s; overflow: hidden; min-height: 110px; width: 100%; max-width: 450px; flex-shrink: 0; }
+        .modal-item { display: flex; flex-direction: row; align-items: stretch; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; transition: all 0.2s; overflow: hidden; min-height: 110px; width: 100%; max-width: 450px; flex-shrink: 0; transform: translateZ(0); will-change: transform; }
         .modal-item-poster { width: 80px; height: auto; object-fit: cover; background: var(--bg-main); flex-shrink: 0; border-right: 1px solid var(--border); }
         .modal-item-content { display: flex; flex-direction: column; justify-content: space-between; flex-grow: 1; min-width: 0; }
         .modal-item-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; flex-grow: 1; padding: 12px 14px; }
@@ -426,7 +426,7 @@
                     <div class="icon" style="color:#ef1960">
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                     </div>
-                    Дубликаты по фото
+                    Дубликаты людей
                     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
                         <circle cx="12" cy="12" r="10"></circle>
                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -674,6 +674,134 @@
 
         let currentModalItems = [];
         let currentTargetTask = 'details';
+        let currentModalDataContext = null;
+        let currentModalOffset = 0;
+        const modalBatchSize = 20;
+        let modalObserver = null;
+        let isRenderingModalBatch = false;
+
+        function getModalItemHtml(item, data) {
+            if (data.is_person) {
+                const fallbackIcon = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239ca3af"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+                const poster = item.poster_url ? item.poster_url : fallbackIcon;
+                const objectFit = item.poster_url ? 'cover' : 'none';
+                
+                // Если это группа дубликатов, выводим список имен с переносами
+                let contentHtml = '';
+                if (item.is_duplicate_group && item.persons) {
+                    const namesList = item.persons.map(name => `<div style="margin-bottom:2px;">• ${name}</div>`).join('');
+                    contentHtml = `
+                        <div class="modal-item-info" style="padding: 15px 20px;">
+                            <div style="color: var(--accent); font-weight: 800; font-size: 12px; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">Обнаружены дубликаты:</div>
+                            <div style="font-size: 15px; color: var(--text-primary); line-height: 1.4; margin-bottom: 12px;">${namesList}</div>
+                            <a href="${item.admin_url}" target="_blank" class="nav-btn" style="width: fit-content; padding: 6px 14px; font-size: 12px; background: var(--bg-card);">Найти и объединить в админке</a>
+                        </div>
+                    `;
+                } else {
+                    contentHtml = `
+                        <div class="modal-item-info" style="flex-direction:row; justify-content:space-between; align-items:center; padding: 15px 20px;">
+                            <div style="min-width: 0; padding-right: 15px;">
+                                <div class="modal-item-title" style="margin:0; font-size: 15px;">${item.title}</div>
+                                <div class="modal-item-orig" style="margin-top: 4px;">${item.original_title || ''}</div>
+                            </div>
+                            <a href="${item.admin_url}" target="_blank" class="nav-btn" style="padding:8px 16px; font-size:13px; height:auto; background: var(--bg-card); flex-shrink: 0;">Правка</a>
+                        </div>
+                    `;
+                }
+
+                return `
+                <div class="modal-item" style="min-height: 80px;">
+                    <img src="${poster}" class="modal-item-poster" alt="avatar" loading="lazy" style="width: 100px; object-fit: ${objectFit}; background: var(--bg-card);">
+                    <div class="modal-item-content">
+                        ${contentHtml}
+                    </div>
+                </div>`;
+            }
+
+            if (data.is_country) {
+                const flag = item.emoji_flag ? `<span style="margin-right:10px; font-size: 1.2em;">${item.emoji_flag}</span>` : '';
+                return `
+                <div class="modal-item" style="min-height: 60px;">
+                    <div class="modal-item-content">
+                        <div class="modal-item-info" style="flex-direction:row; justify-content:space-between; align-items:center; padding: 15px 20px;">
+                            <div class="modal-item-title" style="margin:0; display:flex; align-items:center; font-size: 16px;">
+                                ${flag} ${item.name}
+                            </div>
+                            <a href="${item.admin_url}" target="_blank" class="nav-btn" style="padding:6px 16px; font-size:13px; height:auto; background: var(--bg-card);">Правка</a>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            const qDisabled = item.in_queue ? 'disabled' : '';
+            let btnText = 'Обновить детали';
+            if (item.in_queue) {
+                btnText = 'В очереди';
+            } else if (currentTargetTask === 'priority_sync') {
+                btnText = 'Синхронизировать';
+            }
+            
+            return `
+            <div class="modal-item" id="mi-${item.id}">
+                <img src="${item.poster_url}" class="modal-item-poster" alt="poster" loading="lazy">
+                <div class="modal-item-content">
+                    <div class="modal-item-info">
+                        <div class="modal-item-title">${item.title}</div>
+                        <div class="modal-item-orig">${item.original_title || ''}</div>
+                    </div>
+                    <div class="modal-item-actions">
+                        <button class="queue-btn" id="qb-${item.id}" onclick="addToQueue([${item.id}], this)" ${qDisabled}>
+                            <span>${btnText}</span>
+                        </button>
+                        <a href="${item.kinopub_url}" target="_blank" class="admin-link-btn" style="color: var(--accent); border-right: 1px solid var(--border);" title="Открыть на Кинопабе">
+                            На Кинопабе
+                        </a>
+                        <a href="${item.admin_url}" target="_blank" class="admin-link-btn" title="Открыть в админке">
+                            В админке
+                        </a>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderModalBatch() {
+            if (isRenderingModalBatch || currentModalOffset >= currentModalItems.length) return;
+            isRenderingModalBatch = true;
+
+            const list = document.getElementById('modal-list');
+            const batch = currentModalItems.slice(currentModalOffset, currentModalOffset + modalBatchSize);
+            
+            const html = batch.map(item => getModalItemHtml(item, currentModalDataContext)).join('');
+            
+            let sentinel = document.getElementById('modal-sentinel');
+            if (sentinel) {
+                sentinel.insertAdjacentHTML('beforebegin', html);
+            } else {
+                list.insertAdjacentHTML('beforeend', html);
+                list.insertAdjacentHTML('beforeend', '<div id="modal-sentinel" style="height: 40px; width: 100%; flex-shrink: 0;"></div>');
+                sentinel = document.getElementById('modal-sentinel');
+            }
+
+            currentModalOffset += modalBatchSize;
+            isRenderingModalBatch = false;
+
+            if (currentModalOffset < currentModalItems.length) {
+                if (!modalObserver) {
+                    modalObserver = new IntersectionObserver((entries) => {
+                        if (entries[0].isIntersecting) {
+                            renderModalBatch();
+                        }
+                    }, { root: list, rootMargin: '400px' });
+                }
+                modalObserver.observe(sentinel);
+            } else {
+                if (modalObserver) {
+                    modalObserver.disconnect();
+                    modalObserver = null;
+                }
+                if (sentinel) sentinel.remove();
+            }
+        }
 
         async function openDetails(key, typeLabel) {
             const modal = document.getElementById('details-modal');
@@ -737,6 +865,8 @@
 
                 if (data.items && data.items.length) {
                     currentModalItems = data.items;
+                    currentModalDataContext = data;
+                    currentModalOffset = 0;
                     
                     if (data.items.length > 5) {
                         mContent.style.width = '95vw';
@@ -744,72 +874,13 @@
                         mContent.style.width = 'min(95vw, 550px)';
                     }
 
-                    list.innerHTML = data.items.map(item => {
-                        if (data.is_person) {
-                            const fallbackIcon = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239ca3af"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
-                            const poster = item.poster_url ? item.poster_url : fallbackIcon;
-                            const objectFit = item.poster_url ? 'cover' : 'none';
-                            
-                            return `
-                            <div class="modal-item" style="min-height: 80px;">
-                                <img src="${poster}" class="modal-item-poster" alt="avatar" loading="lazy" style="object-fit: ${objectFit}; background: var(--bg-card);">
-                                <div class="modal-item-content">
-                                    <div class="modal-item-info" style="flex-direction:row; justify-content:space-between; align-items:center; padding: 15px 20px;">
-                                        <div style="min-width: 0; padding-right: 15px;">
-                                            <div class="modal-item-title" style="margin:0; font-size: 15px;">${item.title}</div>
-                                            <div class="modal-item-orig" style="margin-top: 4px;">${item.original_title || ''}</div>
-                                        </div>
-                                        <a href="${item.admin_url}" target="_blank" class="nav-btn" style="padding:8px 16px; font-size:13px; height:auto; background: var(--bg-card); flex-shrink: 0;">Правка</a>
-                                    </div>
-                                </div>
-                            </div>`;
-                        }
-
-                        if (data.is_country) {
-                            const flag = item.emoji_flag ? `<span style="margin-right:10px; font-size: 1.2em;">${item.emoji_flag}</span>` : '';
-                            return `
-                            <div class="modal-item" style="min-height: 60px;">
-                                <div class="modal-item-content">
-                                    <div class="modal-item-info" style="flex-direction:row; justify-content:space-between; align-items:center; padding: 15px 20px;">
-                                        <div class="modal-item-title" style="margin:0; display:flex; align-items:center; font-size: 16px;">
-                                            ${flag} ${item.name}
-                                        </div>
-                                        <a href="${item.admin_url}" target="_blank" class="nav-btn" style="padding:6px 16px; font-size:13px; height:auto; background: var(--bg-card);">Правка</a>
-                                    </div>
-                                </div>
-                            </div>`;
-                        }
-
-                        const qDisabled = item.in_queue ? 'disabled' : '';
-                        let btnText = 'Обновить детали';
-                        if (item.in_queue) {
-                            btnText = 'В очереди';
-                        } else if (currentTargetTask === 'priority_sync') {
-                            btnText = 'Синхронизировать';
-                        }
-                        
-                        return `
-                        <div class="modal-item" id="mi-${item.id}">
-                            <img src="${item.poster_url}" class="modal-item-poster" alt="poster" loading="lazy">
-                            <div class="modal-item-content">
-                                <div class="modal-item-info">
-                                    <div class="modal-item-title">${item.title}</div>
-                                    <div class="modal-item-orig">${item.original_title || ''}</div>
-                                </div>
-                                <div class="modal-item-actions">
-                                    <button class="queue-btn" id="qb-${item.id}" onclick="addToQueue([${item.id}], this)" ${qDisabled}>
-                                        <span>${btnText}</span>
-                                    </button>
-                                    <a href="${item.kinopub_url}" target="_blank" class="admin-link-btn" style="color: var(--accent); border-right: 1px solid var(--border);" title="Открыть на Кинопабе">
-                                        На Кинопабе
-                                    </a>
-                                    <a href="${item.admin_url}" target="_blank" class="admin-link-btn" title="Открыть в админке">
-                                        В админке
-                                    </a>
-                                </div>
-                            </div>
-                        </div>`;
-                    }).join('');
+                    list.innerHTML = '';
+                    if (modalObserver) {
+                        modalObserver.disconnect();
+                        modalObserver = null;
+                    }
+                    
+                    renderModalBatch();
                     
                     const adminBtnHtml = `
                         <a href="${data.admin_url}" target="_blank" class="nav-btn active" style="margin-right:auto; background: var(--secondary); border-color: var(--border); color: var(--text-primary); padding: 12px 20px; display: inline-flex; align-items: center; gap: 8px;">
@@ -835,6 +906,14 @@
                 list.innerHTML = '<div class="empty" style="color:var(--danger)">Ошибка загрузки</div>';
             } finally {
                 loader.classList.add('hidden');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('details-modal').classList.remove('show');
+            if (modalObserver) {
+                modalObserver.disconnect();
+                modalObserver = null;
             }
         }
 
@@ -906,10 +985,6 @@
                 const actionText = currentTargetTask === 'priority_sync' ? 'на синхронизацию' : 'на обновление';
                 btn.innerHTML = `В очередь ${actionText} (${pendingIds.length})`;
             }
-        }
-
-        function closeModal() {
-            document.getElementById('details-modal').classList.remove('show');
         }
 
         function toggleMetricDesc(labelEl) {

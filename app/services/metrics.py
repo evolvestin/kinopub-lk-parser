@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import timedelta
 
 from django.db.models import Count, F, Q
@@ -5,7 +6,13 @@ from django.db.models.functions import Lower, StrIndex
 from django.utils import timezone
 
 from app.models import Country, Person, Show, ShowCrew, SiteMetric
-from shared.constants import SERIES_TYPES
+from shared.constants import (
+    PROFESSIONS_MAPPING_EN,
+    PROFESSIONS_MAPPING_RU,
+    RAW_TO_NORMALIZED_EN,
+    RAW_TO_NORMALIZED_RU,
+    SERIES_TYPES,
+)
 
 
 def calculate_missing_country_meta_metric():
@@ -330,19 +337,25 @@ def get_persons_avatar_stats_list(category: str):
 
 
 def calculate_professions_stats_metric():
-    stats = (
-        ShowCrew.objects.exclude(profession__isnull=True)
-        .exclude(profession='')
-        .values('profession')
-        .annotate(total=Count('person', distinct=True))
-        .order_by('-total')
-    )
-    return [{'name': item['profession'], 'value': item['total']} for item in stats]
+    stats = ShowCrew.objects.values('profession').annotate(total=Count('person', distinct=True))
+
+    merged = {k: 0 for k in PROFESSIONS_MAPPING_RU.keys()}
+    for item in stats:
+        norm = RAW_TO_NORMALIZED_RU.get(item['profession'])
+        if norm and norm in merged:
+            merged[norm] += item['total']
+        else:
+            merged[norm] = item['total']
+
+    return [
+        {'name': k, 'value': v} for k, v in sorted(merged.items(), key=lambda x: x[1], reverse=True)
+    ]
 
 
 def get_professions_stats_list(profession: str):
+    search_list = PROFESSIONS_MAPPING_RU.get(profession, [profession])
     return (
-        Person.objects.filter(showcrew__profession=profession)
+        Person.objects.filter(showcrew__profession__in=search_list)
         .distinct()
         .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
     )
@@ -388,49 +401,68 @@ def calculate_duplicate_photo_urls_metric():
 def get_duplicate_photo_urls_list(source_type: str):
     field = 'tmdb_photo_url' if 'TMDB' in source_type else 'kp_photo_url'
 
-    dupe_urls = (
+    # 1. Находим URL, которые встречаются более одного раза
+    dupe_urls_data = (
         Person.objects.exclude(**{field: ''})
         .filter(**{f'{field}__isnull': False})
         .values(field)
         .annotate(cnt=Count('id'))
         .filter(cnt__gt=1)
-        .order_by('-cnt')[:250]
+        .order_by('-cnt')[:150]  # Ограничим выборку для стабильности
     )
 
-    results = []
-    for entry in dupe_urls:
-        url = entry[field]
-        persons = Person.objects.filter(**{field: url}).values('id', 'name')
-        names = [p['name'] for p in persons]
+    if not dupe_urls_data:
+        return []
 
+    url_counts = {entry[field]: entry['cnt'] for entry in dupe_urls_data}
+    urls = list(url_counts.keys())
+
+    # 2. Одним запросом выгружаем всех людей, использующих эти URL
+    persons_qs = Person.objects.filter(**{f'{field}__in': urls}).values('id', 'name', field)
+
+    # 3. Группируем людей по их URL
+    grouped_persons = defaultdict(list)
+    for p in persons_qs:
+        grouped_persons[p[field]].append(p['name'])
+
+    # 4. Формируем финальный список для фронтенда
+    results = []
+    for url in urls:
+        names = sorted(grouped_persons[url])
         results.append(
             {
-                'id': persons[0]['id'],
-                'title': url,
-                'name': url,
-                'en_name': f'Используют: {", ".join(names[:5])}{"..." if len(names) > 5 else ""}',
-                'usage_count': entry['cnt'],
+                'id': 0,  # ID группы не важен
+                'title': f'Группа дубликатов ({url_counts[url]})',
+                'persons': names,
                 'tmdb_photo_url': url if field == 'tmdb_photo_url' else None,
                 'kp_photo_url': url if field == 'kp_photo_url' else None,
+                # Ссылка на админку с фильтром по этому конкретному URL
+                'admin_url': f'/admin/app/person/?q={url}',
             }
         )
     return results
 
 
 def calculate_en_professions_stats_metric():
-    stats = (
-        ShowCrew.objects.exclude(en_profession__isnull=True)
-        .exclude(en_profession='')
-        .values('en_profession')
-        .annotate(total=Count('person', distinct=True))
-        .order_by('-total')
-    )
-    return [{'name': item['en_profession'], 'value': item['total']} for item in stats]
+    stats = ShowCrew.objects.values('en_profession').annotate(total=Count('person', distinct=True))
+
+    merged = {k: 0 for k in PROFESSIONS_MAPPING_EN.keys()}
+    for item in stats:
+        norm = RAW_TO_NORMALIZED_EN.get(item['en_profession'])
+        if norm and norm in merged:
+            merged[norm] += item['total']
+        else:
+            merged[norm] = item['total']
+
+    return [
+        {'name': k, 'value': v} for k, v in sorted(merged.items(), key=lambda x: x[1], reverse=True)
+    ]
 
 
 def get_en_professions_stats_list(en_profession: str):
+    search_list = PROFESSIONS_MAPPING_EN.get(en_profession, [en_profession])
     return (
-        Person.objects.filter(showcrew__en_profession=en_profession)
+        Person.objects.filter(showcrew__en_profession__in=search_list)
         .distinct()
         .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
     )

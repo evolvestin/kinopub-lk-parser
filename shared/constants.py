@@ -5,6 +5,36 @@ DATETIME_FORMAT = f'{DATE_FORMAT} %H:%M:%S'
 RATING_VALUES = [i / 2 for i in range(2, 21)]
 
 
+PROFESSIONS_MAPPING_RU = {
+    'Актер': ['актеры', 'Актер', 'В ролях', 'актеры дубляжа'],
+    'Режиссер': ['режиссеры', 'Режиссер', 'Создатель', 'Режиссёр'],
+    'Продюсер': ['продюсеры'],
+    'Сценарист': ['сценаристы'],
+    'Художник': ['художники'],
+    'Монтажер': ['монтажеры'],
+    'Оператор': ['операторы'],
+    'Композитор': ['композиторы'],
+}
+
+PROFESSIONS_MAPPING_EN = {
+    'Actor': ['actor', 'Actor', 'voice_actor', 'voiceover'],
+    'Director': ['director', 'Director'],
+    'Producer': ['producer'],
+    'Writer': ['writer'],
+    'Designer': ['designer', 'design'],
+    'Editor': ['editor'],
+    'Operator': ['operator'],
+    'Composer': ['composer'],
+}
+
+RAW_TO_NORMALIZED_RU = {raw: norm for norm, raws in PROFESSIONS_MAPPING_RU.items() for raw in raws}
+
+RAW_TO_NORMALIZED_EN = {raw: norm for norm, raws in PROFESSIONS_MAPPING_EN.items() for raw in raws}
+
+ACTOR_ROLES = PROFESSIONS_MAPPING_RU['Актер'] + PROFESSIONS_MAPPING_EN['Actor']
+DIRECTOR_ROLES = PROFESSIONS_MAPPING_RU['Режиссер'] + PROFESSIONS_MAPPING_EN['Director']
+
+
 class UserRole(StrEnum):
     GUEST = 'guest'
     VIEWER = 'viewer'
