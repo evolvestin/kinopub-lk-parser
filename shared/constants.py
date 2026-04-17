@@ -6,18 +6,20 @@ RATING_VALUES = [i / 2 for i in range(2, 21)]
 
 
 PROFESSIONS_MAPPING_RU = {
-    'Актер': ['актеры', 'Актер', 'В ролях', 'актеры дубляжа'],
-    'Режиссер': ['режиссеры', 'Режиссер', 'Создатель', 'Режиссёр'],
-    'Продюсер': ['продюсеры'],
+    'Актёр': ['актеры', 'Актер', 'В ролях', 'актеры дубляжа'],
+    'Актёр дубляжа': ['актеры дубляжа'],
+    'Режиссёр': ['режиссеры', 'Режиссер', 'Создатель', 'Режиссёр'],
+    'Продюссер': ['продюсеры'],
     'Сценарист': ['сценаристы'],
     'Художник': ['художники'],
-    'Монтажер': ['монтажеры'],
+    'Монтажёр': ['монтажеры'],
     'Оператор': ['операторы'],
     'Композитор': ['композиторы'],
 }
 
 PROFESSIONS_MAPPING_EN = {
-    'Actor': ['actor', 'Actor', 'voice_actor', 'voiceover'],
+    'Actor': ['actor', 'Actor', 'voice_actor'],
+    'Dubbing actor': ['voiceover'],
     'Director': ['director', 'Director'],
     'Producer': ['producer'],
     'Writer': ['writer'],
@@ -31,8 +33,8 @@ RAW_TO_NORMALIZED_RU = {raw: norm for norm, raws in PROFESSIONS_MAPPING_RU.items
 
 RAW_TO_NORMALIZED_EN = {raw: norm for norm, raws in PROFESSIONS_MAPPING_EN.items() for raw in raws}
 
-ACTOR_ROLES = PROFESSIONS_MAPPING_RU['Актер'] + PROFESSIONS_MAPPING_EN['Actor']
-DIRECTOR_ROLES = PROFESSIONS_MAPPING_RU['Режиссер'] + PROFESSIONS_MAPPING_EN['Director']
+ACTOR_ROLES = PROFESSIONS_MAPPING_RU['Актёр'] + PROFESSIONS_MAPPING_EN['Actor']
+DIRECTOR_ROLES = PROFESSIONS_MAPPING_RU['Режиссёр'] + PROFESSIONS_MAPPING_EN['Director']
 
 
 class UserRole(StrEnum):

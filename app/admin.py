@@ -53,6 +53,7 @@ from shared.constants import (
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_EN,
+    RAW_TO_NORMALIZED_RU,
     UserRole,
 )
 
@@ -276,7 +277,22 @@ class ShowCrewInline(admin.TabularInline):
     model = ShowCrew
     extra = 0
     autocomplete_fields = ('person',)
-    readonly_fields = ('created_at', 'updated_at')
+    fields = (
+        'person',
+        'profession',
+        'get_norm_ru',
+        'en_profession',
+        'get_norm_en',
+    )
+    readonly_fields = ('get_norm_ru', 'get_norm_en', 'created_at', 'updated_at')
+
+    @admin.display(description='Отображение (RU)')
+    def get_norm_ru(self, obj):
+        return obj.normalized_profession if obj.id else '-'
+
+    @admin.display(description='Отображение (EN)')
+    def get_norm_en(self, obj):
+        return obj.normalized_en_profession if obj.id else '-'
 
 
 @admin.register(Show, site=admin_site)
@@ -857,6 +873,22 @@ class PersonShowCrewInline(BaseReadonlyInline):
     verbose_name = 'Acted / Directed In Show'
     verbose_name_plural = 'Shows Roles'
     autocomplete_fields = ('show',)
+    fields = (
+        'show',
+        'profession',
+        'get_norm_ru',
+        'en_profession',
+        'get_norm_en',
+    )
+    readonly_fields = ('get_norm_ru', 'get_norm_en')
+
+    @admin.display(description='Отображение (RU)')
+    def get_norm_ru(self, obj):
+        return obj.normalized_profession
+
+    @admin.display(description='Отображение (EN)')
+    def get_norm_en(self, obj):
+        return obj.normalized_en_profession
 
 
 class PersonProfessionFilter(admin.SimpleListFilter):
@@ -896,11 +928,13 @@ class PersonAdmin(BaseNameAdmin):
         'get_photo_display',
         'name',
         'en_name',
+        'get_ru_profession',
         'get_en_profession',
         'get_is_photo_fetched',
         'created_at',
         'updated_at',
     )
+    list_display_links = ('name',)
     list_filter = (
         PhotoSourceFilter,
         'is_photo_fetched',
@@ -921,14 +955,24 @@ class PersonAdmin(BaseNameAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
 
-        profession_subquery = (
+        profession_ru_subquery = (
+            ShowCrew.objects.filter(person=OuterRef('pk'))
+            .exclude(profession__isnull=True)
+            .exclude(profession='')
+            .values('profession')[:1]
+        )
+
+        profession_en_subquery = (
             ShowCrew.objects.filter(person=OuterRef('pk'))
             .exclude(en_profession__isnull=True)
             .exclude(en_profession='')
             .values('en_profession')[:1]
         )
 
-        return qs.annotate(_primary_en_prof=Subquery(profession_subquery))
+        return qs.annotate(
+            _primary_ru_prof=Subquery(profession_ru_subquery),
+            _primary_en_prof=Subquery(profession_en_subquery),
+        )
 
     def lookup_allowed(self, lookup, value):
         allowed_related = [
@@ -943,10 +987,25 @@ class PersonAdmin(BaseNameAdmin):
             return True
         return super().lookup_allowed(lookup, value)
 
-    @admin.display(description='Profession (EN)', ordering='_primary_en_prof')
+    @admin.display(description='Основная роль (RU)', ordering='_primary_ru_prof')
+    def get_ru_profession(self, obj):
+        val = obj._primary_ru_prof
+        if not val:
+            return '-'
+        normalized = RAW_TO_NORMALIZED_RU.get(val, val)
+        if normalized != val:
+            return format_html('<b>{}</b> <small style="opacity:0.5">({})</small>', normalized, val)
+        return normalized
+
+    @admin.display(description='Основная роль (EN)', ordering='_primary_en_prof')
     def get_en_profession(self, obj):
         val = obj._primary_en_prof
-        return RAW_TO_NORMALIZED_EN.get(val, val) if val else '-'
+        if not val:
+            return '-'
+        normalized = RAW_TO_NORMALIZED_EN.get(val, val)
+        if normalized != val:
+            return format_html('<b>{}</b> <small style="opacity:0.5">({})</small>', normalized, val)
+        return normalized
 
     @admin.display(description='Sources', ordering='is_photo_fetched')
     def get_is_photo_fetched(self, obj):
@@ -1483,7 +1542,15 @@ class ShowCrewEnProfessionFilter(admin.SimpleListFilter):
 
 @admin.register(ShowCrew, site=admin_site)
 class ShowCrewAdmin(admin.ModelAdmin):
-    list_display = ('show', 'person', 'get_profession', 'get_en_profession', 'created_at')
+    list_display = (
+        'show',
+        'person',
+        'get_profession',
+        'profession',
+        'get_en_profession',
+        'en_profession',
+        'created_at',
+    )
     search_fields = (
         'show__title',
         'show__original_title',
@@ -1493,18 +1560,26 @@ class ShowCrewAdmin(admin.ModelAdmin):
     )
     list_filter = (ShowCrewProfessionFilter, ShowCrewEnProfessionFilter)
     autocomplete_fields = ('show', 'person')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('get_norm_ru', 'get_norm_en', 'created_at', 'updated_at')
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('show', 'person')
 
-    @admin.display(description='Profession (RU)', ordering='profession')
+    @admin.display(description='Роль (RU)', ordering='profession')
     def get_profession(self, obj):
         return obj.normalized_profession
 
-    @admin.display(description='Profession (EN)', ordering='en_profession')
+    @admin.display(description='Роль (EN)', ordering='en_profession')
     def get_en_profession(self, obj):
+        return obj.normalized_en_profession
+
+    @admin.display(description='Итоговое отображение (RU)')
+    def get_norm_ru(self, obj):
+        return obj.normalized_profession
+
+    @admin.display(description='Итоговое отображение (EN)')
+    def get_norm_en(self, obj):
         return obj.normalized_en_profession
 
 

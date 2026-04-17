@@ -1,3 +1,4 @@
+import urllib
 from collections import defaultdict
 from datetime import timedelta
 
@@ -5,7 +6,7 @@ from django.db.models import Count, F, Q
 from django.db.models.functions import Lower, StrIndex
 from django.utils import timezone
 
-from app.models import Country, Person, Show, ShowCrew, SiteMetric
+from app.models import Country, Genre, Person, Show, ShowCrew, SiteMetric
 from shared.constants import (
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
@@ -466,3 +467,58 @@ def get_en_professions_stats_list(en_profession: str):
         .distinct()
         .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
     )
+
+
+def calculate_total_genres_metric():
+    count = Genre.objects.count()
+    return [{'name': 'Всего', 'value': count}]
+
+
+def get_total_genres_list():
+    return Genre.objects.all().order_by('name').values('id', 'name')
+
+
+def calculate_duplicate_genres_metric():
+    dupes = (
+        Genre.objects.annotate(name_lower=Lower('name'))
+        .values('name_lower')
+        .annotate(cnt=Count('id'))
+        .filter(cnt__gt=1)
+        .count()
+    )
+    return [{'name': 'Дубликаты', 'value': dupes}]
+
+
+def get_duplicate_genres_list():
+    dupe_names_data = (
+        Genre.objects.annotate(name_lower=Lower('name'))
+        .values('name_lower')
+        .annotate(cnt=Count('id'))
+        .filter(cnt__gt=1)
+        .order_by('-cnt')
+    )
+
+    if not dupe_names_data:
+        return []
+
+    names = [entry['name_lower'] for entry in dupe_names_data]
+    genres_qs = Genre.objects.annotate(name_lower=Lower('name')).filter(name_lower__in=names)
+
+    grouped = defaultdict(list)
+    for g in genres_qs:
+        grouped[g.name_lower].append(g.name)
+
+    results = []
+    for name_l in names:
+        genre_names = sorted(grouped[name_l])
+        results.append(
+            {
+                'id': 0,
+                'is_genre': True,
+                'is_duplicate_group': True,
+                'title': f'Группа: {name_l}',
+                'names': genre_names,
+                'admin_url': f'/admin/app/genre/?q={urllib.parse.quote(name_l)}',
+            }
+        )
+    return results

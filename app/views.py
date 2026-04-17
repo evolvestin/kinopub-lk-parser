@@ -33,6 +33,7 @@ from app.models import (
     ViewUserGroup,
 )
 from app.services.metrics import (
+    calculate_duplicate_genres_metric,
     calculate_duplicate_photo_urls_metric,
     calculate_en_professions_stats_metric,
     calculate_has_imdb_metric,
@@ -49,8 +50,10 @@ from app.services.metrics import (
     calculate_professions_stats_metric,
     calculate_title_collision_metric,
     calculate_total_countries_with_shows_metric,
+    calculate_total_genres_metric,
     calculate_total_persons_by_show_type_metric,
     calculate_total_shows_metric,
+    get_duplicate_genres_list,
     get_duplicate_photo_urls_list,
     get_missing_country_meta_list,
     get_missing_imdb_list,
@@ -73,7 +76,7 @@ from shared.constants import (
     RAW_TO_NORMALIZED_RU,
     UserRole,
 )
-from shared.formatters import format_se
+from shared.formatters import deduplicate_items, format_se
 from shared.media import get_poster_url
 
 
@@ -148,7 +151,7 @@ def _serialize_show_details(show, user=None):
         'kinopoisk_rating': show.kinopoisk_rating,
         'imdb_rating': show.imdb_rating,
         'countries': [str(country) for country in show.countries.all()],
-        'genres': [genre.name for genre in show.genres.all()],
+        'genres': show.display_genres,
         'kinopoisk_url': show.kinopoisk_url,
         'imdb_url': show.imdb_url,
         'internal_rating': internal_rating,
@@ -171,6 +174,8 @@ def index(request):
     missing_status = get_or_update_metric('missing_status', calculate_missing_status_metric)
     missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
     no_genres = get_or_update_metric('no_genres', calculate_no_genres_metric)
+    total_genres = get_or_update_metric('total_genres', calculate_total_genres_metric)
+    duplicate_genres = get_or_update_metric('duplicate_genres', calculate_duplicate_genres_metric)
     no_countries = get_or_update_metric('no_countries', calculate_no_countries_metric)
     missing_country_meta = get_or_update_metric(
         'missing_country_meta', calculate_missing_country_meta_metric
@@ -207,6 +212,8 @@ def index(request):
                 'missing_status': missing_status,
                 'missing_plot': missing_plot,
                 'no_genres': no_genres,
+                'total_genres': total_genres,
+                'duplicate_genres': duplicate_genres,
                 'no_countries': no_countries,
                 'missing_country_meta': missing_country_meta,
                 'total_countries': total_countries,
@@ -498,7 +505,7 @@ def bot_search_shows(request):
                 'imdb_url': show.imdb_url,
                 'kinopoisk_url': show.kinopoisk_url,
                 'countries': [str(c) for c in show.countries.all()[:3]],
-                'genres': [g.name for g in show.genres.all()[:3]],
+                'genres': show.display_genres[:3],
                 'internal_rating': internal_rating,
                 'user_ratings': user_ratings,
             }
@@ -1193,7 +1200,9 @@ def webapp_get_show_full(request, show_id):
             'countries': [
                 {'id': c.id, 'name': c.name, 'emoji': c.emoji_flag} for c in show.countries.all()
             ],
-            'genres': [{'id': g.id, 'name': g.name} for g in show.genres.all()],
+            'genres': [
+                {'id': g.id, 'name': g.name} for g in deduplicate_items(list(show.genres.all()))
+            ],
             'directors': directors,
             'actors': actors[:25],
         }
@@ -1320,16 +1329,19 @@ def get_metric_details(request, key):
     show_type = request.GET.get('type')
     is_person_metric = any(x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo'])
     is_country_metric = 'country' in key
+    is_genre_metric = 'genre' in key
 
-    admin_base_url = reverse(
-        'admin:app_person_changelist'
-        if is_person_metric
-        else 'admin:app_country_changelist'
-        if is_country_metric
-        else 'admin:app_show_changelist'
-    )
+    if is_person_metric:
+        admin_base_url = reverse('admin:app_person_changelist')
+    elif is_country_metric:
+        admin_base_url = reverse('admin:app_country_changelist')
+    elif is_genre_metric:
+        admin_base_url = reverse('admin:app_genre_changelist')
+    else:
+        admin_base_url = reverse('admin:app_show_changelist')
 
     query_params = {}
+    is_genre = False
     items, is_summary, is_country, is_person, target_task = [], False, False, False, 'details'
 
     if key == 'missing_kp':
@@ -1359,6 +1371,10 @@ def get_metric_details(request, key):
     elif key == 'no_genres':
         items = list(get_no_genres_list(show_type))
         query_params.update({'type': show_type, 'genres__isnull': 'True'})
+    elif key == 'total_genres':
+        is_summary, items = True, []
+    elif key == 'duplicate_genres':
+        is_genre, items = True, list(get_duplicate_genres_list())
     elif key == 'no_countries':
         items = list(get_no_countries_list(show_type))
         query_params.update({'type': show_type, 'countries__isnull': 'True'})
@@ -1419,7 +1435,11 @@ def get_metric_details(request, key):
         all_queued = set()
 
     for item in items:
-        if is_person:
+        if is_genre:
+            item['is_genre'] = True
+            if not item.get('is_duplicate_group'):
+                item['admin_url'] = reverse('admin:app_genre_change', args=[item['id']])
+        elif is_person:
             if 'persons' in item:
                 item.update(
                     {
@@ -1465,6 +1485,7 @@ def get_metric_details(request, key):
             'target_task': target_task,
             'is_country': is_country,
             'is_person': is_person,
+            'is_genre': is_genre,
         }
     )
 

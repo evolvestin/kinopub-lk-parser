@@ -11,7 +11,7 @@ from shared.constants import (
     RAW_TO_NORMALIZED_RU,
     UserRole,
 )
-from shared.formatters import format_se
+from shared.formatters import deduplicate_items, format_se
 
 
 class BaseModel(models.Model):
@@ -210,6 +210,11 @@ class Show(BaseModel):
     ignore_collision = models.BooleanField(
         default=False, verbose_name='Игнорировать коллизию в названии'
     )
+
+    @property
+    def display_genres(self):
+        names = list(self.genres.values_list('name', flat=True))
+        return deduplicate_items(names)
 
     def get_internal_rating_data(self):
         ratings = self.ratings.select_related('user').all()

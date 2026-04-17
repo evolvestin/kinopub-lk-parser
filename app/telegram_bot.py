@@ -178,7 +178,7 @@ class TelegramSender:
                     show_type=show.type,
                     status=show.status,
                     countries=[str(country) for country in show.countries.all()],
-                    genres=[genre.name for genre in show.genres.all()],
+                    genres=show.display_genres,
                     imdb_rating=show.imdb_rating,
                     imdb_url=show.imdb_url,
                     kinopoisk_rating=show.kinopoisk_rating,

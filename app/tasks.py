@@ -20,6 +20,7 @@ from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
+    calculate_duplicate_genres_metric,
     calculate_duplicate_photo_urls_metric,
     calculate_en_professions_stats_metric,
     calculate_missing_country_meta_metric,
@@ -34,6 +35,7 @@ from app.services.metrics import (
     calculate_professions_stats_metric,
     calculate_title_collision_metric,
     calculate_total_countries_with_shows_metric,
+    calculate_total_genres_metric,
     calculate_total_persons_by_show_type_metric,
 )
 from app.services.stats_calculator import generate_user_stats
@@ -514,8 +516,14 @@ def update_site_metrics_task():
     plot_data = calculate_missing_plot_metric()
     SiteMetric.objects.create(key='missing_plot', data=plot_data)
 
-    genres_data = calculate_no_genres_metric()
-    SiteMetric.objects.create(key='no_genres', data=genres_data)
+    no_genres_data = calculate_no_genres_metric()
+    SiteMetric.objects.create(key='no_genres', data=no_genres_data)
+
+    total_genres_data = calculate_total_genres_metric()
+    SiteMetric.objects.create(key='total_genres', data=total_genres_data)
+
+    dupe_genres_data = calculate_duplicate_genres_metric()
+    SiteMetric.objects.create(key='duplicate_genres', data=dupe_genres_data)
 
     countries_data = calculate_no_countries_metric()
     SiteMetric.objects.create(key='no_countries', data=countries_data)

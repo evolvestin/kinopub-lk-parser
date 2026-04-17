@@ -231,6 +231,23 @@
                 </div>
                 <div id="legend-missing-plot" class="legend-grid"></div>
             </div>
+        </div>
+
+        <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: #f1c40f"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+            Жанры
+        </div>
+        <div class="metrics-grid">
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:var(--info)">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path></svg>
+                    </div>
+                    Всего жанров
+                </div>
+                <div class="metric-desc">Общее количество уникальных жанров в базе.</div>
+                <div class="chart-box" style="height: 180px;"><canvas id="totalGenresChart"></canvas></div>
+            </div>
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
@@ -238,19 +255,21 @@
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
                     </div>
                     Нет жанра
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
                 </div>
-                <div class="metric-desc">
-                    Шоу, к которым не привязан ни один жанр.
-                </div>
-                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
-                    <canvas id="noGenresChart"></canvas>
-                </div>
+                <div class="metric-desc">Шоу, к которым не привязан ни один жанр.</div>
+                <div class="chart-box" style="height: 180px;"><canvas id="noGenresChart"></canvas></div>
                 <div id="legend-no-genres" class="legend-grid"></div>
+            </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:var(--danger)">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    </div>
+                    Дубликаты жанров
+                </div>
+                <div class="metric-desc">Жанры с одинаковыми названиями в разном регистре.</div>
+                <div class="chart-box" style="height: 180px;"><canvas id="duplicateGenresChart"></canvas></div>
             </div>
         </div>
 
@@ -559,6 +578,8 @@
             'missing_status': 'Статус не указан',
             'missing_plot': 'Нет описания (сюжета)',
             'no_genres': 'Нет жанров',
+            'total_genres': 'Всего жанров',
+            'duplicate_genres': 'Дубликаты жанров',
             'no_countries': 'Нет стран',
             'missing_country_meta': 'Страны без ISO кода',
             'total_countries': 'Всего стран',
@@ -577,7 +598,9 @@
             'missing_country_meta': 'critical',
             'title_collision': 'critical',
             'missing_plot': 'warning',
-            'no_genres': 'info',
+            'no_genres': 'critical',
+            'total_genres': 'info',
+            'duplicate_genres': 'critical',
             'no_countries': 'critical',
             'has_kp': 'info',
             'has_imdb': 'info',
@@ -586,7 +609,7 @@
             'total_persons_by_show_type': 'info',
             'persons_avatar_stats': 'warning',
             'professions_stats': 'info',
-            'duplicate_photo_urls': 'critical'
+            'duplicate_photo_urls': 'critical',
         };
 
         const PALETTES = {
@@ -681,6 +704,25 @@
         let isRenderingModalBatch = false;
 
         function getModalItemHtml(item, data) {
+            if (data.is_genre) {
+                let contentHtml = '';
+                if (item.is_duplicate_group && item.names) {
+                    const list = item.names.map(name => `<div style="margin-bottom:2px;">• ${name}</div>`).join('');
+                    contentHtml = `
+                        <div class="modal-item-info" style="padding: 15px 20px;">
+                            <div style="color: var(--danger); font-weight: 800; font-size: 12px; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">Найдены дубликаты:</div>
+                            <div style="font-size: 15px; color: var(--text-primary); line-height: 1.4; margin-bottom: 12px;">${list}</div>
+                            <a href="${item.admin_url}" target="_blank" class="nav-btn" style="width: fit-content; padding: 6px 14px; font-size: 12px; background: var(--bg-card);">Посмотреть в админке</a>
+                        </div>`;
+                } else {
+                    contentHtml = `
+                        <div class="modal-item-info" style="flex-direction:row; justify-content:space-between; align-items:center; padding: 15px 20px;">
+                            <div class="modal-item-title" style="margin:0; font-size: 16px;">${item.name}</div>
+                            <a href="${item.admin_url}" target="_blank" class="nav-btn" style="padding:8px 16px; font-size:13px; height:auto; background: var(--bg-card);">Правка</a>
+                        </div>`;
+                }
+                return `<div class="modal-item" style="min-height: 60px;"><div class="modal-item-content">${contentHtml}</div></div>`;
+            }
             if (data.is_person) {
                 const fallbackIcon = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239ca3af"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
                 const poster = item.poster_url ? item.poster_url : fallbackIcon;
@@ -995,20 +1037,24 @@
         }
 
         function renderDoughnut(chartKey, canvasId, legendId, periodInfo, centerLabel, valueField) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
             const rawData = periodInfo.data || [];
             const timestamp = periodInfo.timestamp;
             const data = rawData.filter(i => i[valueField] > 0);
-            const canvas = document.getElementById(canvasId);
-            const legendEl = document.getElementById(legendId);
+            const legendEl = legendId ? document.getElementById(legendId) : null;
             const wrapper = canvas.parentElement;
-            const cardEl = wrapper.closest('.card');
+            const cardEl = wrapper ? wrapper.closest('.card') : null;
             const severity = METRIC_SEVERITY[chartKey] || 'info';
             const currentPalette = PALETTES[severity];
 
             if (charts[chartKey]) charts[chartKey].destroy();
 
-            const existingEmpty = wrapper.querySelector('.empty-overlay');
-            if (existingEmpty) existingEmpty.remove();
+            if (wrapper) {
+                const existingEmpty = wrapper.querySelector('.empty-overlay');
+                if (existingEmpty) existingEmpty.remove();
+            }
 
             const total = data.reduce((acc, item) => acc + item[valueField], 0);
 
@@ -1020,27 +1066,29 @@
                 }
             }
 
-            if (!timestamp || data.length === 0 && total === 0) {
+            if (!timestamp || (data.length === 0 && total === 0)) {
                 canvas.style.display = 'none';
-                legendEl.innerHTML = '';
+                if (legendEl) legendEl.innerHTML = '';
                 
-                const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'empty-overlay';
-                emptyDiv.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;';
-                
-                if (!timestamp) {
-                    emptyDiv.innerHTML = `
-                        <div style="font-size:36px;margin-bottom:8px;opacity:0.5;">⏳</div>
-                        <div style="color:var(--text-muted);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Нет данных</div>
-                        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;opacity:0.7;">Метрика еще не рассчитывалась</div>
-                    `;
-                } else {
-                    emptyDiv.innerHTML = `
-                        <div style="font-size:36px;margin-bottom:8px;filter:drop-shadow(0 0 8px rgba(46, 204, 113, 0.3));">✅</div>
-                        <div style="color:var(--accent);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Проблем не найдено</div>
-                    `;
+                if (wrapper) {
+                    const emptyDiv = document.createElement('div');
+                    emptyDiv.className = 'empty-overlay';
+                    emptyDiv.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;';
+                    
+                    if (!timestamp) {
+                        emptyDiv.innerHTML = `
+                            <div style="font-size:36px;margin-bottom:8px;opacity:0.5;">⏳</div>
+                            <div style="color:var(--text-muted);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Нет данных</div>
+                            <div style="font-size:12px;color:var(--text-muted);margin-top:4px;opacity:0.7;">Метрика еще не рассчитывалась</div>
+                        `;
+                    } else {
+                        emptyDiv.innerHTML = `
+                            <div style="font-size:36px;margin-bottom:8px;filter:drop-shadow(0 0 8px rgba(46, 204, 113, 0.3));">✅</div>
+                            <div style="color:var(--accent);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Проблем не найдено</div>
+                        `;
+                    }
+                    wrapper.appendChild(emptyDiv);
                 }
-                wrapper.appendChild(emptyDiv);
                 return;
             }
 
@@ -1108,20 +1156,22 @@
                 }
             });
 
-            if (data.length <= 1) {
-                legendEl.innerHTML = '';
-            } else {
-                legendEl.innerHTML = data.map((item, i) => {
-                    const color = legendColors[i];
-                    const pct = total > 0 ? Math.round((item[valueField] / total) * 100) : 0;
-                    const label = item.name || item.type;
-                    return `
-                    <div class="legend-item clickable" onclick="openDetails('${chartKey}', '${label}')">
-                        <div class="legend-dot" style="background:${color}"></div>
-                        <div class="legend-name">${label}</div>
-                        <div class="legend-val">${item[valueField].toLocaleString('ru-RU')} (${pct}%)</div>
-                    </div>`;
-                }).join('');
+            if (legendEl) {
+                if (data.length <= 1) {
+                    legendEl.innerHTML = '';
+                } else {
+                    legendEl.innerHTML = data.map((item, i) => {
+                        const color = legendColors[i];
+                        const pct = total > 0 ? Math.round((item[valueField] / total) * 100) : 0;
+                        const label = item.name || item.type;
+                        return `
+                        <div class="legend-item clickable" onclick="openDetails('${chartKey}', '${label}')">
+                            <div class="legend-dot" style="background:${color}"></div>
+                            <div class="legend-name">${label}</div>
+                            <div class="legend-val">${item[valueField].toLocaleString('ru-RU')} (${pct}%)</div>
+                        </div>`;
+                    }).join('');
+                }
             }
         }
 
@@ -1225,6 +1275,24 @@
             );
 
             renderDoughnut(
+                'total_genres', 
+                'totalGenresChart', 
+                '', 
+                allMetrics.total_genres[period], 
+                'ЖАНРОВ', 
+                'value'
+            );
+            
+            renderDoughnut(
+                'duplicate_genres', 
+                'duplicateGenresChart', 
+                '', 
+                allMetrics.duplicate_genres[period], 
+                'ДУБЛИКАТОВ', 
+                'value'
+            );
+
+            renderDoughnut(
                 'no_countries', 
                 'noCountriesChart', 
                 'legend-no-countries', 
@@ -1238,15 +1306,6 @@
                 'missingCountryMetaChart', 
                 'legend-missing-country-meta', 
                 allMetrics.missing_country_meta[period], 
-                'СТРАН', 
-                'value'
-            );
-
-            renderDoughnut(
-                'total_countries', 
-                'totalCountriesChart', 
-                'legend-total-countries', 
-                allMetrics.total_countries[period], 
                 'СТРАН', 
                 'value'
             );
