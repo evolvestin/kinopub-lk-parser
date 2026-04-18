@@ -41,7 +41,7 @@ class Command(LoggableBaseCommand):
         consecutive_errors = 0
         error_threshold = 5
 
-        logging.info(f'Starting photo fetch for {total} persons...')
+        logging.info(f'Starting photo fetch for {total} persons (Batch limit: {limit}).')
 
         for idx, person in enumerate(persons, start=1):
             try:
