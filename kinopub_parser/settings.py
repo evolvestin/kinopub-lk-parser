@@ -300,8 +300,8 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.tasks.expire_codes_task',
         'schedule': crontab(),  # Каждую минуту
     },
-    'delete_old_logs': {
-        'task': 'app.tasks.delete_old_logs_task',
+    'cleanup_old_data': {
+        'task': 'app.tasks.cleanup_old_data_task',
         'schedule': crontab(minute=0, hour=0),  # every 24 hours
     },
     'process_queues': {

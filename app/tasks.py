@@ -133,8 +133,8 @@ def expire_codes_task():
 
 @shared_task
 @safe_execution
-def delete_old_logs_task():
-    logging.info('Running periodic cleanup of logs and data...')
+def cleanup_old_data_task():
+    logging.info('Running periodic cleanup of logs, metrics and codes...')
     now = timezone.now()
 
     # 1. Очистка логов по уровням
@@ -160,9 +160,18 @@ def delete_old_logs_task():
     cutoff_codes = now - timedelta(days=90)
     deleted_codes, _ = Code.objects.filter(received_at__lt=cutoff_codes).delete()
 
-    logging.info('Cleanup completed. Deleted old codes: %d', deleted_codes)
+    # 3. Очистка метрик
+    # Метрики храним 7 дней
+    cutoff_metrics = now - timedelta(days=7)
+    deleted_metrics, _ = SiteMetric.objects.filter(created_at__lt=cutoff_metrics).delete()
 
-    if deleted_codes > 0:
+    logging.info(
+        'Cleanup completed. Deleted metrics: %d, old codes: %d', 
+        deleted_metrics, 
+        deleted_codes
+    )
+
+    if deleted_codes > 0 or deleted_metrics > 0:
         BackupManager().schedule_backup()
 
 
