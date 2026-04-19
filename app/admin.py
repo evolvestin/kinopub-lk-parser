@@ -50,6 +50,7 @@ from app.telegram_bot import TelegramSender
 from app.views import sync_user_permissions
 from shared.constants import (
     ACTOR_ROLES,
+    PROFESSION_TRANS_MAP,
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_EN,
@@ -901,7 +902,9 @@ class PersonProfessionFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         val = self.value()
         if val:
-            return queryset.filter(showcrew__profession__in=PROFESSIONS_MAPPING_RU.get(val, [val]))
+            return queryset.filter(
+                showcrew__profession__in=PROFESSIONS_MAPPING_RU.get(val, [val])
+            ).distinct()
         return queryset
 
 
@@ -917,7 +920,7 @@ class PersonEnProfessionFilter(admin.SimpleListFilter):
         if val:
             return queryset.filter(
                 showcrew__en_profession__in=PROFESSIONS_MAPPING_EN.get(val, [val])
-            )
+            ).distinct()
         return queryset
 
 
@@ -955,23 +958,42 @@ class PersonAdmin(BaseNameAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
 
-        profession_ru_subquery = (
+        f_ru = request.GET.get('profession_norm')
+        f_en = request.GET.get('en_profession_norm')
+
+        en_to_ru = {v: k for k, v in PROFESSION_TRANS_MAP.items()}
+        target_ru = f_ru or en_to_ru.get(f_en)
+        target_en = f_en or PROFESSION_TRANS_MAP.get(f_ru)
+
+        sc_ru = (
             ShowCrew.objects.filter(person=OuterRef('pk'))
             .exclude(profession__isnull=True)
             .exclude(profession='')
-            .values('profession')[:1]
         )
+        if target_ru:
+            raw_ru = PROFESSIONS_MAPPING_RU.get(target_ru, [target_ru])
+            sc_ru = sc_ru.annotate(
+                p=Case(When(profession__in=raw_ru, then=Value(1)), default=Value(0))
+            ).order_by('-p', 'id')
+        else:
+            sc_ru = sc_ru.order_by('id')
 
-        profession_en_subquery = (
+        sc_en = (
             ShowCrew.objects.filter(person=OuterRef('pk'))
             .exclude(en_profession__isnull=True)
             .exclude(en_profession='')
-            .values('en_profession')[:1]
         )
+        if target_en:
+            raw_en = PROFESSIONS_MAPPING_EN.get(target_en, [target_en])
+            sc_en = sc_en.annotate(
+                p=Case(When(en_profession__in=raw_en, then=Value(1)), default=Value(0))
+            ).order_by('-p', 'id')
+        else:
+            sc_en = sc_en.order_by('id')
 
         return qs.annotate(
-            _primary_ru_prof=Subquery(profession_ru_subquery),
-            _primary_en_prof=Subquery(profession_en_subquery),
+            _primary_ru_prof=Subquery(sc_ru.values('profession')[:1]),
+            _primary_en_prof=Subquery(sc_en.values('en_profession')[:1]),
         )
 
     def lookup_allowed(self, lookup, value):
