@@ -1,4 +1,3 @@
-import urllib
 from collections import defaultdict
 from datetime import timedelta
 
@@ -8,9 +7,11 @@ from django.utils import timezone
 
 from app.models import Country, Genre, Person, Show, ShowCrew, SiteMetric
 from shared.constants import (
+    GENRES_MAPPING,
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_EN,
+    RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
     SERIES_TYPES,
 )
@@ -470,55 +471,56 @@ def get_en_professions_stats_list(en_profession: str):
 
 
 def calculate_total_genres_metric():
-    count = Genre.objects.count()
-    return [{'name': 'Всего', 'value': count}]
+    known_keys = set(GENRES_MAPPING.keys())
+    db_genres = set(Genre.objects.values_list('name', flat=True))
+
+    mapped_count = len(db_genres.intersection(known_keys))
+    unmapped_count = len(db_genres.difference(known_keys))
+
+    return [
+        {'name': 'Основные жанры', 'value': mapped_count},
+        {'name': 'Дубликаты', 'value': unmapped_count},
+    ]
 
 
-def get_total_genres_list():
-    return Genre.objects.all().order_by('name').values('id', 'name')
+def get_total_genres_list(category: str):
+    known_keys = set(GENRES_MAPPING.keys())
 
-
-def calculate_duplicate_genres_metric():
-    dupes = (
-        Genre.objects.annotate(name_lower=Lower('name'))
-        .values('name_lower')
-        .annotate(cnt=Count('id'))
-        .filter(cnt__gt=1)
-        .count()
-    )
-    return [{'name': 'Дубликаты', 'value': dupes}]
-
-
-def get_duplicate_genres_list():
-    dupe_names_data = (
-        Genre.objects.annotate(name_lower=Lower('name'))
-        .values('name_lower')
-        .annotate(cnt=Count('id'))
-        .filter(cnt__gt=1)
-        .order_by('-cnt')
-    )
-
-    if not dupe_names_data:
-        return []
-
-    names = [entry['name_lower'] for entry in dupe_names_data]
-    genres_qs = Genre.objects.annotate(name_lower=Lower('name')).filter(name_lower__in=names)
-
-    grouped = defaultdict(list)
-    for g in genres_qs:
-        grouped[g.name_lower].append(g.name)
+    if category == 'Основные жанры':
+        qs = Genre.objects.filter(name__in=known_keys).order_by('name')
+    else:
+        qs = Genre.objects.exclude(name__in=known_keys).order_by('name')
 
     results = []
-    for name_l in names:
-        genre_names = sorted(grouped[name_l])
+    for g in qs:
         results.append(
             {
-                'id': 0,
+                'id': g.id,
+                'name': g.name,
+                'title': g.name,
                 'is_genre': True,
-                'is_duplicate_group': True,
-                'title': f'Группа: {name_l}',
-                'names': genre_names,
-                'admin_url': f'/admin/app/genre/?q={urllib.parse.quote(name_l)}',
+                'admin_url': f'/admin/app/genre/{g.id}/change/',
+            }
+        )
+    return results
+
+
+def calculate_unmapped_genres_metric():
+    count = Genre.objects.exclude(name__in=RAW_TO_NORMALIZED_GENRE.keys()).count()
+    return [{'name': 'Не распознано', 'value': count}]
+
+
+def get_unmapped_genres_list():
+    qs = Genre.objects.exclude(name__in=RAW_TO_NORMALIZED_GENRE.keys()).order_by('name')
+    results = []
+    for g in qs:
+        results.append(
+            {
+                'id': g.id,
+                'name': g.name,
+                'title': g.name,
+                'is_genre': True,
+                'admin_url': f'/admin/app/genre/{g.id}/change/',
             }
         )
     return results

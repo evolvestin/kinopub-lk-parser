@@ -1,5 +1,6 @@
 import calendar
 import logging
+from collections import defaultdict
 from datetime import date, timedelta
 
 from django.core.cache import cache
@@ -26,6 +27,7 @@ from django.db.models.functions import (
 from django.utils import timezone
 
 from app.models import ShowDuration, UserRating, ViewHistory, ViewUserGroup
+from shared.constants import RAW_TO_NORMALIZED_GENRE
 from shared.formatters import format_duration
 from shared.media import get_poster_url
 
@@ -123,35 +125,40 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
 
 
 def _get_favorites(base_qs, dur_qs):
-    genres_qs = (
-        base_qs.values(tid=F('show__genres__id'), name=F('show__genres__name'))
-        .filter(tid__isnull=False)
-        .annotate(count=Count('id', distinct=True))
-        .order_by('-count')
+    genres_raw = base_qs.filter(show__genres__isnull=False).values('show__genres__name', 'show_id')
+
+    genre_shows = defaultdict(set)
+    for g in genres_raw:
+        raw_name = g['show__genres__name']
+        norm = RAW_TO_NORMALIZED_GENRE.get(raw_name, raw_name)
+        genre_shows[norm].add(g['show_id'])
+
+    genre_durs_raw = (
+        dur_qs.filter(show__genres__isnull=False)
+        .values('show__genres__name')
+        .annotate(m=Sum('final_duration'))
     )
-    total_mentions = sum(g['count'] for g in genres_qs)
+    genre_mins_map = defaultdict(int)
+    for gd in genre_durs_raw:
+        raw_name = gd['show__genres__name']
+        norm = RAW_TO_NORMALIZED_GENRE.get(raw_name, raw_name)
+        genre_mins_map[norm] += int((gd['m'] or 0) / 60)
 
     genres = []
-    genre_mins_map = {}
-    genre_durations = dur_qs.values('show__genres__name').annotate(m=Sum('final_duration'))
-    for gd in genre_durations:
-        if gd['show__genres__name']:
-            genre_mins_map[gd['show__genres__name']] = int((gd['m'] or 0) / 60)
+    total_mentions = sum(len(shows) for shows in genre_shows.values())
 
-    for g in genres_qs[:20]:
-        name = g['name']
-        show_ids = list(
-            base_qs.filter(show__genres__id=g['tid']).values_list('show_id', flat=True).distinct()
-        )
+    sorted_genres = sorted(genre_shows.items(), key=lambda x: len(x[1]), reverse=True)[:20]
+
+    for norm_name, show_ids in sorted_genres:
         genres.append(
             {
-                'name': name,
-                'count': g['count'],
-                'minutes': genre_mins_map.get(name, 0),
-                'percentage': round((g['count'] / total_mentions * 100), 1)
+                'name': norm_name,
+                'count': len(show_ids),
+                'minutes': genre_mins_map[norm_name],
+                'percentage': round((len(show_ids) / total_mentions * 100), 1)
                 if total_mentions
                 else 0,
-                'show_ids': show_ids,
+                'show_ids': list(show_ids),
             }
         )
 
@@ -226,7 +233,7 @@ def _get_favorites(base_qs, dur_qs):
 
     return {
         'genres': genres,
-        'actors': get_person_top(['Актер', 'актер', 'Actor', 'actor', 'В ролях']),
+        'actors': get_person_top(['Актёр', 'актер', 'Actor', 'actor', 'В ролях']),
         'countries': countries,
     }
 

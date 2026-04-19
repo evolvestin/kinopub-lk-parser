@@ -20,7 +20,6 @@ from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
-    calculate_duplicate_genres_metric,
     calculate_duplicate_photo_urls_metric,
     calculate_en_professions_stats_metric,
     calculate_missing_country_meta_metric,
@@ -37,6 +36,7 @@ from app.services.metrics import (
     calculate_total_countries_with_shows_metric,
     calculate_total_genres_metric,
     calculate_total_persons_by_show_type_metric,
+    calculate_unmapped_genres_metric,
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
@@ -523,8 +523,8 @@ def update_site_metrics_task():
     total_genres_data = calculate_total_genres_metric()
     SiteMetric.objects.create(key='total_genres', data=total_genres_data)
 
-    dupe_genres_data = calculate_duplicate_genres_metric()
-    SiteMetric.objects.create(key='duplicate_genres', data=dupe_genres_data)
+    unmapped_genres_data = calculate_unmapped_genres_metric()
+    SiteMetric.objects.create(key='unmapped_genres', data=unmapped_genres_data)
 
     countries_data = calculate_no_countries_metric()
     SiteMetric.objects.create(key='no_countries', data=countries_data)

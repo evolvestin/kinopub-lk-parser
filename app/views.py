@@ -33,7 +33,6 @@ from app.models import (
     ViewUserGroup,
 )
 from app.services.metrics import (
-    calculate_duplicate_genres_metric,
     calculate_duplicate_photo_urls_metric,
     calculate_en_professions_stats_metric,
     calculate_has_imdb_metric,
@@ -53,7 +52,7 @@ from app.services.metrics import (
     calculate_total_genres_metric,
     calculate_total_persons_by_show_type_metric,
     calculate_total_shows_metric,
-    get_duplicate_genres_list,
+    calculate_unmapped_genres_metric,
     get_duplicate_photo_urls_list,
     get_missing_country_meta_list,
     get_missing_imdb_list,
@@ -65,6 +64,8 @@ from app.services.metrics import (
     get_no_genres_list,
     get_or_update_metric,
     get_title_collision_list,
+    get_total_genres_list,
+    get_unmapped_genres_list,
 )
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
@@ -72,11 +73,13 @@ from app.telegram_bot import TelegramSender
 from shared.constants import (
     ACTOR_ROLES,
     DIRECTOR_ROLES,
+    GENRES_MAPPING,
     RAW_TO_NORMALIZED_EN,
+    RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
     UserRole,
 )
-from shared.formatters import deduplicate_items, format_se
+from shared.formatters import format_se
 from shared.media import get_poster_url
 
 
@@ -175,7 +178,7 @@ def index(request):
     missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
     no_genres = get_or_update_metric('no_genres', calculate_no_genres_metric)
     total_genres = get_or_update_metric('total_genres', calculate_total_genres_metric)
-    duplicate_genres = get_or_update_metric('duplicate_genres', calculate_duplicate_genres_metric)
+    unmapped_genres = get_or_update_metric('unmapped_genres', calculate_unmapped_genres_metric)
     no_countries = get_or_update_metric('no_countries', calculate_no_countries_metric)
     missing_country_meta = get_or_update_metric(
         'missing_country_meta', calculate_missing_country_meta_metric
@@ -213,7 +216,7 @@ def index(request):
                 'missing_plot': missing_plot,
                 'no_genres': no_genres,
                 'total_genres': total_genres,
-                'duplicate_genres': duplicate_genres,
+                'unmapped_genres': unmapped_genres,
                 'no_countries': no_countries,
                 'missing_country_meta': missing_country_meta,
                 'total_countries': total_countries,
@@ -1200,9 +1203,7 @@ def webapp_get_show_full(request, show_id):
             'countries': [
                 {'id': c.id, 'name': c.name, 'emoji': c.emoji_flag} for c in show.countries.all()
             ],
-            'genres': [
-                {'id': g.id, 'name': g.name} for g in deduplicate_items(list(show.genres.all()))
-            ],
+            'genres': show.genres,
             'directors': directors,
             'actors': actors[:25],
         }
@@ -1236,8 +1237,10 @@ def webapp_get_collection(request, collection_type, item_id):
             title = f'Режиссер: {person.name}'
         elif collection_type == 'genre':
             genre = Genre.objects.get(id=item_id)
-            shows = shows.filter(genres=genre)
-            title = f'Жанр: {genre.name}'
+            norm_name = RAW_TO_NORMALIZED_GENRE.get(genre.name, genre.name)
+            search_list = GENRES_MAPPING.get(norm_name, [genre.name])
+            shows = shows.filter(genres__name__in=search_list)
+            title = f'Жанр: {norm_name}'
         elif collection_type == 'country':
             country = Country.objects.get(id=item_id)
             shows = shows.filter(countries=country)
@@ -1372,9 +1375,9 @@ def get_metric_details(request, key):
         items = list(get_no_genres_list(show_type))
         query_params.update({'type': show_type, 'genres__isnull': 'True'})
     elif key == 'total_genres':
-        is_summary, items = True, []
-    elif key == 'duplicate_genres':
-        is_genre, items = True, list(get_duplicate_genres_list())
+        is_genre, items = True, list(get_total_genres_list(show_type))
+    elif key == 'unmapped_genres':
+        is_genre, items = True, list(get_unmapped_genres_list())
     elif key == 'no_countries':
         items = list(get_no_countries_list(show_type))
         query_params.update({'type': show_type, 'countries__isnull': 'True'})
@@ -1438,7 +1441,10 @@ def get_metric_details(request, key):
         if is_genre:
             item['is_genre'] = True
             if not item.get('is_duplicate_group'):
-                item['admin_url'] = reverse('admin:app_genre_change', args=[item['id']])
+                item['admin_url'] = (
+                    f'{reverse("admin:app_genre_changelist")}?q='
+                    f'{urllib.parse.quote(item.get("name", item.get("title", "")))}'
+                )
         elif is_person:
             if 'persons' in item:
                 item.update(

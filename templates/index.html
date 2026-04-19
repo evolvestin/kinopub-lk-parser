@@ -247,6 +247,7 @@
                 </div>
                 <div class="metric-desc">Общее количество уникальных жанров в базе.</div>
                 <div class="chart-box" style="height: 180px;"><canvas id="totalGenresChart"></canvas></div>
+                <div id="legend-total-genres" class="legend-grid"></div>
             </div>
 
             <div class="card hoverable anim-item">
@@ -266,17 +267,17 @@
                     <div class="icon" style="color:var(--danger)">
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                     </div>
-                    Дубликаты жанров
+                    Нераспознанные жанры
                 </div>
-                <div class="metric-desc">Жанры с одинаковыми названиями в разном регистре.</div>
-                <div class="chart-box" style="height: 180px;"><canvas id="duplicateGenresChart"></canvas></div>
+                <div class="metric-desc">Жанры, которые не были найдены в маппинге констант.</div>
+                <div class="chart-box" style="height: 180px;"><canvas id="unmappedGenresChart"></canvas></div>
             </div>
         </div>
 
         <!-- БЛОК 1: РЕЙТИНГИ -->
         <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
             <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: var(--accent)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-            Статистика рейтингов
+            Рейтинги
         </div>
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
@@ -373,6 +374,26 @@
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:#388bfd">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    </div>
+                    Всего стран
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Количество стран, у которых есть хотя бы один привязанный фильм или сериал.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="totalCountriesChart"></canvas>
+                </div>
+                <div id="legend-total-countries" class="legend-grid"></div>
+            </div>
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
                     <div class="icon" style="color:#2ea043">
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
                     </div>
@@ -410,27 +431,6 @@
                     <canvas id="missingCountryMetaChart"></canvas>
                 </div>
                 <div id="legend-missing-country-meta" class="legend-grid"></div>
-            </div>
-
-            <div class="card hoverable anim-item">
-                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#388bfd">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                    </div>
-                    Всего стран
-                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                </div>
-                <div class="metric-desc">
-                    Количество стран, у которых есть хотя бы один привязанный фильм или сериал.
-                </div>
-                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
-                    <canvas id="totalCountriesChart"></canvas>
-                </div>
-                <div id="legend-total-countries" class="legend-grid"></div>
             </div>
         </div>
 
@@ -579,7 +579,7 @@
             'missing_plot': 'Нет описания (сюжета)',
             'no_genres': 'Нет жанров',
             'total_genres': 'Всего жанров',
-            'duplicate_genres': 'Дубликаты жанров',
+            'unmapped_genres': 'Нераспознанные жанры',
             'no_countries': 'Нет стран',
             'missing_country_meta': 'Страны без ISO кода',
             'total_countries': 'Всего стран',
@@ -600,7 +600,7 @@
             'missing_plot': 'warning',
             'no_genres': 'critical',
             'total_genres': 'info',
-            'duplicate_genres': 'critical',
+            'unmapped_genres': 'critical',
             'no_countries': 'critical',
             'has_kp': 'info',
             'has_imdb': 'info',
@@ -699,7 +699,7 @@
         let currentTargetTask = 'details';
         let currentModalDataContext = null;
         let currentModalOffset = 0;
-        const modalBatchSize = 20;
+        const modalBatchSize = 50;
         let modalObserver = null;
         let isRenderingModalBatch = false;
 
@@ -820,7 +820,7 @@
                 sentinel.insertAdjacentHTML('beforebegin', html);
             } else {
                 list.insertAdjacentHTML('beforeend', html);
-                list.insertAdjacentHTML('beforeend', '<div id="modal-sentinel" style="height: 40px; width: 100%; flex-shrink: 0;"></div>');
+                list.insertAdjacentHTML('beforeend', '<div id="modal-sentinel" style="height: 40px; width: 100%; flex-shrink: 0; grid-column: 1 / -1;"></div>');
                 sentinel = document.getElementById('modal-sentinel');
             }
 
@@ -833,7 +833,7 @@
                         if (entries[0].isIntersecting) {
                             renderModalBatch();
                         }
-                    }, { root: list, rootMargin: '400px' });
+                    }, { root: list, rootMargin: '600px' });
                 }
                 modalObserver.observe(sentinel);
             } else {
@@ -932,7 +932,9 @@
                     `;
 
                     footer.innerHTML = adminBtnHtml;
-                    if (!data.is_country && !data.is_person) {
+                    if (data.is_genre || key.includes('genre')) {
+                        // Для жанров кнопку очереди не добавляем
+                    } else if (!data.is_country && !data.is_person) {
                         footer.innerHTML += `<button class="add-all-btn" id="add-all-btn" onclick="addAllToQueue()">В очередь на обновление</button>`;
                         updateAddAllButtonState();
                     }
@@ -1277,18 +1279,18 @@
             renderDoughnut(
                 'total_genres', 
                 'totalGenresChart', 
-                '', 
+                'legend-total-genres', 
                 allMetrics.total_genres[period], 
                 'ЖАНРОВ', 
                 'value'
             );
             
             renderDoughnut(
-                'duplicate_genres', 
-                'duplicateGenresChart', 
-                '', 
-                allMetrics.duplicate_genres[period], 
-                'ДУБЛИКАТОВ', 
+                'unmapped_genres', 
+                'unmappedGenresChart', 
+                'legend-unmapped-genres', 
+                allMetrics.unmapped_genres[period], 
+                'НЕ РАСПОЗНАНО', 
                 'value'
             );
 

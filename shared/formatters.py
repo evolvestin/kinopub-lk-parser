@@ -1,17 +1,3 @@
-def deduplicate_items(items):
-    seen = set()
-    result = []
-    for item in items:
-        name = item if isinstance(item, str) else getattr(item, 'name', str(item))
-        if not name:
-            continue
-        norm = name.strip().lower()
-        if norm not in seen:
-            seen.add(norm)
-            result.append(item)
-    return result
-
-
 def format_duration(seconds: int | float | None) -> str:
     if not seconds or seconds < 0:
         return '0м'

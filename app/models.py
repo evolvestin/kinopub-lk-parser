@@ -8,10 +8,11 @@ from shared.constants import (
     DATETIME_FORMAT,
     RATING_VALUES,
     RAW_TO_NORMALIZED_EN,
+    RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
     UserRole,
 )
-from shared.formatters import deduplicate_items, format_se
+from shared.formatters import format_se
 
 
 class BaseModel(models.Model):
@@ -214,7 +215,14 @@ class Show(BaseModel):
     @property
     def display_genres(self):
         names = list(self.genres.values_list('name', flat=True))
-        return deduplicate_items(names)
+        seen = set()
+        result = []
+        for n in names:
+            norm = RAW_TO_NORMALIZED_GENRE.get(n, n)
+            if norm not in seen:
+                seen.add(norm)
+                result.append(norm)
+        return sorted(result)
 
     def get_internal_rating_data(self):
         ratings = self.ratings.select_related('user').all()

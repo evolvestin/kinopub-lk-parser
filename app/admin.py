@@ -925,8 +925,8 @@ class PersonEnProfessionFilter(admin.SimpleListFilter):
 class PersonAdmin(BaseNameAdmin):
     inlines = [PersonShowCrewInline]
     list_display = (
-        'get_photo_display',
         'name',
+        'get_photo_display',
         'en_name',
         'get_ru_profession',
         'get_en_profession',
