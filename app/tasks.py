@@ -166,9 +166,7 @@ def cleanup_old_data_task():
     deleted_metrics, _ = SiteMetric.objects.filter(created_at__lt=cutoff_metrics).delete()
 
     logging.info(
-        'Cleanup completed. Deleted metrics: %d, old codes: %d', 
-        deleted_metrics, 
-        deleted_codes
+        'Cleanup completed. Deleted metrics: %d, old codes: %d', deleted_metrics, deleted_codes
     )
 
     if deleted_codes > 0 or deleted_metrics > 0:

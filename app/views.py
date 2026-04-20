@@ -1163,27 +1163,33 @@ def webapp_get_shared_stats(request, stat_id):
 @require_http_methods(['GET'])
 def webapp_get_show_full(request, show_id):
     try:
-        show = Show.objects.prefetch_related('countries', 'genres', 'showcrew_set__person').get(
-            id=show_id
-        )
+        show = Show.objects.prefetch_related(
+            'countries', 'genres', 'showcrew_set__person__master_person'
+        ).get(id=show_id)
 
         internal_rating, _ = show.get_internal_rating_data()
 
         directors = []
         actors = []
+        seen_canonical_ids = set()
 
         for crew_member in show.showcrew_set.all():
+            person = crew_member.person.canonical
+            if person.id in seen_canonical_ids:
+                continue
+
+            seen_canonical_ids.add(person.id)
             norm_ru = RAW_TO_NORMALIZED_RU.get(crew_member.profession, crew_member.profession)
             norm_en = RAW_TO_NORMALIZED_EN.get(crew_member.en_profession, crew_member.en_profession)
 
             person_data = {
-                'id': crew_member.person.id,
-                'name': crew_member.person.name,
-                'photo_url': crew_member.person.photo_url,
+                'id': person.id,
+                'name': person.name,
+                'photo_url': person.photo_url,
             }
 
             if norm_ru == 'Режиссер' or norm_en == 'Director':
-                directors.append({'id': crew_member.person.id, 'name': crew_member.person.name})
+                directors.append({'id': person.id, 'name': person.name})
             elif norm_ru == 'Актер' or norm_en == 'Actor':
                 actors.append(person_data)
 
@@ -1203,7 +1209,7 @@ def webapp_get_show_full(request, show_id):
             'countries': [
                 {'id': c.id, 'name': c.name, 'emoji': c.emoji_flag} for c in show.countries.all()
             ],
-            'genres': show.genres,
+            'genres': show.display_genres,
             'directors': directors,
             'actors': actors[:25],
         }
@@ -1223,15 +1229,17 @@ def webapp_get_collection(request, collection_type, item_id):
 
         if collection_type == 'actor':
             person = Person.objects.get(id=item_id)
+            target_ids = [person.id] + list(person.aliases.values_list('id', flat=True))
             shows = shows.filter(
-                showcrew__person=person,
+                showcrew__person__id__in=target_ids,
                 showcrew__profession__in=ACTOR_ROLES,
             )
             title = person.name
         elif collection_type == 'director':
             person = Person.objects.get(id=item_id)
+            target_ids = [person.id] + list(person.aliases.values_list('id', flat=True))
             shows = shows.filter(
-                showcrew__person=person,
+                showcrew__person__id__in=target_ids,
                 showcrew__profession__in=DIRECTOR_ROLES,
             )
             title = f'Режиссер: {person.name}'
@@ -1291,9 +1299,11 @@ def webapp_search(request):
             Q(title__icontains=query) | Q(original_title__icontains=query)
         ).order_by('-year', '-id')[:15]
 
-        persons = Person.objects.filter(
-            Q(name__icontains=query) | Q(en_name__icontains=query)
-        ).order_by('-updated_at')[:10]
+        persons = (
+            Person.objects.filter(Q(name__icontains=query) | Q(en_name__icontains=query))
+            .select_related('master_person')
+            .order_by('-updated_at')[:20]
+        )
 
         show_results = []
         for s in shows:
@@ -1309,15 +1319,22 @@ def webapp_search(request):
             )
 
         person_results = []
+        seen_canonical_ids = set()
         for p in persons:
+            canonical = p.canonical
+            if canonical.id in seen_canonical_ids:
+                continue
+            seen_canonical_ids.add(canonical.id)
             person_results.append(
                 {
-                    'id': p.id,
-                    'name': p.name,
-                    'en_name': p.en_name,
-                    'photo_url': p.photo_url,
+                    'id': canonical.id,
+                    'name': canonical.name,
+                    'en_name': canonical.en_name,
+                    'photo_url': canonical.photo_url,
                 }
             )
+            if len(person_results) >= 10:
+                break
 
         return JsonResponse({'shows': show_results, 'persons': person_results})
     except Exception as e:

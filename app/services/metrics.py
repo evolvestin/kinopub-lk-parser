@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import timedelta
 
 from django.db.models import Count, F, Q
-from django.db.models.functions import Lower, StrIndex
+from django.db.models.functions import Coalesce, Lower, StrIndex
 from django.utils import timezone
 
 from app.models import Country, Genre, Person, Show, ShowCrew, SiteMetric
@@ -263,8 +263,9 @@ def get_no_countries_list(show_type: str):
 
 def calculate_total_persons_by_show_type_metric():
     stats = (
-        ShowCrew.objects.values('show__type')
-        .annotate(total=Count('person', distinct=True))
+        ShowCrew.objects.annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
+        .values('show__type')
+        .annotate(total=Count('canonical_id', distinct=True))
         .order_by('-total')
     )
     return [{'name': item['show__type'] or 'Unknown', 'value': item['total']} for item in stats]
@@ -339,7 +340,11 @@ def get_persons_avatar_stats_list(category: str):
 
 
 def calculate_professions_stats_metric():
-    stats = ShowCrew.objects.values('profession').annotate(total=Count('person', distinct=True))
+    stats = (
+        ShowCrew.objects.annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
+        .values('profession')
+        .annotate(total=Count('canonical_id', distinct=True))
+    )
 
     merged = {k: 0 for k in PROFESSIONS_MAPPING_RU.keys()}
     for item in stats:
@@ -379,7 +384,8 @@ def get_missing_status_list(show_type: str):
 
 def calculate_duplicate_photo_urls_metric():
     tmdb_dupes = (
-        Person.objects.exclude(tmdb_photo_url='')
+        Person.objects.filter(master_person__isnull=True)
+        .exclude(tmdb_photo_url='')
         .filter(tmdb_photo_url__isnull=False)
         .values('tmdb_photo_url')
         .annotate(cnt=Count('id'))
@@ -387,7 +393,8 @@ def calculate_duplicate_photo_urls_metric():
         .count()
     )
     kp_dupes = (
-        Person.objects.exclude(kp_photo_url='')
+        Person.objects.filter(master_person__isnull=True)
+        .exclude(kp_photo_url='')
         .filter(kp_photo_url__isnull=False)
         .values('kp_photo_url')
         .annotate(cnt=Count('id'))
@@ -403,14 +410,14 @@ def calculate_duplicate_photo_urls_metric():
 def get_duplicate_photo_urls_list(source_type: str):
     field = 'tmdb_photo_url' if 'TMDB' in source_type else 'kp_photo_url'
 
-    # 1. Находим URL, которые встречаются более одного раза
     dupe_urls_data = (
-        Person.objects.exclude(**{field: ''})
+        Person.objects.filter(master_person__isnull=True)
+        .exclude(**{field: ''})
         .filter(**{f'{field}__isnull': False})
         .values(field)
         .annotate(cnt=Count('id'))
         .filter(cnt__gt=1)
-        .order_by('-cnt')[:150]  # Ограничим выборку для стабильности
+        .order_by('-cnt')[:150]
     )
 
     if not dupe_urls_data:
@@ -419,26 +426,26 @@ def get_duplicate_photo_urls_list(source_type: str):
     url_counts = {entry[field]: entry['cnt'] for entry in dupe_urls_data}
     urls = list(url_counts.keys())
 
-    # 2. Одним запросом выгружаем всех людей, использующих эти URL
-    persons_qs = Person.objects.filter(**{f'{field}__in': urls}).values('id', 'name', field)
+    persons_qs = (
+        Person.objects.filter(master_person__isnull=True)
+        .filter(**{f'{field}__in': urls})
+        .values('id', 'name', field)
+    )
 
-    # 3. Группируем людей по их URL
     grouped_persons = defaultdict(list)
     for p in persons_qs:
         grouped_persons[p[field]].append(p['name'])
 
-    # 4. Формируем финальный список для фронтенда
     results = []
     for url in urls:
         names = sorted(grouped_persons[url])
         results.append(
             {
-                'id': 0,  # ID группы не важен
+                'id': 0,
                 'title': f'Группа дубликатов ({url_counts[url]})',
                 'persons': names,
                 'tmdb_photo_url': url if field == 'tmdb_photo_url' else None,
                 'kp_photo_url': url if field == 'kp_photo_url' else None,
-                # Ссылка на админку с фильтром по этому конкретному URL
                 'admin_url': f'/admin/app/person/?q={url}',
             }
         )
@@ -446,7 +453,11 @@ def get_duplicate_photo_urls_list(source_type: str):
 
 
 def calculate_en_professions_stats_metric():
-    stats = ShowCrew.objects.values('en_profession').annotate(total=Count('person', distinct=True))
+    stats = (
+        ShowCrew.objects.annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
+        .values('en_profession')
+        .annotate(total=Count('canonical_id', distinct=True))
+    )
 
     merged = {k: 0 for k in PROFESSIONS_MAPPING_EN.keys()}
     for item in stats:

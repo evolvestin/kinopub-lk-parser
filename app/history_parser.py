@@ -176,7 +176,9 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
 
         logging.info(f'Fetching extended details for show id={show_id}')
 
-        show.title = title_text
+        if title_text:
+            show.title = title_text
+
         try:
             small_elem = h3_elem.find_element(By.TAG_NAME, 'small')
             raw_orig = small_elem.text
@@ -184,13 +186,16 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
                 r'\+?\s*(?:HD|4K|UHD|3D|AC3|5\.1|7\.1)\b', '', raw_orig, flags=re.IGNORECASE
             )
             clean_orig = ' '.join(clean_orig.split()).strip()
-            show.original_title = clean_orig if clean_orig else show.title
+            if clean_orig:
+                show.original_title = clean_orig
         except NoSuchElementException:
-            show.original_title = show.title
+            pass
 
         try:
             plot_elem = driver.find_element(By.ID, 'plot')
-            show.plot = plot_elem.text.strip()
+            p_text = plot_elem.text.strip()
+            if p_text:
+                show.plot = p_text
         except NoSuchElementException:
             pass
 
@@ -206,7 +211,9 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
 
         year_data = get_row_data('Год выхода')
         if year_data:
-            show.year = _extract_int_from_string(year_data.text)
+            y_val = _extract_int_from_string(year_data.text)
+            if y_val:
+                show.year = y_val
             try:
                 link = year_data.find_element(By.TAG_NAME, 'a')
                 href = link.get_attribute('href')
@@ -216,12 +223,13 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
                     type_key = type_match.group(1)
                     show.type = SHOW_TYPE_MAPPING.get(type_key, type_key.capitalize())
             except NoSuchElementException:
-                logging.error(f'Could not find type link for show id={show_id}')
+                pass
 
         status_data = get_row_data('Статус')
         if status_data:
             raw_status = status_data.text.strip()
-            show.status = SHOW_STATUS_MAPPING.get(raw_status, raw_status)
+            if raw_status:
+                show.status = SHOW_STATUS_MAPPING.get(raw_status, raw_status)
 
         rating_data = get_row_data('Рейтинг')
         if rating_data:
@@ -236,7 +244,9 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
                     votes_element = kinopoisk_link.find_element(
                         By.XPATH, './following-sibling::small'
                     )
-                    show.kinopoisk_votes = _extract_int_from_string(votes_element.text)
+                    v_val = _extract_int_from_string(votes_element.text)
+                    if v_val:
+                        show.kinopoisk_votes = v_val
             except (NoSuchElementException, ValueError):
                 pass
             try:
@@ -244,7 +254,9 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
                 show.imdb_url = imdb_link.get_attribute('href')
                 show.imdb_rating = float(imdb_link.text)
                 votes_element = imdb_link.find_element(By.XPATH, './following-sibling::small')
-                show.imdb_votes = _extract_int_from_string(votes_element.text)
+                v_val = _extract_int_from_string(votes_element.text)
+                if v_val:
+                    show.imdb_votes = v_val
             except (NoSuchElementException, ValueError):
                 pass
 
@@ -256,17 +268,19 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         ]:
             elements_data = get_row_data(label)
             if elements_data:
-                relation.clear()
                 elements = elements_data.find_elements(By.TAG_NAME, 'a')
-                for link_element in elements:
-                    name = link_element.get_attribute('textContent').strip()
-                    if name:
+                names = [
+                    el.get_attribute('textContent').strip()
+                    for el in elements
+                    if el.get_attribute('textContent').strip()
+                ]
+                if names:
+                    relation.clear()
+                    for name in names:
                         obj, _ = model.objects.update_or_create(name=name)
                         relation.add(obj)
 
         crew_labels = ['Создатель', 'Режиссёр', 'В ролях']
-        ShowCrew.objects.filter(show=show, profession__in=crew_labels).delete()
-
         for label in crew_labels:
             elements_data = get_row_data(label)
             if elements_data:

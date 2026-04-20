@@ -1,5 +1,6 @@
 import json
 
+from django import forms
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
@@ -924,13 +925,42 @@ class PersonEnProfessionFilter(admin.SimpleListFilter):
         return queryset
 
 
+class MasterPersonFilter(admin.SimpleListFilter):
+    title = 'Тип записи'
+    parameter_name = 'is_master'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('yes', 'Основа'),
+            ('no', 'Алиас'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'yes':
+            return queryset.filter(master_person__isnull=True)
+        if self.value() == 'no':
+            return queryset.filter(master_person__isnull=False)
+        return queryset
+
+
+class PersonAdminForm(forms.ModelForm):
+    clear_tmdb_photo = forms.BooleanField(required=False, label='Очистить ссылку TMDB')
+    clear_kp_photo = forms.BooleanField(required=False, label='Очистить ссылку Кинопоиск')
+
+    class Meta:
+        model = Person
+        fields = '__all__'
+
+
 @admin.register(Person, site=admin_site)
 class PersonAdmin(BaseNameAdmin):
+    form = PersonAdminForm
     inlines = [PersonShowCrewInline]
     list_display = (
         'name',
         'get_photo_display',
         'en_name',
+        'get_master_link',
         'get_ru_profession',
         'get_en_profession',
         'get_is_photo_fetched',
@@ -939,6 +969,7 @@ class PersonAdmin(BaseNameAdmin):
     )
     list_display_links = ('name',)
     list_filter = (
+        MasterPersonFilter,
         PhotoSourceFilter,
         'is_photo_fetched',
         PersonEnProfessionFilter,
@@ -948,15 +979,76 @@ class PersonAdmin(BaseNameAdmin):
     search_fields = ('name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
     readonly_fields = BaseNameAdmin.readonly_fields + (
         'get_photo_display',
+        'get_master_link',
         'refetch_photo_button',
         'related_genres',
         'related_countries',
         'user_stats',
+        'get_aliases',
     )
+    raw_id_fields = ('master_person',)
     ordering = ('-updated_at',)
+    actions = ['action_merge_persons']
+
+    fieldsets = (
+        (None, {'fields': ('name', 'en_name', 'master_person')}),
+        (
+            'Metadata & Photos',
+            {
+                'fields': (
+                    'get_photo_display',
+                    'tmdb_photo_url',
+                    'clear_tmdb_photo',
+                    'kp_photo_url',
+                    'clear_kp_photo',
+                    'is_photo_fetched',
+                    'refetch_photo_button',
+                ),
+            },
+        ),
+        (
+            'Statistics & Relations',
+            {
+                'fields': (
+                    'get_aliases',
+                    'user_stats',
+                    'related_genres',
+                    'related_countries',
+                ),
+            },
+        ),
+        (
+            'Dates',
+            {
+                'fields': ('created_at', 'updated_at'),
+                'classes': ('collapse',),
+            },
+        ),
+    )
+
+    def save_model(self, request, obj, form, change):
+        if obj.master_person_id == obj.id:
+            obj.master_person = None
+
+        if form.cleaned_data.get('clear_tmdb_photo'):
+            obj.tmdb_photo_url = None
+
+        if form.cleaned_data.get('clear_kp_photo'):
+            obj.kp_photo_url = None
+
+        if not obj.tmdb_photo_url:
+            obj.tmdb_photo_url = None
+
+        if not obj.kp_photo_url:
+            obj.kp_photo_url = None
+
+        if not obj.tmdb_photo_url and not obj.kp_photo_url:
+            obj.is_photo_fetched = False
+
+        super().save_model(request, obj, form, change)
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
+        qs = super().get_queryset(request).select_related('master_person')
 
         f_ru = request.GET.get('profession_norm')
         f_en = request.GET.get('en_profession_norm')
@@ -996,8 +1088,55 @@ class PersonAdmin(BaseNameAdmin):
             _primary_en_prof=Subquery(sc_en.values('en_profession')[:1]),
         )
 
+    @admin.display(description='Тип / Мастер', ordering='master_person')
+    def get_master_link(self, obj):
+        if not obj.master_person_id or obj.master_person_id == obj.id:
+            return format_html('<span style="color: #3498db; font-weight: bold;">⭐ Основа</span>')
+
+        url = reverse('admin:app_person_change', args=[obj.master_person_id])
+        return format_html(
+            '<span style="opacity: 0.5;">Алиас ➜</span> <a href="{}"><b>{}</b></a>',
+            url,
+            obj.master_person.name,
+        )
+
+    @admin.action(description='Объединить выбранных (первый станет основным)')
+    def action_merge_persons(self, request, queryset):
+        persons = list(queryset.order_by('id'))
+        if len(persons) < 2:
+            self.message_user(
+                request, 'Для объединения необходимо выбрать минимум 2 записи.', level='WARNING'
+            )
+            return
+
+        master = persons[0]
+        if master.master_person_id:
+            master = master.master_person
+
+        count = 0
+        for p in persons:
+            if p.id != master.id:
+                p.master_person = master
+                p.save(update_fields=['master_person'])
+                count += 1
+
+        self.message_user(request, f'Успешно объединено {count} записей в мастера "{master.name}".')
+
+    @admin.display(description='Алиасы (дубликаты)')
+    def get_aliases(self, obj):
+        aliases = obj.aliases.exclude(id=obj.id).all()
+        if not aliases:
+            return '-'
+        html = '<ul>'
+        for alias in aliases:
+            url = reverse('admin:app_person_change', args=[alias.id])
+            html += f'<li><a href="{url}">{alias.name}</a></li>'
+        html += '</ul>'
+        return format_html(html)
+
     def lookup_allowed(self, lookup, value):
         allowed_related = [
+            'master_person__isnull',
             'showcrew__profession',
             'showcrew__en_profession',
             'showcrew__profession__exact',
@@ -1093,15 +1232,22 @@ class PersonAdmin(BaseNameAdmin):
 
     @admin.display(description='User Stats (Shows watched)')
     def user_stats(self, obj):
-        return _get_user_stats_html(Q(history__show__crew=obj))
+        target_ids = [obj.id] + list(obj.aliases.values_list('id', flat=True))
+        return _get_user_stats_html(Q(history__show__crew__id__in=target_ids))
 
     @admin.display(description='Genres')
     def related_genres(self, obj):
-        return _get_related_items_html(Genre, Q(show__crew=obj), 'admin:app_genre_change')
+        target_ids = [obj.id] + list(obj.aliases.values_list('id', flat=True))
+        return _get_related_items_html(
+            Genre, Q(show__crew__id__in=target_ids), 'admin:app_genre_change'
+        )
 
     @admin.display(description='Countries')
     def related_countries(self, obj):
-        return _get_related_items_html(Country, Q(show__crew=obj), 'admin:app_country_change')
+        target_ids = [obj.id] + list(obj.aliases.values_list('id', flat=True))
+        return _get_related_items_html(
+            Country, Q(show__crew__id__in=target_ids), 'admin:app_country_change'
+        )
 
     def get_urls(self):
         urls = super().get_urls()

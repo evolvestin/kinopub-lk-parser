@@ -69,12 +69,24 @@ class Person(BaseModel):
     tmdb_photo_url = models.URLField(max_length=500, null=True, blank=True)
     kp_photo_url = models.URLField(max_length=500, null=True, blank=True)
     is_photo_fetched = models.BooleanField(default=False)
+    master_person = models.ForeignKey(
+        'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='aliases'
+    )
+
+    @property
+    def canonical(self):
+        if self.master_person_id and self.master_person_id != self.id:
+            return self.master_person
+        return self
 
     @property
     def photo_url(self):
-        return self.tmdb_photo_url or self.kp_photo_url
+        target = self.canonical
+        return target.tmdb_photo_url or target.kp_photo_url
 
     def __str__(self):
+        if self.master_person_id and self.master_person_id != self.id:
+            return f'{self.name} -> [{self.master_person.name}]'
         return self.name
 
     class Meta:

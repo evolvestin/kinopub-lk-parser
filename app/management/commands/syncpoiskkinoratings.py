@@ -1,9 +1,10 @@
 import logging
-from collections import defaultdict
 from datetime import timedelta
 
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
+from redis import Redis
 
 from app.management.base import LoggableBaseCommand
 from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew
@@ -42,9 +43,6 @@ class Command(LoggableBaseCommand):
         # Извлечение приоритетных ID из Redis
         priority_show_ids = set()
         try:
-            from django.conf import settings
-            from redis import Redis
-
             r = Redis.from_url(settings.CELERY_BROKER_URL)
             priority_raw = r.spop('queue:priority_ratings_sync', count=limit)
             if priority_raw:
@@ -169,11 +167,7 @@ class Command(LoggableBaseCommand):
 
         shows_to_update = []
         ext_ratings_to_update = []
-
-        show_genres_map = defaultdict(set)
-        show_countries_map = defaultdict(set)
-        show_crew_map = defaultdict(list)
-
+        crew_objects = []
         persons_to_update = {}
 
         for show_id, item in data_map.items():
@@ -184,14 +178,32 @@ class Command(LoggableBaseCommand):
             r_data = item.get('rating') or {}
             v_data = item.get('votes') or {}
 
-            show.kinopoisk_rating = r_data.get('kp')
-            show.kinopoisk_votes = v_data.get('kp')
-            show.imdb_rating = r_data.get('imdb')
-            show.imdb_votes = v_data.get('imdb')
-            show.year = item.get('year')
-            show.plot = item.get('description')
-            show.status = SHOW_STATUS_MAPPING.get(item.get('status'), item.get('status'))
-            shows_to_update.append(show)
+            updated_fields = []
+
+            if kp_r := r_data.get('kp'):
+                show.kinopoisk_rating = kp_r
+                updated_fields.append('kinopoisk_rating')
+            if kp_v := v_data.get('kp'):
+                show.kinopoisk_votes = kp_v
+                updated_fields.append('kinopoisk_votes')
+            if imdb_r := r_data.get('imdb'):
+                show.imdb_rating = imdb_r
+                updated_fields.append('imdb_rating')
+            if imdb_v := v_data.get('imdb'):
+                show.imdb_votes = imdb_v
+                updated_fields.append('imdb_votes')
+            if yr := item.get('year'):
+                show.year = yr
+                updated_fields.append('year')
+            if desc := item.get('description'):
+                show.plot = desc
+                updated_fields.append('plot')
+            if st := item.get('status'):
+                show.status = SHOW_STATUS_MAPPING.get(st, st)
+                updated_fields.append('status')
+
+            if updated_fields:
+                shows_to_update.append(show)
 
             ext_ratings_to_update.append(
                 ExternalRating(
@@ -206,13 +218,19 @@ class Command(LoggableBaseCommand):
                 )
             )
 
-            for genre_data in item.get('genres', []):
-                if genre := existing_genres.get(genre_data['name']):
-                    show_genres_map[show_id].add(genre.id)
+            api_genres = item.get('genres', [])
+            if api_genres:
+                show.genres.clear()
+                for genre_data in api_genres:
+                    if genre := existing_genres.get(genre_data['name']):
+                        show.genres.add(genre)
 
-            for country_data in item.get('countries', []):
-                if country := existing_countries.get(country_data['name']):
-                    show_countries_map[show_id].add(country.id)
+            api_countries = item.get('countries', [])
+            if api_countries:
+                show.countries.clear()
+                for country_data in api_countries:
+                    if country := existing_countries.get(country_data['name']):
+                        show.countries.add(country)
 
             for person_data in item.get('persons', []):
                 p_name = person_data.get('name')
@@ -242,10 +260,14 @@ class Command(LoggableBaseCommand):
                 if needs_update:
                     persons_to_update[person.id] = person
 
-                raw_prof_ru = person_data.get('profession')
-                raw_prof_en = person_data.get('enProfession')
-
-                show_crew_map[show_id].append((person.id, raw_prof_ru, raw_prof_en))
+                crew_objects.append(
+                    ShowCrew(
+                        show_id=show_id,
+                        person_id=person.id,
+                        profession=person_data.get('profession'),
+                        en_profession=person_data.get('enProfession'),
+                    )
+                )
 
         if shows_to_update:
             Show.objects.bulk_update(
@@ -262,37 +284,7 @@ class Command(LoggableBaseCommand):
                 batch_size=500,
             )
 
-            Show.genres.through.objects.filter(show_id__in=show_ids).delete()
-            Show.countries.through.objects.filter(show_id__in=show_ids).delete()
-            ShowCrew.objects.filter(show_id__in=show_ids).delete()
-
-            Show.genres.through.objects.bulk_create(
-                [
-                    Show.genres.through(show_id=s_id, genre_id=g_id)
-                    for s_id, g_ids in show_genres_map.items()
-                    for g_id in g_ids
-                ],
-                ignore_conflicts=True,
-                batch_size=2000,
-            )
-
-            Show.countries.through.objects.bulk_create(
-                [
-                    Show.countries.through(show_id=s_id, country_id=c_id)
-                    for s_id, c_ids in show_countries_map.items()
-                    for c_id in c_ids
-                ],
-                ignore_conflicts=True,
-                batch_size=2000,
-            )
-
-            crew_objects = []
-            for s_id, crew_list in show_crew_map.items():
-                for p_id, p_ru, p_en in crew_list:
-                    crew_objects.append(
-                        ShowCrew(show_id=s_id, person_id=p_id, profession=p_ru, en_profession=p_en)
-                    )
-
+        if crew_objects:
             ShowCrew.objects.bulk_create(crew_objects, ignore_conflicts=True, batch_size=2000)
 
         if ext_ratings_to_update:
