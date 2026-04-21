@@ -961,6 +961,7 @@ class PersonAdmin(BaseNameAdmin):
         'get_photo_display',
         'en_name',
         'get_master_link',
+        'get_id_copyable',
         'get_ru_profession',
         'get_en_profession',
         'get_is_photo_fetched',
@@ -1025,6 +1026,34 @@ class PersonAdmin(BaseNameAdmin):
             },
         ),
     )
+
+    @admin.display(description='ID', ordering='id')
+    def get_id_copyable(self, obj):
+        return format_html(
+            '<div style="display: flex; align-items: center; gap: 6px;">'
+            '<span style="font-family: ui-monospace, monospace; font-weight: 700; '
+            'color: var(--body-fg); '
+            'background: var(--darkened-bg); padding: 2px 6px; border-radius: 4px; '
+            'border: 1px solid var(--border-color); font-size: 11px; '
+            'letter-spacing: 0.5px;">{0}</span>'
+            '<a href="javascript:void(0)" title="Копировать ID" '
+            'style="display: inline-flex; align-items: center; justify-content: center; '
+            'width: 26px; height: 26px; '
+            'background: var(--secondary); border: 1px solid var(--border-color); '
+            'border-radius: 4px; '
+            'color: var(--link-fg); transition: all 0.2s ease;" '
+            "onclick=\"navigator.clipboard.writeText('{0}'); "
+            "const icon = this.querySelector('.material-icons'); "
+            "icon.innerText = 'check'; this.style.borderColor = 'var(--accent)'; "
+            "this.style.color = 'var(--accent)'; "
+            "setTimeout(() => {{ icon.innerText = 'content_copy'; "
+            "this.style.borderColor = ''; this.style.color = ''; }}, 1500); "
+            'return false;">'
+            '<span class="material-icons" style="font-size: 16px;">content_copy</span>'
+            '</a>'
+            '</div>',
+            obj.id,
+        )
 
     def save_model(self, request, obj, form, change):
         if obj.master_person_id == obj.id:

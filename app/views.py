@@ -38,6 +38,7 @@ from app.services.metrics import (
     calculate_has_imdb_metric,
     calculate_has_kp_metric,
     calculate_missing_country_meta_metric,
+    calculate_missing_durations_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
     calculate_missing_plot_metric,
@@ -48,11 +49,12 @@ from app.services.metrics import (
     calculate_persons_avatar_stats_metric,
     calculate_professions_stats_metric,
     calculate_title_collision_metric,
-    calculate_total_countries_with_shows_metric,
+    calculate_total_countries_metric,
     calculate_total_genres_metric,
     calculate_total_persons_by_show_type_metric,
     calculate_total_shows_metric,
     calculate_unmapped_genres_metric,
+    get_active_countries_list,
     get_duplicate_photo_urls_list,
     get_missing_country_meta_list,
     get_missing_imdb_list,
@@ -66,6 +68,7 @@ from app.services.metrics import (
     get_title_collision_list,
     get_total_genres_list,
     get_unmapped_genres_list,
+    get_unused_countries_list,
 )
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
@@ -176,6 +179,9 @@ def index(request):
     missing_year = get_or_update_metric('missing_year', calculate_missing_year_metric)
     missing_status = get_or_update_metric('missing_status', calculate_missing_status_metric)
     missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
+    missing_durations = get_or_update_metric(
+        'missing_durations', calculate_missing_durations_metric
+    )
     no_genres = get_or_update_metric('no_genres', calculate_no_genres_metric)
     total_genres = get_or_update_metric('total_genres', calculate_total_genres_metric)
     unmapped_genres = get_or_update_metric('unmapped_genres', calculate_unmapped_genres_metric)
@@ -183,9 +189,7 @@ def index(request):
     missing_country_meta = get_or_update_metric(
         'missing_country_meta', calculate_missing_country_meta_metric
     )
-    total_countries = get_or_update_metric(
-        'total_countries', calculate_total_countries_with_shows_metric
-    )
+    total_countries = get_or_update_metric('total_countries', calculate_total_countries_metric)
     total_persons_by_show_type = get_or_update_metric(
         'total_persons_by_show_type', calculate_total_persons_by_show_type_metric
     )
@@ -214,6 +218,7 @@ def index(request):
                 'missing_year': missing_year,
                 'missing_status': missing_status,
                 'missing_plot': missing_plot,
+                'missing_durations': missing_durations,
                 'no_genres': no_genres,
                 'total_genres': total_genres,
                 'unmapped_genres': unmapped_genres,
@@ -1388,6 +1393,12 @@ def get_metric_details(request, key):
     elif key == 'missing_plot':
         items = list(get_missing_plot_list(show_type))
         query_params.update({'type': show_type, 'plot__isnull': 'True'})
+    elif key == 'missing_durations':
+        from app.services.metrics import get_missing_durations_list
+
+        items = list(get_missing_durations_list(show_type))
+        query_params.update({'type': show_type, 'showduration__isnull': 'True'})
+        target_task = 'durations'
     elif key == 'no_genres':
         items = list(get_no_genres_list(show_type))
         query_params.update({'type': show_type, 'genres__isnull': 'True'})
@@ -1411,7 +1422,11 @@ def get_metric_details(request, key):
     elif key == 'missing_country_meta':
         is_country, items = True, list(get_missing_country_meta_list())
     elif key == 'total_countries':
-        is_summary = True
+        is_country = True
+        if show_type == 'Неиспользуемые':
+            items = list(get_unused_countries_list())
+        else:
+            items = list(get_active_countries_list())
     elif key == 'total_persons_by_show_type':
         is_summary = True
         query_params['showcrew__show__type'] = show_type
@@ -1448,9 +1463,11 @@ def get_metric_details(request, key):
 
     try:
         r = Redis.from_url(settings.CELERY_BROKER_URL)
-        all_queued = {int(x) for x in r.smembers('queue:update_details')} | {
-            int(x) for x in r.smembers('queue:priority_ratings_sync')
-        }
+        all_queued = (
+            {int(x) for x in r.smembers('queue:update_details')}
+            | {int(x) for x in r.smembers('queue:priority_ratings_sync')}
+            | {int(x) for x in r.smembers('queue:update_durations')}
+        )
     except Exception:
         all_queued = set()
 
@@ -1526,9 +1543,12 @@ def queue_update_details(request):
         if not ids:
             return JsonResponse({'status': 'ok', 'added': 0})
 
-        redis_key = (
-            'queue:priority_ratings_sync' if target == 'priority_sync' else 'queue:update_details'
-        )
+        if target == 'priority_sync':
+            redis_key = 'queue:priority_ratings_sync'
+        elif target == 'durations':
+            redis_key = 'queue:update_durations'
+        else:
+            redis_key = 'queue:update_details'
 
         r = Redis.from_url(settings.CELERY_BROKER_URL)
         added = r.sadd(redis_key, *ids)

@@ -269,14 +269,9 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
             elements_data = get_row_data(label)
             if elements_data:
                 elements = elements_data.find_elements(By.TAG_NAME, 'a')
-                names = [
-                    el.get_attribute('textContent').strip()
-                    for el in elements
-                    if el.get_attribute('textContent').strip()
-                ]
-                if names:
-                    relation.clear()
-                    for name in names:
+                for el in elements:
+                    name = el.get_attribute('textContent').strip()
+                    if name:
                         obj, _ = model.objects.update_or_create(name=name)
                         relation.add(obj)
 

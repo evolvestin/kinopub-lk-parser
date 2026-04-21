@@ -33,7 +33,7 @@ from app.services.metrics import (
     calculate_persons_avatar_stats_metric,
     calculate_professions_stats_metric,
     calculate_title_collision_metric,
-    calculate_total_countries_with_shows_metric,
+    calculate_total_countries_metric,
     calculate_total_genres_metric,
     calculate_total_persons_by_show_type_metric,
     calculate_unmapped_genres_metric,
@@ -524,6 +524,11 @@ def update_site_metrics_task():
     plot_data = calculate_missing_plot_metric()
     SiteMetric.objects.create(key='missing_plot', data=plot_data)
 
+    from app.services.metrics import calculate_missing_durations_metric
+
+    durations_data = calculate_missing_durations_metric()
+    SiteMetric.objects.create(key='missing_durations', data=durations_data)
+
     no_genres_data = calculate_no_genres_metric()
     SiteMetric.objects.create(key='no_genres', data=no_genres_data)
 
@@ -539,7 +544,7 @@ def update_site_metrics_task():
     country_meta_data = calculate_missing_country_meta_metric()
     SiteMetric.objects.create(key='missing_country_meta', data=country_meta_data)
 
-    total_countries_data = calculate_total_countries_with_shows_metric()
+    total_countries_data = calculate_total_countries_metric()
     SiteMetric.objects.create(key='total_countries', data=total_countries_data)
 
     persons_by_type_data = calculate_total_persons_by_show_type_metric()

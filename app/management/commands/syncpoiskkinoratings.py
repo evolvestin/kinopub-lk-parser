@@ -220,14 +220,12 @@ class Command(LoggableBaseCommand):
 
             api_genres = item.get('genres', [])
             if api_genres:
-                show.genres.clear()
                 for genre_data in api_genres:
                     if genre := existing_genres.get(genre_data['name']):
                         show.genres.add(genre)
 
             api_countries = item.get('countries', [])
             if api_countries:
-                show.countries.clear()
                 for country_data in api_countries:
                     if country := existing_countries.get(country_data['name']):
                         show.countries.add(country)

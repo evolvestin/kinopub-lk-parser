@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import timedelta
 
-from django.db.models import Count, F, Q
+from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, Lower, StrIndex
 from django.utils import timezone
 
@@ -26,9 +26,31 @@ def get_missing_country_meta_list():
     return Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code='')).values('id', 'name')
 
 
-def calculate_total_countries_with_shows_metric():
-    count = Country.objects.filter(show__isnull=False).distinct().count()
-    return [{'name': 'Страны', 'value': count}]
+def calculate_total_countries_metric():
+    active_count = Country.objects.filter(show__isnull=False).distinct().count()
+    unused_count = Country.objects.filter(show__isnull=True).count()
+    return [
+        {'name': 'Активные', 'value': active_count},
+        {'name': 'Неиспользуемые', 'value': unused_count},
+    ]
+
+
+def get_active_countries_list():
+    return (
+        Country.objects.filter(show__isnull=False)
+        .distinct()
+        .annotate(num_shows=Count('show'))
+        .order_by('-num_shows')
+        .values('id', 'name', 'iso_code', 'emoji_flag')
+    )
+
+
+def get_unused_countries_list():
+    return (
+        Country.objects.filter(show__isnull=True)
+        .order_by('name')
+        .values('id', 'name', 'iso_code', 'emoji_flag')
+    )
 
 
 def get_total_countries_with_shows_list():
@@ -383,24 +405,26 @@ def get_missing_status_list(show_type: str):
 
 
 def calculate_duplicate_photo_urls_metric():
-    tmdb_dupes = (
+    tmdb_qs = (
         Person.objects.filter(master_person__isnull=True)
         .exclude(tmdb_photo_url='')
         .filter(tmdb_photo_url__isnull=False)
         .values('tmdb_photo_url')
         .annotate(cnt=Count('id'))
         .filter(cnt__gt=1)
-        .count()
     )
-    kp_dupes = (
+    tmdb_dupes = tmdb_qs.aggregate(total=Sum('cnt'))['total'] or 0
+
+    kp_qs = (
         Person.objects.filter(master_person__isnull=True)
         .exclude(kp_photo_url='')
         .filter(kp_photo_url__isnull=False)
         .values('kp_photo_url')
         .annotate(cnt=Count('id'))
         .filter(cnt__gt=1)
-        .count()
     )
+    kp_dupes = kp_qs.aggregate(total=Sum('cnt'))['total'] or 0
+
     return [
         {'name': 'TMDB дубликаты', 'value': tmdb_dupes},
         {'name': 'KP дубликаты', 'value': kp_dupes},
@@ -417,7 +441,7 @@ def get_duplicate_photo_urls_list(source_type: str):
         .values(field)
         .annotate(cnt=Count('id'))
         .filter(cnt__gt=1)
-        .order_by('-cnt')[:150]
+        .order_by('-cnt')
     )
 
     if not dupe_urls_data:
@@ -535,3 +559,19 @@ def get_unmapped_genres_list():
             }
         )
     return results
+
+
+def calculate_missing_durations_metric():
+    stats = (
+        Show.objects.filter(showduration__isnull=True)
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+
+
+def get_missing_durations_list(show_type: str):
+    return Show.objects.filter(type=show_type, showduration__isnull=True).values(
+        'id', 'title', 'original_title'
+    )
