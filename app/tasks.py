@@ -23,6 +23,7 @@ from app.services.metrics import (
     calculate_duplicate_photo_urls_metric,
     calculate_en_professions_stats_metric,
     calculate_missing_country_meta_metric,
+    calculate_missing_durations_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
     calculate_missing_plot_metric,
@@ -523,8 +524,6 @@ def update_site_metrics_task():
 
     plot_data = calculate_missing_plot_metric()
     SiteMetric.objects.create(key='missing_plot', data=plot_data)
-
-    from app.services.metrics import calculate_missing_durations_metric
 
     durations_data = calculate_missing_durations_metric()
     SiteMetric.objects.create(key='missing_durations', data=durations_data)

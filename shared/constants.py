@@ -206,9 +206,13 @@ SHOW_STATUS_MAPPING = {
     'окончен': 'Finished',
     'в эфире': 'Ongoing',
     'COMPLETED': 'Finished',
+    'completed': 'Finished',
     'FILMING': 'Filming',
+    'filming': 'Filming',
     'POST_PRODUCTION': 'Post Production',
+    'post-production': 'Post Production',
     'PRE_PRODUCTION': 'Pre Production',
+    'pre-production': 'Pre Production',
     'UNKNOWN': None,
 }
 
