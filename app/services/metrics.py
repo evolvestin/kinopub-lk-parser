@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import timedelta
 
+from django.conf import settings
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, Lower, StrIndex
 from django.utils import timezone
@@ -137,7 +138,8 @@ def get_or_update_metric(key: str, calc_func) -> dict:
 
     latest = SiteMetric.objects.filter(key=key).order_by('-created_at').first()
 
-    if not latest or (now - latest.created_at).total_seconds() > 300:
+    cache_timeout = 60 if settings.DEBUG else 300
+    if not latest or (now - latest.created_at).total_seconds() > cache_timeout:
         new_data = calc_func()
         latest = SiteMetric.objects.create(key=key, data=new_data)
 

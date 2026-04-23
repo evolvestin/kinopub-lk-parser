@@ -29,6 +29,7 @@ function initIcons() {
     i('ic-time', 'time'); i('ic-cal', 'cal'); i('ic-tv', 'tv'); i('ic-film', 'film');
     i('ic-chart-internal', 'chart'); i('ic-flame-internal', 'flame');
     i('it-gen-internal', 'masks'); i('it-act-internal', 'masks'); 
+    i('it-dir-internal', 'film'); i('it-wri-internal', 'list');
     i('it-cou-internal', 'globe'); i('it-bin-internal', 'bolt');
     i('it-star-internal', 'star'); i('ic-weekday-internal', 'days');
     i('ic-search-nav', 'search'); i('ic-stats-nav', 'nav_stats');
@@ -163,11 +164,11 @@ function renderSearchResults(data) {
     let html = '';
     
     if (data.persons?.length) {
-        html += `<div class="label"><div class="icon" style="color:#d29922">${Icons.users}</div>Актеры и Режиссеры</div>`;
+        html += `<div class="label"><div class="icon" style="color:#d29922">${Icons.users}</div>Люди</div>`;
         html += '<div class="h-scroll-container" style="padding-bottom:16px;">';
         data.persons.forEach(p => {
             const img = p.photo_url ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;">` : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
-            html += `<div class="person-pill" onclick="window.App.openCollectionLayer('actor', ${p.id}, '${p.name.replace(/'/g, "\\'")}')">${img}<div class="person-name">${p.name}</div></div>`;
+            html += `<div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${p.name.replace(/'/g, "\\'")}')">${img}<div class="person-name">${p.name}</div></div>`;
         });
         html += '</div>';
     }
@@ -344,6 +345,12 @@ function render() {
     const hasActors = D.actors?.length > 0;
     toggle('card-actors', hasActors);
     
+    const hasDirectors = D.directors?.length > 0;
+    toggle('card-directors', hasDirectors);
+
+    const hasWriters = D.writers?.length > 0;
+    toggle('card-writers', hasWriters);
+    
     const hasCountries = D.countries?.length > 0;
     toggle('card-countries', hasCountries);
     
@@ -375,6 +382,8 @@ function render() {
     renderCharts();
     
     if (hasActors) fillList('actors-list', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
+    if (hasDirectors) fillList('directors-list', D.directors, null, ['просмотр', 'просмотра', 'просмотров'], 'directors');
+    if (hasWriters) fillList('writers-list', D.writers, null, ['просмотр', 'просмотра', 'просмотров'], 'writers');
     if (hasCountries) fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
     if (hasBinges) fillBinges();
 }
@@ -832,18 +841,21 @@ window.openShowLayer = async function(showId) {
         if (!r.ok) throw new Error('Not found');
         const show = await r.json();
 
-        let actorsHtml = '';
-        if (show.actors && show.actors.length > 0) {
-            actorsHtml = `
-            <div class="label"><div class="icon" style="color:#d29922">${Icons.masks}</div>В ролях</div>
-            <div class="h-scroll-container">
-                ${show.actors.map(a => `
-                    <div class="person-pill" onclick="window.App.openCollectionLayer('actor', ${a.id}, '${a.name.replace(/'/g, "\\'")}')">
-                        ${a.photo_url ? `<img src="${a.photo_url}" class="person-avatar" style="object-fit:cover;">` : `<div class="person-avatar">${a.name.charAt(0)}</div>`}
-                        <div class="person-name">${a.name}</div>
-                    </div>
-                `).join('')}
-            </div>`;
+        let crewHtml = '';
+        if (show.crew && show.crew.length > 0) {
+            show.crew.forEach((group, index) => {
+                crewHtml += `
+                <div class="label" style="${index === 0 ? '' : 'padding-top:0'}"><div class="icon" style="color:#d29922">${Icons.users}</div>${group.profession}</div>
+                <div class="h-scroll-container" style="padding-bottom:16px;">
+                    ${group.persons.map(p => `
+                        <div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${p.name.replace(/'/g, "\\'")}')">
+                            ${p.photo_url ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;">` : `<div class="person-avatar">${p.name.charAt(0)}</div>`}
+                            <div class="person-name">${p.name}</div>
+                        </div>
+                    `).join('')}
+                </div>`;
+            });
+            crewHtml += '<div style="height: 12px;"></div>';
         }
 
         let genresHtml = '';
@@ -870,9 +882,10 @@ window.openShowLayer = async function(showId) {
 
         const preloadUrls = [];
         if (posterUrl) preloadUrls.push(posterUrl);
-        if (show.actors && show.actors.length > 0) {
-            show.actors.slice(0, 6).forEach(a => {
-                if (a.photo_url) preloadUrls.push(a.photo_url);
+        if (show.crew && show.crew.length > 0) {
+            const firstGroup = show.crew[0];
+            firstGroup.persons.slice(0, 6).forEach(p => {
+                if (p.photo_url) preloadUrls.push(p.photo_url);
             });
         }
 
@@ -915,7 +928,7 @@ window.openShowLayer = async function(showId) {
 
             ${show.plot ? `<div class="plot-box">${show.plot}</div>` : ''}
             
-            ${actorsHtml}
+            ${crewHtml}
             ${genresHtml}
             ${countriesHtml}
         `;

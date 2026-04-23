@@ -3,6 +3,7 @@ import logging
 from collections import defaultdict
 from datetime import date, timedelta
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import (
     Avg,
@@ -26,8 +27,13 @@ from django.db.models.functions import (
 )
 from django.utils import timezone
 
-from app.models import ShowDuration, UserRating, ViewHistory, ViewUserGroup
-from shared.constants import RAW_TO_NORMALIZED_GENRE
+from app.models import Person, ShowDuration, UserRating, ViewHistory, ViewUserGroup
+from shared.constants import (
+    ACTOR_ROLES,
+    DIRECTOR_ROLES,
+    RAW_TO_NORMALIZED_GENRE,
+    WRITER_ROLES,
+)
 from shared.formatters import format_duration
 from shared.media import get_poster_url
 
@@ -163,46 +169,74 @@ def _get_favorites(base_qs, dur_qs):
         )
 
     def get_person_top(professions, limit=5):
-        qs = (
-            base_qs.filter(show__showcrew__profession__in=professions)
-            .values(
-                tid=F('show__showcrew__person__id'),
-                name=F('show__showcrew__person__name'),
-                photo_url=Coalesce(
-                    'show__showcrew__person__tmdb_photo_url', 'show__showcrew__person__kp_photo_url'
-                ),
+        role_filter = Q(show__showcrew__profession__in=professions) | Q(
+            show__showcrew__en_profession__in=professions
+        )
+
+        canonical_qs = (
+            base_qs.filter(role_filter)
+            .annotate(
+                canonical_id=Coalesce(
+                    'show__showcrew__person__master_person_id', 'show__showcrew__person__id'
+                )
             )
-            .filter(tid__isnull=False)
+            .values('canonical_id')
+            .filter(canonical_id__isnull=False)
             .annotate(views=Count('id', distinct=True), shows_count=Count('show_id', distinct=True))
             .order_by('-views')[:limit]
         )
+
         result = []
-        for p in qs:
-            show_ids = list(
-                base_qs.filter(show__showcrew__person__id=p['tid'])
-                .values_list('show_id', flat=True)
-                .distinct()
+        for p in canonical_qs:
+            cid = p['canonical_id']
+            try:
+                person = Person.objects.get(id=cid)
+            except Person.DoesNotExist:
+                continue
+
+            target_ids = [cid] + list(person.aliases.values_list('id', flat=True))
+
+            person_role_filter = Q(show__showcrew__profession__in=professions) | Q(
+                show__showcrew__en_profession__in=professions
+            )
+            person_shows = base_qs.filter(show__showcrew__person__id__in=target_ids).filter(
+                person_role_filter
             )
 
+            show_ids = list(person_shows.values_list('show_id', flat=True).distinct())
             show_titles = list(
-                base_qs.filter(show__showcrew__person__id=p['tid'])
-                .order_by('show__original_title')
+                person_shows.order_by('show__original_title')
                 .values_list('show__original_title', flat=True)
                 .distinct()
             )
 
+            sub_text = ', '.join(show_titles)
+            if len(sub_text) > 80:
+                sub_text = sub_text[:80] + '...'
+
             result.append(
                 {
-                    'name': p['name'],
-                    'photo_url': p['photo_url'],
+                    'name': person.name,
+                    'photo_url': person.photo_url,
                     'shows': p['shows_count'],
                     'views': p['views'],
                     'count': p['views'],
                     'show_ids': show_ids,
-                    'sub': ', '.join(show_titles),
+                    'sub': sub_text,
                 }
             )
         return result
+
+    countries_qs = (
+        base_qs.values(
+            tid=F('show__countries__id'),
+            name=F('show__countries__name'),
+            emoji=F('show__countries__emoji_flag'),
+        )
+        .filter(tid__isnull=False)
+        .annotate(count=Count('id', distinct=True))
+        .order_by('-count')[:5]
+    )
 
     countries_qs = (
         base_qs.values(
@@ -233,7 +267,9 @@ def _get_favorites(base_qs, dur_qs):
 
     return {
         'genres': genres,
-        'actors': get_person_top(['Актёр', 'актер', 'Actor', 'actor', 'В ролях']),
+        'actors': get_person_top(ACTOR_ROLES),
+        'directors': get_person_top(DIRECTOR_ROLES),
+        'writers': get_person_top(WRITER_ROLES),
         'countries': countries,
     }
 
@@ -475,6 +511,8 @@ def generate_user_stats(user, year=None):
 
     user_role = str(user.role).lower() if user.role else 'guest'
 
+    cache_timeout = 60 if settings.DEBUG else 3600
+
     if summary['total_views'] == 0:
         result = {
             'meta': {
@@ -502,7 +540,7 @@ def generate_user_stats(user, year=None):
                 'history': ratings_history,
             },
         }
-        cache.set(cache_key, result, timeout=86400)
+        cache.set(cache_key, result, timeout=cache_timeout)
         return result
 
     favs = _get_favorites(base_qs, dur_qs)
@@ -581,6 +619,8 @@ def generate_user_stats(user, year=None):
         'heatmap': _get_heatmap(dur_qs, year, all_years),
         'genres': favs['genres'],
         'actors': favs['actors'],
+        'directors': favs['directors'],
+        'writers': favs['writers'],
         'countries': favs['countries'],
         'binges': binge,
         'monthly_chart': _get_monthly_chart(base_qs, dur_qs),
@@ -594,7 +634,7 @@ def generate_user_stats(user, year=None):
             'history': ratings_history,
         },
     }
-    cache.set(cache_key, result, timeout=86400)
+    cache.set(cache_key, result, timeout=cache_timeout)
     return result
 
 
@@ -713,5 +753,6 @@ def generate_group_stats(user, year=None):
         'history_episodes': history_episodes,
     }
 
-    cache.set(cache_key, result, timeout=86400)
+    cache_timeout = 60 if settings.DEBUG else 3600
+    cache.set(cache_key, result, timeout=cache_timeout)
     return result

@@ -770,9 +770,9 @@ class CountryAdmin(BaseNameAdmin):
     def related_actors(self, obj):
         return _get_related_items_html(
             Person,
-            Q(
-                shows_as_crew__countries=obj,
-                showcrew__profession__in=ACTOR_ROLES,
+            Q(shows_as_crew__countries=obj)
+            & (
+                Q(showcrew__profession__in=ACTOR_ROLES) | Q(showcrew__en_profession__in=ACTOR_ROLES)
             ),
             'admin:app_person_change',
             relation_field='shows_as_crew',
@@ -810,9 +810,9 @@ class GenreAdmin(BaseNameAdmin):
     def related_actors(self, obj):
         return _get_related_items_html(
             Person,
-            Q(
-                shows_as_crew__genres=obj,
-                showcrew__profession__in=ACTOR_ROLES,
+            Q(shows_as_crew__genres=obj)
+            & (
+                Q(showcrew__profession__in=ACTOR_ROLES) | Q(showcrew__en_profession__in=ACTOR_ROLES)
             ),
             'admin:app_person_change',
             relation_field='shows_as_crew',

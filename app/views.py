@@ -74,10 +74,7 @@ from app.services.stats_calculator import generate_group_stats, generate_user_st
 from app.services.telegram_auth import validate_telegram_init_data
 from app.telegram_bot import TelegramSender
 from shared.constants import (
-    ACTOR_ROLES,
-    DIRECTOR_ROLES,
     GENRES_MAPPING,
-    RAW_TO_NORMALIZED_EN,
     RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
     UserRole,
@@ -1168,35 +1165,55 @@ def webapp_get_shared_stats(request, stat_id):
 @require_http_methods(['GET'])
 def webapp_get_show_full(request, show_id):
     try:
+        from collections import defaultdict
+
         show = Show.objects.prefetch_related(
             'countries', 'genres', 'showcrew_set__person__master_person'
         ).get(id=show_id)
 
         internal_rating, _ = show.get_internal_rating_data()
 
-        directors = []
-        actors = []
-        seen_canonical_ids = set()
+        crew_grouped = defaultdict(list)
+        seen_canonical_by_prof = defaultdict(set)
 
         for crew_member in show.showcrew_set.all():
             person = crew_member.person.canonical
-            if person.id in seen_canonical_ids:
-                continue
-
-            seen_canonical_ids.add(person.id)
             norm_ru = RAW_TO_NORMALIZED_RU.get(crew_member.profession, crew_member.profession)
-            norm_en = RAW_TO_NORMALIZED_EN.get(crew_member.en_profession, crew_member.en_profession)
+            if not norm_ru:
+                norm_ru = 'Другое'
 
-            person_data = {
-                'id': person.id,
-                'name': person.name,
-                'photo_url': person.photo_url,
-            }
+            if person.id in seen_canonical_by_prof[norm_ru]:
+                continue
+            seen_canonical_by_prof[norm_ru].add(person.id)
 
-            if norm_ru == 'Режиссер' or norm_en == 'Director':
-                directors.append({'id': person.id, 'name': person.name})
-            elif norm_ru == 'Актер' or norm_en == 'Actor':
-                actors.append(person_data)
+            crew_grouped[norm_ru].append(
+                {
+                    'id': person.id,
+                    'name': person.name,
+                    'photo_url': person.photo_url,
+                }
+            )
+
+        preferred_order = [
+            'Режиссёр',
+            'Сценарист',
+            'Продюссер',
+            'Оператор',
+            'Композитор',
+            'Художник',
+            'Монтажёр',
+            'Актёр',
+            'Актёр дубляжа',
+        ]
+
+        ordered_crew = []
+        for prof in preferred_order:
+            if prof in crew_grouped and crew_grouped[prof]:
+                ordered_crew.append({'profession': prof, 'persons': crew_grouped[prof]})
+
+        for prof, persons in crew_grouped.items():
+            if prof not in preferred_order:
+                ordered_crew.append({'profession': prof, 'persons': persons})
 
         data = {
             'id': show.id,
@@ -1215,8 +1232,7 @@ def webapp_get_show_full(request, show_id):
                 {'id': c.id, 'name': c.name, 'emoji': c.emoji_flag} for c in show.countries.all()
             ],
             'genres': show.display_genres,
-            'directors': directors,
-            'actors': actors[:25],
+            'crew': ordered_crew,
         }
         return JsonResponse(data)
     except Show.DoesNotExist:
@@ -1232,22 +1248,11 @@ def webapp_get_collection(request, collection_type, item_id):
         shows = Show.objects.all()
         title = 'Коллекция'
 
-        if collection_type == 'actor':
+        if collection_type == 'person':
             person = Person.objects.get(id=item_id)
             target_ids = [person.id] + list(person.aliases.values_list('id', flat=True))
-            shows = shows.filter(
-                showcrew__person__id__in=target_ids,
-                showcrew__profession__in=ACTOR_ROLES,
-            )
+            shows = shows.filter(showcrew__person__id__in=target_ids)
             title = person.name
-        elif collection_type == 'director':
-            person = Person.objects.get(id=item_id)
-            target_ids = [person.id] + list(person.aliases.values_list('id', flat=True))
-            shows = shows.filter(
-                showcrew__person__id__in=target_ids,
-                showcrew__profession__in=DIRECTOR_ROLES,
-            )
-            title = f'Режиссер: {person.name}'
         elif collection_type == 'genre':
             genre = Genre.objects.get(id=item_id)
             norm_name = RAW_TO_NORMALIZED_GENRE.get(genre.name, genre.name)
@@ -1372,13 +1377,13 @@ def get_metric_details(request, key):
     if key == 'missing_kp':
         items = list(get_missing_kp_list(show_type))
         query_params.update(
-            {'type': show_type, 'kinopoisk_url__isnull': 'False', 'ext_rating__isnull': 'True'}
+            {'type': show_type, 'kinopoisk_url__isnull': 'False', 'ext_rating__kp__isnull': 'True'}
         )
         target_task = 'priority_sync'
     elif key == 'missing_imdb':
         items = list(get_missing_imdb_list(show_type))
         query_params.update(
-            {'type': show_type, 'imdb_url__isnull': 'False', 'ext_rating__isnull': 'True'}
+            {'type': show_type, 'imdb_url__isnull': 'False', 'ext_rating__imdb__isnull': 'True'}
         )
         target_task = 'priority_sync'
     elif key == 'title_collision':

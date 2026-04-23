@@ -4,7 +4,6 @@ DATE_FORMAT = '%Y-%m-%d'
 DATETIME_FORMAT = f'{DATE_FORMAT} %H:%M:%S'
 RATING_VALUES = [i / 2 for i in range(2, 21)]
 
-
 PROFESSIONS_MAPPING_RU = {
     'Актёр': ['актеры', 'Актер', 'В ролях', 'актеры дубляжа'],
     'Актёр дубляжа': ['актеры дубляжа'],
@@ -42,11 +41,12 @@ PROFESSION_TRANS_MAP = {
 }
 
 RAW_TO_NORMALIZED_RU = {raw: norm for norm, raws in PROFESSIONS_MAPPING_RU.items() for raw in raws}
-
 RAW_TO_NORMALIZED_EN = {raw: norm for norm, raws in PROFESSIONS_MAPPING_EN.items() for raw in raws}
 
 ACTOR_ROLES = PROFESSIONS_MAPPING_RU['Актёр'] + PROFESSIONS_MAPPING_EN['Actor']
 DIRECTOR_ROLES = PROFESSIONS_MAPPING_RU['Режиссёр'] + PROFESSIONS_MAPPING_EN['Director']
+WRITER_ROLES = PROFESSIONS_MAPPING_RU['Сценарист'] + PROFESSIONS_MAPPING_EN['Writer']
+PRODUCER_ROLES = PROFESSIONS_MAPPING_RU['Продюссер'] + PROFESSIONS_MAPPING_EN['Producer']
 
 GENRES_MAPPING = {
     'Короткометражка': ['короткометражка', 'Короткометражка'],
