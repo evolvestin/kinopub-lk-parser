@@ -16,6 +16,7 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
+from app.utils import enqueue_show_update
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 
 
@@ -108,7 +109,7 @@ def parse_and_save_catalog_page(driver, mode):
 
     page_ids = [s['id'] for s in shows_on_page]
     existing_ids = set(Show.objects.filter(id__in=page_ids).values_list('id', flat=True))
-    new_count = len(page_ids) - len(existing_ids)
+    new_ids = [sid for sid in page_ids if sid not in existing_ids]
 
     shows_to_upsert = [Show(**data) for data in shows_on_page]
 
@@ -129,7 +130,10 @@ def parse_and_save_catalog_page(driver, mode):
         update_fields=update_fields,
     )
 
-    return new_count
+    if new_ids:
+        enqueue_show_update(new_ids, details=True, durations=True)
+
+    return len(new_ids)
 
 
 def run_full_scan_session(headless=True, target_type=None, process_all_pages=False):

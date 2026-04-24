@@ -67,12 +67,14 @@ class Command(LoggableBaseCommand):
 
         missing_kp_ids = []
         skipped_priority_ids = []
+        invalid_url_sids = []
 
         for sid in combined_show_ids:
             kp_id = reverse_mapping.get(sid)
             if kp_id:
                 missing_kp_ids.append(kp_id)
             else:
+                invalid_url_sids.append(sid)
                 if sid in priority_show_ids:
                     skipped_priority_ids.append(sid)
 
@@ -80,6 +82,21 @@ class Command(LoggableBaseCommand):
             logging.warning(
                 f'Priority IDs without valid Kinopoisk URL: {skipped_priority_ids}. '
                 f'Check if URLs are correct and contain /film/ID or /series/ID.'
+            )
+
+        if invalid_url_sids:
+            blank_ratings = [
+                ExternalRating(show_id=sid, updated_at=now) for sid in invalid_url_sids
+            ]
+            ExternalRating.objects.bulk_create(
+                blank_ratings,
+                update_conflicts=True,
+                unique_fields=['show_id'],
+                update_fields=['updated_at'],
+                batch_size=500,
+            )
+            logging.info(
+                f'Marked {len(invalid_url_sids)} shows with invalid/missing KP URLs as processed.'
             )
 
         if missing_kp_ids:
@@ -97,6 +114,18 @@ class Command(LoggableBaseCommand):
                     f'Poiskkino API returned NO data for these Show IDs: {not_found_sids}. '
                     f'Possible reasons: item missing in Poiskkino DB or invalid KP ID.'
                 )
+
+                if not_found_sids:
+                    blank_ratings = [
+                        ExternalRating(show_id=sid, updated_at=now) for sid in not_found_sids
+                    ]
+                    ExternalRating.objects.bulk_create(
+                        blank_ratings,
+                        update_conflicts=True,
+                        unique_fields=['show_id'],
+                        update_fields=['updated_at'],
+                        batch_size=500,
+                    )
 
         if not data:
             logging.info('No data to process.')

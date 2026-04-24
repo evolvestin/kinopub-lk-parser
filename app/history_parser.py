@@ -30,6 +30,7 @@ from app.models import (
     ViewHistory,
 )
 from app.signals import view_history_created
+from app.utils import enqueue_show_update
 from kinopub_parser import celery_app
 from shared.constants import (
     DATE_FORMAT,
@@ -797,6 +798,9 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
         for item in views_on_page
     ]
     Show.objects.bulk_create(shows_to_create, ignore_conflicts=True)
+
+    unique_show_ids = list({item['show_id'] for item in views_on_page})
+    enqueue_show_update(unique_show_ids, details=True, durations=False)
 
     q_objects = Q()
     for item in views_on_page:

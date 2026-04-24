@@ -2,6 +2,7 @@ import logging
 
 import requests
 from django.db import DatabaseError
+from django.db.models import Count
 
 from app.management.base import LoggableBaseCommand
 from app.models import Person
@@ -18,8 +19,37 @@ class Command(LoggableBaseCommand):
         parser.add_argument(
             '--force', action='store_true', help='Reset is_photo_fetched flag and retry everyone'
         )
+        parser.add_argument(
+            '--purge-dupes',
+            action='store_true',
+            help='Remove TMDB photos that belong to multiple different persons',
+        )
 
     def handle(self, *args, **options):
+        if options.get('purge_dupes'):
+            logging.info('Finding duplicate TMDB photo URLs to purge...')
+            duplicate_urls_qs = (
+                Person.objects.exclude(tmdb_photo_url__isnull=True)
+                .exclude(tmdb_photo_url='')
+                .values('tmdb_photo_url')
+                .annotate(cnt=Count('id'))
+                .filter(cnt__gt=1)
+            )
+
+            urls_to_purge = [item['tmdb_photo_url'] for item in duplicate_urls_qs]
+
+            if urls_to_purge:
+                purged_count = Person.objects.filter(tmdb_photo_url__in=urls_to_purge).update(
+                    tmdb_photo_url=None, is_photo_fetched=False
+                )
+                logging.info(
+                    f'Successfully purged {purged_count} persons '
+                    f'sharing {len(urls_to_purge)} duplicate URLs.'
+                )
+            else:
+                logging.info('No duplicate TMDB photos found.')
+            return
+
         limit = options.get('limit')
 
         if options.get('force'):

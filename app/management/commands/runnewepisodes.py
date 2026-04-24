@@ -6,18 +6,15 @@ from django.conf import settings
 from app.gdrive_backup import BackupManager
 from app.history_parser import (
     close_driver,
-    get_season_durations_and_save,
     get_total_pages,
     initialize_driver_session,
     open_url_safe,
     parse_new_episodes_list,
-    process_show_durations,
-    update_show_details,
 )
 from app.management.base import LoggableBaseCommand
 from app.models import Show, ShowDuration
+from app.utils import enqueue_show_update
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
-from shared.formatters import format_se
 
 
 class Command(LoggableBaseCommand):
@@ -95,38 +92,14 @@ class Command(LoggableBaseCommand):
                             show.type = show_type
                             show.save(update_fields=['type'])
 
-                        delay_needed = False
-
-                        if not show_has_details:
-                            logging.info(
-                                f'Show {show_id} missing details/year. Performing full update...'
+                        if not show_has_details or not duration_exists:
+                            enqueue_show_update(
+                                [show_id],
+                                details=not show_has_details,
+                                durations=not duration_exists,
                             )
-                            try:
-                                update_show_details(driver, show_id, session_type='main')
-                                process_show_durations(driver, show, session_type='main')
-                                delay_needed = True
-                            except Exception as e:
-                                logging.error(f'Failed full update for show {show_id}: {e}')
-
-                        elif not duration_exists:
-                            logging.info(
-                                f'Missing duration for {show_id} {format_se(season, episode)}.'
-                                f' Fetching season...'
-                            )
-                            try:
-                                get_season_durations_and_save(
-                                    driver, show_id, season, session_type='main'
-                                )
-                                delay_needed = True
-                            except Exception as e:
-                                logging.error(f'Failed duration update for {show_id}: {e}')
-
-                        new_items_on_page += 1
-                        total_processed_count += 1
-
-                        if delay_needed:
-                            logging.info('Waiting 60s before next request...')
-                            time.sleep(60)
+                            new_items_on_page += 1
+                            total_processed_count += 1
 
                     if new_items_on_page == 0:
                         logging.info(
@@ -139,7 +112,7 @@ class Command(LoggableBaseCommand):
 
             if total_processed_count > 0:
                 logging.info(
-                    f'Updated {total_processed_count} shows/episodes total. Scheduling backup.'
+                    f'Added {total_processed_count} tasks to update queue. Scheduling backup.'
                 )
                 BackupManager().schedule_backup()
             else:

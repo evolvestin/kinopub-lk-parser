@@ -305,6 +305,8 @@ class ShowAdmin(admin.ModelAdmin):
         'type',
         'status',
         'year',
+        'get_ext_kp_rating',
+        'get_ext_imdb_rating',
         'ignore_collision',
         'view_count',
         'total_duration_hours',
@@ -332,10 +334,10 @@ class ShowAdmin(admin.ModelAdmin):
         'status',
         'year',
         'kinopoisk_url',
-        'kinopoisk_rating',
+        'get_ext_kp_rating',
         'kinopoisk_votes',
         'imdb_url',
-        'imdb_rating',
+        'get_ext_imdb_rating',
         'imdb_votes',
         'created_at',
         'updated_at',
@@ -343,25 +345,8 @@ class ShowAdmin(admin.ModelAdmin):
     filter_horizontal = ('countries', 'genres')
     actions = ['action_update_details', 'action_update_durations']
 
-    def lookup_allowed(self, lookup, value):
-        allowed_lookups = [
-            'ext_rating__kp__isnull',
-            'ext_rating__imdb__isnull',
-            'ext_rating__isnull',
-            'kinopoisk_url__isnull',
-            'imdb_url__isnull',
-            'year__isnull',
-            'plot__isnull',
-            'genres__isnull',
-            'countries__isnull',
-            'type',
-        ]
-        if lookup in allowed_lookups:
-            return True
-        return super().lookup_allowed(lookup, value)
-
     def get_queryset(self, request):
-        queryset = super().get_queryset(request)
+        queryset = super().get_queryset(request).select_related('ext_rating')
 
         duration_subquery = (
             ShowDuration.objects.filter(show=OuterRef('pk'))
@@ -376,6 +361,20 @@ class ShowAdmin(admin.ModelAdmin):
             _avg_rating=Avg('ratings__rating'),
         )
         return queryset
+
+    @admin.display(description='KP', ordering='ext_rating__kp')
+    def get_ext_kp_rating(self, obj):
+        if hasattr(obj, 'ext_rating') and obj.ext_rating.kp is not None:
+            url = reverse('admin:app_externalrating_change', args=[obj.ext_rating.id])
+            return format_html('<a href="{}"><b>{}</b></a>', url, obj.ext_rating.kp)
+        return '-'
+
+    @admin.display(description='IMDb', ordering='ext_rating__imdb')
+    def get_ext_imdb_rating(self, obj):
+        if hasattr(obj, 'ext_rating') and obj.ext_rating.imdb is not None:
+            url = reverse('admin:app_externalrating_change', args=[obj.ext_rating.id])
+            return format_html('<a href="{}"><b>{}</b></a>', url, obj.ext_rating.imdb)
+        return '-'
 
     @admin.display(description='Views', ordering='_view_count')
     def view_count(self, obj):
@@ -842,7 +841,14 @@ class PhotoSourceFilter(admin.SimpleListFilter):
         has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
         has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
         tmdb_done = Q(is_photo_fetched=True)
-        kp_done = Q(showcrew__show__ext_rating__isnull=False)
+
+        invalid_url = Q(showcrew__show__kinopoisk_url__endswith='/film/0')
+        kp_waiting = (
+            Q(showcrew__show__kinopoisk_url__isnull=False)
+            & ~Q(showcrew__show__kinopoisk_url='')
+            & ~invalid_url
+            & Q(showcrew__show__ext_rating__isnull=True)
+        )
 
         val = self.value()
         if val == 'tmdb':
@@ -860,13 +866,15 @@ class PhotoSourceFilter(admin.SimpleListFilter):
         if val == 'tmdb_none':
             return queryset.filter(tmdb_done).exclude(has_tmdb)
         if val == 'kp_none':
-            return queryset.filter(kp_done).exclude(has_kp).distinct()
+            return queryset.exclude(has_kp).exclude(kp_waiting).distinct()
         if val == 'tmdb_wait':
             return queryset.exclude(tmdb_done | has_tmdb)
         if val == 'kp_wait':
-            return queryset.exclude(kp_done | has_kp).distinct()
+            return queryset.filter(kp_waiting).exclude(has_kp).distinct()
         if val == 'all_none':
-            return queryset.filter(tmdb_done, kp_done).exclude(has_tmdb | has_kp).distinct()
+            return (
+                queryset.filter(tmdb_done).exclude(has_tmdb | has_kp).exclude(kp_waiting).distinct()
+            )
         return queryset
 
 

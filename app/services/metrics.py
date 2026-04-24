@@ -123,8 +123,10 @@ def get_missing_imdb_list(show_type: str):
 
 
 def calculate_missing_kp_metric():
-    qs = Show.objects.filter(kinopoisk_url__isnull=False, ext_rating__isnull=True).exclude(
-        kinopoisk_url=''
+    qs = (
+        Show.objects.filter(kinopoisk_url__isnull=False, ext_rating__isnull=True)
+        .exclude(kinopoisk_url='')
+        .exclude(kinopoisk_url__endswith='/film/0')
     )
 
     stats = qs.values('type').annotate(total_missing=Count('id')).order_by('-total_missing')
@@ -202,6 +204,7 @@ def get_missing_kp_list(show_type: str):
     return (
         Show.objects.filter(type=show_type, kinopoisk_url__isnull=False, ext_rating__isnull=True)
         .exclude(kinopoisk_url='')
+        .exclude(kinopoisk_url__endswith='/film/0')
         .values('id', 'title', 'original_title')
     )
 
@@ -307,7 +310,14 @@ def calculate_persons_avatar_stats_metric():
     has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
     has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
     tmdb_done = Q(is_photo_fetched=True)
-    kp_done = Q(showcrew__show__ext_rating__isnull=False)
+
+    invalid_url = Q(showcrew__show__kinopoisk_url__endswith='/film/0')
+    kp_waiting = (
+        Q(showcrew__show__kinopoisk_url__isnull=False)
+        & ~Q(showcrew__show__kinopoisk_url='')
+        & ~invalid_url
+        & Q(showcrew__show__ext_rating__isnull=True)
+    )
 
     return [
         {'name': 'Есть фото (TMDB)', 'value': Person.objects.filter(has_tmdb).count()},
@@ -321,17 +331,18 @@ def calculate_persons_avatar_stats_metric():
         },
         {
             'name': 'KP не найдено',
-            'value': Person.objects.filter(kp_done).exclude(has_kp).distinct().count(),
+            'value': Person.objects.exclude(has_kp).exclude(kp_waiting).distinct().count(),
         },
         {'name': 'В ожидании TMDB', 'value': Person.objects.exclude(tmdb_done | has_tmdb).count()},
         {
             'name': 'В ожидании KP',
-            'value': Person.objects.exclude(kp_done | has_kp).distinct().count(),
+            'value': Person.objects.filter(kp_waiting).exclude(has_kp).distinct().count(),
         },
         {
             'name': 'Не найдено вообще',
-            'value': Person.objects.filter(tmdb_done, kp_done)
+            'value': Person.objects.filter(tmdb_done)
             .exclude(has_tmdb | has_kp)
+            .exclude(kp_waiting)
             .distinct()
             .count(),
         },
@@ -342,7 +353,14 @@ def get_persons_avatar_stats_list(category: str):
     has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
     has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
     tmdb_done = Q(is_photo_fetched=True)
-    kp_done = Q(showcrew__show__ext_rating__isnull=False)
+
+    invalid_url = Q(showcrew__show__kinopoisk_url__endswith='/film/0')
+    kp_waiting = (
+        Q(showcrew__show__kinopoisk_url__isnull=False)
+        & ~Q(showcrew__show__kinopoisk_url='')
+        & ~invalid_url
+        & Q(showcrew__show__ext_rating__isnull=True)
+    )
 
     qs = Person.objects.all()
     if category == 'Есть фото (TMDB)':
@@ -352,13 +370,13 @@ def get_persons_avatar_stats_list(category: str):
     elif category == 'TMDB не найдено':
         qs = qs.filter(tmdb_done).exclude(has_tmdb)
     elif category == 'KP не найдено':
-        qs = qs.filter(kp_done).exclude(has_kp)
+        qs = qs.exclude(has_kp).exclude(kp_waiting)
     elif category == 'В ожидании TMDB':
         qs = qs.exclude(tmdb_done | has_tmdb)
     elif category == 'В ожидании KP':
-        qs = qs.exclude(kp_done | has_kp)
+        qs = qs.filter(kp_waiting).exclude(has_kp)
     elif category == 'Не найдено вообще':
-        qs = qs.filter(tmdb_done, kp_done).exclude(has_tmdb | has_kp)
+        qs = qs.filter(tmdb_done).exclude(has_tmdb | has_kp).exclude(kp_waiting)
 
     return qs.distinct().values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
 
