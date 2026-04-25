@@ -39,7 +39,7 @@ class LogConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def get_recent_logs(self):
         LogEntry = apps.get_model('app', 'LogEntry')
-        logs = LogEntry.objects.all().order_by('-created_at')[:50]
+        logs = list(LogEntry.objects.all().order_by('-created_at')[:50])
         return list(reversed(logs))
 
     @database_sync_to_async
@@ -66,6 +66,8 @@ class LogConsumer(AsyncWebsocketConsumer):
         return {'history': history_data, 'schedule': scheduled_tasks}
 
     async def send_recent_logs(self):
+        await self.send(text_data=json.dumps({'type': 'connected'}))
+        
         recent_logs = await self.get_recent_logs()
         for log in recent_logs:
             await self.send(
