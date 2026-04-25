@@ -108,8 +108,8 @@ class Command(LoggableBaseCommand):
                         time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
                         driver = open_url_safe(driver, target_url, session_type='aux')
 
-                        page_title = driver.title
-                        if 'Not Found' in page_title or '404' in page_title:
+                        page_title = driver.title.strip()
+                        if page_title == 'Not Found (#404)':
                             success = True
                             continue
 
@@ -127,9 +127,12 @@ class Command(LoggableBaseCommand):
                             if not title_text:
                                 title_text = title_el.text.strip().split('\n')[0]
 
-                            # Проверяем заголовок на "мусорные" значения
-                            if title_text and title_text not in ('Авторизация', 'Browser', 'Error'):
-                                # Дополнительная проверка на наличие таблицы данных
+                            if title_text and title_text not in (
+                                'Авторизация',
+                                'Browser',
+                                'Not Found (#404)',
+                                'Error',
+                            ):
                                 has_info_table = (
                                     len(
                                         driver.find_elements(By.CSS_SELECTOR, 'table.table-striped')

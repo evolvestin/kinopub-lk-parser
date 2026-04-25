@@ -112,8 +112,9 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         logging.error(f'Failed to fetch show {show_id}: Stuck on login page.')
         return
 
-    if 'Not Found' in driver.title or '404' in driver.title:
-        logging.warning(f'Show {show_id} returned 404.')
+    page_title = driver.title.strip()
+    if page_title == 'Not Found (#404)':
+        logging.warning(f'Show {show_id} returned 404 (Not Found).')
         return
 
     try:
@@ -125,6 +126,11 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
                 )
             )
         except TimeoutException:
+            page_text = driver.find_element(By.TAG_NAME, 'body').text
+            if 'Запрошенная страница не найдена' in page_text:
+                logging.warning(f'Show {show_id} returned 404 content.')
+                return
+
             logging.warning(f'Info table not found for show {show_id}. Metadata update aborted.')
             return
 
@@ -150,6 +156,7 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
             'Авторизация',
             'Browser',
             '404 Not Found',
+            'Not Found (#404)',
             'Error',
             'Cloudflare',
             'Один момент',
