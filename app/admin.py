@@ -906,14 +906,27 @@ class PersonProfessionFilter(admin.SimpleListFilter):
     parameter_name = 'profession_norm'
 
     def lookups(self, request, model_admin):
-        return [(k, k) for k in PROFESSIONS_MAPPING_RU.keys()]
+        return [(k, k) for k in PROFESSIONS_MAPPING_RU.keys()] + [('Неизвестно', 'Неизвестно')]
 
     def queryset(self, request, queryset):
         val = self.value()
-        if val:
-            return queryset.filter(
-                showcrew__profession__in=PROFESSIONS_MAPPING_RU.get(val, [val])
+        if val == 'Неизвестно':
+            # Исключаем людей, у которых есть хоть одна распознанная роль в любом из полей
+            return queryset.exclude(
+                Q(showcrew__profession__in=RAW_TO_NORMALIZED_RU.keys())
+                | Q(showcrew__en_profession__in=RAW_TO_NORMALIZED_EN.keys())
             ).distinct()
+
+        if val:
+            # Находим эквивалентную EN роль для RU фильтра
+            en_val = PROFESSION_TRANS_MAP.get(val)
+            q_filter = Q(showcrew__profession__in=PROFESSIONS_MAPPING_RU.get(val, [val]))
+            if en_val:
+                q_filter |= Q(
+                    showcrew__en_profession__in=PROFESSIONS_MAPPING_EN.get(en_val, [en_val])
+                )
+
+            return queryset.filter(q_filter).distinct()
         return queryset
 
 
@@ -922,14 +935,24 @@ class PersonEnProfessionFilter(admin.SimpleListFilter):
     parameter_name = 'en_profession_norm'
 
     def lookups(self, request, model_admin):
-        return [(k, k) for k in PROFESSIONS_MAPPING_EN.keys()]
+        return [(k, k) for k in PROFESSIONS_MAPPING_EN.keys()] + [('Неизвестно', 'Неизвестно')]
 
     def queryset(self, request, queryset):
         val = self.value()
-        if val:
-            return queryset.filter(
-                showcrew__en_profession__in=PROFESSIONS_MAPPING_EN.get(val, [val])
+        if val == 'Неизвестно':
+            return queryset.exclude(
+                Q(showcrew__profession__in=RAW_TO_NORMALIZED_RU.keys())
+                | Q(showcrew__en_profession__in=RAW_TO_NORMALIZED_EN.keys())
             ).distinct()
+
+        if val:
+            # Находим эквивалентную RU роль для EN фильтра
+            ru_val = next((k for k, v in PROFESSION_TRANS_MAP.items() if v == val), None)
+            q_filter = Q(showcrew__en_profession__in=PROFESSIONS_MAPPING_EN.get(val, [val]))
+            if ru_val:
+                q_filter |= Q(showcrew__profession__in=PROFESSIONS_MAPPING_RU.get(ru_val, [ru_val]))
+
+            return queryset.filter(q_filter).distinct()
         return queryset
 
 
@@ -1087,38 +1110,20 @@ class PersonAdmin(BaseNameAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request).select_related('master_person')
 
-        f_ru = request.GET.get('profession_norm')
-        f_en = request.GET.get('en_profession_norm')
-
-        en_to_ru = {v: k for k, v in PROFESSION_TRANS_MAP.items()}
-        target_ru = f_ru or en_to_ru.get(f_en)
-        target_en = f_en or PROFESSION_TRANS_MAP.get(f_ru)
-
+        # Упрощенные подзапросы без Case и сложной сортировки для повышения производительности
         sc_ru = (
             ShowCrew.objects.filter(person=OuterRef('pk'))
             .exclude(profession__isnull=True)
             .exclude(profession='')
+            .order_by('id')
         )
-        if target_ru:
-            raw_ru = PROFESSIONS_MAPPING_RU.get(target_ru, [target_ru])
-            sc_ru = sc_ru.annotate(
-                p=Case(When(profession__in=raw_ru, then=Value(1)), default=Value(0))
-            ).order_by('-p', 'id')
-        else:
-            sc_ru = sc_ru.order_by('id')
 
         sc_en = (
             ShowCrew.objects.filter(person=OuterRef('pk'))
             .exclude(en_profession__isnull=True)
             .exclude(en_profession='')
+            .order_by('id')
         )
-        if target_en:
-            raw_en = PROFESSIONS_MAPPING_EN.get(target_en, [target_en])
-            sc_en = sc_en.annotate(
-                p=Case(When(en_profession__in=raw_en, then=Value(1)), default=Value(0))
-            ).order_by('-p', 'id')
-        else:
-            sc_en = sc_en.order_by('id')
 
         return qs.annotate(
             _primary_ru_prof=Subquery(sc_ru.values('profession')[:1]),

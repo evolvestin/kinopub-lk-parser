@@ -9,6 +9,7 @@ from django.utils import timezone
 from app.models import Country, Genre, Person, Show, ShowCrew, SiteMetric
 from shared.constants import (
     GENRES_MAPPING,
+    PROFESSION_TRANS_MAP,
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_EN,
@@ -382,23 +383,50 @@ def get_persons_avatar_stats_list(category: str):
 
 
 def calculate_professions_stats_metric():
-    stats = (
-        ShowCrew.objects.annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
-        .values('profession')
-        .annotate(total=Count('canonical_id', distinct=True))
+    # Собираем всех людей, у которых есть хоть какая-то привязка к ролям
+    # Считаем их по нормализованным RU ролям, используя кросс-маппинг
+
+    # Инвертированный маппинг EN -> RU для кросс-чека
+    en_to_ru_map = {v: k for k, v in PROFESSION_TRANS_MAP.items()}
+
+    # Получаем все записи, где заполнено хотя бы одно поле
+    crew_qs = (
+        ShowCrew.objects.exclude(
+            Q(profession__isnull=True, en_profession__isnull=True)
+            | Q(profession='', en_profession='')
+        )
+        .annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
+        .values('profession', 'en_profession', 'canonical_id')
     )
 
-    merged = {k: 0 for k in PROFESSIONS_MAPPING_RU.keys()}
-    for item in stats:
-        norm = RAW_TO_NORMALIZED_RU.get(item['profession'])
-        if norm and norm in merged:
-            merged[norm] += item['total']
-        else:
-            merged[norm] = item['total']
+    merged = defaultdict(set)  # {NormName: {person_ids}}
 
-    return [
-        {'name': k, 'value': v} for k, v in sorted(merged.items(), key=lambda x: x[1], reverse=True)
-    ]
+    for row in crew_qs:
+        norm_ru = RAW_TO_NORMALIZED_RU.get(row['profession'])
+        if not norm_ru and row['en_profession']:
+            norm_en = RAW_TO_NORMALIZED_EN.get(row['en_profession'])
+            norm_ru = en_to_ru_map.get(norm_en)
+
+        if norm_ru:
+            merged[norm_ru].add(row['canonical_id'])
+
+    result = [{'name': k, 'value': len(v)} for k, v in merged.items()]
+
+    # Неизвестно — это те, у кого вообще нет распознанных ролей
+    unknown_count = (
+        Person.objects.filter(master_person__isnull=True)
+        .exclude(
+            Q(showcrew__profession__in=RAW_TO_NORMALIZED_RU.keys())
+            | Q(showcrew__en_profession__in=RAW_TO_NORMALIZED_EN.keys())
+        )
+        .distinct()
+        .count()
+    )
+
+    if unknown_count > 0:
+        result.append({'name': 'Неизвестно', 'value': unknown_count})
+
+    return sorted(result, key=lambda x: x['value'], reverse=True)
 
 
 def get_professions_stats_list(profession: str):
@@ -497,23 +525,43 @@ def get_duplicate_photo_urls_list(source_type: str):
 
 
 def calculate_en_professions_stats_metric():
-    stats = (
-        ShowCrew.objects.annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
-        .values('en_profession')
-        .annotate(total=Count('canonical_id', distinct=True))
+    # Аналогичная логика для английских метрик
+    crew_qs = (
+        ShowCrew.objects.exclude(
+            Q(profession__isnull=True, en_profession__isnull=True)
+            | Q(profession='', en_profession='')
+        )
+        .annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
+        .values('profession', 'en_profession', 'canonical_id')
     )
 
-    merged = {k: 0 for k in PROFESSIONS_MAPPING_EN.keys()}
-    for item in stats:
-        norm = RAW_TO_NORMALIZED_EN.get(item['en_profession'])
-        if norm and norm in merged:
-            merged[norm] += item['total']
-        else:
-            merged[norm] = item['total']
+    merged = defaultdict(set)
 
-    return [
-        {'name': k, 'value': v} for k, v in sorted(merged.items(), key=lambda x: x[1], reverse=True)
-    ]
+    for row in crew_qs:
+        norm_en = RAW_TO_NORMALIZED_EN.get(row['en_profession'])
+        if not norm_en and row['profession']:
+            norm_ru = RAW_TO_NORMALIZED_RU.get(row['profession'])
+            norm_en = PROFESSION_TRANS_MAP.get(norm_ru)
+
+        if norm_en:
+            merged[norm_en].add(row['canonical_id'])
+
+    result = [{'name': k, 'value': len(v)} for k, v in merged.items()]
+
+    unknown_count = (
+        Person.objects.filter(master_person__isnull=True)
+        .exclude(
+            Q(showcrew__profession__in=RAW_TO_NORMALIZED_RU.keys())
+            | Q(showcrew__en_profession__in=RAW_TO_NORMALIZED_EN.keys())
+        )
+        .distinct()
+        .count()
+    )
+
+    if unknown_count > 0:
+        result.append({'name': 'Неизвестно', 'value': unknown_count})
+
+    return sorted(result, key=lambda x: x['value'], reverse=True)
 
 
 def get_en_professions_stats_list(en_profession: str):
