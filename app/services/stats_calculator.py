@@ -31,6 +31,8 @@ from app.models import Person, ShowDuration, UserRating, ViewHistory, ViewUserGr
 from shared.constants import (
     ACTOR_ROLES,
     DIRECTOR_ROLES,
+    PROFESSIONS_MAPPING_EN,
+    PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_GENRE,
     WRITER_ROLES,
 )
@@ -169,12 +171,24 @@ def _get_favorites(base_qs, dur_qs):
         )
 
     def get_person_top(professions, limit=5):
-        role_filter = Q(show__showcrew__profession__in=professions) | Q(
+        role_cond = Q(show__showcrew__profession__in=professions) | Q(
             show__showcrew__en_profession__in=professions
         )
 
+        if professions == ACTOR_ROLES:
+            dub_ru = PROFESSIONS_MAPPING_RU.get('Актёр дубляжа', [])
+            dub_en = PROFESSIONS_MAPPING_EN.get('Dubbing actor', [])
+
+            final_role_filter = (
+                role_cond
+                & ~Q(show__showcrew__profession__in=dub_ru)
+                & ~Q(show__showcrew__en_profession__in=dub_en)
+            )
+        else:
+            final_role_filter = role_cond
+
         canonical_qs = (
-            base_qs.filter(role_filter)
+            base_qs.filter(final_role_filter)
             .annotate(
                 canonical_id=Coalesce(
                     'show__showcrew__person__master_person_id', 'show__showcrew__person__id'
@@ -196,11 +210,8 @@ def _get_favorites(base_qs, dur_qs):
 
             target_ids = [cid] + list(person.aliases.values_list('id', flat=True))
 
-            person_role_filter = Q(show__showcrew__profession__in=professions) | Q(
-                show__showcrew__en_profession__in=professions
-            )
             person_shows = base_qs.filter(show__showcrew__person__id__in=target_ids).filter(
-                person_role_filter
+                final_role_filter
             )
 
             show_ids = list(person_shows.values_list('show_id', flat=True).distinct())
@@ -751,6 +762,94 @@ def generate_group_stats(user, year=None):
         'genres': favs['genres'],
         'history_movies': history_movies,
         'history_episodes': history_episodes,
+    }
+
+    cache_timeout = 60 if settings.DEBUG else 3600
+    cache.set(cache_key, result, timeout=cache_timeout)
+    return result
+
+
+def generate_global_stats(year=None):
+    cache_key = f'global_stats_v1:{year or "all"}'
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
+
+    history_filter = Q(is_checked=True)
+    if year:
+        history_filter &= Q(view_date__year=year)
+
+    base_qs = (
+        ViewHistory.objects.filter(history_filter).select_related('show').prefetch_related('users')
+    )
+
+    episode_dur = ShowDuration.objects.filter(
+        show_id=OuterRef('show_id'),
+        season_number=OuterRef('season_number'),
+        episode_number=OuterRef('episode_number'),
+    )
+    movie_dur = ShowDuration.objects.filter(
+        show_id=OuterRef('show_id'),
+        season_number__isnull=True,
+        episode_number__isnull=True,
+    )
+
+    dur_qs = base_qs.annotate(
+        duration=Case(
+            When(season_number=0, then=Subquery(movie_dur.values('duration_seconds')[:1])),
+            default=Subquery(episode_dur.values('duration_seconds')[:1]),
+        )
+    ).annotate(final_duration=Coalesce('duration', 0))
+
+    all_years_qs = (
+        ViewHistory.objects.filter(is_checked=True)
+        .annotate(y=ExtractYear('view_date'))
+        .values_list('y', flat=True)
+        .distinct()
+    )
+    all_years = sorted(list(set(all_years_qs)), reverse=True)
+
+    summary = _get_yearly_summary(base_qs, dur_qs, year)
+    favs = _get_favorites(base_qs, dur_qs)
+    monthly_chart = _get_monthly_chart(base_qs, dur_qs)
+    weekday_chart = _get_weekday_chart(base_qs)
+    heatmap = _get_heatmap(dur_qs, year, all_years)
+    binge = _get_binge_records(base_qs)
+
+    ratings_qs = UserRating.objects.all()
+    if year:
+        ratings_qs = ratings_qs.filter(updated_at__year=year)
+
+    total_ratings = ratings_qs.count()
+    avg_rating = ratings_qs.aggregate(avg=Avg('rating'))['avg'] or 0.0
+
+    dist_data = {str(i): 0 for i in range(1, 11)}
+    for r in ratings_qs.values('rating').annotate(cnt=Count('id')):
+        bucket = str(int(r['rating'])) if r['rating'] >= 1 else '1'
+        dist_data[bucket] += r['cnt']
+
+    dist_list = [dist_data[str(i)] for i in range(1, 11)]
+
+    result = {
+        'meta': {
+            'years': all_years,
+        },
+        'summary': summary,
+        'genres': favs['genres'],
+        'actors': favs['actors'],
+        'directors': favs['directors'],
+        'writers': favs['writers'],
+        'countries': favs['countries'],
+        'binges': binge,
+        'monthly_chart': monthly_chart,
+        'weekday_chart': weekday_chart,
+        'heatmap': heatmap,
+        'ratings': {
+            'total': total_ratings,
+            'avg': round(avg_rating, 1),
+            'distribution': dist_list,
+            'history': [],
+        },
     }
 
     cache_timeout = 60 if settings.DEBUG else 3600

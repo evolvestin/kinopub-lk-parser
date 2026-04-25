@@ -1,4 +1,7 @@
 import json
+import shlex
+import subprocess
+import sys
 from argparse import _StoreFalseAction, _StoreTrueAction
 
 from django.conf import settings
@@ -8,7 +11,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import path, reverse
 
-from app.dashboard import dashboard_callback, get_scheduled_tasks_info  # Обновленный импорт
+from app.dashboard import dashboard_callback, get_scheduled_tasks_info
 from app.models import TaskRun
 from app.tasks import run_admin_command
 from kinopub_parser import celery_app
@@ -233,6 +236,36 @@ class CustomAdminSite(admin.AdminSite):
                             args_list.append(f'{arg["name"]} {json.dumps(value)}')
 
                 arguments_str = ' '.join(args_list)
+
+                if command_name == 'resetlocks':
+                    task_run = TaskRun.objects.create(
+                        command=command_name, arguments=arguments_str, status='RUNNING'
+                    )
+
+                    cmd = [sys.executable, 'manage.py', command_name]
+                    if arguments_str:
+                        cmd.extend(shlex.split(arguments_str))
+
+                    try:
+                        result = subprocess.run(
+                            cmd, capture_output=True, text=True, cwd=settings.BASE_DIR, timeout=60
+                        )
+                        task_run.output = (result.stdout + '\n' + result.stderr).strip()
+                        if result.returncode == 0:
+                            task_run.status = 'SUCCESS'
+                        else:
+                            task_run.status = 'FAILURE'
+                            task_run.error_message = f'Exit code: {result.returncode}'
+                    except Exception as e:
+                        task_run.status = 'FAILURE'
+                        task_run.error_message = str(e)
+
+                    task_run.save()
+                    messages.success(
+                        request,
+                        f'Команда {command_name} выполнена принудительно (в обход очереди).',
+                    )
+                    return redirect('admin:task_control')
 
                 TaskRun.objects.create(command=command_name, arguments=arguments_str)
                 last_run = TaskRun.objects.order_by('-id').first()
