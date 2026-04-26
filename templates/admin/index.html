@@ -203,11 +203,11 @@
             document.getElementById('card-genres').style.display = 'none';
         }
 
-        if (D.actors?.length > 0) { document.getElementById('card-actors').style.display = 'flex'; fillList('actors-list', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors'); }
-        if (D.directors?.length > 0) { document.getElementById('card-directors').style.display = 'flex'; fillList('directors-list', D.directors, null, ['просмотр', 'просмотра', 'просмотров'], 'directors'); }
-        if (D.writers?.length > 0) { document.getElementById('card-writers').style.display = 'flex'; fillList('writers-list', D.writers, null, ['просмотр', 'просмотра', 'просмотров'], 'writers'); }
-        if (D.countries?.length > 0) { document.getElementById('card-countries').style.display = 'flex'; fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries'); }
-        if (D.binges?.length > 0) { document.getElementById('card-binges').style.display = 'flex'; fillBinges(); }
+        if (D.actors?.length > 0) { document.getElementById('card-actors').style.display = 'block'; fillList('actors-list', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors'); }
+        if (D.directors?.length > 0) { document.getElementById('card-directors').style.display = 'block'; fillList('directors-list', D.directors, null, ['просмотр', 'просмотра', 'просмотров'], 'directors'); }
+        if (D.writers?.length > 0) { document.getElementById('card-writers').style.display = 'block'; fillList('writers-list', D.writers, null, ['просмотр', 'просмотра', 'просмотров'], 'writers'); }
+        if (D.countries?.length > 0) { document.getElementById('card-countries').style.display = 'block'; fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries'); }
+        if (D.binges?.length > 0) { document.getElementById('card-binges').style.display = 'block'; fillBinges(); }
 
         if (D.ratings?.total > 0) {
             const rt = D.ratings;

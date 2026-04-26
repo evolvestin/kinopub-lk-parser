@@ -31,6 +31,7 @@ from app.models import (
     ViewHistory,
     ViewUser,
     ViewUserGroup,
+    ExternalRating,
 )
 from app.services.metrics import (
     calculate_duplicate_photo_urls_metric,
@@ -206,7 +207,22 @@ def index(request):
     )
     unused_persons = get_or_update_metric('unused_persons', calculate_unused_persons_metric)
 
+    def _get_latest_date(qs, field):
+        dt = qs.order_by(f'-{field}').values_list(field, flat=True).first()
+        if dt:
+            return timezone.localtime(dt).strftime('%d.%m.%Y %H:%M')
+        return 'Никогда'
+
+    last_actions = {
+        'history': _get_latest_date(ViewHistory.objects.all(), 'created_at'),
+        'shows': _get_latest_date(Show.objects.all(), 'created_at'),
+        'ratings': _get_latest_date(ExternalRating.objects.all(), 'updated_at'),
+        'durations': _get_latest_date(ShowDuration.objects.all(), 'updated_at'),
+        'photos': _get_latest_date(Person.objects.filter(is_photo_fetched=True), 'updated_at'),
+    }
+
     context = {
+        'last_actions': last_actions,
         'metrics_json': json.dumps(
             {
                 'missing_kp': missing_kp,
@@ -232,7 +248,7 @@ def index(request):
                 'duplicate_photo_urls': duplicate_photo_urls,
                 'unused_persons': unused_persons,
             }
-        )
+        ),
     }
     return render(request, 'index.html', context)
 
