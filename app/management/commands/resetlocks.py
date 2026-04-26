@@ -1,5 +1,7 @@
 import logging
-
+import os
+import signal
+import subprocess
 from django.conf import settings
 from redis import Redis
 
@@ -19,50 +21,40 @@ class Command(LoggableBaseCommand):
         )
 
     def handle(self, *args, **options):
-        lock_keys_patterns = [
-            'selenium_global_lock',
-            'backup_lock',
-            'cookies_backup_lock',
-            'sync_poiskkino_ratings',
-            'lock:selenium_global_lock',
-            'lock:backup_lock',
-        ]
-
         try:
             r = Redis.from_url(settings.CELERY_BROKER_URL)
             removed_locks_count = 0
 
-            for pattern in lock_keys_patterns:
-                keys = r.keys(f'*{pattern}*')
-                for key in keys:
-                    if r.delete(key):
-                        removed_locks_count += 1
-                        logging.info(
-                            f'Lock "{key.decode() if isinstance(key, bytes) else key}" '
-                            'has been reset.'
-                        )
+            # Ищем ВООБЩЕ ВСЕ ключи блокировок по паттернам
+            all_keys = set()
+            for p in ['*lock*', '*queue*']:
+                all_keys.update(r.keys(p))
 
+            for key in all_keys:
+                if r.delete(key):
+                    removed_locks_count += 1
+                    logging.info(f'Key "{key.decode() if isinstance(key, bytes) else key}" deleted.')
+
+            # Сбрасываем все зависшие TaskRun
             stuck_tasks = TaskRun.objects.filter(status__in=['RUNNING', 'QUEUED'])
             stuck_count = stuck_tasks.count()
             if stuck_count > 0:
                 stuck_tasks.update(
-                    status='FAILURE', error_message='Forced reset via resetlocks command.'
+                    status='FAILURE', 
+                    error_message='Forced reset via resetlocks. Check worker logs for TimeLimitExceeded.'
                 )
-                logging.info(f'Marked {stuck_count} stuck tasks as FAILURE in database.')
+                logging.info(f'Marked {stuck_count} tasks as FAILURE.')
 
             if options.get('purge'):
-                logging.info('Purging Celery queues in Redis...')
                 celery_app.control.purge()
-                logging.info('Redis queue purged successfully.')
+                logging.info('Celery queues purged.')
 
-            if removed_locks_count == 0 and stuck_count == 0:
-                logging.info('No active locks or stuck tasks found.')
-            else:
-                logging.info(
-                    f'Cleanup finished. Locks reset: {removed_locks_count}. '
-                    f'Tasks reset: {stuck_count}.'
-                )
+            # Очистка зомби-процессов Chrome
+            subprocess.run(['pkill', '-f', 'chromium'], stderr=subprocess.DEVNULL)
+            subprocess.run(['pkill', '-f', 'chromedriver'], stderr=subprocess.DEVNULL)
+
+            logging.info(f'Cleanup finished. Keys reset: {removed_locks_count}. Tasks: {stuck_count}.')
 
         except Exception as e:
-            logging.error(f'Failed to perform full reset: {e}')
+            logging.error(f'Failed reset: {e}')
             raise e

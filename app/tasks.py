@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from datetime import timedelta
 
 from celery import shared_task
+from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.management import call_command
 from django.utils import timezone
@@ -46,8 +47,9 @@ from app.telegram_bot import TelegramSender
 @contextmanager
 def _redis_lock(lock_name, timeout):
     redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
-    lock = redis_client.lock(lock_name, timeout=timeout)
-    acquired = lock.acquire(blocking=False)
+    # Используем прямой SET NX EX для гарантии атомарности TTL
+    # Если команда прошла успешно, ключ ВЫСТАВИТСЯ сразу с временем жизни
+    acquired = redis_client.set(f"lock:{lock_name}", "locked", ex=timeout, nx=True)
 
     if not acquired:
         logging.warning(f'Lock acquisition failed for "{lock_name}". Resource is busy.')
@@ -57,7 +59,7 @@ def _redis_lock(lock_name, timeout):
     finally:
         if acquired:
             try:
-                lock.release()
+                redis_client.delete(f"lock:{lock_name}")
             except Exception as e:
                 logging.warning(f'Failed to release lock {lock_name}: {e}')
 
@@ -68,17 +70,18 @@ def single_instance_task(lock_name, timeout):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            with _redis_lock(lock_name, timeout) as acquired:
+            # Важно: TTL блокировки должен быть чуть больше лимита задачи
+            with _redis_lock(lock_name, timeout + 60) as acquired:
                 if not acquired:
-                    logging.warning(f'Skipping task {func.__name__}: Resource {lock_name} is busy.')
                     return
                 try:
                     return func(*args, **kwargs)
+                except SoftTimeLimitExceeded:
+                    logging.error(f'Task {func.__name__} hit SoftTimeLimit.')
+                    raise
                 except Exception as e:
                     logging.error(f'Celery task {func.__name__} failed: {e}', exc_info=True)
-
         return wrapper
-
     return decorator
 
 
@@ -89,9 +92,13 @@ def safe_execution(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
+        except SoftTimeLimitExceeded:
+            logging.critical(f'CRITICAL: Task {func.__name__} timed out (Soft limit). Force exiting.')
+            # Мы не ловим исключение здесь, чтобы Celery пометил задачу как Failed,
+            # но логируем факт падения.
+            raise
         except Exception as e:
             logging.error(f'Celery task: {func.__name__} failed: {e}', exc_info=True)
-
     return wrapper
 
 
@@ -479,9 +486,12 @@ def run_gap_scanner_task():
     call_command('rungapscanner')
 
 
-@shared_task(time_limit=1800, soft_time_limit=1700)
+@shared_task(
+    time_limit=3600,
+    soft_time_limit=3300
+)
+@single_instance_task(lock_name='fetch_person_photos_lock', timeout=3600)
 @safe_execution
-@single_instance_task(lock_name='fetch_person_photos_lock', timeout=1800)
 def fetch_person_photos_task(limit=500):
     call_command('fetchpersonphotos', limit=limit)
 
