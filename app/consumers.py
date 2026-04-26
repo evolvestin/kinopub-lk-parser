@@ -4,7 +4,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.apps import apps
 
-from app.dashboard import get_scheduled_tasks_info  # Импорт общей функции
+from app.utils import get_scheduled_tasks_info
 from shared.constants import DATETIME_FORMAT
 
 
@@ -67,7 +67,7 @@ class LogConsumer(AsyncWebsocketConsumer):
 
     async def send_recent_logs(self):
         await self.send(text_data=json.dumps({'type': 'connected'}))
-        
+
         recent_logs = await self.get_recent_logs()
         for log in recent_logs:
             await self.send(

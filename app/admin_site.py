@@ -11,9 +11,10 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import path, reverse
 
-from app.dashboard import dashboard_callback, get_scheduled_tasks_info
+from app.dashboard import dashboard_callback
 from app.models import TaskRun
 from app.tasks import run_admin_command
+from app.utils import get_scheduled_tasks_info
 from kinopub_parser import celery_app
 from shared.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING
 
