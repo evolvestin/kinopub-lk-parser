@@ -54,9 +54,11 @@ from app.services.metrics import (
     calculate_total_persons_by_show_type_metric,
     calculate_total_shows_metric,
     calculate_unmapped_genres_metric,
+    calculate_unused_persons_metric,
     get_active_countries_list,
     get_duplicate_photo_urls_list,
     get_missing_country_meta_list,
+    get_missing_durations_list,
     get_missing_imdb_list,
     get_missing_kp_list,
     get_missing_plot_list,
@@ -202,6 +204,7 @@ def index(request):
     duplicate_photo_urls = get_or_update_metric(
         'duplicate_photo_urls', calculate_duplicate_photo_urls_metric
     )
+    unused_persons = get_or_update_metric('unused_persons', calculate_unused_persons_metric)
 
     context = {
         'metrics_json': json.dumps(
@@ -227,6 +230,7 @@ def index(request):
                 'professions_stats': professions_stats,
                 'en_professions_stats': en_professions_stats,
                 'duplicate_photo_urls': duplicate_photo_urls,
+                'unused_persons': unused_persons,
             }
         )
     }
@@ -1357,7 +1361,9 @@ def webapp_search(request):
 @require_http_methods(['GET'])
 def get_metric_details(request, key):
     show_type = request.GET.get('type')
-    is_person_metric = any(x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo'])
+    is_person_metric = any(
+        x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo', 'unused_persons']
+    )
     is_country_metric = 'country' in key
     is_genre_metric = 'genre' in key
 
@@ -1399,8 +1405,6 @@ def get_metric_details(request, key):
         items = list(get_missing_plot_list(show_type))
         query_params.update({'type': show_type, 'plot__isnull': 'True'})
     elif key == 'missing_durations':
-        from app.services.metrics import get_missing_durations_list
-
         items = list(get_missing_durations_list(show_type))
         query_params.update({'type': show_type, 'showduration__isnull': 'True'})
         target_task = 'durations'
@@ -1457,6 +1461,9 @@ def get_metric_details(request, key):
     elif key == 'duplicate_photo_urls':
         is_person, items = True, list(get_duplicate_photo_urls_list(show_type))
         query_params['q'] = show_type
+    elif key == 'unused_persons':
+        is_summary = True
+        query_params['showcrew__isnull'] = 'True'
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
 
@@ -1497,12 +1504,12 @@ def get_metric_details(request, key):
                 item.update(
                     {
                         'is_person': True,
-                        'title': item['title'],
-                        'original_title': item['en_name'],
+                        'title': item.get('name', item.get('title')),
+                        'original_title': item.get('en_name'),
                         'poster_url': item.get('tmdb_photo_url') or item.get('kp_photo_url') or '',
                         'admin_url': (
                             f'{reverse("admin:app_person_changelist")}'
-                            f'?q={urllib.parse.quote(item["title"])}'
+                            f'?q={urllib.parse.quote(item.get("name", item.get("title", "")))}'
                         ),
                     }
                 )

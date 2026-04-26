@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from django import db
 from django.db import DatabaseError
 from django.db.models import Count
 
@@ -51,54 +52,66 @@ class Command(LoggableBaseCommand):
             return
 
         limit = options.get('limit')
-
         if options.get('force'):
-            logging.info(
-                'Force flag detected. Resetting is_photo_fetched for all persons without photos.'
-            )
+            logging.info('Force flag detected. Resetting is_photo_fetched for missing photos.')
             Person.objects.filter(tmdb_photo_url__isnull=True, kp_photo_url__isnull=True).update(
                 is_photo_fetched=False
             )
 
-        persons = Person.objects.filter(is_photo_fetched=False).order_by('updated_at')[:limit]
-
-        if not persons:
-            logging.info('No persons need photo fetching.')
-            return
-
-        count = 0
-        total = len(persons)
+        processed_count = 0
         consecutive_errors = 0
         error_threshold = 5
+        batch_size = 100
 
-        logging.info(f'Starting photo fetch for {total} persons (Batch limit: {limit}).')
+        # Мы используем исключение обработанных ID, чтобы не зацикливаться на ошибках сети
+        failed_ids = []
 
-        for idx, person in enumerate(persons, start=1):
-            try:
-                if fetch_person_photo_from_tmdb(person):
-                    count += 1
-                    consecutive_errors = 0
+        logging.info(f'Starting photo fetch. Target limit: {limit}')
 
-                if idx % 100 == 0:
-                    logging.info(f'Progress: {idx}/{total} processed...')
+        while processed_count < limit:
+            current_batch_limit = min(batch_size, limit - processed_count)
 
-            except DatabaseError as e:
-                logging.critical(f'Fatal database error on person {person.name}: {e}')
-                return
-            except requests.RequestException as e:
-                consecutive_errors += 1
-                logging.warning(
-                    f'TMDB request failed for '
-                    f'{person.name} ({consecutive_errors}/{error_threshold}): {e}'
-                )
-                if consecutive_errors >= error_threshold:
-                    logging.error(
-                        f'Aborting batch: '
-                        f'TMDB API is unreachable after {error_threshold} consecutive errors.'
+            # Выбираем только тех, кого еще не трогали в этом запуске
+            batch = list(
+                Person.objects.filter(is_photo_fetched=False)
+                .exclude(id__in=failed_ids)
+                .order_by('id')[:current_batch_limit]
+            )
+
+            if not batch:
+                break
+
+            for person in batch:
+                try:
+                    if fetch_person_photo_from_tmdb(person):
+                        processed_count += 1
+                        consecutive_errors = 0
+                    else:
+                        # Если метод вернул False без исключения,
+                        # значит он сам пометил person как обработанный (is_photo_fetched=True)
+                        processed_count += 1
+
+                except DatabaseError as e:
+                    logging.critical(f'Fatal database error on person {person.name}: {e}')
+                    return
+                except requests.RequestException as e:
+                    consecutive_errors += 1
+                    failed_ids.append(person.id)
+                    logging.warning(
+                        f'TMDB request failed for {person.name} '
+                        f'({consecutive_errors}/{error_threshold}): {e}'
                     )
-                    break
-                continue
-            except Exception as e:
-                logging.error(f'Skipping {person.name} due to unexpected error: {e}')
+                    if consecutive_errors >= error_threshold:
+                        logging.error('Aborting: TMDB API is unreachable.')
+                        return
+                except Exception as e:
+                    failed_ids.append(person.id)
+                    logging.error(f'Skipping {person.name} due to unexpected error: {e}')
 
-        logging.info(f'Successfully processed {count} persons.')
+                if processed_count % 50 == 0:
+                    logging.info(f'Progress: {processed_count} processed...')
+
+            # Критически важно для предотвращения утечки памяти в Django
+            db.reset_queries()
+
+        logging.info(f'Successfully processed {processed_count} persons.')

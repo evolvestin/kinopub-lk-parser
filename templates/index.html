@@ -565,6 +565,27 @@
                 </div>
                 <div id="legend-en-professions" class="legend-grid"></div>
             </div>
+
+            <div class="card hoverable anim-item">
+                <div class="label label-clickable" onclick="toggleMetricDesc(this)">
+                    <div class="icon" style="color:var(--danger)">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    </div>
+                    Балласт
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" style="margin-left:auto; opacity:0.5">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="metric-desc">
+                    Люди, которые присутствуют в базе данных, но не привязаны ни к одному фильму или сериалу.
+                </div>
+                <div class="chart-box" style="height: clamp(180px, 25vh, 260px); min-height: 180px;">
+                    <canvas id="unusedPersonsChart"></canvas>
+                </div>
+                <div id="legend-unused-persons" class="legend-grid"></div>
+            </div>
         </div>
         
     </div>
@@ -609,7 +630,8 @@
             'persons_avatar_stats': 'Фото людей',
             'professions_stats': 'Роли (профессии)',
             'en_professions_stats': 'Роли (EN)',
-            'duplicate_photo_urls': 'Одинаковые фото (дубли)'
+            'duplicate_photo_urls': 'Одинаковые фото (дубли)',
+            'unused_persons': 'Балласт'
         };
 
         const METRIC_SEVERITY = {
@@ -633,6 +655,7 @@
             'persons_avatar_stats': 'warning',
             'professions_stats': 'info',
             'duplicate_photo_urls': 'critical',
+            'unused_persons': 'critical',
         };
 
         const PALETTES = {
@@ -1362,7 +1385,7 @@
                 'personsByTypeChart', 
                 'legend-persons-by-type', 
                 allMetrics.total_persons_by_show_type[period], 
-                'ЛЮДЕЙ', 
+                'ЧЕЛОВЕК', 
                 'value'
             );
 
@@ -1399,6 +1422,15 @@
                 'legend-duplicate-photo', 
                 allMetrics.duplicate_photo_urls[period], 
                 'ДУБЛЕЙ URL', 
+                'value'
+            );
+
+            renderDoughnut(
+                'unused_persons', 
+                'unusedPersonsChart', 
+                'legend-unused-persons', 
+                allMetrics.unused_persons[period], 
+                'ЧЕЛОВЕК', 
                 'value'
             );
         }

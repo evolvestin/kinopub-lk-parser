@@ -39,6 +39,7 @@ from app.services.metrics import (
     calculate_total_genres_metric,
     calculate_total_persons_by_show_type_metric,
     calculate_unmapped_genres_metric,
+    calculate_unused_persons_metric,
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
@@ -572,5 +573,8 @@ def update_site_metrics_task():
 
     duplicate_photo_data = calculate_duplicate_photo_urls_metric()
     SiteMetric.objects.create(key='duplicate_photo_urls', data=duplicate_photo_data)
+
+    unused_persons_data = calculate_unused_persons_metric()
+    SiteMetric.objects.create(key='unused_persons', data=unused_persons_data)
 
     logging.info('Site metrics updated successfully.')

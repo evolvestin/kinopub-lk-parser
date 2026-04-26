@@ -643,3 +643,16 @@ def get_missing_durations_list(show_type: str):
     return Show.objects.filter(type=show_type, showduration__isnull=True).values(
         'id', 'title', 'original_title'
     )
+
+
+def calculate_unused_persons_metric():
+    count = Person.objects.filter(showcrew__isnull=True).count()
+    return [{'name': 'Без ролей', 'value': count}]
+
+
+def get_unused_persons_list():
+    return (
+        Person.objects.filter(showcrew__isnull=True)
+        .order_by('-created_at')
+        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
+    )

@@ -42,7 +42,7 @@ class Command(LoggableBaseCommand):
             if stuck_count > 0:
                 stuck_tasks.update(
                     status='FAILURE',
-                    error_message='Forced reset via resetlocks. Check worker logs for TimeLimitExceeded.',
+                    error_message='Forced reset via resetlocks. Check logs for TimeLimitExceeded.',
                 )
                 logging.info(f'Marked {stuck_count} tasks as FAILURE.')
 

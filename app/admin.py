@@ -1179,6 +1179,7 @@ class PersonAdmin(BaseNameAdmin):
     def lookup_allowed(self, lookup, value):
         allowed_related = [
             'master_person__isnull',
+            'showcrew__isnull',
             'showcrew__profession',
             'showcrew__en_profession',
             'showcrew__profession__exact',
