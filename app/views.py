@@ -37,30 +37,9 @@ from app.models import (
     ViewUserGroup,
 )
 from app.services.metrics import (
-    calculate_duplicate_photo_urls_metric,
-    calculate_en_professions_stats_metric,
-    calculate_has_imdb_metric,
-    calculate_has_kp_metric,
-    calculate_missing_country_meta_metric,
-    calculate_missing_durations_metric,
-    calculate_missing_imdb_metric,
-    calculate_missing_kp_metric,
-    calculate_missing_plot_metric,
-    calculate_missing_status_metric,
-    calculate_missing_year_metric,
-    calculate_no_countries_metric,
-    calculate_no_genres_metric,
-    calculate_persons_avatar_stats_metric,
-    calculate_professions_stats_metric,
-    calculate_title_collision_metric,
-    calculate_total_countries_metric,
-    calculate_total_genres_metric,
-    calculate_total_persons_by_show_type_metric,
-    calculate_total_shows_metric,
-    calculate_unmapped_genres_metric,
-    calculate_unused_persons_metric,
     get_active_countries_list,
     get_duplicate_photo_urls_list,
+    get_global_metrics_history,
     get_missing_country_meta_list,
     get_missing_durations_list,
     get_missing_imdb_list,
@@ -70,7 +49,6 @@ from app.services.metrics import (
     get_missing_year_list,
     get_no_countries_list,
     get_no_genres_list,
-    get_or_update_metric,
     get_title_collision_list,
     get_total_genres_list,
     get_unmapped_genres_list,
@@ -173,42 +151,7 @@ def _serialize_show_details(show, user=None):
 
 
 def index(request):
-    missing_kp = get_or_update_metric('missing_kp', calculate_missing_kp_metric)
-    missing_imdb = get_or_update_metric('missing_imdb', calculate_missing_imdb_metric)
-    has_kp = get_or_update_metric('has_kp', calculate_has_kp_metric)
-    has_imdb = get_or_update_metric('has_imdb', calculate_has_imdb_metric)
-    total_shows = get_or_update_metric('total_shows', calculate_total_shows_metric)
-    title_collision = get_or_update_metric('title_collision', calculate_title_collision_metric)
-    missing_year = get_or_update_metric('missing_year', calculate_missing_year_metric)
-    missing_status = get_or_update_metric('missing_status', calculate_missing_status_metric)
-    missing_plot = get_or_update_metric('missing_plot', calculate_missing_plot_metric)
-    missing_durations = get_or_update_metric(
-        'missing_durations', calculate_missing_durations_metric
-    )
-    no_genres = get_or_update_metric('no_genres', calculate_no_genres_metric)
-    total_genres = get_or_update_metric('total_genres', calculate_total_genres_metric)
-    unmapped_genres = get_or_update_metric('unmapped_genres', calculate_unmapped_genres_metric)
-    no_countries = get_or_update_metric('no_countries', calculate_no_countries_metric)
-    missing_country_meta = get_or_update_metric(
-        'missing_country_meta', calculate_missing_country_meta_metric
-    )
-    total_countries = get_or_update_metric('total_countries', calculate_total_countries_metric)
-    total_persons_by_show_type = get_or_update_metric(
-        'total_persons_by_show_type', calculate_total_persons_by_show_type_metric
-    )
-    persons_avatar_stats = get_or_update_metric(
-        'persons_avatar_stats', calculate_persons_avatar_stats_metric
-    )
-    professions_stats = get_or_update_metric(
-        'professions_stats', calculate_professions_stats_metric
-    )
-    en_professions_stats = get_or_update_metric(
-        'en_professions_stats', calculate_en_professions_stats_metric
-    )
-    duplicate_photo_urls = get_or_update_metric(
-        'duplicate_photo_urls', calculate_duplicate_photo_urls_metric
-    )
-    unused_persons = get_or_update_metric('unused_persons', calculate_unused_persons_metric)
+    metrics_history = get_global_metrics_history()
 
     def _get_latest_date(qs, field):
         dt = qs.order_by(f'-{field}').values_list(field, flat=True).first()
@@ -238,32 +181,7 @@ def index(request):
         'errors_24h_count': errors_24h_count,
         'bot_users_active': bot_users_active,
         'bot_users_total': bot_users_total,
-        'metrics_json': json.dumps(
-            {
-                'missing_kp': missing_kp,
-                'missing_imdb': missing_imdb,
-                'has_kp': has_kp,
-                'has_imdb': has_imdb,
-                'total_shows': total_shows,
-                'title_collision': title_collision,
-                'missing_year': missing_year,
-                'missing_status': missing_status,
-                'missing_plot': missing_plot,
-                'missing_durations': missing_durations,
-                'no_genres': no_genres,
-                'total_genres': total_genres,
-                'unmapped_genres': unmapped_genres,
-                'no_countries': no_countries,
-                'missing_country_meta': missing_country_meta,
-                'total_countries': total_countries,
-                'total_persons_by_show_type': total_persons_by_show_type,
-                'persons_avatar_stats': persons_avatar_stats,
-                'professions_stats': professions_stats,
-                'en_professions_stats': en_professions_stats,
-                'duplicate_photo_urls': duplicate_photo_urls,
-                'unused_persons': unused_persons,
-            }
-        ),
+        'metrics_json': json.dumps(metrics_history),
     }
     return render(request, 'index.html', context)
 

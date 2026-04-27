@@ -146,40 +146,74 @@ def calculate_missing_kp_metric():
     return data
 
 
-def get_or_update_metric(key: str, calc_func) -> dict:
+def generate_global_metrics_snapshot() -> dict:
+    return {
+        'missing_kp': calculate_missing_kp_metric(),
+        'missing_imdb': calculate_missing_imdb_metric(),
+        'has_kp': calculate_has_kp_metric(),
+        'has_imdb': calculate_has_imdb_metric(),
+        'total_shows': calculate_total_shows_metric(),
+        'title_collision': calculate_title_collision_metric(),
+        'missing_year': calculate_missing_year_metric(),
+        'missing_status': calculate_missing_status_metric(),
+        'missing_plot': calculate_missing_plot_metric(),
+        'missing_durations': calculate_missing_durations_metric(),
+        'no_genres': calculate_no_genres_metric(),
+        'total_genres': calculate_total_genres_metric(),
+        'unmapped_genres': calculate_unmapped_genres_metric(),
+        'no_countries': calculate_no_countries_metric(),
+        'missing_country_meta': calculate_missing_country_meta_metric(),
+        'total_countries': calculate_total_countries_metric(),
+        'total_persons_by_show_type': calculate_total_persons_by_show_type_metric(),
+        'persons_avatar_stats': calculate_persons_avatar_stats_metric(),
+        'professions_stats': calculate_professions_stats_metric(),
+        'en_professions_stats': calculate_en_professions_stats_metric(),
+        'duplicate_photo_urls': calculate_duplicate_photo_urls_metric(),
+        'unused_persons': calculate_unused_persons_metric(),
+    }
+
+
+def get_global_metrics_history() -> dict:
     now = timezone.now()
 
-    latest = SiteMetric.objects.filter(key=key).order_by('-created_at').first()
+    latest = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
 
-    cache_timeout = 60 if settings.DEBUG else 300
+    cache_timeout = 60 if settings.DEBUG else 3600
     if not latest or (now - latest.created_at).total_seconds() > cache_timeout:
-        new_data = calc_func()
-        latest = SiteMetric.objects.create(key=key, data=new_data)
+        new_data = generate_global_metrics_snapshot()
+        latest = SiteMetric.objects.create(key='global_snapshot', data=new_data)
 
     yesterday_cutoff = now - timedelta(days=1)
     yesterday = (
-        SiteMetric.objects.filter(key=key, created_at__lte=yesterday_cutoff)
+        SiteMetric.objects.filter(key='global_snapshot', created_at__lte=yesterday_cutoff)
         .order_by('-created_at')
         .first()
     )
 
     week_cutoff = now - timedelta(days=7)
     week_ago = (
-        SiteMetric.objects.filter(key=key, created_at__lte=week_cutoff)
+        SiteMetric.objects.filter(key='global_snapshot', created_at__lte=week_cutoff)
         .order_by('-created_at')
         .first()
     )
 
-    def _format_entry(entry):
-        if not entry:
+    def _format_entry(entry, metric_key):
+        if not entry or metric_key not in entry.data:
             return {'data': [], 'timestamp': None}
-        return {'data': entry.data, 'timestamp': entry.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+        return {
+            'data': entry.data[metric_key],
+            'timestamp': entry.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        }
 
-    return {
-        'now': _format_entry(latest),
-        'yesterday': _format_entry(yesterday),
-        'week_ago': _format_entry(week_ago),
-    }
+    result = {}
+    for key in latest.data.keys():
+        result[key] = {
+            'now': _format_entry(latest, key),
+            'yesterday': _format_entry(yesterday, key),
+            'week_ago': _format_entry(week_ago, key),
+        }
+
+    return result
 
 
 def calculate_title_collision_metric():

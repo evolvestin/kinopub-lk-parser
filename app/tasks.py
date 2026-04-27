@@ -21,25 +21,7 @@ from app.gdrive_backup import BackupManager
 from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
-    calculate_duplicate_photo_urls_metric,
-    calculate_en_professions_stats_metric,
-    calculate_missing_country_meta_metric,
-    calculate_missing_durations_metric,
-    calculate_missing_imdb_metric,
-    calculate_missing_kp_metric,
-    calculate_missing_plot_metric,
-    calculate_missing_status_metric,
-    calculate_missing_year_metric,
-    calculate_no_countries_metric,
-    calculate_no_genres_metric,
-    calculate_persons_avatar_stats_metric,
-    calculate_professions_stats_metric,
-    calculate_title_collision_metric,
-    calculate_total_countries_metric,
-    calculate_total_genres_metric,
-    calculate_total_persons_by_show_type_metric,
-    calculate_unmapped_genres_metric,
-    calculate_unused_persons_metric,
+    generate_global_metrics_snapshot,
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
@@ -520,61 +502,6 @@ def sync_poiskkino_ratings_task():
 @shared_task
 @safe_execution
 def update_site_metrics_task():
-    kp_data = calculate_missing_kp_metric()
-    SiteMetric.objects.create(key='missing_kp', data=kp_data)
-
-    imdb_data = calculate_missing_imdb_metric()
-    SiteMetric.objects.create(key='missing_imdb', data=imdb_data)
-
-    collision_data = calculate_title_collision_metric()
-    SiteMetric.objects.create(key='title_collision', data=collision_data)
-
-    year_data = calculate_missing_year_metric()
-    SiteMetric.objects.create(key='missing_year', data=year_data)
-
-    status_data = calculate_missing_status_metric()
-    SiteMetric.objects.create(key='missing_status', data=status_data)
-
-    plot_data = calculate_missing_plot_metric()
-    SiteMetric.objects.create(key='missing_plot', data=plot_data)
-
-    durations_data = calculate_missing_durations_metric()
-    SiteMetric.objects.create(key='missing_durations', data=durations_data)
-
-    no_genres_data = calculate_no_genres_metric()
-    SiteMetric.objects.create(key='no_genres', data=no_genres_data)
-
-    total_genres_data = calculate_total_genres_metric()
-    SiteMetric.objects.create(key='total_genres', data=total_genres_data)
-
-    unmapped_genres_data = calculate_unmapped_genres_metric()
-    SiteMetric.objects.create(key='unmapped_genres', data=unmapped_genres_data)
-
-    countries_data = calculate_no_countries_metric()
-    SiteMetric.objects.create(key='no_countries', data=countries_data)
-
-    country_meta_data = calculate_missing_country_meta_metric()
-    SiteMetric.objects.create(key='missing_country_meta', data=country_meta_data)
-
-    total_countries_data = calculate_total_countries_metric()
-    SiteMetric.objects.create(key='total_countries', data=total_countries_data)
-
-    persons_by_type_data = calculate_total_persons_by_show_type_metric()
-    SiteMetric.objects.create(key='total_persons_by_show_type', data=persons_by_type_data)
-
-    persons_avatars_data = calculate_persons_avatar_stats_metric()
-    SiteMetric.objects.create(key='persons_avatar_stats', data=persons_avatars_data)
-
-    professions_data = calculate_professions_stats_metric()
-    SiteMetric.objects.create(key='professions_stats', data=professions_data)
-
-    en_professions_data = calculate_en_professions_stats_metric()
-    SiteMetric.objects.create(key='en_professions_stats', data=en_professions_data)
-
-    duplicate_photo_data = calculate_duplicate_photo_urls_metric()
-    SiteMetric.objects.create(key='duplicate_photo_urls', data=duplicate_photo_data)
-
-    unused_persons_data = calculate_unused_persons_metric()
-    SiteMetric.objects.create(key='unused_persons', data=unused_persons_data)
-
-    logging.info('Site metrics updated successfully.')
+    data = generate_global_metrics_snapshot()
+    SiteMetric.objects.create(key='global_snapshot', data=data)
+    logging.info('Global site metrics snapshot updated successfully.')
