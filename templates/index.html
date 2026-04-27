@@ -141,8 +141,18 @@
                         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
                     </div>
                     <div class="status-info">
-                        <div class="status-label">Парсинг истории</div>
+                        <div class="status-label">Последний просмотр</div>
                         <div class="status-val">{{ last_actions.history }}</div>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon-wrap" style="background: rgba(163, 113, 247, 0.15); color: #a371f7;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    </div>
+                    <div class="status-info">
+                        <div class="status-label">Запуск парсера</div>
+                        <div class="status-val">{{ last_actions.parser_run }}</div>
                     </div>
                 </div>
                 

@@ -114,10 +114,11 @@ class CustomAdminSite(admin.AdminSite):
 
         hidden_commands = [
             'healthcheck',
-            'runemail_listener',
+            'runemaillistener',
             'runparserlocal',
             'createsuperuserifneeded',
             'restorebackup',
+            'runhealthdaemon',
         ]
 
         target_commands = [

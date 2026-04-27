@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import timedelta
 
 from django.conf import settings
@@ -9,6 +10,17 @@ from redis import Redis
 from shared.constants import DATETIME_FORMAT
 
 logger = logging.getLogger(__name__)
+
+
+def update_heartbeat():
+    if getattr(settings, 'LOCAL_RUN', False):
+        return
+    try:
+        heartbeat_file = getattr(settings, 'HEARTBEAT_FILE', '/tmp/kinopub-parser_heartbeat')
+        with open(heartbeat_file, 'a'):
+            os.utime(heartbeat_file, None)
+    except Exception as e:
+        logger.warning('Could not update heartbeat file: %s', e)
 
 
 def enqueue_show_update(show_ids: list[int], details: bool = True, durations: bool = True):

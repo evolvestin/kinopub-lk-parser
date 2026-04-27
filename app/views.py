@@ -159,8 +159,17 @@ def index(request):
             return timezone.localtime(dt).strftime('%d.%m.%Y %H:%M')
         return 'Никогда'
 
+    last_parser_log = (
+        LogEntry.objects.filter(level='INFO', message__contains='Parser session finished')
+        .order_by('-created_at')
+        .first()
+    )
+
     last_actions = {
         'history': _get_latest_date(ViewHistory.objects.all(), 'created_at'),
+        'parser_run': timezone.localtime(last_parser_log.created_at).strftime('%d.%m.%Y %H:%M')
+        if last_parser_log
+        else 'Никогда',
         'shows': _get_latest_date(Show.objects.all(), 'created_at'),
         'ratings': _get_latest_date(ExternalRating.objects.all(), 'updated_at'),
         'durations': _get_latest_date(ShowDuration.objects.all(), 'updated_at'),

@@ -6,6 +6,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.apps import apps
 from django.conf import settings
+from django.db import DatabaseError, ProgrammingError
 from django.utils import timezone
 
 from app.telegram_bot import TelegramSender
@@ -16,6 +17,7 @@ class DatabaseLogHandler(logging.Handler):
         super().__init__(*args, **kwargs)
         self._log_entry_model = None
         self._is_writing = False
+        self._db_ready = True
 
     @property
     def log_entry_model(self):
@@ -27,7 +29,7 @@ class DatabaseLogHandler(logging.Handler):
         return self._log_entry_model
 
     def emit(self, record):
-        if self._is_writing:
+        if self._is_writing or not self._db_ready:
             return
 
         model = self.log_entry_model
@@ -53,14 +55,21 @@ class DatabaseLogHandler(logging.Handler):
 
             def _save_and_send():
                 try:
-                    model.objects.create(
-                        level=record.levelname[:10],
-                        module=record.module[:100],
-                        message=msg,
-                        traceback=tb_str,
-                        created_at=now,
-                        updated_at=now,
-                    )
+                    try:
+                        model.objects.create(
+                            level=record.levelname[:10],
+                            module=record.module[:100],
+                            message=msg,
+                            traceback=tb_str,
+                            created_at=now,
+                            updated_at=now,
+                        )
+                    except ProgrammingError as e:
+                        if 'does not exist' in str(e):
+                            self._db_ready = False
+                        return
+                    except DatabaseError:
+                        return
 
                     try:
                         channel_layer = get_channel_layer()

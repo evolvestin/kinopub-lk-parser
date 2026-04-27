@@ -9,6 +9,7 @@ from django.conf import settings
 
 from app import email_processor
 from app.management.base import LoggableBaseCommand
+from app.utils import update_heartbeat
 
 shutdown_flag = threading.Event()
 
@@ -18,22 +19,8 @@ def _handle_signal(signum, _):
     shutdown_flag.set()
 
 
-def _update_heartbeat():
-    if settings.LOCAL_RUN:
-        return
-    try:
-        with open(settings.HEARTBEAT_FILE, 'a'):
-            os.utime(settings.HEARTBEAT_FILE, None)
-    except Exception as e:
-        logging.warning('Could not update heartbeat file: %s', e)
-
-
 def _watchdog(stop_event):
-    """
-    Фоновый поток, который принудительно убивает процесс, если heartbeat завис.
-    Это необходимо, чтобы Docker увидел падение процесса и перезапустил контейнер.
-    """
-    threshold = 300  # 5 минут (должно быть больше тайм-аута healthcheck)
+    threshold = 300
     while not stop_event.is_set():
         time.sleep(30)
         try:
@@ -45,7 +32,7 @@ def _watchdog(stop_event):
                         f'Watchdog: Heartbeat stuck ({age:.1f}s > {threshold}s).'
                         f' Killing process to force restart.'
                     )
-                    os._exit(1)  # Принудительный выход из интерпретатора
+                    os._exit(1)
         except Exception as e:
             logging.error(f'Watchdog error: {e}')
 
@@ -60,7 +47,7 @@ def run_idle_loop(mail, current_shutdown_flag):
                 'Entering IDLE mode. Waiting for updates for %d seconds...',
                 settings.IDLE_TIMEOUT,
             )
-            _update_heartbeat()
+            update_heartbeat()
             mail.idle(timeout=settings.IDLE_TIMEOUT)
         except (imaplib2.IMAP4.error, OSError) as e:
             logging.warning('Connection lost in IDLE mode. Reconnecting. Error: %s', e)
@@ -68,9 +55,8 @@ def run_idle_loop(mail, current_shutdown_flag):
 
 
 def run_email_listener(current_shutdown_flag):
-    """The main loop for the email listener, including connection and reconnect logic."""
     while not current_shutdown_flag.is_set():
-        _update_heartbeat()
+        update_heartbeat()
         try:
             with email_processor.imap_connection() as mail:
                 run_idle_loop(mail, current_shutdown_flag)
@@ -86,20 +72,22 @@ class Command(LoggableBaseCommand):
     help = 'Runs the email listener service to process incoming 2FA codes.'
 
     def handle(self, *args, **options):
+        update_heartbeat()
+
         for sig in (signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, _handle_signal)
 
         if settings.DEBUG:
             logging.info('DEBUG mode detected. Email listener disabled (idling).')
-            _update_heartbeat()
+            update_heartbeat()
             while not shutdown_flag.is_set():
                 shutdown_flag.wait(30)
-                _update_heartbeat()
+                update_heartbeat()
             return
 
         threading.Thread(target=_watchdog, args=(shutdown_flag,), daemon=True).start()
 
         logging.info('Starting email listener with Watchdog enabled...')
-        _update_heartbeat()
+        update_heartbeat()
         run_email_listener(shutdown_flag)
         logging.info('Email listener stopped.')

@@ -11,25 +11,14 @@ BOT_API_PORT = os.getenv('BOT_API_PORT', '8081')
 BOT_API_URL = f'http://{BOT_API_HOST}:{BOT_API_PORT}/api/internal/set_url'
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 POLL_INTERVAL = 5
+SYNC_INTERVAL = 30
 
 
-def extract_url(log_line):
-    match = re.search(r'(https://[a-zA-Z0-9-]+\.trycloudflare\.com)', log_line)
-    return match.group(1) if match else None
-
-
-def wait_for_bot_api():
-    ping_url = f'http://{BOT_API_HOST}:{BOT_API_PORT}/api/get_me'
-    print(f'Waiting for Bot API readiness at {ping_url}...', flush=True)
-    while True:
-        try:
-            resp = requests.get(ping_url, timeout=2)
-            if resp.status_code == 200:
-                print('Bot API is ready.', flush=True)
-                return True
-        except requests.RequestException:
-            pass
-        time.sleep(2)
+def extract_url(log_data):
+    if not log_data:
+        return None
+    matches = re.findall(r'(https://[a-zA-Z0-9-]+\.trycloudflare\.com)', log_data)
+    return matches[-1] if matches else None
 
 
 def send_to_bot(url):
@@ -37,82 +26,73 @@ def send_to_bot(url):
         headers = {'X-Bot-Token': BOT_TOKEN}
         resp = requests.post(BOT_API_URL, json={'url': url}, headers=headers, timeout=5)
         if resp.status_code == 200:
-            print(f'Successfully updated bot URL: {url}', flush=True)
             return True
         else:
-            print(f'Bot returned error {resp.status_code}: {resp.text}', flush=True)
-    except Exception as e:
-        print(f'Failed to connect to bot: {e}', flush=True)
+            print(f'Bot API returned error {resp.status_code}: {resp.text}', flush=True)
+    except requests.RequestException:
+        # Silence connection errors as bot might be restarting
+        pass
     return False
 
 
 def main():
-    print('Starting Tunnel Monitor...', flush=True)
+    print('Starting Tunnel Monitor (Active Sync Mode)...', flush=True)
 
-    while True:
+    client = None
+    socket_path = '/var/run/docker.sock'
+
+    while not client:
         try:
-            client = docker.from_env()
+            if os.path.exists(socket_path):
+                client = docker.DockerClient(base_url=f'unix://{socket_path}')
+            else:
+                client = docker.from_env()
             client.ping()
-            break
-        except Exception:
-            print('Waiting for Docker socket...', flush=True)
+        except Exception as e:
+            print(f'Waiting for Docker socket ({e})...', flush=True)
+            client = None
             time.sleep(5)
 
-    wait_for_bot_api()
-
     last_url = None
-    container = None
+    last_sync_time = 0
 
     while True:
         try:
+            container = next(
+                (
+                    c
+                    for c in client.containers.list()
+                    if TARGET_CONTAINER_KEYWORD in c.name
+                    and 'monitor' not in c.name
+                    and c.status == 'running'
+                ),
+                None,
+            )
+
             if not container:
-                container = next(
-                    (
-                        c
-                        for c in client.containers.list()
-                        if TARGET_CONTAINER_KEYWORD in c.name
-                        and 'monitor' not in c.name
-                        and c.status == 'running'
-                    ),
-                    None,
-                )
-                if container:
-                    print(f'Attached to target container: {container.name}', flush=True)
+                last_url = None
+                time.sleep(POLL_INTERVAL)
+                continue
 
-                    existing_logs = container.logs(tail=100).decode('utf-8', errors='ignore')
-                    found_urls = []
-                    for line in existing_logs.split('\n'):
-                        url = extract_url(line)
-                        if url:
-                            found_urls.append(url)
+            logs = container.logs(tail=200).decode('utf-8', errors='ignore')
+            current_url = extract_url(logs)
 
-                    if found_urls:
-                        last_url = found_urls[-1]
-                        print(f'Found latest URL in history: {last_url}. Syncing...', flush=True)
-                        send_to_bot(last_url)
+            if current_url:
+                now = time.time()
+                # Продвигаем URL в бот если:
+                # 1. URL изменился
+                # 2. Прошло время SYNC_INTERVAL (на случай рестарта бота)
+                if current_url != last_url or (now - last_sync_time) > SYNC_INTERVAL:
+                    if send_to_bot(current_url):
+                        if current_url != last_url:
+                            print(f'Detected and synced new URL: {current_url}', flush=True)
+                        last_url = current_url
+                        last_sync_time = now
 
-                    for line in container.logs(stream=True, tail=0):
-                        line_str = line.decode('utf-8', errors='ignore')
-                        url = extract_url(line_str)
-                        if url and url != last_url:
-                            print(f'Detected new URL: {url}', flush=True)
-                            last_url = url
-                            send_to_bot(url)
-                else:
-                    time.sleep(POLL_INTERVAL)
-            else:
-                container.reload()
-                if container.status != 'running':
-                    print('Tunnel container stopped.', flush=True)
-                    container = None
-                else:
-                    if last_url:
-                        send_to_bot(last_url)
-                    time.sleep(30)
+            time.sleep(POLL_INTERVAL)
 
-        except (docker.errors.NotFound, Exception) as e:
-            print(f'Connection lost or error: {e}', flush=True)
-            container = None
+        except Exception as e:
+            print(f'Monitor loop error: {e}', flush=True)
             time.sleep(POLL_INTERVAL)
 
 

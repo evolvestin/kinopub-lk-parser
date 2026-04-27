@@ -11,8 +11,11 @@ class Command(BaseCommand):
     help = 'Performs a health check by checking the heartbeat file.'
 
     def handle(self, *args, **options):
+        if getattr(settings, 'LOCAL_RUN', False):
+            sys.exit(0)
+
         heartbeat_file = settings.HEARTBEAT_FILE
-        threshold = 60
+        threshold = 120
         try:
             stat = os.stat(heartbeat_file)
             age = time.time() - stat.st_mtime
@@ -20,12 +23,13 @@ class Command(BaseCommand):
                 sys.exit(0)
             else:
                 logging.error(
-                    f'Heartbeat stale: {age:.1f}s > {threshold}s (file: {heartbeat_file})'
+                    f'Healthcheck: Heartbeat stale. Last update: {age:.1f}s ago '
+                    f'(threshold: {threshold}s, file: {heartbeat_file})'
                 )
                 sys.exit(1)
         except FileNotFoundError:
-            logging.error(f'Heartbeat not found (file: {heartbeat_file})')
+            logging.error(f'Healthcheck: Heartbeat file not found: {heartbeat_file}')
             sys.exit(1)
         except Exception as e:
-            logging.error(f'Healthcheck error: {e}')
+            logging.error(f'Healthcheck: Unexpected error: {e}')
             sys.exit(1)

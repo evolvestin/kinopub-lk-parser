@@ -5,6 +5,51 @@ services:
     volumes:
       - ./data:/data
 
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file: .env
+    command: postgres -c 'max_connections=100' -c 'shared_buffers=256MB'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - kinopub-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - kinopub-net
+
+  app-init:
+    build: .
+    env_file: .env
+    volumes:
+      - .:/app:delegated
+      - ./data:/data
+    command: >
+      sh -c "
+        if [ \"$ENVIRONMENT\" = \"DEV\" ]; then
+          echo \"Starting restore from backup...\" &&
+          python manage.py restorebackup;
+        fi &&
+        python manage.py migrate --noinput &&
+        python manage.py createsuperuserifneeded
+      "
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    networks:
+      - kinopub-net
+
   web:
     build: .
     restart: unless-stopped
@@ -14,20 +59,13 @@ services:
     volumes:
       - .:/app:delegated
       - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command: >
       sh -c "
         python manage.py collectstatic --noinput &&
-        if [ \"$ENVIRONMENT\" = \"DEV\" ]; then
-          echo \"Dev environment detected. Starting restore from backup...\" &&
-          python manage.py restorebackup;
-        fi &&
-        python manage.py migrate --noinput &&
-        python manage.py createsuperuserifneeded &&
         if [ \"$DJANGO_DEBUG\" = \"true\" ] || [ \"$DJANGO_DEBUG\" = \"True\" ]; then
-          echo \"Starting Django Development Server (ASGI)...\" &&
           python manage.py runserver 0.0.0.0:8000;
         else
-          echo \"Starting Gunicorn (WSGI)...\" &&
           gunicorn kinopub_parser.wsgi:application --bind 0.0.0.0:8000 --workers 3 --threads 2;
         fi
       "
@@ -37,10 +75,8 @@ services:
       timeout: 10s
       retries: 3
     depends_on:
-      init:
+      app-init:
         condition: service_completed_successfully
-      db:
-        condition: service_healthy
       redis:
         condition: service_started
     networks:
@@ -61,32 +97,10 @@ services:
       timeout: 10s
       retries: 3
     depends_on:
-      web:
-        condition: service_started
+      app-init:
+        condition: service_completed_successfully
       redis:
         condition: service_started
-    networks:
-      - kinopub-net
-
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    env_file: .env
-    command: postgres -c 'max_connections=100' -c 'shared_buffers=256MB'
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-      start_period: 90s
-    networks:
-      - kinopub-net
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
     networks:
       - kinopub-net
 
@@ -98,15 +112,12 @@ services:
     volumes:
       - .:/app:delegated
       - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
-      init:
+      app-init:
         condition: service_completed_successfully
       redis:
         condition: service_started
-      db:
-        condition: service_healthy
-      web:
-        condition: service_healthy
     networks:
       - kinopub-net
     healthcheck:
@@ -114,43 +125,39 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
 
   celery-beat:
-      build: .
-      command: celery -A kinopub_parser beat -l INFO --schedule=/data/celerybeat-schedule
-      restart: unless-stopped
-      env_file: .env
-      volumes:
-        - .:/app:delegated
-        - ./data:/data
-      depends_on:
-        init:
-          condition: service_completed_successfully
-        redis:
-          condition: service_started
-        db:
-          condition: service_healthy
-        web:
-          condition: service_healthy
-      networks:
-        - kinopub-net
-      healthcheck:
-        test: [ "CMD-SHELL", "pgrep -f 'celery' || exit 1" ]
-        interval: 30s
-        timeout: 10s
-        retries: 3
+    build: .
+    command: celery -A kinopub_parser beat -l INFO --schedule=/data/celerybeat-schedule
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - .:/app:delegated
+      - ./data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    networks:
+      - kinopub-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep -f 'celery' || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   email-listener:
     build: .
-    command: python manage.py runemail_listener
+    command: python manage.py runemaillistener
     restart: unless-stopped
     env_file: .env
     volumes:
       - .:/app:delegated
     depends_on:
-      db:
-        condition: service_healthy
+      app-init:
+        condition: service_completed_successfully
     networks:
       - kinopub-net
   
@@ -163,7 +170,7 @@ services:
       - BACKEND_URL=http://web:8000
     depends_on:
       web:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - ./shared:/app/shared
       - ./telegram_bot:/app
@@ -180,7 +187,7 @@ services:
       - kinopub-net
     depends_on:
       web:
-        condition: service_started
+        condition: service_healthy
   
   tunnel-monitor:
     build:
@@ -198,6 +205,21 @@ services:
         condition: service_started
       tunnel:
         condition: service_started
+  
+  health-monitor:
+    build: .
+    user: root
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - .:/app:delegated
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: python manage.py runhealthdaemon
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+    networks:
+      - kinopub-net
 
 volumes:
   pgdata:

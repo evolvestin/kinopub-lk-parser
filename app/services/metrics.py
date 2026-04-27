@@ -4,6 +4,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, Lower, StrIndex
+from django.db.utils import ProgrammingError
 from django.utils import timezone
 
 from app.models import (
@@ -176,12 +177,18 @@ def generate_global_metrics_snapshot() -> dict:
 def get_global_metrics_history() -> dict:
     now = timezone.now()
 
-    latest = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
+    try:
+        latest = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
+    except ProgrammingError:
+        return {}
 
     cache_timeout = 60 if settings.DEBUG else 3600
     if not latest or (now - latest.created_at).total_seconds() > cache_timeout:
-        new_data = generate_global_metrics_snapshot()
-        latest = SiteMetric.objects.create(key='global_snapshot', data=new_data)
+        try:
+            new_data = generate_global_metrics_snapshot()
+            latest = SiteMetric.objects.create(key='global_snapshot', data=new_data)
+        except ProgrammingError:
+            return {}
 
     yesterday_cutoff = now - timedelta(days=1)
     yesterday = (
