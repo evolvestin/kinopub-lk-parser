@@ -6,7 +6,17 @@ from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, Lower, StrIndex
 from django.utils import timezone
 
-from app.models import Country, Genre, Person, Show, ShowCrew, SiteMetric
+from app.models import (
+    Country,
+    Genre,
+    LogEntry,
+    Person,
+    Show,
+    ShowCrew,
+    SiteMetric,
+    TelegramLog,
+    ViewUser,
+)
 from shared.constants import (
     GENRES_MAPPING,
     PROFESSION_TRANS_MAP,
@@ -656,3 +666,24 @@ def get_unused_persons_list():
         .order_by('-created_at')
         .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
     )
+
+
+def calculate_last_tg_activity_metric():
+    last_log = TelegramLog.objects.order_by('-created_at').first()
+    if not last_log:
+        return [{'name': 'Активность', 'value': 0}]
+
+    timestamp = int(last_log.created_at.timestamp())
+    return [{'name': 'Последнее сообщение', 'value': timestamp}]
+
+
+def calculate_recent_errors_metric():
+    cutoff = timezone.now() - timedelta(days=1)
+    count = LogEntry.objects.filter(created_at__gte=cutoff, level__in=['ERROR', 'CRITICAL']).count()
+    return [{'name': 'Ошибки (24ч)', 'value': count}]
+
+
+def calculate_bot_users_health_metric():
+    active = ViewUser.objects.filter(is_bot_active=True).count()
+    inactive = ViewUser.objects.filter(is_bot_active=False).count()
+    return [{'name': 'Активны', 'value': active}, {'name': 'Отключены', 'value': inactive}]

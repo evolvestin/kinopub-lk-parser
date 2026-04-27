@@ -285,6 +285,15 @@ function getUserColor(id) {
     return UserAvatarColors[(id - 1) % UserAvatarColors.length];
 }
 
+window.switchPersonTab = function(category, mode, btn) {
+    const container = btn.closest('.view-toggle');
+    container.querySelectorAll('.vt-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    const data = D[category][mode];
+    fillList(`${category}-list`, data, null, ['просмотр', 'просмотра', 'просмотров'], category, mode);
+};
+
 function render() {
     if (!D?.meta) return;
     const n = D.meta.name || 'Пользователь';
@@ -367,20 +376,25 @@ function render() {
     const hasGenres = D.genres?.length > 0;
     toggle('card-genres', hasGenres);
     
-    const hasActors = D.actors?.length > 0;
+    const hasActors = (D.actors?.series?.length || D.actors?.others?.length);
     toggle('card-actors', hasActors);
+    if (hasActors) fillList('actors-list', D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series');
     
-    const hasDirectors = D.directors?.length > 0;
+    const hasDirectors = (D.directors?.series?.length || D.directors?.others?.length);
     toggle('card-directors', hasDirectors);
+    if (hasDirectors) fillList('directors-list', D.directors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'directors', 'series');
 
-    const hasWriters = D.writers?.length > 0;
+    const hasWriters = (D.writers?.series?.length || D.writers?.others?.length);
     toggle('card-writers', hasWriters);
+    if (hasWriters) fillList('writers-list', D.writers.series, null, ['просмотр', 'просмотра', 'просмотров'], 'writers', 'series');
     
     const hasCountries = D.countries?.length > 0;
     toggle('card-countries', hasCountries);
+    if (hasCountries) fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
     
     const hasBinges = D.binges?.length > 0;
     toggle('card-binges', hasBinges);
+    if (hasBinges) fillBinges();
 
     const rt = D.ratings;
     const hasRatings = rt && rt.total > 0;
@@ -405,12 +419,6 @@ function render() {
     toggle('tab-group-btn', !!D.group);
     renderGroup();
     renderCharts();
-    
-    if (hasActors) fillList('actors-list', D.actors, null, ['просмотр', 'просмотра', 'просмотров'], 'actors');
-    if (hasDirectors) fillList('directors-list', D.directors, null, ['просмотр', 'просмотра', 'просмотров'], 'directors');
-    if (hasWriters) fillList('writers-list', D.writers, null, ['просмотр', 'просмотра', 'просмотров'], 'writers');
-    if (hasCountries) fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
-    if (hasBinges) fillBinges();
 }
 
 function renderRatingsDist() {
@@ -589,9 +597,13 @@ function renderHeatmap() {
     zoomContent.appendChild(fragment); initGlobalHeatmapZoom();
 }
 
-function fillList(id, items, ico, unit, categoryKey) {
+function fillList(id, items, ico, unit, categoryKey, mode = 'series') {
     const el = document.getElementById(id);
-    if (!items?.length) return;
+    if (!el) return;
+    if (!items?.length) {
+        el.innerHTML = '<div class="empty" style="padding: 20px 0;"><div class="icon" style="font-size:24px;">' + Icons.dash + '</div>Нет данных</div>';
+        return;
+    }
     let html = '';
     items.forEach((it, i) => {
         const cnt = it.count || it.views || 0, sub = it.sub || (it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
@@ -609,7 +621,10 @@ function fillList(id, items, ico, unit, categoryKey) {
             visual = `<div class="icon" style="color:var(--text-muted);display:inline-block;vertical-align:middle;margin-right:6px;">${ico}</div>`;
         }
 
-        html += `<div class="li li-clickable anim-list-item clickable" onclick="window.openHistoryLayer('filter', '${safeName}', null, null, '${categoryKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
+        const histKey = ['actors', 'directors', 'writers'].includes(categoryKey) ? `${categoryKey}_${mode}` : categoryKey;
+        D[histKey] = items;
+
+        html += `<div class="li li-clickable anim-list-item clickable" onclick="window.openHistoryLayer('filter', '${safeName}', null, null, '${histKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
     });
     el.innerHTML = html;
 }

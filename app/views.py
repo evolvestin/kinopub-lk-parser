@@ -5,6 +5,8 @@ import logging
 import urllib.parse
 import uuid
 from collections import defaultdict
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
@@ -26,11 +28,11 @@ from app.models import (
     Person,
     SharedStat,
     Show,
+    ShowCrew,
     ShowDuration,
     TelegramLog,
     UserRating,
     ViewHistory,
-    ShowCrew,
     ViewUser,
     ViewUserGroup,
 )
@@ -220,10 +222,22 @@ def index(request):
         'ratings': _get_latest_date(ExternalRating.objects.all(), 'updated_at'),
         'durations': _get_latest_date(ShowDuration.objects.all(), 'updated_at'),
         'photos': _get_latest_date(Person.objects.filter(is_photo_fetched=True), 'updated_at'),
+        'tg': _get_latest_date(TelegramLog.objects.all(), 'created_at'),
     }
+
+    cutoff_24h = timezone.now() - timedelta(days=1)
+    errors_24h_count = LogEntry.objects.filter(
+        created_at__gte=cutoff_24h, level__in=['ERROR', 'CRITICAL']
+    ).count()
+
+    bot_users_active = ViewUser.objects.filter(is_bot_active=True).count()
+    bot_users_total = ViewUser.objects.count()
 
     context = {
         'last_actions': last_actions,
+        'errors_24h_count': errors_24h_count,
+        'bot_users_active': bot_users_active,
+        'bot_users_total': bot_users_total,
         'metrics_json': json.dumps(
             {
                 'missing_kp': missing_kp,
@@ -1241,10 +1255,7 @@ def webapp_get_show_full(request, show_id):
             if norm_name not in genre_map:
                 genre_map[norm_name] = g.id
 
-        genres_list = [
-            {'id': gid, 'name': name}
-            for name, gid in sorted(genre_map.items())
-        ]
+        genres_list = [{'id': gid, 'name': name} for name, gid in sorted(genre_map.items())]
 
         data = {
             'id': show.id,
@@ -1283,11 +1294,11 @@ def webapp_get_collection(request, collection_type, item_id):
         if collection_type == 'person':
             base_person = Person.objects.get(id=item_id)
             person = base_person.canonical
-            
+
             target_ids = [person.id] + list(person.aliases.values_list('id', flat=True))
             shows = shows.filter(showcrew__person__id__in=target_ids)
             title = person.name
-            
+
             professions = (
                 ShowCrew.objects.filter(person_id__in=target_ids)
                 .exclude(profession__isnull=True)
@@ -1295,11 +1306,11 @@ def webapp_get_collection(request, collection_type, item_id):
                 .distinct()
             )
             norm_profs = sorted(list({RAW_TO_NORMALIZED_RU.get(p, p) for p in professions if p}))
-            
+
             person_info = {
                 'photo_url': person.photo_url,
                 'fallback_photo_url': person.kp_photo_url if person.tmdb_photo_url else None,
-                'professions': norm_profs
+                'professions': norm_profs,
             }
         elif collection_type == 'genre':
             genre = Genre.objects.get(id=item_id)

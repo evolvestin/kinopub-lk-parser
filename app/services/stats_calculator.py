@@ -34,6 +34,7 @@ from shared.constants import (
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_GENRE,
+    SERIES_TYPES,
     WRITER_ROLES,
 )
 from shared.formatters import format_duration
@@ -154,7 +155,6 @@ def _get_favorites(base_qs, dur_qs):
 
     genres = []
     total_mentions = sum(len(shows) for shows in genre_shows.values())
-
     sorted_genres = sorted(genre_shows.items(), key=lambda x: len(x[1]), reverse=True)[:20]
 
     for norm_name, show_ids in sorted_genres:
@@ -170,25 +170,26 @@ def _get_favorites(base_qs, dur_qs):
             }
         )
 
-    def get_person_top(professions, limit=5):
+    def get_person_top(professions, limit=5, mode='series'):
         role_cond = Q(show__showcrew__profession__in=professions) | Q(
             show__showcrew__en_profession__in=professions
         )
 
+        filtered_qs = base_qs
+        if mode == 'series':
+            filtered_qs = filtered_qs.filter(show__type__in=SERIES_TYPES)
+        else:
+            filtered_qs = filtered_qs.exclude(show__type__in=SERIES_TYPES)
+
         if professions == ACTOR_ROLES:
             dub_ru = PROFESSIONS_MAPPING_RU.get('Актёр дубляжа', [])
             dub_en = PROFESSIONS_MAPPING_EN.get('Dubbing actor', [])
-
-            final_role_filter = (
-                role_cond
-                & ~Q(show__showcrew__profession__in=dub_ru)
-                & ~Q(show__showcrew__en_profession__in=dub_en)
+            role_cond &= ~Q(show__showcrew__profession__in=dub_ru) & ~Q(
+                show__showcrew__en_profession__in=dub_en
             )
-        else:
-            final_role_filter = role_cond
 
         canonical_qs = (
-            base_qs.filter(final_role_filter)
+            filtered_qs.filter(role_cond)
             .annotate(
                 canonical_id=Coalesce(
                     'show__showcrew__person__master_person_id', 'show__showcrew__person__id'
@@ -215,23 +216,16 @@ def _get_favorites(base_qs, dur_qs):
                 | Q(show__showcrew__en_profession__in=professions)
             )
 
-            if professions == ACTOR_ROLES:
-                person_role_filter &= ~Q(show__showcrew__profession__in=dub_ru)
-                person_role_filter &= ~Q(show__showcrew__en_profession__in=dub_en)
-
             person_shows_data = (
-                base_qs.filter(person_role_filter)
+                filtered_qs.filter(person_role_filter)
                 .values('show_id', 'show__title', 'show__original_title')
                 .distinct()
             )
 
             show_ids = [row['show_id'] for row in person_shows_data]
-
-            titles_set = set()
-            for row in person_shows_data:
-                title = row['show__original_title'] or row['show__title']
-                if title:
-                    titles_set.add(title)
+            titles_set = {
+                row['show__original_title'] or row['show__title'] for row in person_shows_data
+            }
 
             show_titles = sorted(list(titles_set))
             sub_text = ', '.join(show_titles)
@@ -254,16 +248,11 @@ def _get_favorites(base_qs, dur_qs):
             )
         return result
 
-    countries_qs = (
-        base_qs.values(
-            tid=F('show__countries__id'),
-            name=F('show__countries__name'),
-            emoji=F('show__countries__emoji_flag'),
-        )
-        .filter(tid__isnull=False)
-        .annotate(count=Count('id', distinct=True))
-        .order_by('-count')[:5]
-    )
+    def get_split_top(professions):
+        return {
+            'series': get_person_top(professions, mode='series'),
+            'others': get_person_top(professions, mode='others'),
+        }
 
     countries_qs = (
         base_qs.values(
@@ -294,9 +283,9 @@ def _get_favorites(base_qs, dur_qs):
 
     return {
         'genres': genres,
-        'actors': get_person_top(ACTOR_ROLES),
-        'directors': get_person_top(DIRECTOR_ROLES),
-        'writers': get_person_top(WRITER_ROLES),
+        'actors': get_split_top(ACTOR_ROLES),
+        'directors': get_split_top(DIRECTOR_ROLES),
+        'writers': get_split_top(WRITER_ROLES),
         'countries': countries,
     }
 
@@ -499,7 +488,7 @@ def _get_weekday_chart(base_qs):
 
 
 def generate_user_stats(user, year=None):
-    cache_key = f'user_stats_v3:{user.id}:{year or "all"}'
+    cache_key = f'user_stats_v5:{user.id}:{year or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -719,7 +708,7 @@ def generate_user_stats(user, year=None):
 
 
 def generate_group_stats(user, year=None):
-    cache_key = f'group_stats_v4:{user.id}:{year or "all"}'
+    cache_key = f'group_stats_v6:{user.id}:{year or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -840,7 +829,7 @@ def generate_group_stats(user, year=None):
 
 
 def generate_global_stats(year=None):
-    cache_key = f'global_stats_v1:{year or "all"}'
+    cache_key = f'global_stats_v2:{year or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
