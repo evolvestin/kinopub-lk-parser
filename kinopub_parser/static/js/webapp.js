@@ -1,3 +1,27 @@
+window.handleImgErr = function(img, fallbackUrl, name) {
+    if (fallbackUrl && !img.dataset.fallbackTried) {
+        img.dataset.fallbackTried = 'true';
+        img.src = fallbackUrl;
+    } else {
+        const div = document.createElement('div');
+        div.className = img.className || '';
+        div.style.cssText = img.style.cssText;
+        div.style.display = 'inline-flex';
+        div.style.alignItems = 'center';
+        div.style.justifyContent = 'center';
+        div.style.background = 'var(--bg-input)';
+        div.style.color = 'var(--text-muted)';
+        div.style.fontWeight = '800';
+        
+        if (!div.style.width && div.classList.contains('person-avatar')) {
+            div.style.fontSize = '24px';
+        }
+        
+        div.textContent = name ? name.charAt(0).toUpperCase() : '?';
+        img.replaceWith(div);
+    }
+};
+
 const Icons = {
     moon: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
     sun: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm0 160c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64zM256 128c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16s-16 7.2-16 16v64c0 8.8 7.2 16 16 16zM256 384c-8.8 0-16 7.2-16 16v64c0 8.8 7.2 16 16 16s16-7.2 16-16v-64c0-8.8-7.2-16-16-16zM464 240h-64c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM112 240H48c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM403.1 108.9c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM176.8 335.2c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM403.1 403.1c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0z"/></svg>',
@@ -167,7 +191,8 @@ function renderSearchResults(data) {
         html += `<div class="label"><div class="icon" style="color:#d29922">${Icons.users}</div>Люди</div>`;
         html += '<div class="h-scroll-container" style="padding-bottom:16px;">';
         data.persons.forEach(p => {
-            const img = p.photo_url ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;">` : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
+            const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
+            const img = p.photo_url ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" onerror="window.handleImgErr(this, ${fb}, '${p.name.replace(/'/g, "\\'")}')">` : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
             html += `<div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${p.name.replace(/'/g, "\\'")}')">${img}<div class="person-name">${p.name}</div></div>`;
         });
         html += '</div>';
@@ -573,16 +598,17 @@ function fillList(id, items, ico, unit, categoryKey) {
         const lbl = Array.isArray(unit) ? `${cnt} ${plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
         const delay = (i + 1) * 0.05;
         
+        const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         let visual = '';
         if (it.photo_url) {
-            visual = `<img src="${it.photo_url}" style="width:clamp(24px, 6vw, 32px);height:clamp(24px, 6vw, 32px);border-radius:50%;object-fit:cover;margin-right:6px;vertical-align:middle;display:inline-block;" onerror="this.style.display='none'">`;
+            const fb = it.fallback_photo_url ? `'${it.fallback_photo_url}'` : 'null';
+            visual = `<img src="${it.photo_url}" style="width:clamp(24px, 6vw, 32px);height:clamp(24px, 6vw, 32px);border-radius:50%;object-fit:cover;margin-right:6px;vertical-align:middle;display:inline-block;" onerror="window.handleImgErr(this, ${fb}, '${safeName}')">`;
         } else if (it.emoji) {
             visual = `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>`;
         } else if (ico) {
             visual = `<div class="icon" style="color:var(--text-muted);display:inline-block;vertical-align:middle;margin-right:6px;">${ico}</div>`;
         }
 
-        const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         html += `<div class="li li-clickable anim-list-item clickable" onclick="window.openHistoryLayer('filter', '${safeName}', null, null, '${categoryKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
     });
     el.innerHTML = html;
@@ -847,12 +873,15 @@ window.openShowLayer = async function(showId) {
                 crewHtml += `
                 <div class="label" style="${index === 0 ? '' : 'padding-top:0'}"><div class="icon" style="color:#d29922">${Icons.users}</div>${group.profession}</div>
                 <div class="h-scroll-container" style="padding-bottom:16px;">
-                    ${group.persons.map(p => `
+                    ${group.persons.map(p => {
+                        const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
+                        const imgHtml = p.photo_url ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" onerror="window.handleImgErr(this, ${fb}, '${p.name.replace(/'/g, "\\'")}')">` : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
+                        return `
                         <div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${p.name.replace(/'/g, "\\'")}')">
-                            ${p.photo_url ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;">` : `<div class="person-avatar">${p.name.charAt(0)}</div>`}
+                            ${imgHtml}
                             <div class="person-name">${p.name}</div>
-                        </div>
-                    `).join('')}
+                        </div>`;
+                    }).join('')}
                 </div>`;
             });
             crewHtml += '<div style="height: 12px;"></div>';

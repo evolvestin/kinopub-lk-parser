@@ -229,6 +229,9 @@ def _get_favorites(base_qs, dur_qs):
                 {
                     'name': person.name,
                     'photo_url': person.photo_url,
+                    'fallback_photo_url': person.canonical.kp_photo_url
+                    if person.canonical.tmdb_photo_url
+                    else None,
                     'shows': p['shows_count'],
                     'views': p['views'],
                     'count': p['views'],

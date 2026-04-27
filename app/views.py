@@ -20,6 +20,7 @@ from redis import Redis
 
 from app.models import (
     Country,
+    ExternalRating,
     Genre,
     LogEntry,
     Person,
@@ -31,7 +32,6 @@ from app.models import (
     ViewHistory,
     ViewUser,
     ViewUserGroup,
-    ExternalRating,
 )
 from app.services.metrics import (
     calculate_duplicate_photo_urls_metric,
@@ -1211,6 +1211,7 @@ def webapp_get_show_full(request, show_id):
                     'id': person.id,
                     'name': person.name,
                     'photo_url': person.photo_url,
+                    'fallback_photo_url': person.kp_photo_url if person.tmdb_photo_url else None,
                 }
             )
 
@@ -1361,6 +1362,9 @@ def webapp_search(request):
                     'name': canonical.name,
                     'en_name': canonical.en_name,
                     'photo_url': canonical.photo_url,
+                    'fallback_photo_url': canonical.kp_photo_url
+                    if canonical.tmdb_photo_url
+                    else None,
                 }
             )
             if len(person_results) >= 10:
