@@ -16,11 +16,12 @@ def update_heartbeat():
     if getattr(settings, 'LOCAL_RUN', False):
         return
     try:
-        heartbeat_file = getattr(settings, 'HEARTBEAT_FILE', '/tmp/kinopub-parser_heartbeat')
+        heartbeat_file = settings.HEARTBEAT_FILE
+        os.makedirs(os.path.dirname(heartbeat_file), exist_ok=True)
         with open(heartbeat_file, 'a'):
             os.utime(heartbeat_file, None)
     except Exception as e:
-        logger.warning('Could not update heartbeat file: %s', e)
+        logger.warning('Could not update heartbeat file %s: %s', heartbeat_file, e)
 
 
 def enqueue_show_update(show_ids: list[int], details: bool = True, durations: bool = True):

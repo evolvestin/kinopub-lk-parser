@@ -25,7 +25,7 @@ class Command(LoggableBaseCommand):
         backup_file_path = manager.restore_from_backup()
 
         if not backup_file_path or not os.path.exists(backup_file_path):
-            logging.warning('Backup file not found. Aborting.')
+            logging.error('Backup file not found on Google Drive. Aborting.')
             return
 
         try:
@@ -38,7 +38,8 @@ class Command(LoggableBaseCommand):
                 cursor.execute(f"""
                     SELECT pg_terminate_backend(pg_stat_activity.pid)
                     FROM pg_stat_activity
-                    WHERE pg_stat_activity.datname = '{db_name}' AND pid <> pg_backend_pid();
+                    WHERE pg_stat_activity.datname = '{db_name}'
+                      AND pid <> pg_backend_pid();
                 """)
 
                 time.sleep(2)
@@ -94,7 +95,6 @@ class Command(LoggableBaseCommand):
                 raise subprocess.CalledProcessError(retcode, cmd)
 
             logging.info('Restore successful.')
-            manager.schedule_backup()
 
         except Exception as e:
             logging.error(f'Restore failed: {e}')

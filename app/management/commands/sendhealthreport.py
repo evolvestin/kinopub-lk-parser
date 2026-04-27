@@ -1,4 +1,6 @@
+import os
 import shutil
+import time
 from datetime import datetime, timedelta
 
 import requests
@@ -26,6 +28,7 @@ from app.services.metrics import (
     calculate_title_collision_metric,
     calculate_unused_persons_metric,
 )
+from kinopub_parser import celery_app
 
 
 class Command(BaseCommand):
@@ -145,14 +148,61 @@ class Command(BaseCommand):
             is_critical = True
             components_lines.append(f'❌ Database: <b>Error</b> ({str(e)[:30]})')
 
+        r = None
         try:
             r = Redis.from_url(settings.CELERY_BROKER_URL, socket_timeout=3)
             q_det = r.scard('queue:update_details')
             q_dur = r.scard('queue:update_durations')
-            components_lines.append(f'✅ Redis/Queue: <b>OK</b> (Q: {q_det}/{q_dur})')
+            q_def = r.llen('celery')
+            components_lines.append(f'✅ Redis/Queue: <b>OK</b> (Q: {q_det}/{q_dur}/{q_def})')
         except Exception as e:
             is_critical = True
             components_lines.append(f'❌ Redis/Queue: <b>Error</b> ({str(e)[:30]})')
+
+        try:
+            inspect = celery_app.control.inspect(timeout=5)
+            ping = inspect.ping()
+            worker_count = len(ping) if ping else 0
+            if worker_count > 0:
+                components_lines.append(f'✅ Celery: <b>OK</b> ({worker_count} active)')
+            else:
+                is_critical = True
+                components_lines.append('❌ Celery: <b>No workers</b>')
+        except Exception:
+            is_critical = True
+            components_lines.append('❌ Celery: <b>Inaccessible</b>')
+
+        try:
+            heartbeat_dir = settings.HEARTBEAT_DIR
+            hb_files = list(heartbeat_dir.glob('heartbeat_*'))
+
+            if not hb_files:
+                has_warnings = True
+                components_lines.append('⚠️ Heartbeat: <b>No services detected</b>')
+            else:
+                stale_services = []
+                active_count = 0
+                for hb_file in hb_files:
+                    age = time.time() - os.path.getmtime(hb_file)
+                    service_name = hb_file.name.replace('heartbeat_', '')
+                    if age > 600:
+                        stale_services.append(service_name)
+                    else:
+                        active_count += 1
+
+                if stale_services:
+                    has_warnings = True
+                    list_str = ', '.join(stale_services)
+                    components_lines.append(
+                        f'⚠️ Heartbeat: <b>{active_count} OK, '
+                        f'{len(stale_services)} STALE</b> ({list_str})'
+                    )
+                else:
+                    components_lines.append(
+                        f'✅ Heartbeat: <b>OK</b> ({active_count} services active)'
+                    )
+        except Exception as e:
+            components_lines.append(f'⚠️ Heartbeat: <b>Error scanning dir</b> ({str(e)[:20]})')
 
         try:
             total, used, free = shutil.disk_usage('/data')

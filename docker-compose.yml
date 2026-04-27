@@ -70,7 +70,7 @@ services:
         fi
       "
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/admin/login/"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/admin/login/ && python manage.py healthcheck --touch"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -92,7 +92,7 @@ services:
       - .:/app:delegated
     command: daphne -b 0.0.0.0 -p 8001 kinopub_parser.asgi:application
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/ && python manage.py healthcheck --touch"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -121,7 +121,7 @@ services:
     networks:
       - kinopub-net
     healthcheck:
-      test: [ "CMD-SHELL", "pgrep -f 'celery worker' || exit 1" ]
+      test: [ "CMD-SHELL", "pgrep -f 'celery worker' && python manage.py healthcheck --touch" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -143,7 +143,7 @@ services:
     networks:
       - kinopub-net
     healthcheck:
-      test: [ "CMD-SHELL", "pgrep -f 'celery' || exit 1" ]
+      test: [ "CMD-SHELL", "pgrep -f 'celery' && python manage.py healthcheck --touch" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -155,6 +155,7 @@ services:
     env_file: .env
     volumes:
       - .:/app:delegated
+      - ./data:/data
     depends_on:
       app-init:
         condition: service_completed_successfully
@@ -208,13 +209,18 @@ services:
   
   health-monitor:
     build: .
-    user: root
     restart: unless-stopped
     env_file: .env
     volumes:
       - .:/app:delegated
+      - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: python manage.py runhealthdaemon
+    healthcheck:
+      test: [ "CMD", "python", "manage.py", "healthcheck" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     depends_on:
       app-init:
         condition: service_completed_successfully

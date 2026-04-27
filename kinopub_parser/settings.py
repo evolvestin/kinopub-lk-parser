@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 import sys
 from pathlib import Path
 
@@ -213,9 +214,13 @@ TMDB_API_KEY = os.getenv('TMDB_API_KEY')
 POISKKINO_API_KEY = os.getenv('POISKKINO_API_KEY')
 
 # --- App Core Config ---
+_hostname = socket.gethostname()
+
 REGEX_CODE = r'\d{6}'
 CODE_LIFETIME_MINUTES = 15
-HEARTBEAT_FILE = '/tmp/kinopub-parser_heartbeat'
+_heartbeat_base = os.getenv('HEARTBEAT_FILE', str(data_dir / 'heartbeat'))
+HEARTBEAT_FILE = f'{_heartbeat_base}_{_hostname}'
+HEARTBEAT_DIR = Path(_heartbeat_base).parent
 REQUEST_TIMEOUT = 10
 IMAP_TIMEOUT = 30
 IDLE_TIMEOUT = 25

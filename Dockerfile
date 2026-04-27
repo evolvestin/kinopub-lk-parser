@@ -33,7 +33,7 @@ RUN chmod +x /app/manage.py
 USER app
 
 ENV PATH=/home/app/bin:$PATH \
-    HEARTBEAT_FILE=/tmp/kinopub-parser_heartbeat \
+    HEARTBEAT_FILE=/data/heartbeat \
     LOG_LEVEL=INFO \
     PYTHONUNBUFFERED=1 \
     DJANGO_SETTINGS_MODULE=kinopub_parser.settings
