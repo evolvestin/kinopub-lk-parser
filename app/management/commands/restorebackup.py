@@ -24,12 +24,22 @@ class Command(LoggableBaseCommand):
         logging.info(f'Using backup file at {backup_file_path}')
 
         try:
-            logging.info('Dropping public schema to clean database...')
+            db_conf = settings.DATABASES['default']
+            db_name = db_conf['NAME']
+
+            logging.info('Terminating existing connections and cleaning schema...')
             with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    SELECT pg_terminate_backend(pg_stat_activity.pid)
+                    FROM pg_stat_activity
+                    WHERE pg_stat_activity.datname = '{db_name}'
+                      AND pid <> pg_backend_pid();
+                    """
+                )
                 cursor.execute('DROP SCHEMA public CASCADE;')
                 cursor.execute('CREATE SCHEMA public;')
 
-            db_conf = settings.DATABASES['default']
             env = os.environ.copy()
             env['PGPASSWORD'] = db_conf['PASSWORD']
 
@@ -42,7 +52,7 @@ class Command(LoggableBaseCommand):
                 '-U',
                 db_conf['USER'],
                 '-d',
-                db_conf['NAME'],
+                db_name,
                 '--no-owner',
                 '-v',
                 backup_file_path,

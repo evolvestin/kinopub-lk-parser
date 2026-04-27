@@ -4,7 +4,7 @@ import json
 import logging
 import urllib.parse
 import uuid
-
+from collections import defaultdict
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
@@ -30,6 +30,7 @@ from app.models import (
     TelegramLog,
     UserRating,
     ViewHistory,
+    ShowCrew,
     ViewUser,
     ViewUserGroup,
 )
@@ -1185,8 +1186,6 @@ def webapp_get_shared_stats(request, stat_id):
 @require_http_methods(['GET'])
 def webapp_get_show_full(request, show_id):
     try:
-        from collections import defaultdict
-
         show = Show.objects.prefetch_related(
             'countries', 'genres', 'showcrew_set__person__master_person'
         ).get(id=show_id)
@@ -1236,6 +1235,17 @@ def webapp_get_show_full(request, show_id):
             if prof not in preferred_order:
                 ordered_crew.append({'profession': prof, 'persons': persons})
 
+        genre_map = {}
+        for g in show.genres.all():
+            norm_name = RAW_TO_NORMALIZED_GENRE.get(g.name, g.name)
+            if norm_name not in genre_map:
+                genre_map[norm_name] = g.id
+
+        genres_list = [
+            {'id': gid, 'name': name}
+            for name, gid in sorted(genre_map.items())
+        ]
+
         data = {
             'id': show.id,
             'title': show.title,
@@ -1252,7 +1262,7 @@ def webapp_get_show_full(request, show_id):
             'countries': [
                 {'id': c.id, 'name': c.name, 'emoji': c.emoji_flag} for c in show.countries.all()
             ],
-            'genres': show.display_genres,
+            'genres': genres_list,
             'crew': ordered_crew,
         }
         return JsonResponse(data)
@@ -1268,12 +1278,29 @@ def webapp_get_collection(request, collection_type, item_id):
     try:
         shows = Show.objects.all()
         title = 'Коллекция'
+        person_info = None
 
         if collection_type == 'person':
-            person = Person.objects.get(id=item_id)
+            base_person = Person.objects.get(id=item_id)
+            person = base_person.canonical
+            
             target_ids = [person.id] + list(person.aliases.values_list('id', flat=True))
             shows = shows.filter(showcrew__person__id__in=target_ids)
             title = person.name
+            
+            professions = (
+                ShowCrew.objects.filter(person_id__in=target_ids)
+                .exclude(profession__isnull=True)
+                .values_list('profession', flat=True)
+                .distinct()
+            )
+            norm_profs = sorted(list({RAW_TO_NORMALIZED_RU.get(p, p) for p in professions if p}))
+            
+            person_info = {
+                'photo_url': person.photo_url,
+                'fallback_photo_url': person.kp_photo_url if person.tmdb_photo_url else None,
+                'professions': norm_profs
+            }
         elif collection_type == 'genre':
             genre = Genre.objects.get(id=item_id)
             norm_name = RAW_TO_NORMALIZED_GENRE.get(genre.name, genre.name)
@@ -1304,7 +1331,7 @@ def webapp_get_collection(request, collection_type, item_id):
                 }
             )
 
-        return JsonResponse({'title': title, 'items': results})
+        return JsonResponse({'title': title, 'items': results, 'person_info': person_info})
     except (Person.DoesNotExist, Genre.DoesNotExist, Country.DoesNotExist):
         return JsonResponse({'error': 'Item not found'}, status=404)
     except Exception as e:

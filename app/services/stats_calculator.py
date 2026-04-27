@@ -210,17 +210,30 @@ def _get_favorites(base_qs, dur_qs):
 
             target_ids = [cid] + list(person.aliases.values_list('id', flat=True))
 
-            person_shows = base_qs.filter(show__showcrew__person__id__in=target_ids).filter(
-                final_role_filter
+            person_role_filter = Q(show__showcrew__person__id__in=target_ids) & (
+                Q(show__showcrew__profession__in=professions)
+                | Q(show__showcrew__en_profession__in=professions)
             )
 
-            show_ids = list(person_shows.values_list('show_id', flat=True).distinct())
-            show_titles = list(
-                person_shows.order_by('show__original_title')
-                .values_list('show__original_title', flat=True)
+            if professions == ACTOR_ROLES:
+                person_role_filter &= ~Q(show__showcrew__profession__in=dub_ru)
+                person_role_filter &= ~Q(show__showcrew__en_profession__in=dub_en)
+
+            person_shows_data = (
+                base_qs.filter(person_role_filter)
+                .values('show_id', 'show__title', 'show__original_title')
                 .distinct()
             )
 
+            show_ids = [row['show_id'] for row in person_shows_data]
+
+            titles_set = set()
+            for row in person_shows_data:
+                title = row['show__original_title'] or row['show__title']
+                if title:
+                    titles_set.add(title)
+
+            show_titles = sorted(list(titles_set))
             sub_text = ', '.join(show_titles)
             if len(sub_text) > 80:
                 sub_text = sub_text[:80] + '...'
@@ -359,7 +372,7 @@ def _get_heatmap(dur_qs, year, all_years):
     return result
 
 
-def _get_monthly_chart(base_qs, dur_qs):
+def _get_monthly_chart(base_qs, dur_qs, year=None):
     month_names = [
         '',
         'Янв',
@@ -375,24 +388,7 @@ def _get_monthly_chart(base_qs, dur_qs):
         'Ноя',
         'Дек',
     ]
-
-    monthly_counts = (
-        base_qs.annotate(m_num=ExtractMonth('view_date'))
-        .values('m_num')
-        .annotate(
-            views=Count('id'),
-            episodes=Count('id', filter=Q(season_number__gt=0)),
-            movies=Count('id', filter=Q(season_number=0)),
-        )
-    )
-    count_map = {mc['m_num']: mc for mc in monthly_counts if mc['m_num']}
-
-    monthly_hours = (
-        dur_qs.annotate(m_num=ExtractMonth('view_date'))
-        .values('m_num')
-        .annotate(hours=Sum('final_duration') / 3600)
-    )
-    hours_map = {mh['m_num']: mh['hours'] for mh in monthly_hours if mh['m_num']}
+    now = timezone.now()
 
     labels = []
     views_data = []
@@ -400,13 +396,83 @@ def _get_monthly_chart(base_qs, dur_qs):
     episodes_data = []
     movies_data = []
 
-    for i in range(1, 13):
-        labels.append(month_names[i])
-        entry = count_map.get(i, {})
-        views_data.append(entry.get('views', 0))
-        hours_data.append(round(float(hours_map.get(i, 0) or 0), 1))
-        episodes_data.append(entry.get('episodes', 0))
-        movies_data.append(entry.get('movies', 0))
+    if year:
+        year_val = int(year)
+        limit_month = now.month if year_val == now.year else 12
+
+        monthly_counts = (
+            base_qs.annotate(m_num=ExtractMonth('view_date'))
+            .values('m_num')
+            .annotate(
+                views=Count('id'),
+                episodes=Count('id', filter=Q(season_number__gt=0)),
+                movies=Count('id', filter=Q(season_number=0)),
+            )
+        )
+        count_map = {mc['m_num']: mc for mc in monthly_counts if mc['m_num']}
+
+        monthly_hours = (
+            dur_qs.annotate(m_num=ExtractMonth('view_date'))
+            .values('m_num')
+            .annotate(hours=Sum('final_duration') / 3600.0)
+        )
+        hours_map = {mh['m_num']: mh['hours'] for mh in monthly_hours if mh['m_num']}
+
+        for i in range(1, limit_month + 1):
+            labels.append(month_names[i])
+            entry = count_map.get(i, {})
+            views_data.append(entry.get('views', 0))
+            hours_data.append(round(float(hours_map.get(i, 0) or 0), 1))
+            episodes_data.append(entry.get('episodes', 0))
+            movies_data.append(entry.get('movies', 0))
+    else:
+        timeline_counts = (
+            base_qs.annotate(m_trunc=TruncMonth('view_date'))
+            .values('m_trunc')
+            .annotate(
+                views=Count('id'),
+                episodes=Count('id', filter=Q(season_number__gt=0)),
+                movies=Count('id', filter=Q(season_number=0)),
+            )
+            .order_by('m_trunc')
+        )
+
+        if not timeline_counts.exists():
+            return {
+                'labels': [],
+                'views': [],
+                'hours': [],
+                'episodes': [],
+                'movies': [],
+            }
+
+        first_m = timeline_counts.first()['m_trunc']
+        last_m = timeline_counts.last()['m_trunc']
+
+        count_map = {item['m_trunc']: item for item in timeline_counts}
+
+        timeline_hours = (
+            dur_qs.annotate(m_trunc=TruncMonth('view_date'))
+            .values('m_trunc')
+            .annotate(hours=Sum('final_duration') / 3600.0)
+        )
+        hours_map = {item['m_trunc']: item['hours'] for item in timeline_hours}
+
+        curr = first_m
+        while curr <= last_m:
+            label = f'{month_names[curr.month]} {str(curr.year)[2:]}'
+            labels.append(label)
+
+            entry = count_map.get(curr, {})
+            views_data.append(entry.get('views', 0))
+            hours_data.append(round(float(hours_map.get(curr, 0) or 0), 1))
+            episodes_data.append(entry.get('episodes', 0))
+            movies_data.append(entry.get('movies', 0))
+
+            if curr.month == 12:
+                curr = curr.replace(year=curr.year + 1, month=1)
+            else:
+                curr = curr.replace(month=curr.month + 1)
 
     return {
         'labels': labels,
@@ -637,7 +703,7 @@ def generate_user_stats(user, year=None):
         'writers': favs['writers'],
         'countries': favs['countries'],
         'binges': binge,
-        'monthly_chart': _get_monthly_chart(base_qs, dur_qs),
+        'monthly_chart': _get_monthly_chart(base_qs, dur_qs, year),
         'weekday_chart': _get_weekday_chart(base_qs),
         'history_movies': movies_history,
         'history_episodes': episodes_history,
@@ -763,6 +829,7 @@ def generate_group_stats(user, year=None):
         'duration_display': format_duration(total_seconds),
         'active_days': counts['active_days'],
         'genres': favs['genres'],
+        'monthly_chart': _get_monthly_chart(base_qs, dur_qs, year),
         'history_movies': history_movies,
         'history_episodes': history_episodes,
     }
@@ -814,7 +881,7 @@ def generate_global_stats(year=None):
 
     summary = _get_yearly_summary(base_qs, dur_qs, year)
     favs = _get_favorites(base_qs, dur_qs)
-    monthly_chart = _get_monthly_chart(base_qs, dur_qs)
+    monthly_chart = _get_monthly_chart(base_qs, dur_qs, year)
     weekday_chart = _get_weekday_chart(base_qs)
     heatmap = _get_heatmap(dur_qs, year, all_years)
     binge = _get_binge_records(base_qs)

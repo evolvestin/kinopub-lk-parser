@@ -651,10 +651,15 @@ function renderMonthly() {
     const c = cc();
     let fillGradient = getCtxGradient(ctx, isDark?'rgba(35, 134, 54, 0.4)':'rgba(46, 160, 67, 0.3)', 'rgba(35, 134, 54, 0.0)'), lineGradient = ctx.createLinearGradient(0, 0, canvas.width || 400, 0);
     lineGradient.addColorStop(0, '#2ea043'); lineGradient.addColorStop(1, '#3fb950');
+    
+    // Вычисляем размер шрифта для меток на оси X в зависимости от их количества
+    let labelFontSize = fSizeAx;
+    if (ch.labels.length > 12) labelFontSize = Math.max(8, fSizeAx - 2);
+
     chM = new Chart(ctx, { 
         type:'line', 
         data:{ labels:ch.labels, datasets:[{ label: ' Просмотры', data: ch.views, backgroundColor: fillGradient, borderColor: lineGradient, borderWidth: 3, tension: 0.4, fill: true, yAxisID: 'y', pointBackgroundColor: isDark ? '#0d1117' : '#ffffff', pointBorderColor: '#3fb950', pointBorderWidth: 2, pointRadius: 4, pointHoverRadius: 6 }, { label: ' Часы', data: ch.hours, backgroundColor: 'transparent', borderColor: c.i, borderWidth: 2, borderDash: [5, 5], tension: 0.4, fill: false, yAxisID: 'y1', pointBackgroundColor: isDark ? '#0d1117' : '#ffffff', pointBorderColor: c.i, pointRadius: 0, pointHoverRadius: 5 }] },
-        options:{ responsive:true, maintainAspectRatio:false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins:{ legend: { display: true, position: 'top', labels: { color: c.t, usePointStyle: true, boxWidth: 8, padding: 15, font: { size: fSizeAx, family: 'system-ui' } } }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, padding: 12, cornerRadius: 8, displayColors: true, boxPadding: 6, bodySpacing: 8, titleSpacing: 10 } }, interaction: { mode: 'index', intersect: false }, scales:{ x:{ ticks:{color:c.t,font:{size:fSizeAx}}, grid:{display:false} }, y:{ type: 'linear', display: true, position: 'left', ticks:{color:c.a,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true }, y1: { type: 'linear', display: true, position: 'right', ticks:{color:c.i,font:{size:fSizeAx}}, grid:{drawOnChartArea: false}, beginAtZero:true } } } 
+        options:{ responsive:true, maintainAspectRatio:false, animation: { duration: 1500, easing: 'easeOutQuart' }, plugins:{ legend: { display: true, position: 'top', labels: { color: c.t, usePointStyle: true, boxWidth: 8, padding: 15, font: { size: fSizeAx, family: 'system-ui' } } }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, padding: 12, cornerRadius: 8, displayColors: true, boxPadding: 6, bodySpacing: 8, titleSpacing: 10 } }, interaction: { mode: 'index', intersect: false }, scales:{ x:{ ticks:{color:c.t, font:{size:labelFontSize}, maxRotation: 45, minRotation: 0}, grid:{display:false} }, y:{ type: 'linear', display: true, position: 'left', ticks:{color:c.a,font:{size:fSizeAx}}, grid:{color:c.g}, beginAtZero:true }, y1: { type: 'linear', display: true, position: 'right', ticks:{color:c.i,font:{size:fSizeAx}}, grid:{drawOnChartArea: false}, beginAtZero:true } } } 
     });
 }
 
@@ -720,23 +725,86 @@ let viewMode = localStorage.getItem('kp_view_mode') || 'grid';
 window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, extraIndex) {
     curHistType = type;
     
-    if (type === 'all') { curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date)); } 
-    else if (type === 'day') { curHistData =[...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate); } 
-    else if (type === 'binge') { curHistData = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => { if (a.season_number !== b.season_number) return a.season_number - b.season_number; return a.episode_number - b.episode_number; }); } 
-    else if (type === 'ratings') { curHistData = D.ratings.history; } 
-    else if (type === 'movies') { curHistData = D.history_movies; } 
-    else if (type === 'episodes') { curHistData = D.history_episodes; } 
-    else if (type === 'filter') { const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] :[...D.history_movies, ...D.history_episodes]; const allowedIds = D[extraKey][extraIndex].show_ids ||[]; curHistData = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); } 
-    else if (type === 'group_member') { const member = D.group.members[extraIndex]; curHistData =[...D.group.history_movies, ...D.group.history_episodes].filter(item => item.user_ids.includes(member.id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); } 
-    else if (type === 'weekday') { curHistData =[...D.history_movies, ...D.history_episodes].filter(item => { const date = new Date(item.view_date); const jsDay = date.getDay(); return (jsDay === 0 ? 6 : jsDay - 1) === extraIndex; }).sort((a, b) => b.view_date.localeCompare(a.view_date)); } 
-    else if (type === 'rating_filter') { curHistData = D.ratings.history.filter(item => { let b = Math.floor(item.rating); if (b < 1) b = 1; return b === extraIndex; }); curHistType = 'ratings'; }
+    if (type === 'all') { 
+        curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date)); 
+    } 
+    else if (type === 'day') { 
+        curHistData = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate); 
+    } 
+    else if (type === 'binge') { 
+        curHistData = D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => { 
+            if (a.season_number !== b.season_number) return a.season_number - b.season_number; 
+            return a.episode_number - b.episode_number; 
+        }); 
+    } 
+    else if (type === 'ratings') { 
+        curHistData = D.ratings.history; 
+    } 
+    else if (type === 'movies') { 
+        curHistData = D.history_movies; 
+    } 
+    else if (type === 'episodes') { 
+        curHistData = D.history_episodes; 
+    } 
+    else if (type === 'filter') { 
+        const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] : [...D.history_movies, ...D.history_episodes]; 
+        const allowedIds = D[extraKey][extraIndex].show_ids || []; 
+        curHistData = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); 
+    } 
+    else if (type === 'group_member') { 
+        const member = D.group.members[extraIndex]; 
+        curHistData = [...D.group.history_movies, ...D.group.history_episodes].filter(item => item.user_ids.includes(member.id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); 
+    } 
+    else if (type === 'weekday') { 
+        curHistData = [...D.history_movies, ...D.history_episodes].filter(item => { 
+            const date = new Date(item.view_date); 
+            const jsDay = date.getDay(); 
+            return (jsDay === 0 ? 6 : jsDay - 1) === extraIndex; 
+        }).sort((a, b) => b.view_date.localeCompare(a.view_date)); 
+    } 
+    else if (type === 'rating_filter') { 
+        curHistData = D.ratings.history.filter(item => { 
+            let b = Math.floor(item.rating); 
+            if (b < 1) b = 1; 
+            return b === extraIndex; 
+        }); 
+        curHistType = 'ratings'; 
+    }
+
+    let headerSectionHtml = '';
+    if (type === 'filter' && ['actors', 'directors', 'writers'].includes(extraKey)) {
+        const p = D[extraKey][extraIndex];
+        const safeName = p.name.replace(/'/g, "\\'");
+        const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
+        const imgHtml = p.photo_url 
+            ? `<img src="${p.photo_url}" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;" onerror="window.handleImgErr(this, ${fb}, '${safeName}')">`
+            : `<div class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px;">${p.name.charAt(0)}</div>`;
+        
+        const labels = { 'actors': 'Актёр', 'directors': 'Режиссёр', 'writers': 'Сценарист' };
+        const profLabel = labels[extraKey] || '';
+        
+        headerSectionHtml = `
+            <div class="card anim-item" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm);">
+                ${imgHtml}
+                <div style="min-width:0;">
+                    <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">${p.name}</div>
+                    <div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">${profLabel}</div>
+                </div>
+            </div>`;
+    } else if (type === 'filter' && extraKey === 'countries') {
+        const c = D[extraKey][extraIndex];
+        const flag = c.emoji ? `<span style="margin-right:10px; font-size: 1.2em;">${c.emoji}</span>` : '';
+        headerSectionHtml = `<div class="label"><div class="icon" style="color:var(--info)">${Icons.globe}</div>${flag}${c.name}</div>`;
+    } else if (type === 'filter' && (extraKey === 'genres_top' || extraKey === 'group_genres_top')) {
+        headerSectionHtml = `<div class="label"><div class="icon" style="color:var(--info)">${Icons.masks}</div>Жанр: ${title}</div>`;
+    }
 
     const headerHtml = `
     <div class="layer-header">
         <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 16px;">
             <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
         </button>
-        <span style="font-weight:800; color:var(--text-primary); font-size:16px;">${title}</span>
+        <span style="font-weight:800; color:var(--text-primary); font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:50%;">${title}</span>
         <div class="view-toggle" style="margin:0; padding:2px;">
             <button class="vt-btn ${viewMode === 'grid' ? 'active' : ''}" onclick="window.App.setViewModeLayer('grid')">${Icons.grid}</button>
             <button class="vt-btn ${viewMode === 'list' ? 'active' : ''}" onclick="window.App.setViewModeLayer('list')">${Icons.list}</button>
@@ -745,6 +813,7 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
 
     const bodyHtml = `
         ${headerHtml}
+        ${headerSectionHtml}
         <div id="layer-hist-container" style="padding: 16px;"></div>
         <div id="layer-hist-sentinel" style="height: 40px; width: 100%;"></div>
     `;
@@ -996,9 +1065,34 @@ window.openCollectionLayer = async function(type, id, titleFallback) {
             gridHtml = `<div class="empty" style="grid-column: 1/-1"><div class="icon">${Icons.film}</div>Пусто</div>`;
         }
 
+        let headerSectionHtml = '';
+        if (data.person_info) {
+            const p = data.person_info;
+            const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
+            const safeName = titleFallback.replace(/'/g, "\\'");
+            const imgHtml = p.photo_url 
+                ? `<img src="${p.photo_url}" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;" onerror="window.handleImgErr(this, ${fb}, '${safeName}')">`
+                : `<div class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px;">${titleFallback.charAt(0)}</div>`;
+            
+            const profsHtml = p.professions && p.professions.length > 0 
+                ? `<div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">${p.professions.join(' · ')}</div>`
+                : '';
+
+            headerSectionHtml = `
+                <div class="card anim-item" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm);">
+                    ${imgHtml}
+                    <div style="min-width:0;">
+                        <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">${titleFallback}</div>
+                        ${profsHtml}
+                    </div>
+                </div>`;
+        } else {
+            headerSectionHtml = `<div class="label"><div class="icon" style="color:var(--info)">${Icons.star}</div>${data.title || titleFallback}</div>`;
+        }
+
         const html = `
             ${getLayerHeader(data.title || titleFallback)}
-            <div class="label"><div class="icon" style="color:var(--info)">${Icons.star}</div>${data.title || titleFallback}</div>
+            ${headerSectionHtml}
             <div class="hist-grid" style="padding: 0 16px;">
                 ${gridHtml}
             </div>

@@ -72,14 +72,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file: .env
-    command: postgres -c 'max_connections=500' -c 'shared_buffers=256MB'
+    command: postgres -c 'max_connections=100' -c 'shared_buffers=256MB'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 15s
+      timeout: 10s
       retries: 5
+      start_period: 90s
     networks:
       - kinopub-net
 

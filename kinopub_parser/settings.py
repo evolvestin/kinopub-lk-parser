@@ -81,6 +81,7 @@ TEMPLATES = [
         'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
+            'debug': DEBUG,
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
@@ -127,6 +128,9 @@ SILENCED_SYSTEM_CHECKS = ['security.W019']
 
 STATIC_URL = 'static/'
 STATIC_ROOT = data_dir / 'staticfiles'
+
+WHITENOISE_USE_FINDERS = DEBUG
+WHITENOISE_AUTOREFRESH = DEBUG
 
 STATICFILES_DIRS = []
 static_src = BASE_DIR / 'kinopub_parser' / 'static'
