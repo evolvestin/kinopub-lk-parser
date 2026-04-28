@@ -40,12 +40,7 @@ urlpatterns = [
         name='webapp_get_shared_stats',
     ),
     path('api/webapp/show/<int:show_id>/', views.webapp_get_show_full, name='webapp_get_show_full'),
-    path(
-        'api/webapp/collection/<str:collection_type>/<int:item_id>/',
-        views.webapp_get_collection,
-        name='webapp_get_collection',
-    ),
-    # Bot API Endpoints
+    path('api/webapp/wishlist/', views.webapp_wishlist_data, name='webapp_wishlist_data'),
     path('api/bot/check/<int:telegram_id>/', views.check_bot_user),
     path('api/bot/register/', views.register_bot_user),
     path('api/bot/set_role/', views.set_bot_user_role),

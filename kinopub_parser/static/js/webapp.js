@@ -43,7 +43,10 @@ const Icons = {
     grid: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
     list: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>',
     search: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
-    nav_stats: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>'
+    nav_stats: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>',
+    bookmark: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>',
+    bookmark_plus: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path><line x1="12" y1="7" x2="12" y2="13"></line><line x1="9" y1="10" x2="15" y2="10"></line></svg>',
+    grip: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="9" x2="16" y2="9"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg>'
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -57,6 +60,8 @@ function initIcons() {
     i('it-cou-internal', 'globe'); i('it-bin-internal', 'bolt');
     i('it-star-internal', 'star'); i('ic-weekday-internal', 'days');
     i('ic-search-nav', 'search'); i('ic-stats-nav', 'nav_stats');
+    i('ic-wishlist-nav', 'bookmark');
+    i('ic-bookmark', 'bookmark'); i('ic-check', 'check');
 }
 
 if (document.readyState === 'loading') {
@@ -79,6 +84,8 @@ let isSharedMode = false;
 let SharedDataMap = {};
 let availableYears = [];
 let activeMainView = 'search';
+
+let wishlistFolders = [];
 
 function toggleTheme() {
     isDark = !isDark;
@@ -131,15 +138,13 @@ async function init() {
         await load();
         
         const role = D?.meta?.role || 'guest';
+        document.getElementById('bottom-nav').style.display = 'flex';
+        document.body.classList.add('has-nav');
         if (role === 'guest') {
             document.getElementById('bn-stats').classList.add('hidden');
-            document.getElementById('bottom-nav').style.display = 'none';
-        } else {
-            document.getElementById('bottom-nav').style.display = 'flex';
-            document.body.classList.add('has-nav');
         }
         
-        switchMainView(viewFromUrl === 'stats' ? 'stats' : 'search');
+        switchMainView(viewFromUrl || 'search');
 
         if (showIdFromUrl) {
             window.App.openShowLayer(showIdFromUrl);
@@ -151,10 +156,16 @@ function switchMainView(view) {
     activeMainView = view;
     document.getElementById('view-search').style.display = view === 'search' ? 'block' : 'none';
     document.getElementById('view-stats').style.display = view === 'stats' ? 'block' : 'none';
+    document.getElementById('view-wishlist').style.display = view === 'wishlist' ? 'block' : 'none';
     
     document.getElementById('bn-search').classList.toggle('active', view === 'search');
     document.getElementById('bn-stats').classList.toggle('active', view === 'stats');
+    document.getElementById('bn-wishlist').classList.toggle('active', view === 'wishlist');
     window.scrollTo(0, 0);
+
+    if (view === 'wishlist') {
+        loadWishlist();
+    }
 }
 
 let searchTimer = null;
@@ -203,7 +214,15 @@ function renderSearchResults(data) {
         html += '<div class="hist-grid" style="padding:0 16px;">';
         data.shows.forEach(s => {
             const poster = s.poster_url ? `<img src="${s.poster_url}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
-            html += `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${s.id})"><div class="grid-item">${poster}${s.year ? `<div class="grid-year">${s.year}</div>` : ''}</div><div class="grid-below-title">${s.title}</div></div>`;
+            const safeTitle = s.title.replace(/'/g, "\\'");
+            html += `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${s.id})">
+                <div class="grid-item">
+                    ${poster}
+                    ${s.year ? `<div class="grid-year">${s.year}</div>` : ''}
+                    <button class="wishlist-add-btn" onclick="event.stopPropagation(); window.App.showFolderModal(${s.id}, '${safeTitle}')">${Icons.bookmark_plus}</button>
+                </div>
+                <div class="grid-below-title">${s.title}</div>
+            </div>`;
         });
         html += '</div>';
     }
@@ -347,6 +366,9 @@ function render() {
         const movLbl = document.getElementById('s-mov').nextElementSibling;
         if (movLbl) movLbl.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
         document.getElementById('s-uni').textContent = s.movies_duration || '0м';
+        
+        document.getElementById('s-wl-added').textContent = s.wishlist_added || 0;
+        document.getElementById('s-wl-watched').textContent = s.wishlist_watched || 0;
     }
 
     const showWelcome = !isGuest && vViews === 0;
@@ -1014,6 +1036,8 @@ window.openShowLayer = async function(showId) {
             ]);
         }
 
+        const safeTitle = show.title.replace(/'/g, "\\'");
+        
         const html = `
             ${getLayerHeader('О шоу')}
             <div class="hero-container">
@@ -1023,7 +1047,10 @@ window.openShowLayer = async function(showId) {
             </div>
             
             <div class="show-info">
-                <div class="show-title">${show.title}</div>
+                <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:6px;">
+                    <div class="show-title" style="margin-bottom:0">${show.title}</div>
+                    <button class="wishlist-add-btn" style="position:relative; width:36px; height:36px; border-radius:50%; padding:0; display:flex; align-items:center; justify-content:center;" onclick="window.App.showFolderModal(${show.id}, '${safeTitle}')">${Icons.bookmark_plus}</button>
+                </div>
                 ${show.original_title && show.original_title !== show.title ? `<div class="show-orig">${show.original_title}</div>` : ''}
                 
                 <div class="show-meta-tags">
@@ -1333,6 +1360,204 @@ async function submitShare() {
     }
 }
 
+// WISHLIST LOGIC
+async function sendWishlistAction(action, payload={}) {
+    const r = await fetch('/api/webapp/wishlist/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ action, ...payload, init_data: tg?.initData || '' })
+    });
+    if (!r.ok) throw new Error('Network response was not ok');
+    return r.json();
+}
+
+async function loadWishlist() {
+    const container = document.getElementById('wishlist-folders-container');
+    container.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
+    try {
+        const data = await sendWishlistAction('get');
+        wishlistFolders = data.folders || [];
+        renderWishlist();
+    } catch (e) {
+        container.innerHTML = '<div class="empty">Ошибка загрузки вишлиста</div>';
+    }
+}
+
+function renderWishlist() {
+    const container = document.getElementById('wishlist-folders-container');
+    if (!wishlistFolders.length) {
+        container.innerHTML = '<div class="empty">Нет папок</div>';
+        return;
+    }
+    
+    let html = '';
+    wishlistFolders.forEach(f => {
+        html += `
+        <div class="wl-folder" data-id="${f.id}">
+            <div class="wl-folder-header">
+                <div class="wl-folder-drag">${Icons.grip}</div>
+                <div class="wl-folder-title" onclick="window.App.toggleFolder(${f.id})">${f.name} <span style="opacity:0.5; font-size:12px; margin-left:6px;">${f.items.length}</span></div>
+                <button class="wl-btn" onclick="window.App.renameFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')">✎</button>
+                <button class="wl-btn" style="color:var(--danger)" onclick="window.App.deleteFolder(${f.id})">×</button>
+            </div>
+            <div class="wl-folder-items hidden" id="wl-items-${f.id}">
+                ${f.items.length ? '' : '<div class="empty" style="padding:10px;">Пусто</div>'}
+                ${f.items.map(item => `
+                    <div class="wl-item" data-id="${item.id}">
+                        <div class="wl-item-drag">${Icons.grip}</div>
+                        <img src="${item.poster_url}" class="wl-item-poster" onclick="window.App.openShowLayer(${item.show_id})">
+                        <div class="wl-item-info" onclick="window.App.openShowLayer(${item.show_id})">
+                            <div class="wl-item-title">${item.title}</div>
+                            <div class="wl-item-meta">${item.year || ''} · ${item.type || ''}</div>
+                        </div>
+                        <button class="wl-btn" style="color:var(--danger); padding:0 10px;" onclick="window.App.removeItem(${item.id})">×</button>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+    initTouchSort('#wishlist-folders-container', '.wl-folder', '.wl-folder-drag', saveFolderOrder);
+    wishlistFolders.forEach(f => {
+        initTouchSort(`#wl-items-${f.id}`, '.wl-item', '.wl-item-drag', () => saveItemOrder(f.id));
+    });
+}
+
+window.toggleFolder = function(id) {
+    document.getElementById(`wl-items-${id}`).classList.toggle('hidden');
+};
+
+window.createFolder = async function() {
+    const name = prompt('Название новой папки:');
+    if (!name) return;
+    await sendWishlistAction('create_folder', { name });
+    loadWishlist();
+};
+
+window.renameFolder = async function(id, oldName) {
+    const name = prompt('Новое название папки:', oldName);
+    if (!name || name === oldName) return;
+    await sendWishlistAction('rename_folder', { folder_id: id, name });
+    loadWishlist();
+};
+
+window.deleteFolder = async function(id) {
+    if (!confirm('Удалить папку и всё её содержимое?')) return;
+    await sendWishlistAction('delete_folder', { folder_id: id });
+    loadWishlist();
+};
+
+window.removeItem = async function(id) {
+    await sendWishlistAction('remove_item', { item_id: id });
+    loadWishlist();
+};
+
+function saveFolderOrder() {
+    const container = document.getElementById('wishlist-folders-container');
+    const order = [...container.querySelectorAll('.wl-folder')].map(el => parseInt(el.dataset.id));
+    sendWishlistAction('reorder_folders', { order });
+}
+
+function saveItemOrder(folderId) {
+    const container = document.getElementById(`wl-items-${folderId}`);
+    const order = [...container.querySelectorAll('.wl-item')].map(el => parseInt(el.dataset.id));
+    sendWishlistAction('reorder_items', { folder_id: folderId, order });
+}
+
+let activeShowForWishlist = null;
+window.showFolderModal = async function(showId, title) {
+    activeShowForWishlist = showId;
+    document.getElementById('wl-modal-title').textContent = title;
+    const grid = document.getElementById('wl-modal-folders');
+    grid.innerHTML = '<div class="spinner"></div>';
+    document.getElementById('wl-modal').classList.add('show');
+    
+    try {
+        const data = await sendWishlistAction('get');
+        if (data.folders) {
+            grid.innerHTML = data.folders.map(f => `
+                <button class="nav-btn" style="width:100%; margin-bottom:8px; text-align:left;" onclick="window.App.addToFolder(${f.id})">
+                    📁 ${f.name}
+                </button>
+            `).join('');
+        }
+    } catch (e) {
+        grid.innerHTML = 'Ошибка';
+    }
+};
+
+window.closeFolderModal = function() {
+    document.getElementById('wl-modal').classList.remove('show');
+};
+
+window.addToFolder = async function(folderId) {
+    if (!activeShowForWishlist) return;
+    try {
+        await sendWishlistAction('add_item', { folder_id: folderId, show_id: activeShowForWishlist });
+        showToast('Добавлено в вишлист');
+        closeFolderModal();
+    } catch(e) {
+        showToast('Ошибка при добавлении');
+    }
+};
+
+function initTouchSort(containerSelector, itemSelector, handleSelector, onEnd) {
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+    let dragging = null, ghost = null, startY = 0, initialY = 0;
+
+    container.addEventListener('touchstart', e => {
+        const handle = e.target.closest(handleSelector);
+        if (!handle) return;
+        dragging = handle.closest(itemSelector);
+        if (!dragging) return;
+        const rect = dragging.getBoundingClientRect();
+        startY = e.touches[0].clientY;
+        initialY = rect.top;
+        
+        ghost = dragging.cloneNode(true);
+        ghost.style.position = 'fixed';
+        ghost.style.top = rect.top + 'px';
+        ghost.style.left = rect.left + 'px';
+        ghost.style.width = rect.width + 'px';
+        ghost.style.opacity = '0.8';
+        ghost.style.zIndex = '1000';
+        ghost.style.pointerEvents = 'none';
+        ghost.style.background = 'var(--bg-card)';
+        ghost.style.boxShadow = 'var(--shadow-glow)';
+        document.body.appendChild(ghost);
+        
+        dragging.style.opacity = '0.3';
+    }, {passive: false});
+
+    container.addEventListener('touchmove', e => {
+        if (!dragging || !ghost) return;
+        e.preventDefault();
+        const y = e.touches[0].clientY;
+        const delta = y - startY;
+        ghost.style.top = (initialY + delta) + 'px';
+
+        const items = [...container.querySelectorAll(itemSelector)].filter(i => i !== dragging);
+        const afterEl = items.find(i => {
+            const r = i.getBoundingClientRect();
+            return y < r.top + r.height / 2;
+        });
+        if (afterEl) {
+            container.insertBefore(dragging, afterEl);
+        } else {
+            container.appendChild(dragging);
+        }
+    }, {passive: false});
+
+    container.addEventListener('touchend', () => {
+        if (!dragging) return;
+        ghost.remove();
+        dragging.style.opacity = '1';
+        dragging = ghost = null;
+        if (onEnd) onEnd();
+    });
+}
+
 window.App = {
     toggleTheme: toggleTheme,
     openShareModal: openShareModal,
@@ -1349,5 +1574,13 @@ window.App = {
     openShowLayer: window.openShowLayer,
     openCollectionLayer: window.openCollectionLayer,
     doSearch: doSearch,
-    switchMainView: switchMainView
+    switchMainView: switchMainView,
+    toggleFolder: window.toggleFolder,
+    createFolder: window.createFolder,
+    renameFolder: window.renameFolder,
+    deleteFolder: window.deleteFolder,
+    removeItem: window.removeItem,
+    showFolderModal: window.showFolderModal,
+    closeFolderModal: window.closeFolderModal,
+    addToFolder: window.addToFolder
 };

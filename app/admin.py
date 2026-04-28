@@ -45,6 +45,8 @@ from app.models import (
     ViewHistory,
     ViewUser,
     ViewUserGroup,
+    WishlistFolder,
+    WishlistItem,
 )
 from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender
@@ -1805,3 +1807,19 @@ class SiteMetricAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+class WishlistItemInline(admin.TabularInline):
+    model = WishlistItem
+    extra = 0
+    autocomplete_fields = ('show',)
+
+
+@admin.register(WishlistFolder, site=admin_site)
+class WishlistFolderAdmin(admin.ModelAdmin):
+    list_display = ('name', 'user', 'sort_order', 'created_at')
+    list_filter = ('user',)
+    search_fields = ('name', 'user__username', 'user__name')
+    autocomplete_fields = ('user',)
+    inlines = [WishlistItemInline]
+    ordering = ('user', 'sort_order')

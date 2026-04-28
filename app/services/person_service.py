@@ -31,15 +31,27 @@ def get_tmdb_session():
 
 def _is_valid_tmdb_match(query: str, tmdb_result: dict) -> bool:
     q_lower = query.lower().strip()
-    name = (tmdb_result.get('name') or '').lower().strip()
-    orig_name = (tmdb_result.get('original_name') or '').lower().strip()
-    known_as = [str(alias).lower().strip() for alias in tmdb_result.get('known_for_department', [])]
 
-    if q_lower == name or q_lower == orig_name or q_lower in known_as:
+    # Собираем все возможные варианты имен и метаданных из ответа
+    # Поле known_for_department — строка, поэтому кладем её в список, а не итерируем
+    possible_matches = {
+        (tmdb_result.get('name') or '').lower().strip(),
+        (tmdb_result.get('original_name') or '').lower().strip(),
+        (tmdb_result.get('known_for_department') or '').lower().strip(),
+    }
+
+    # Удаляем пустые значения из сета
+    possible_matches.discard('')
+
+    if q_lower in possible_matches:
         return True
 
     if len(q_lower) <= 4:
         return False
+
+    # Частичное совпадение по основным полям имен
+    name = (tmdb_result.get('name') or '').lower().strip()
+    orig_name = (tmdb_result.get('original_name') or '').lower().strip()
 
     if q_lower in name or q_lower in orig_name:
         return True

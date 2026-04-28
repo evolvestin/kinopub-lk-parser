@@ -11,7 +11,7 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -35,6 +35,8 @@ from app.models import (
     ViewHistory,
     ViewUser,
     ViewUserGroup,
+    WishlistFolder,
+    WishlistItem,
 )
 from app.services.metrics import (
     get_active_countries_list,
@@ -1552,3 +1554,123 @@ def queue_update_details(request):
         return JsonResponse({'status': 'ok', 'added': added})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_wishlist_data(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+        action = body.get('action')
+
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        try:
+            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        except ViewUser.DoesNotExist:
+            view_user = ViewUser.objects.create(
+                telegram_id=tg_user.get('id'),
+                username=tg_user.get('username'),
+                name=tg_user.get('first_name'),
+                language=tg_user.get('language_code', 'ru'),
+                role=UserRole.GUEST,
+            )
+
+        if action == 'get':
+            if not WishlistFolder.objects.filter(user=view_user).exists():
+                WishlistFolder.objects.create(user=view_user, name='Фильмы', sort_order=1)
+                WishlistFolder.objects.create(user=view_user, name='Сериалы', sort_order=2)
+
+            folders = WishlistFolder.objects.filter(user=view_user).prefetch_related('items__show')
+            data = []
+            for folder in folders:
+                items = []
+                for item in folder.items.all():
+                    items.append(
+                        {
+                            'id': item.id,
+                            'show_id': item.show.id,
+                            'title': item.show.title,
+                            'year': item.show.year,
+                            'type': item.show.type,
+                            'poster_url': get_poster_url(item.show.id, 'small'),
+                        }
+                    )
+                data.append(
+                    {
+                        'id': folder.id,
+                        'name': folder.name,
+                        'sort_order': folder.sort_order,
+                        'items': items,
+                    }
+                )
+            return JsonResponse({'folders': data})
+
+        elif action == 'create_folder':
+            name = body.get('name', '').strip()
+            if not name:
+                return JsonResponse({'error': 'Empty name'}, status=400)
+            max_order = (
+                WishlistFolder.objects.filter(user=view_user).aggregate(m=Max('sort_order'))['m']
+                or 0
+            )
+            WishlistFolder.objects.create(user=view_user, name=name, sort_order=max_order + 1)
+            return JsonResponse({'status': 'ok'})
+
+        elif action == 'delete_folder':
+            folder_id = body.get('folder_id')
+            WishlistFolder.objects.filter(id=folder_id, user=view_user).delete()
+            return JsonResponse({'status': 'ok'})
+
+        elif action == 'rename_folder':
+            folder_id = body.get('folder_id')
+            name = body.get('name', '').strip()
+            if name:
+                WishlistFolder.objects.filter(id=folder_id, user=view_user).update(name=name)
+            return JsonResponse({'status': 'ok'})
+
+        elif action == 'add_item':
+            folder_id = body.get('folder_id')
+            show_id = body.get('show_id')
+            folder = WishlistFolder.objects.filter(id=folder_id, user=view_user).first()
+            if not folder:
+                return JsonResponse({'error': 'Folder not found'}, status=404)
+            show = Show.objects.filter(id=show_id).first()
+            if not show:
+                return JsonResponse({'error': 'Show not found'}, status=404)
+            max_order = (
+                WishlistItem.objects.filter(folder=folder).aggregate(m=Max('sort_order'))['m'] or 0
+            )
+            WishlistItem.objects.get_or_create(
+                folder=folder, show=show, defaults={'sort_order': max_order + 1}
+            )
+            return JsonResponse({'status': 'ok'})
+
+        elif action == 'remove_item':
+            item_id = body.get('item_id')
+            WishlistItem.objects.filter(id=item_id, folder__user=view_user).delete()
+            return JsonResponse({'status': 'ok'})
+
+        elif action == 'reorder_folders':
+            order_ids = body.get('order', [])
+            for idx, fid in enumerate(order_ids):
+                WishlistFolder.objects.filter(id=fid, user=view_user).update(sort_order=idx)
+            return JsonResponse({'status': 'ok'})
+
+        elif action == 'reorder_items':
+            folder_id = body.get('folder_id')
+            order_ids = body.get('order', [])
+            folder = WishlistFolder.objects.filter(id=folder_id, user=view_user).first()
+            if folder:
+                for idx, item_id in enumerate(order_ids):
+                    WishlistItem.objects.filter(id=item_id, folder=folder).update(sort_order=idx)
+            return JsonResponse({'status': 'ok'})
+
+        return JsonResponse({'error': 'Invalid action'}, status=400)
+
+    except Exception as e:
+        logging.error(f'WebApp Wishlist Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)

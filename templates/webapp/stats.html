@@ -32,6 +32,18 @@
                 </div>
             </div>
 
+            <div class="view" id="view-wishlist" style="display: none; padding: 16px;">
+                <div class="header" style="padding: 0 0 16px 0;">
+                    <div class="header-name glow-text">Вишлист</div>
+                    <div class="top-controls">
+                        <button class="share-btn" onclick="window.App.createFolder()">
+                            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="wishlist-folders-container"></div>
+            </div>
+
             <div class="view" id="view-stats" style="display: none;">
                 <div class="header">
                     <div class="header-left">
@@ -86,6 +98,17 @@
                             <div class="stat-val" id="s-mov">0</div>
                             <div class="stat-lbl">Фильмов</div>
                             <div class="stat-sub" id="s-uni" style="background: rgba(210, 153, 34, 0.15); color: #d29922"></div>
+                        </div>
+                        <div class="stat anim-item" style="animation-delay: 0.25s">
+                            <div class="stat-icon" id="ic-bookmark"></div>
+                            <div class="stat-val" id="s-wl-added">0</div>
+                            <div class="stat-lbl">В вишлисте</div>
+                        </div>
+                        <div class="stat anim-item" style="animation-delay: 0.3s">
+                            <div class="stat-icon" id="ic-check"></div>
+                            <div class="stat-val" id="s-wl-watched">0</div>
+                            <div class="stat-lbl">Просмотрено</div>
+                            <div class="stat-sub" style="background: var(--accent-dim); color: var(--accent)">Из вишлиста</div>
                         </div>
                     </div>
 
@@ -189,6 +212,9 @@
                 <button class="bn-btn active" onclick="window.App.switchMainView('search')" id="bn-search">
                     <div class="icon" id="ic-search-nav"></div> Поиск
                 </button>
+                <button class="bn-btn" onclick="window.App.switchMainView('wishlist')" id="bn-wishlist">
+                    <div class="icon" id="ic-wishlist-nav"></div> Вишлист
+                </button>
                 <button class="bn-btn" onclick="window.App.switchMainView('stats')" id="bn-stats">
                     <div class="icon" id="ic-stats-nav"></div> Статистика
                 </button>
@@ -226,6 +252,17 @@
                 <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
                 Создать ссылку
             </button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="wl-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" style="font-size:16px;">Добавить: <span id="wl-modal-title" style="color:var(--accent);"></span></div>
+                <button class="modal-close" onclick="window.App.closeFolderModal()">×</button>
+            </div>
+            <div id="wl-modal-folders" style="display:flex; flex-direction:column; gap:8px;">
+            </div>
         </div>
     </div>
 

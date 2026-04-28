@@ -612,3 +612,39 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 
 /* Loader for search */
 .loader-inline { display: flex; justify-content: center; padding: 40px; }
+
+/* WISHLIST CSS */
+.wishlist-add-btn {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    transition: transform var(--transition-bounce), background var(--transition-smooth);
+}
+.wishlist-add-btn:active { transform: scale(0.9); background: var(--accent); border-color: var(--accent); }
+.wishlist-add-btn svg { width: 18px; height: 18px; }
+
+.wl-folder { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
+.wl-folder-header { display: flex; align-items: center; padding: 12px; background: var(--bg-input); border-bottom: 1px solid var(--border); }
+.wl-folder-drag { padding: 4px; margin-right: 8px; color: var(--text-muted); cursor: grab; }
+.wl-folder-title { flex: 1; font-weight: 800; color: var(--text-primary); cursor: pointer; user-select: none; }
+.wl-btn { background: none; border: none; color: var(--text-muted); padding: 4px 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: color 0.2s; }
+.wl-btn:active { color: var(--text-primary); }
+
+.wl-item { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-card); }
+.wl-item:last-child { border-bottom: none; }
+.wl-item-drag { padding: 4px; margin-right: 8px; color: var(--text-muted); cursor: grab; }
+.wl-item-poster { width: 40px; height: 60px; object-fit: cover; border-radius: 6px; margin-right: 12px; cursor: pointer; }
+.wl-item-info { flex: 1; min-width: 0; cursor: pointer; }
+.wl-item-title { font-weight: 700; font-size: 14px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+.wl-item-meta { font-size: 12px; color: var(--text-muted); }

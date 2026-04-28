@@ -575,6 +575,19 @@ def generate_user_stats(user, year=None):
 
     summary = _get_yearly_summary(base_qs, dur_qs, year)
 
+    from app.models import WishlistItem
+
+    wl_added = WishlistItem.objects.filter(folder__user=user).count()
+    wl_watched = (
+        WishlistItem.objects.filter(
+            folder__user=user, show__viewhistory__users=user, show__viewhistory__is_checked=True
+        )
+        .distinct()
+        .count()
+    )
+    summary['wishlist_added'] = wl_added
+    summary['wishlist_watched'] = wl_watched
+
     if is_redundant and str(year) == str(current_yr):
         summary['period_label'] = 'Все время'
 

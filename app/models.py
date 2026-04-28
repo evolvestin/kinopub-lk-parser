@@ -447,3 +447,32 @@ class SiteMetric(BaseModel):
 
     def __str__(self):
         return f'{self.key} at {self.created_at.strftime(DATETIME_FORMAT)}'
+
+
+class WishlistFolder(BaseModel):
+    user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='wishlist_folders')
+    name = models.CharField(max_length=100)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Wishlist Folder'
+        verbose_name_plural = 'Wishlist Folders'
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return f'{self.user} - {self.name}'
+
+
+class WishlistItem(BaseModel):
+    folder = models.ForeignKey(WishlistFolder, on_delete=models.CASCADE, related_name='items')
+    show = models.ForeignKey(Show, on_delete=models.CASCADE)
+    sort_order = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Wishlist Item'
+        verbose_name_plural = 'Wishlist Items'
+        unique_together = ('folder', 'show')
+        ordering = ['sort_order', '-id']
+
+    def __str__(self):
+        return f'{self.show.title} in {self.folder.name}'
