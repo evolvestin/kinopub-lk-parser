@@ -614,6 +614,40 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 .loader-inline { display: flex; justify-content: center; padding: 40px; }
 
 /* WISHLIST CSS */
+.detail-wishlist-btn {
+    position: absolute !important;
+    bottom: -18px !important;
+    right: -18px !important;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 50% !important;
+    background: var(--accent) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4) !important;
+    border: 3px solid var(--bg-main) !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.detail-wishlist-btn svg {
+    width: 24px !important;
+    height: 24px !important;
+}
+
+.detail-wishlist-btn:active {
+    transform: scale(0.85) !important;
+}
+
+/* На мобильных устройствах немного уменьшим смещение, чтобы кнопка не вылазила за экран */
+@media (max-width: 380px) {
+    .detail-wishlist-btn {
+        right: -10px !important;
+        bottom: -10px !important;
+    }
+}
+
 .wishlist-add-btn {
     position: absolute;
     bottom: 8px;

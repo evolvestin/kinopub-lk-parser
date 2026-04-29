@@ -130,6 +130,15 @@ SILENCED_SYSTEM_CHECKS = ['security.W019']
 STATIC_URL = 'static/'
 STATIC_ROOT = data_dir / 'staticfiles'
 
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
 WHITENOISE_USE_FINDERS = DEBUG
 WHITENOISE_AUTOREFRESH = DEBUG
 

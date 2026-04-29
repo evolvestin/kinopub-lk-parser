@@ -1043,14 +1043,14 @@ window.openShowLayer = async function(showId) {
             <div class="hero-container">
                 <div class="hero-bg" style="background-image: url('${bgUrl}')"></div>
                 <div class="hero-gradient"></div>
-                ${posterUrl ? `<img src="${posterUrl}" class="hero-poster" alt="poster">` : ''}
+                <div style="position: relative; z-index: 3; height: 85%; max-width: 65%; display: flex; align-items: flex-end;">
+                    ${posterUrl ? `<img src="${posterUrl}" class="hero-poster" style="max-width: 100%; height: 100%; margin: 0; box-shadow: none;" alt="poster">` : ''}
+                    <button class="wishlist-add-btn detail-wishlist-btn anim-item" style="animation-delay: 0.6s;" onclick="window.App.showFolderModal(${show.id}, '${safeTitle}')">${Icons.bookmark_plus}</button>
+                </div>
             </div>
             
             <div class="show-info">
-                <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:6px;">
-                    <div class="show-title" style="margin-bottom:0">${show.title}</div>
-                    <button class="wishlist-add-btn" style="position:relative; width:36px; height:36px; border-radius:50%; padding:0; display:flex; align-items:center; justify-content:center;" onclick="window.App.showFolderModal(${show.id}, '${safeTitle}')">${Icons.bookmark_plus}</button>
-                </div>
+                <div class="show-title">${show.title}</div>
                 ${show.original_title && show.original_title !== show.title ? `<div class="show-orig">${show.original_title}</div>` : ''}
                 
                 <div class="show-meta-tags">
