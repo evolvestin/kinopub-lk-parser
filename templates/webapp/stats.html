@@ -33,7 +33,7 @@
                 </div>
             </div>
 
-            <<div class="view" id="view-wishlist" style="display: none;">
+            <div class="view" id="view-wishlist" style="display: none;">
                 <div class="header" style="padding-bottom: 8px;">
                     <div class="header-name glow-text">Вишлист</div>
                     <div class="top-controls">
@@ -45,7 +45,7 @@
                 </div>
 
                 <!-- Блок с папками -->
-                <div style="padding: 10px 16px;">
+                <div style="padding: 10px 16px;" id="wl-folders-wrapper">
                     <div id="wl-folders-grid" class="wl-folders-grid"></div>
                 </div>
 
@@ -303,9 +303,9 @@
             <div class="share-section-title">Иконка</div>
             <div class="wl-icon-picker" id="wl-icon-picker"></div>
 
-            <div style="display: flex; gap: 12px; margin-top: 30px;">
-                <button class="btn-primary" id="wl-delete-folder-btn" style="background: var(--bg-input); color: var(--danger); border: 1px solid var(--border); margin-top: 0; display: none;" onclick="window.App.deleteActiveFolder()">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <div style="display: flex; gap: 12px; margin-top: 30px; align-items: center;">
+                <button class="btn-primary" id="wl-delete-folder-btn" style="background: var(--bg-input); color: var(--danger); border: 1px solid var(--border); margin-top: 0; display: none; width: 56px; height: 56px; padding: 0; flex-shrink: 0;" onclick="window.App.deleteActiveFolder()">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" style="display: block; margin: auto;"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                 </button>
                 <button class="btn-primary" style="margin-top: 0; flex: 1;" onclick="window.App.saveFolderEdit()">Сохранить</button>
             </div>

@@ -29,7 +29,7 @@ const Icons = {
     edit: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
     trash: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
     moon: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
-    sun: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm0 160c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64zM256 128c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16s-16 7.2-16 16v64c0 8.8 7.2 16 16 16zM256 384c-8.8 0-16 7.2-16 16v64c0 8.8 7.2 16 16 16s16-7.2 16-16v-64c0-8.8-7.2-16-16-16zM464 240h-64c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM112 240H48c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM403.1 108.9c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM176.8 335.2c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM403.1 403.1c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0z"/></svg>',
+    sun: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm0 160c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64zM256 128c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16s-16 7.2-16 16v64c0 8.8 7.2 16 16 16zM256 384c-8.8 0-16 7.2-16 16v64c0 8.8 7.2 16 16 16s16-7.2 16-16v-64c0-8.8-7.2-16-16-16zM464 240h-64c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM112 240H48c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM403.1 108.9c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM176.8 335.2c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM403.1 403.1c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0z"/></svg>',
     user: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 288c79.53 0 144-64.47 144-144S335.53 0 256 0 112 64.47 112 144s64.47 144 144 144zm128 32h-24.1c-30.83 18.66-67.43 28-103.9 28s-73.07-9.34-103.9-28H128c-70.69 0-128 57.31-128 128v56c0 13.25 10.75 24 24 24h464c13.25 0 24-10.75 24-24v-56c0-70.69-57.31-128-128-128z"/></svg>',
     users: '<svg viewBox="0 0 512 512"><path d="M336 256c-20.56 0-40.44-5.06-58.26-14.34-14.73 21-36.42 36.63-61.64 43.68C236.41 298.54 263.26 304 290.5 304h25.4C379.79 304 432 356.21 432 419.86v43.21a20.89 20.89 0 0019.2 20.93h41.6a20.9 20.9 0 0019.2-20.93v-43.21C512 344.21 433.79 256 336 256zM336 224a104 104 0 10-104-104 104.12 104.12 0 00104 104zM201.5 272c-63.53 0-115.2 51.68-115.2 115.21v43.86A20.94 20.94 0 00105.5 452h192a20.94 20.94 0 0019.2-20.93v-43.86C316.7 323.68 265.03 272 201.5 272zM201.5 240A112 112 0 1089.5 128a112.12 112.12 0 00112 112z"/></svg>',
     dash: '<svg viewBox="0 0 512 512"><path d="M200 48H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM424 48H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM200 272H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40zM424 272H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40z"/></svg>',
@@ -51,7 +51,22 @@ const Icons = {
     nav_stats: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>',
     bookmark: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>',
     bookmark_plus: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path><line x1="12" y1="7" x2="12" y2="13"></line><line x1="9" y1="10" x2="15" y2="10"></line></svg>',
-    grip: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="9" x2="16" y2="9"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg>'
+    grip: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="9" x2="16" y2="9"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg>',
+    play_circle: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>',
+    video: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>',
+    award: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>',
+    eye: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+    smile: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>',
+    frown: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 16s-1.5-2-4-2-4 2-4 2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>',
+    ticket: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path><line x1="13" y1="5" x2="13" y2="19"></line></svg>',
+    monitor: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>',
+    music: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>',
+    zap: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+    coffee: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>',
+    ghost: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 10h.01"></path><path d="M15 10h.01"></path><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"></path></svg>',
+    skull: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14h.01"></path><path d="M15 14h.01"></path><path d="M12 2a8 8 0 0 0-8 8v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a8 8 0 0 0-8-8z"></path><path d="M10 22v-3h4v3"></path></svg>',
+    rocket: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 22 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-5.03a12 12 0 0 1 3-3"></path><path d="M12 15v5s3.03-.55 5.03-2a12 12 0 0 0 3-3"></path></svg>',
+    target: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>',
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -1367,7 +1382,13 @@ async function submitShare() {
 
 // WISHLIST LOGIC
 const FOLDER_COLORS = ['#388bfd', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#95a5a6', '#fd79a8'];
-const FOLDER_ICONS = ['folder', 'star', 'heart', 'film', 'tv', 'bookmark', 'clock', 'list'];
+const FOLDER_ICONS = [
+    'folder', 'bookmark', 'star', 'heart', // Системные и основные
+    'film', 'tv', 'video', 'ticket', // Контент
+    'award', 'zap', 'rocket', // Статус/Достижения
+    'ghost', // Эмоции/Жанры
+    'coffee', 'list' // Разное
+];
 
 let activeWlFolderId = null;
 let wlViewMode = localStorage.getItem('wl_view_mode') || 'grid';
@@ -1402,6 +1423,11 @@ async function loadWishlist() {
             if (!exists) activeWlFolderId = wishlistFolders[0].id;
         }
         
+        const wrapper = document.getElementById('wl-folders-wrapper');
+        if (wrapper) {
+            wrapper.style.display = wishlistFolders.length > 1 ? 'block' : 'none';
+        }
+
         renderWishlistFolders();
         renderActiveWlFolder();
     } catch (e) {
@@ -1501,6 +1527,7 @@ function renderActiveWlFolder() {
     const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
     
     titleEl.innerHTML = `<span style="color:${folder.color}">${Icons[folder.icon] || Icons.folder}</span> ${folder.name}`;
+    titleEl.style.display = wishlistFolders.length > 1 ? 'flex' : 'none';
     
     document.getElementById('wl-vt-grid').classList.toggle('active', wlViewMode === 'grid');
     document.getElementById('wl-vt-list').classList.toggle('active', wlViewMode === 'list');
@@ -1632,24 +1659,26 @@ window.saveFolderEdit = async function() {
     const color = document.getElementById('wl-color-picker').dataset.color;
     const icon = document.getElementById('wl-icon-picker').dataset.icon;
     
-    if (!name) { showToast('Введите название'); return; }
-    
     window.App.closeFolderEditModal();
     
     if (editFolderMode === 'create') {
-        // Оптимистичное создание
         const tempId = -Date.now();
-        wishlistFolders.push({ id: tempId, name, color, icon, items: [] });
+        wishlistFolders.push({ id: tempId, name: name || '', color, icon, items: [] });
         activeWlFolderId = tempId;
+        
+        const wrapper = document.getElementById('wl-folders-wrapper');
+        if (wrapper) {
+            wrapper.style.display = wishlistFolders.length > 1 ? 'block' : 'none';
+        }
+
         renderWishlistFolders();
         renderActiveWlFolder();
         
         await sendWishlistAction('create_folder', { name, icon, color });
-        loadWishlist(); // перезагружаем для получения реального ID
+        loadWishlist();
     } else {
-        // Оптимистичное обновление
         const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
-        folder.name = name; folder.color = color; folder.icon = icon;
+        folder.name = name || ''; folder.color = color; folder.icon = icon;
         renderWishlistFolders();
         renderActiveWlFolder();
         
@@ -1663,8 +1692,22 @@ window.deleteActiveFolder = async function() {
     
     const idToDelete = activeWlFolderId;
     wishlistFolders = wishlistFolders.filter(f => f.id !== idToDelete);
-    activeWlFolderId = wishlistFolders.length ? wishlistFolders[0].id : null;
     
+    if (wishlistFolders.length === 0) {
+        document.getElementById('wl-active-folder-content').style.display = 'none';
+        document.getElementById('wl-folders-grid').innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
+        await sendWishlistAction('delete_folder', { folder_id: idToDelete });
+        await loadWishlist();
+        return;
+    }
+
+    activeWlFolderId = wishlistFolders[0].id;
+    
+    const wrapper = document.getElementById('wl-folders-wrapper');
+    if (wrapper) {
+        wrapper.style.display = wishlistFolders.length > 1 ? 'block' : 'none';
+    }
+
     renderWishlistFolders();
     renderActiveWlFolder();
     
@@ -1675,6 +1718,17 @@ window.deleteActiveFolder = async function() {
 let activeShowForWishlist = null;
 window.showFolderModal = async function(showId, title) {
     activeShowForWishlist = showId;
+    
+    if (wishlistFolders.length === 1) {
+        try {
+            await sendWishlistAction('add_item', { folder_id: wishlistFolders[0].id, show_id: showId });
+            showToast('Успешно добавлено');
+        } catch(e) {
+            showToast('Ошибка при добавлении');
+        }
+        return;
+    }
+
     document.getElementById('wl-modal-title').textContent = title;
     const grid = document.getElementById('wl-modal-folders');
     grid.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div>';
@@ -1683,6 +1737,15 @@ window.showFolderModal = async function(showId, title) {
     try {
         const data = await sendWishlistAction('get');
         if (data.folders) {
+            wishlistFolders = data.folders;
+
+            if (wishlistFolders.length === 1) {
+                window.App.closeFolderModal();
+                await sendWishlistAction('add_item', { folder_id: wishlistFolders[0].id, show_id: showId });
+                showToast('Успешно добавлено');
+                return;
+            }
+
             grid.innerHTML = data.folders.map(f => `
                 <div class="wl-folder-card" style="margin-bottom:8px;" onclick="window.App.addToFolder(${f.id})">
                     <div class="wl-folder-icon" style="background: ${f.color}20; color: ${f.color};">
