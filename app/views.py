@@ -1599,6 +1599,7 @@ def webapp_wishlist_data(request):
                             'year': item.show.year,
                             'type': item.show.type,
                             'poster_url': get_poster_url(item.show.id, 'small'),
+                            'added_at': item.created_at.strftime('%Y-%m-%d'),
                         }
                     )
                 data.append(

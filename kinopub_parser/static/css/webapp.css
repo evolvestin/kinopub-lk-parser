@@ -107,7 +107,7 @@ body {
 
 .light .theme-btn {
     background: var(--bg-input);
-    color: #f1c40f; /* Солнечный желтый для светлой темы */
+    color: #f1c40f; 
     border-color: var(--border);
 }
 
@@ -250,7 +250,6 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--bg-input); color: var(--text-primary); padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 700; border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 1000; transition: transform var(--transition-bounce), opacity var(--transition-smooth); opacity: 0; pointer-events: none; white-space: nowrap; }
 .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
-/* Group Compare styling */
 .cmp { display: flex; justify-content: space-between; align-items: center; padding: clamp(10px, 3vw, 12px) 0; border-bottom: 1px dashed var(--border); }
 .cmp:last-child { border: none; }
 .cmp-lb { font-size: clamp(13px, 3.5vw, 15px); color: var(--text-secondary); font-weight: 700; display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); }
@@ -354,13 +353,9 @@ body.has-banner #app {
 .hist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: clamp(10px, 3vw, 14px); }
 .grid-item-wrap { display: flex; flex-direction: column; gap: 2px; cursor: pointer; transition: transform 0.2s; }
 .grid-item-wrap:active { transform: scale(0.95); }
-#history-sentinel {
-    height: 40px;
-    width: 100%;
-    margin-top: 10px;
-}
+#history-sentinel { height: 40px; width: 100%; margin-top: 10px; }
 .grid-item { position: relative; aspect-ratio: 2/3; border-radius: 12px; overflow: hidden; background: var(--bg-input); border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: box-shadow 0.2s; transform: translateZ(0); }
-.grid-poster { width: 100%; height: 100%; object-fit: cover; }
+.grid-poster { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .grid-overlay { 
     position: absolute; 
     inset: 0; 
@@ -419,14 +414,8 @@ body.has-banner #app {
     padding-bottom: clamp(24px, 8vw, 36px);
 }
 @keyframes layerFadeIn {
-    from { 
-        opacity: 0; 
-        transform: scale(0.96);
-    }
-    to { 
-        opacity: 1; 
-        transform: scale(1);
-    }
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
 }
 
 .layer-header {
@@ -452,7 +441,6 @@ body.has-banner #app {
     justify-content: center; 
     padding: 20px; 
     animation: zoomIn 0.6s ease-out;
-    /* Мягкое затухание границ контейнера */
     mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
     -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
 }
@@ -460,27 +448,23 @@ body.has-banner #app {
 
 .hero-bg { 
     position: absolute; 
-    inset: -40px; /* Увеличено, чтобы спрятать края размытия */
+    inset: -40px; 
     background-size: cover; 
     background-position: center; 
     filter: blur(40px) brightness(0.4); 
     z-index: 1; 
     transform: scale(1.1); 
 }
-.light .hero-bg { 
-    filter: blur(40px) brightness(0.85); /* Чуть мягче яркость */
-}
+.light .hero-bg { filter: blur(40px) brightness(0.85); }
 
 .hero-gradient { 
     position: absolute; 
     inset: 0; 
-    /* Радиальный градиент в дополнение к линейному для мягких краев по бокам */
     background: 
         radial-gradient(circle at center, transparent 30%, var(--bg-main) 100%),
         linear-gradient(to bottom, var(--bg-main) 0%, transparent 20%, transparent 80%, var(--bg-main) 100%); 
     z-index: 2; 
 }
-
 .light .hero-gradient { 
     background: 
         radial-gradient(circle at center, transparent 30%, var(--bg-main) 100%),
@@ -520,10 +504,6 @@ body.has-banner #app {
 .genre-pill:active { transform: scale(0.95); background: var(--accent); color: white; border-color: var(--accent); }
 
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-
-/* Fix dynamic views overlay behavior */
-#views-container { position: relative; }
-
 
 /* BOTTOM NAVIGATION & SEARCH */
 body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
@@ -578,19 +558,9 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     padding-bottom: calc(12px + env(safe-area-inset-bottom));
     transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.light .search-container {
-    background: rgba(246, 248, 250, 0.85);
-}
-
-.has-nav .search-container {
-    bottom: calc(60px + env(safe-area-inset-bottom));
-    padding-bottom: 12px;
-}
-
-#search-results {
-    padding-bottom: 160px;
-}
+.light .search-container { background: rgba(246, 248, 250, 0.85); }
+.has-nav .search-container { bottom: calc(60px + env(safe-area-inset-bottom)); padding-bottom: 12px; }
+#search-results { padding-bottom: 160px; }
 
 .search-input {
     width: 100%;
@@ -604,13 +574,8 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     transition: all var(--transition-smooth);
     box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
 }
-.search-input:focus {
-    border-color: var(--accent);
-    box-shadow: var(--shadow-glow);
-}
+.search-input:focus { border-color: var(--accent); box-shadow: var(--shadow-glow); }
 .search-input::placeholder { color: var(--text-muted); }
-
-/* Loader for search */
 .loader-inline { display: flex; justify-content: center; padding: 40px; }
 
 /* WISHLIST CSS */
@@ -630,13 +595,9 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     justify-content: center;
     z-index: 10;
 }
-
 .detail-wishlist-btn svg { width: 24px !important; height: 24px !important; }
 .detail-wishlist-btn:active { transform: scale(0.85) !important; }
-
-@media (max-width: 380px) {
-    .detail-wishlist-btn { right: -10px !important; bottom: -10px !important; }
-}
+@media (max-width: 380px) { .detail-wishlist-btn { right: -10px !important; bottom: -10px !important; } }
 
 .wishlist-add-btn {
     position: absolute; bottom: 8px; right: 8px; width: 32px; height: 32px;
@@ -648,171 +609,76 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 .wishlist-add-btn:active { transform: scale(0.9); background: var(--accent); border-color: var(--accent); }
 .wishlist-add-btn svg { width: 18px; height: 18px; }
 
-/* Сетка папок a-la Google Drive */
-.wl-folders-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 12px;
-}
-
-.wl-folder-card {
-    cursor: pointer;
-    user-select: none;
-    -webkit-touch-callout: none !important;
-    -webkit-user-select: none !important;
-    touch-action: manipulation;
-    transition: transform var(--transition-bounce);
-}
-
-.wl-folder-inner {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 12px 14px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: var(--shadow-sm);
-    transition: border-color 0.2s, background 0.2s;
-    height: 100%;
-    width: 100%;
-}
-
+.wl-folders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.wl-folder-card { cursor: pointer; user-select: none; -webkit-touch-callout: none !important; -webkit-user-select: none !important; touch-action: manipulation; transition: transform var(--transition-bounce); }
+.wl-folder-inner { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm); transition: border-color 0.2s, background 0.2s; height: 100%; width: 100%; }
 .wl-folder-card:active { transform: scale(0.95); }
 .wl-folder-card.active .wl-folder-inner { border-color: var(--accent); background: var(--accent-dim); }
 
-.reorder-mode .wl-folder-inner {
-    border-color: var(--border);
-    background: var(--bg-card);
-}
-
-.wl-folder-inner.wiggle {
-    animation: wiggle 0.3s infinite ease-in-out;
-}
-
-
-.wl-folder-icon {
-    width: 36px; height: 36px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px; flex-shrink: 0;
-}
+.wl-folder-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
 .wl-folder-info { flex: 1; min-width: 0; }
 .wl-folder-name { font-weight: 800; font-size: 14px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
 .wl-folder-count { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
 
-/* Pickers for Modal */
 .wl-color-picker { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
-.wl-color-btn {
-    width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent;
-    cursor: pointer; transition: transform 0.2s; display: flex; align-items: center; justify-content: center;
-}
+.wl-color-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s; display: flex; align-items: center; justify-content: center; }
 .wl-color-btn.active { transform: scale(1.15); border-color: var(--text-primary); }
 .wl-color-btn::after { content: ''; width: 100%; height: 100%; border-radius: 50%; background: inherit; }
 
 .wl-icon-picker { display: flex; gap: 12px; flex-wrap: wrap; }
-.wl-icon-btn {
-    width: 44px; height: 44px; border-radius: 12px; background: var(--bg-input);
-    border: 1px solid var(--border); color: var(--text-muted); font-size: 20px;
-    display: flex; align-items: center; justify-content: center; cursor: pointer;
-    transition: all 0.2s;
-}
+.wl-icon-btn { width: 44px; height: 44px; border-radius: 12px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
 .wl-icon-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); transform: scale(1.1); }
 
-.sortable-fallback {
-    opacity: 0.9 !important;
-    border: 1px solid var(--accent) !important;
-}
-
-/* SortableJS Ghost Classes */
-.sortable-ghost {
-    opacity: 0.4 !important;
-}
-.sortable-drag {
-    opacity: 0 !important;
-}
-
-/* Delete button overlay on list items */
 .wl-item-del {
-    position: absolute;
-    top: 8px; right: 8px;
-    width: 28px; height: 28px;
-    border-radius: 8px;
-    background: rgba(231, 76, 60, 0.9);
-    color: white;
-    border: none;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; z-index: 10;
+    position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
+    border-radius: 8px; background: rgba(231, 76, 60, 0.9); color: white; border: none;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10;
     opacity: 0; transition: opacity 0.2s, transform 0.2s;
 }
 .grid-item-wrap:hover .wl-item-del, .hist-item:hover .wl-item-del { opacity: 1; }
 .wl-item-del:active { transform: scale(0.9); }
-.hist-item { position: relative; } /* needed for absolute del btn in list view */
+.hist-item { position: relative; } 
 
-
-.grid-item-wrap, .hist-item {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-}
-
-.grid-poster, .hist-poster {
-    pointer-events: none;
-}
+.grid-item-wrap, .hist-item { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 
 #trash-zone {
-    position: fixed;
-    bottom: 40px;
-    left: 50%;
-    margin-left: -30px;
-    width: 60px;
-    height: 60px;
-    background: var(--danger);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    z-index: 9999;
-    transform: translateY(150px) scale(0.5);
-    opacity: 0;
-    transition: transform 0.4s var(--transition-bounce), opacity 0.3s;
-    box-shadow: 0 10px 25px rgba(231, 76, 60, 0.5);
-    pointer-events: none;
+    position: fixed; bottom: 40px; left: 50%; margin-left: -30px; width: 60px; height: 60px;
+    background: var(--danger); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 28px; z-index: 9999; transform: translateY(150px) scale(0.5); opacity: 0;
+    transition: transform 0.4s var(--transition-bounce), opacity 0.3s; box-shadow: 0 10px 25px rgba(231, 76, 60, 0.5); pointer-events: none;
+}
+#trash-zone.visible { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
+#trash-zone svg { width: 28px; height: 28px; pointer-events: none; }
+
+/* ========================================= */
+/* === IOS-LIKE DRAG & DROP (SORTABLEJS) === */
+/* ========================================= */
+
+/* 1. Анимация дребезжания (Wiggle) */
+@keyframes iosWiggle {
+    0% { transform: rotate(-1.5deg) translate(0, 0); }
+    25% { transform: rotate(1.5deg) translate(-1px, 1px); }
+    50% { transform: rotate(-1.5deg) translate(1px, -1px); }
+    75% { transform: rotate(1.5deg) translate(0, 0); }
+    100% { transform: rotate(-1.5deg) translate(0, 0); }
 }
 
-#trash-zone.visible {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-    pointer-events: auto;
+/* Применяем анимацию только когда включен режим редактирования */
+.reorder-mode .wl-folder-card .wl-folder-inner,
+.reorder-items-mode .grid-item-wrap,
+.reorder-items-mode .hist-item {
+    animation: iosWiggle 0.35s infinite ease-in-out;
+    cursor: grab;
 }
 
-#trash-zone svg {
-    width: 28px;
-    height: 28px;
-    pointer-events: none;
-}
-
-.trash-ghost {
-    opacity: 0 !important;
-}
-
-
-
-@keyframes wiggle {
-    0% { transform: rotate(0deg); }
-    25% { transform: rotate(-1.5deg); }
-    50% { transform: rotate(0deg); }
-    75% { transform: rotate(1.5deg); }
-    100% { transform: rotate(0deg); }
-}
-
-.wiggle {
-    animation: wiggle 0.3s infinite ease-in-out;
+/* Сдвиг фазы, чтобы не дребезжали синхронно */
+.reorder-mode .wl-folder-card:nth-child(even) .wl-folder-inner,
+.reorder-items-mode .grid-item-wrap:nth-child(even),
+.reorder-items-mode .hist-item:nth-child(even) {
+    animation-delay: -0.15s;
 }
 
 .reorder-mode .wl-folder-card.active {
-    border-color: var(--border);
     background: var(--bg-card);
 }
 
@@ -830,10 +696,45 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     transform: translateY(20px);
 }
 
+/* 2. Элемент "в руке" (Fallback) */
+.sortable-fallback {
+    display: block !important;
+    opacity: 1 !important;
+    position: fixed !important;
+    z-index: 999999 !important;
+    pointer-events: none !important; /* Чтобы мышь "пробивала" элемент до сетки */
+    transition: none !important;
+    animation: none !important;
+    will-change: transform;
+    cursor: grabbing !important;
+}
 
-.reorder-items-mode .grid-item-wrap,
 
-.reorder-items-mode .grid-item,
-.reorder-items-mode .hist-item {
-    animation: wiggle 0.3s infinite ease-in-out;
+/* Создаем эффект "взятия" (тень и увеличение) только для внутренностей */
+.sortable-fallback > * {
+    box-shadow: none !important;
+    transform: scale(1.08) !important;
+    background: none;
+    border-radius: none !important;
+    animation: none !important; /* Отключаем дребезжание для элемента в руке */
+    transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.3s ease !important;
+}
+
+
+.sortable-fallback .grid-below-title {
+    margin-top: 60px !important;
+}
+
+/* Отключаем дребезжание и внутри fallback-элемента на всех уровнях */
+.sortable-fallback .wl-folder-inner,
+.sortable-fallback .grid-item-wrap,
+.sortable-fallback .hist-item {
+    animation: none !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* 3. Дырка в списке (Ghost) */
+.sortable-ghost {
+    opacity: 0.3 !important; 
 }

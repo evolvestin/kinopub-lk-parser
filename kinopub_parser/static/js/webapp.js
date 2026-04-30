@@ -78,53 +78,57 @@ window.handleImgErr = function (img, fallbackUrl, name) {
 };
 
 const Icons = {
-    folder: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
-    heart: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>',
-    clock: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
-    edit: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
-    trash: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
-    moon: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
-    sun: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm0 160c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64zM256 128c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16s-16 7.2-16 16v64c0 8.8 7.2 16 16 16zM256 384c-8.8 0-16 7.2-16 16v64c0 8.8 7.2 16 16 16s16-7.2 16-16v-64c0-8.8-7.2-16-16-16zM464 240h-64c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM112 240H48c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM403.1 108.9c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM176.8 335.2c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM403.1 403.1c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0z"/></svg>',
-    user: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 288c79.53 0 144-64.47 144-144S335.53 0 256 0 112 64.47 112 144s64.47 144 144 144zm128 32h-24.1c-30.83 18.66-67.43 28-103.9 28s-73.07-9.34-103.9-28H128c-70.69 0-128 57.31-128 128v56c0 13.25 10.75 24 24 24h464c13.25 0 24-10.75 24-24v-56c0-70.69-57.31-128-128-128z"/></svg>',
-    users: '<svg viewBox="0 0 512 512"><path d="M336 256c-20.56 0-40.44-5.06-58.26-14.34-14.73 21-36.42 36.63-61.64 43.68C236.41 298.54 263.26 304 290.5 304h25.4C379.79 304 432 356.21 432 419.86v43.21a20.89 20.89 0 0019.2 20.93h41.6a20.9 20.9 0 0019.2-20.93v-43.21C512 344.21 433.79 256 336 256zM336 224a104 104 0 10-104-104 104.12 104.12 0 00104 104zM201.5 272c-63.53 0-115.2 51.68-115.2 115.21v43.86A20.94 20.94 0 00105.5 452h192a20.94 20.94 0 0019.2-20.93v-43.86C316.7 323.68 265.03 272 201.5 272zM201.5 240A112 112 0 1089.5 128a112.12 112.12 0 00112 112z"/></svg>',
-    dash: '<svg viewBox="0 0 512 512"><path d="M200 48H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM424 48H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V88a40 40 0 00-40-40zM200 272H88a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40zM424 272H312a40 40 0 00-40 40v112a40 40 0 0040 40h112a40 40 0 0040-40V312a40 40 0 00-40-40z"/></svg>',
-    time: '<svg viewBox="0 0 512 512"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48zm96 240h-96a16 16 0 01-16-16V128a16 16 0 0132 0v128h80a16 16 0 010 32z"/></svg>',
-    cal: '<svg viewBox="0 0 512 512"><path d="M416 64h-16V48a16 16 0 00-32 0v16H144V48a16 16 0 00-32 0v16H96a64 64 0 00-64 64v320a64 64 0 0064 64h320a64 64 0 0064-64V128a64 64 0 00-64-64zm16 384a16 16 0 01-16 16H96a16 16 0 01-16-16V208h352z"/></svg>',
-    tv: '<svg viewBox="0 0 512 512"><path d="M447.86 384H64.14A48.2 48.2 0 0116 335.86V128.14A48.2 48.2 0 0164.14 80h383.72A48.2 48.2 0 01496 128.14v207.72A48.2 48.2 0 01447.86 384zM256 416c-48.87 0-98.39 12-113 18.52-5.71 2.54-9 8.24-9 14.28a15.82 15.82 0 0015.42 16.63c33.09-1.28 70.84-1.43 106.58-1.43 36.31 0 74.45.15 106.58 1.43A15.82 15.82 0 00378 448.8c0-6-3.29-11.74-9-14.28C354.39 428 304.87 416 256 416z"/></svg>',
-    film: '<svg viewBox="0 0 512 512"><path d="M436 48H76a44.05 44.05 0 00-44 44v328a44.05 44.05 0 0044 44h360a44.05 44.05 0 0044-44V92a44.05 44.05 0 00-44-44zM136 400H88v-48h48zm0-96H88v-48h48zm0-96H88v-48h48zm0-96H88V64h48zm288 288h-48v-48h48zm0-96h-48v-48h48zm0-96h-48v-48h48zm0-96h-48V64h48z"/></svg>',
-    chart: '<svg viewBox="0 0 512 512"><path d="M480 384H64V48a16 16 0 00-32 0v352a16 16 0 0016 16h432a16 16 0 000-32z"/><path d="M112 320h48a16 16 0 0016-16V144a16 16 0 00-16-16h-48a16 16 0 00-16 16v160a16 16 0 0016 16zM240 320h48a16 16 0 0016-16V208a16 16 0 00-16-16h-48a16 16 0 00-16 16v96a16 16 0 0016 16zM368 320h48a16 16 0 0016-16V80a16 16 0 00-16-16h-48a16 16 0 00-16 16v224a16 16 0 0016 16z"/></svg>',
-    masks: '<svg viewBox="0 0 512 512"><path d="M374.83 148.5c-20.73-35.41-61.35-43.1-99.28-40.35-6.61.48-12.78 1.15-18.42 1.94-39.77 5.61-75.14-3.23-95.64-38.38A180.78 180.78 0 00122 55.45c-29.35.53-53.72 26-58.84 55.51-14.88 85.54-6.39 173.23 23.32 240.59 13.9 31.5 35.79 53 58 53h.46c24.23-1 43.17-18.4 56.44-48 11.23-25.07 16-53.64 21.05-83.33 3.6-21.05 7.42-43.34 16.89-63.56-5.71-1.39-11.41-2.92-17.15-4.43-15.65-4.14-25-18-20.89-33.65a25.4 25.4 0 0132.88-18.19c23.07 6.4 51.5 15.67 76.5 33.15 48.74 34.11 36.85 91.22 36.85 91.22a201.81 201.81 0 0040.35-71.39c4.27-14.28.32-41.56-13.03-57.87zM102.58 205.15a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42zm86 16.51a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42z"/><path d="M449.62 189.65c-20-43.43-63.85-61.27-111-61.27-23.36 0-46.73 4-66.36 8.78-22.39-17-54-28-80.12-35-15.48-4.2-24.93 9.77-20.89 25.4a25.4 25.4 0 0032.88 18.2c6-1.51 11.75-2.73 17.51-3.66a220.4 220.4 0 01-13 46 179.88 179.88 0 0113.1 19.34c38 52.32 94.61 74.32 153.37 74.32a188 188 0 0021.2-1.22c-.64.12-.52 0-1.11.15a133 133 0 01-17.7 21c-5.26 5-11.45 9.76-18.72 14.18-12.78 7.78-26.24 13-39.73 15.35A177.36 177.36 0 00346.59 455c14.25 31 35.08 51 57.82 51h.51c23.59-1 42.14-18.74 55-48 29.83-67.75 38.64-155.8 23.37-241.64-5.35-29.62-28.77-44.62-33.67-26.71zm-136.2 30.68a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42zm86 0a20.42 20.42 0 1120.42-20.42 20.42 20.42 0 01-20.42 20.42z"/></svg>',
-    star: '<svg viewBox="0 0 512 512"><path d="M480 208H328L256 48l-72 160H32l128 104-48 152 144-104 144 104-48-152 128-104z"/></svg>',
-    globe: '<svg viewBox="0 0 512 512"><path d="M256 48C141.13 48 48 141.13 48 256s93.13 208 208 208 208-93.13 208-208S370.87 48 256 48zm89.15 112.59A151.78 151.78 0 01366 240H288v-87.35a265.41 265.41 0 0157.15 8zM256 80.59A231.87 231.87 0 01283.47 152H228.53A231.87 231.87 0 01256 80.59zM166.85 160.59A265.41 265.41 0 01224 152.65V240h-78A151.78 151.78 0 01166.85 160.59zM80.58 240H146a256.32 256.32 0 000 32H80.58a176 176 0 010-32zm86.27 111.41A151.78 151.78 0 01146 272h78v87.35a265.41 265.41 0 01-57.15-7.94zM256 431.41A231.87 231.87 0 01228.53 360h54.94A231.87 231.87 0 01256 431.41zM345.15 351.41A265.41 265.41 0 01288 359.35V272h78A151.78 151.78 0 01345.15 351.41zM431.42 272H366a256.32 256.32 0 000-32h65.42a176 176 0 010 32z"/></svg>',
-    bolt: '<svg viewBox="0 0 512 512"><path d="M312 32h-110a18 18 0 00-17.74 21l32 188H152a18.3 18.3 0 00-14.86 28.92l160 216a18 18 0 0031.57-12.78l-23-189.14H360a18.3 18.3 0 0015-28.84L215 72h97a18 18 0 000-36z"/></svg>',
-    flame: '<svg viewBox="0 0 512 512"><path d="M313.29 82.26c-11.42-30.82-50.62-31-62.29.35C227.18 146.42 160 178.68 160 256c0 53 43 96 96 96s96-43 96-96c0-67.62-54-106.82-38.71-173.74zM256 320c-17.64 0-32-14.36-32-32 0-33.15 28.57-55 42-83.39 12 25.15 22 50.18 22 83.39 0 17.64-14.36 32-32 32z"/><path d="M255.8 48c-42.54 0-82.68 20.31-112 54.34-31 36-47.8 84.34-47.8 135.59 0 114.69 93.31 208.07 208 208.07S512 352.62 512 237.93C512 119 407.41 48 255.8 48zm0 366c-88.22 0-160-71.78-160-160 0-41.6 13.92-80.49 40.23-112.5C160.7 171.84 200.56 150 240 150c18.52 0 35.1 4.54 48 13 41.52-32.55 80-28 80 75 0 88.22-71.78 160-160 160z"/></svg>',
-    check: '<svg viewBox="0 0 512 512"><path d="M256 48C141.31 48 48 141.31 48 256s93.31 208 208 208 208-93.31 208-208S370.69 48 256 48zm108.25 138.29l-134.4 160a16 16 0 01-12 5.71h-.27a16 16 0 01-11.89-5.3l-57.6-64a16 16 0 1123.78-21.4l45.29 50.32 122.59-145.91a16 16 0 0124.5 20.58z"/></svg>',
-    days: '<svg viewBox="0 0 512 512"><path d="M400 48V16h-64v32H176V16h-64v32H48v448h416V48h-64zM112 432H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm0-64H80v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm160 256h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32zm0-64h-32v-32h32v32z"/></svg>',
-    grid: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>',
-    list: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>',
-    search: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
-    nav_stats: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>',
-    bookmark: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>',
-    bookmark_plus: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path><line x1="12" y1="7" x2="12" y2="13"></line><line x1="9" y1="10" x2="15" y2="10"></line></svg>',
-    grip: '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="9" x2="16" y2="9"></line><line x1="8" y1="15" x2="16" y2="15"></line></svg>',
-    play_circle: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>',
-    video: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>',
-    award: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>',
-    eye: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
-    smile: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>',
-    frown: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 16s-1.5-2-4-2-4 2-4 2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>',
-    ticket: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path><line x1="13" y1="5" x2="13" y2="19"></line></svg>',
-    monitor: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>',
-    music: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>',
-    zap: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
-    coffee: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>',
-    ghost: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 10h.01"></path><path d="M15 10h.01"></path><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"></path></svg>',
-    skull: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14h.01"></path><path d="M15 14h.01"></path><path d="M12 2a8 8 0 0 0-8 8v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a8 8 0 0 0-8-8z"></path><path d="M10 22v-3h4v3"></path></svg>',
-    rocket: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 22 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22 0 0 1-4 2z"></path><path d="M9 12H4s.55-3.03 2-5.03a12 12 0 0 1 3-3"></path><path d="M12 15v5s3.03-.55 5.03-2a12 12 0 0 0 3-3"></path></svg>',
-    target: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>',
-    reorder: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="8" x2="20" y2="8"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="16" x2="20" y2="16"></line></svg>',
-    done: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
-    gear: '<svg viewBox="0 0 24 24" width="100%" height="100%" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>',
+    folder: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+    heart: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>',
+    clock: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><polyline style="fill:none;" points="12 6 12 12 16 14"></polyline></svg>',
+    edit: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path style="fill:none;" d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
+    trash: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="3 6 5 6 21 6"></polyline><path style="fill:none;" d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+    
+    // Интерфейсные
+    gear: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="3"></circle><path style="fill:none;" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>',
+    search: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="10.5" cy="10.5" r="7.5"></circle><line style="fill:none;" x1="21" y1="21" x2="15.8" y2="15.8"></line></svg>',
+    reorder: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M12 5v14M8 9l4-4 4 4M8 15l4 4 4-4"></path></svg>',
+    
+    // Остальные
+    moon: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>',
+    sun: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="5"></circle><line style="fill:none;" x1="12" y1="1" x2="12" y2="3"></line><line style="fill:none;" x1="12" y1="21" x2="12" y2="23"></line><line style="fill:none;" x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line style="fill:none;" x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line style="fill:none;" x1="1" y1="12" x2="3" y2="12"></line><line style="fill:none;" x1="21" y1="12" x2="23" y2="12"></line><line style="fill:none;" x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line style="fill:none;" x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>',
+    user: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle style="fill:none;" cx="12" cy="7" r="4"></circle></svg>',
+    users: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle style="fill:none;" cx="9" cy="7" r="4"></circle><path style="fill:none;" d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path style="fill:none;" d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+    dash: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect style="fill:none;" x="3" y="3" width="7" height="9" rx="1"></rect><rect style="fill:none;" x="14" y="3" width="7" height="5" rx="1"></rect><rect style="fill:none;" x="14" y="12" width="7" height="9" rx="1"></rect><rect style="fill:none;" x="3" y="16" width="7" height="5" rx="1"></rect></svg>',
+    time: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><polyline style="fill:none;" points="12 6 12 12 16 14"></polyline></svg>',
+    cal: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect style="fill:none;" x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line style="fill:none;" x1="16" y1="2" x2="16" y2="6"></line><line style="fill:none;" x1="8" y1="2" x2="8" y2="6"></line><line style="fill:none;" x1="3" y1="10" x2="21" y2="10"></line></svg>',
+    tv: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect style="fill:none;" x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline style="fill:none;" points="17 2 12 7 7 2"></polyline></svg>',
+    film: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect style="fill:none;" x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line style="fill:none;" x1="7" y1="2" x2="7" y2="22"></line><line style="fill:none;" x1="17" y1="2" x2="17" y2="22"></line><line style="fill:none;" x1="2" y1="12" x2="22" y2="12"></line><line style="fill:none;" x1="2" y1="7" x2="7" y2="7"></line><line style="fill:none;" x1="2" y1="17" x2="7" y2="17"></line><line style="fill:none;" x1="17" y1="17" x2="22" y2="17"></line><line style="fill:none;" x1="17" y1="7" x2="22" y2="7"></line></svg>',
+    chart: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line style="fill:none;" x1="12" y1="20" x2="12" y2="10"></line><line style="fill:none;" x1="18" y1="20" x2="18" y2="4"></line><line style="fill:none;" x1="6" y1="20" x2="6" y2="16"></line></svg>',
+    masks: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M2 12c0 5.5 4.5 10 10 10s10-4.5 10-10S17.5 2 12 2 2 6.5 2 12z"></path><path style="fill:none;" d="M8 10h.01"></path><path style="fill:none;" d="M16 10h.01"></path><path style="fill:none;" d="M9 15c.5 1.5 1.5 2 3 2s2.5-.5 3-2"></path></svg>',
+    star: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon style="fill:none;" points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>',
+    globe: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><line style="fill:none;" x1="2" y1="12" x2="22" y2="12"></line><path style="fill:none;" d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>',
+    bolt: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon style="fill:none;" points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+    flame: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>',
+    check: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="20 6 9 17 4 12"></polyline></svg>',
+    days: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect style="fill:none;" x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line style="fill:none;" x1="16" y1="2" x2="16" y2="6"></line><line style="fill:none;" x1="8" y1="2" x2="8" y2="6"></line><line style="fill:none;" x1="3" y1="10" x2="21" y2="10"></line><path style="fill:none;" d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"></path></svg>',
+    grid: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect style="fill:none;" x="3" y="3" width="7" height="7"></rect><rect style="fill:none;" x="14" y="3" width="7" height="7"></rect><rect style="fill:none;" x="14" y="14" width="7" height="7"></rect><rect style="fill:none;" x="3" y="14" width="7" height="7"></rect></svg>',
+    list: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line style="fill:none;" x1="8" y1="6" x2="21" y2="6"></line><line style="fill:none;" x1="8" y1="12" x2="21" y2="12"></line><line style="fill:none;" x1="8" y1="18" x2="21" y2="18"></line><line style="fill:none;" x1="3" y1="6" x2="3.01" y2="6"></line><line style="fill:none;" x1="3" y1="12" x2="3.01" y2="12"></line><line style="fill:none;" x1="3" y1="18" x2="3.01" y2="18"></line></svg>',
+    nav_stats: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line style="fill:none;" x1="18" y1="20" x2="18" y2="10"></line><line style="fill:none;" x1="12" y1="20" x2="12" y2="4"></line><line style="fill:none;" x1="6" y1="20" x2="6" y2="14"></line></svg>',
+    bookmark: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>',
+    bookmark_plus: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path><line style="fill:none;" x1="12" y1="7" x2="12" y2="13"></line><line style="fill:none;" x1="9" y1="10" x2="15" y2="10"></line></svg>',
+    grip: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="9" cy="12" r="1"></circle><circle style="fill:none;" cx="9" cy="5" r="1"></circle><circle style="fill:none;" cx="9" cy="19" r="1"></circle><circle style="fill:none;" cx="15" cy="12" r="1"></circle><circle style="fill:none;" cx="15" cy="5" r="1"></circle><circle style="fill:none;" cx="15" cy="19" r="1"></circle></svg>',
+    play_circle: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><polygon style="fill:none;" points="10 8 16 12 10 16 10 8"></polygon></svg>',
+    video: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon style="fill:none;" points="23 7 16 12 23 17 23 7"></polygon><rect style="fill:none;" x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>',
+    award: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="8" r="7"></circle><polyline style="fill:none;" points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>',
+    eye: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle style="fill:none;" cx="12" cy="12" r="3"></circle></svg>',
+    smile: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><path style="fill:none;" d="M8 14s1.5 2 4 2 4-2 4-2"></path><line style="fill:none;" x1="9" y1="9" x2="9.01" y2="9"></line><line style="fill:none;" x1="15" y1="9" x2="15.01" y2="9"></line></svg>',
+    frown: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><path style="fill:none;" d="M16 16s-1.5-2-4-2-4 2-4 2"></path><line style="fill:none;" x1="9" y1="9" x2="9.01" y2="9"></line><line style="fill:none;" x1="15" y1="9" x2="15.01" y2="9"></line></svg>',
+    ticket: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path><line style="fill:none;" x1="13" y1="5" x2="13" y2="19"></line></svg>',
+    monitor: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect style="fill:none;" x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line style="fill:none;" x1="8" y1="21" x2="16" y2="21"></line><line style="fill:none;" x1="12" y1="17" x2="12" y2="21"></line></svg>',
+    music: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M9 18V5l12-2v13"></path><circle style="fill:none;" cx="6" cy="18" r="3"></circle><circle style="fill:none;" cx="18" cy="16" r="3"></circle></svg>',
+    zap: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon style="fill:none;" points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+    coffee: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path style="fill:none;" d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line style="fill:none;" x1="6" y1="1" x2="6" y2="4"></line><line style="fill:none;" x1="10" y1="1" x2="10" y2="4"></line><line style="fill:none;" x1="14" y1="1" x2="14" y2="4"></line></svg>',
+    ghost: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M9 10h.01"></path><path style="fill:none;" d="M15 10h.01"></path><path style="fill:none;" d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"></path></svg>',
+    skull: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M9 14h.01"></path><path style="fill:none;" d="M15 14h.01"></path><path style="fill:none;" d="M12 2a8 8 0 0 0-8 8v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a8 8 0 0 0-8-8z"></path><path style="fill:none;" d="M10 22v-3h4v3"></path></svg>',
+    rocket: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path style="fill:none;" d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 22 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22 0 0 1-4 2z"></path><path style="fill:none;" d="M9 12H4s.55-3.03 2-5.03a12 12 0 0 1 3-3"></path><path style="fill:none;" d="M12 15v5s3.03-.55 5.03-2a12 12 0 0 0 3-3"></path></svg>',
+    target: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><circle style="fill:none;" cx="12" cy="12" r="6"></circle><circle style="fill:none;" cx="12" cy="12" r="2"></circle></svg>',
+    done: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="20 6 9 17 4 12"></polyline></svg>',
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -1566,21 +1570,29 @@ function renderWishlistFolders() {
 
     if (typeof Sortable !== 'undefined' && !wlFoldersSortable) {
         wlFoldersSortable = new Sortable(grid, {
-            animation: 200,
+            animation: 350,
+            easing: "cubic-bezier(0.25, 1, 0.5, 1)",
             disabled: true,
             forceFallback: true,
             fallbackOnBody: true,
-            fallbackTolerance: 0,
-            swapThreshold: 0.65,
-            ghostClass: 'sortable-ghost',
             fallbackClass: 'sortable-fallback',
-            chosenClass: 'sortable-chosen',
-            dragClass: 'sortable-drag',
-            delay: 0, 
-            touchStartThreshold: 3,
-            onStart: function() {
+            ghostClass: 'sortable-ghost',
+            onStart: function(evt) {
                 document.body.classList.add('sorting-active');
                 if (window.navigator.vibrate) window.navigator.vibrate(10);
+                
+                requestAnimationFrame(() => {
+                    const fallback = document.querySelector('.sortable-fallback');
+                    if (fallback) {
+                        fallback.style.width = evt.item.offsetWidth + 'px';
+                        fallback.style.height = evt.item.offsetHeight + 'px';
+                        
+                        const animatedChildren = fallback.querySelectorAll('.wiggle, .wl-folder-inner');
+                        animatedChildren.forEach(el => {
+                            el.style.animation = 'none';
+                        });
+                    }
+                });
             },
             onEnd: function (evt) {
                 document.body.classList.remove('sorting-active');
@@ -1600,7 +1612,8 @@ window.selectWlFolder = function(id) {
 
 function getWlItemHtml(item, viewModeStr) {
     const sid = item.show_id;
-    // Убраны ручные обработчики pointerdown/up, чтобы не конфликтовать с SortableJS
+    const addedDate = item.added_at || '';
+    
     if (viewModeStr === 'list') {
         const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy" draggable="false">` : `<div class="hist-poster"></div>`;
         return `
@@ -1612,6 +1625,7 @@ function getWlItemHtml(item, viewModeStr) {
                 <div class="hist-meta">
                     ${item.year ? `<span>${item.year}</span>` : ''}
                     ${item.type ? `<span>· ${item.type}</span>` : ''}
+                    <span style="opacity: 0.6;">· ${addedDate}</span>
                 </div>
             </div>
         </div>`;
@@ -1625,6 +1639,9 @@ function getWlItemHtml(item, viewModeStr) {
             <div class="grid-item">
                 ${posterHtml}
                 ${yearHtml}
+                <div class="grid-overlay">
+                    <div class="grid-date" style="color: var(--text-muted);">${addedDate}</div>
+                </div>
             </div>
             <div class="grid-below-title">${item.title}</div>
             ${item.original_title && item.original_title !== item.title ? `<div class="grid-below-orig">${item.original_title}</div>` : ''}
@@ -1688,22 +1705,30 @@ function renderActiveWlFolder() {
 
         wlItemsSortable = new Sortable(targetContainer, {
             group: 'wl-items',
-            animation: 200,
+            animation: 350,
+            easing: "cubic-bezier(0.25, 1, 0.5, 1)",
             disabled: !isItemsReorderMode,
             forceFallback: true,
             fallbackOnBody: true,
-            fallbackTolerance: 0,
-            swapThreshold: 0.65,
-            ghostClass: 'sortable-ghost',
             fallbackClass: 'sortable-fallback',
-            chosenClass: 'sortable-chosen',
-            dragClass: 'sortable-drag',
-            delay: 0,
-            touchStartThreshold: 3,
+            ghostClass: 'sortable-ghost',
             onStart: function (evt) {
                 if (trashEl) trashEl.classList.add('visible');
                 if (window.navigator.vibrate) window.navigator.vibrate(10);
                 document.body.classList.add('sorting-active');
+
+                requestAnimationFrame(() => {
+                    const fallback = document.querySelector('.sortable-fallback');
+                    if (fallback) {
+                        fallback.style.width = evt.item.offsetWidth + 'px';
+                        fallback.style.height = evt.item.offsetHeight + 'px';
+                        
+                        const animatedChildren = fallback.querySelectorAll('.wiggle, .grid-item-wrap, .hist-item, .grid-item');
+                        animatedChildren.forEach(el => {
+                            el.style.animation = 'none';
+                        });
+                    }
+                });
             },
             onEnd: function (evt) {
                 if (trashEl) trashEl.classList.remove('visible');
