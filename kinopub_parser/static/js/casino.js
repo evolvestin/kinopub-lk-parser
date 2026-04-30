@@ -116,20 +116,22 @@ window.openCasino = function() {
         return;
     }
 
+    const modal = document.getElementById('casino-modal');
+    const body = document.getElementById('casino-body');
+    body.style.opacity = '1';
+
     const cached = localStorage.getItem('kp_casino_res');
     if (cached) {
         const data = JSON.parse(cached);
-        // Показываем результат в любом случае, если он есть
         window.renderCasinoResult(data.item, data.expires);
-        document.getElementById('casino-modal').classList.add('show');
+        modal.classList.add('show');
         return;
     }
 
     const validFolders = wishlistFolders.filter(f => f.items.length > 0);
-    const body = document.getElementById('casino-body');
     
-    let html = `<div style="font-size:22px; font-weight:900; margin-bottom:24px; color:#f1c40f;">Делайте ваши ставки!</div>`;
-    html += `<button class="btn-primary" style="background:linear-gradient(135deg, #e74c3c, #c0392b); margin-bottom:15px;" onclick="window.startCasinoSpin('all')">🎰 ВЕСЬ КАТАЛОГ</button>`;
+    let html = `<div style="font-size:22px; font-weight:900; margin-bottom:24px; color:#f1c40f;">🎰 Казино</div>`;
+    html += `<button class="btn-primary" style="background:linear-gradient(135deg, #e74c3c, #c0392b); margin-bottom:15px;" onclick="window.startCasinoSpin('all')">ВЕСЬ КАТАЛОГ</button>`;
     
     validFolders.forEach(f => {
         html += `<button class="btn-primary casino-btn-choice" onclick="window.startCasinoSpin(${f.id})">
@@ -140,7 +142,7 @@ window.openCasino = function() {
     });
 
     body.innerHTML = html;
-    document.getElementById('casino-modal').classList.add('show');
+    modal.classList.add('show');
 };
 
 window.startCasinoSpin = function(folderId) {
@@ -154,89 +156,112 @@ window.startCasinoSpin = function(folderId) {
         if (f) pool = f.items;
     }
 
+    if (!pool.length) return;
+
     const winner = pool[Math.floor(Math.random() * pool.length)];
-    window.setupCasinoLayout();
+    const body = document.getElementById('casino-body');
     
-    const posterEl = document.getElementById('cas-poster');
-    const placeholderEl = document.getElementById('cas-placeholder');
-    const titleEl = document.getElementById('cas-title');
+    // Плавный переход от выбора к игре
+    body.style.opacity = '0';
     
-    posterEl.style.display = 'block';
-    placeholderEl.style.display = 'none';
-    titleEl.textContent = 'КРУТИМ...';
-
-    let elapsed = 0, duration = 2000, delay = 50;
-
-    const tick = () => {
-        const rnd = pool[Math.floor(Math.random() * pool.length)];
-        posterEl.src = rnd.poster_url?.replace('/small/', '/medium/') || '';
-        if (window.navigator.vibrate) window.navigator.vibrate(10);
-        elapsed += delay;
-        if (elapsed < duration) {
-            delay = 50 + (elapsed / duration) * 150;
-            setTimeout(tick, delay);
-        } else {
-            runMysteryPhase(winner);
+    setTimeout(() => {
+        window.setupCasinoLayout();
+        body.style.opacity = '1';
+        
+        let dimmer = document.getElementById('casino-global-dimmer');
+        if (!dimmer) {
+            dimmer = document.createElement('div');
+            dimmer.id = 'casino-global-dimmer';
+            dimmer.className = 'casino-dimmed';
+            document.body.appendChild(dimmer);
         }
-    };
-    tick();
+        dimmer.classList.add('active');
+
+        const posterEl = document.getElementById('cas-poster');
+        const placeholderEl = document.getElementById('cas-placeholder');
+        const titleEl = document.getElementById('cas-title');
+        
+        posterEl.style.display = 'block';
+        placeholderEl.style.display = 'none';
+        titleEl.textContent = 'КРУТИМ...';
+
+        let elapsed = 0, duration = 5000, delay = 50;
+
+        const tick = () => {
+            const rnd = pool[Math.floor(Math.random() * pool.length)];
+            posterEl.src = rnd.poster_url?.replace('/small/', '/medium/') || '';
+            
+            let progress = elapsed / duration;
+            if (dimmer) dimmer.style.opacity = (progress * 0.9).toString();
+            if (window.navigator.vibrate) window.navigator.vibrate(10);
+            
+            elapsed += delay;
+            if (elapsed < duration) {
+                delay = 50 + (Math.pow(progress, 3) * 400); 
+                setTimeout(tick, delay);
+            } else {
+                runMysteryPhase(winner);
+            }
+        };
+        tick();
+    }, 300);
 };
 
 function runMysteryPhase(winner) {
-    let dimmer = document.getElementById('casino-global-dimmer');
-    if (!dimmer) {
-        dimmer = document.createElement('div');
-        dimmer.id = 'casino-global-dimmer';
-        dimmer.className = 'casino-dimmed';
-        document.body.appendChild(dimmer);
-    }
-    dimmer.classList.add('active');
-    
     const posterEl = document.getElementById('cas-poster');
     const placeholderEl = document.getElementById('cas-placeholder');
     const titleEl = document.getElementById('cas-title');
-
+    
+    // Мгновенная смена состояния без задержек, чтобы не было "дырки"
     posterEl.style.display = 'none';
     placeholderEl.style.display = 'flex';
     titleEl.textContent = 'КТО ЖЕ ТАМ...';
 
-    const rect = document.querySelector('.casino-modal-content').getBoundingClientRect();
+    const modal = document.querySelector('.casino-modal-content');
+    const rect = modal.getBoundingClientRect();
+    
     const interval = setInterval(() => {
-        if (!dimmer.classList.contains('active')) {
+        if (!document.getElementById('casino-modal').classList.contains('show')) {
             clearInterval(interval);
             return;
         }
-        engine.explode(Math.random() * rect.width, -20, 5, 'confetti');
+        engine.explode(Math.random() * rect.width, -10, 3, 'confetti');
     }, 100);
 
     setTimeout(() => {
         clearInterval(interval);
         runReveal(winner);
-    }, 2000);
+    }, 1500);
 }
 
 function runReveal(winner) {
-    const dimmer = document.getElementById('casino-global-dimmer');
-    if (dimmer) dimmer.classList.remove('active');
-    
-    document.body.classList.add('app-shake-active');
-    setTimeout(() => document.body.classList.remove('app-shake-active'), 500);
-
     const expires = Date.now() + 10 * 60 * 1000;
     localStorage.setItem('kp_casino_res', JSON.stringify({ item: winner, expires }));
 
+    // Сначала рендерим результат, чтобы избежать пустоты
     window.renderCasinoResult(winner, expires, true);
+
+    const dimmer = document.getElementById('casino-global-dimmer');
+    if (dimmer) {
+        dimmer.style.opacity = '0';
+        setTimeout(() => dimmer.classList.remove('active'), 300);
+    }
+    
+    document.body.classList.add('app-shake-active');
+    setTimeout(() => document.body.classList.remove('app-shake-active'), 500);
 
     const modal = document.querySelector('.casino-modal-content');
     const rect = modal.getBoundingClientRect();
     const cx = rect.width / 2, cy = rect.height / 3;
 
-    // Первичный мощный взрыв
     engine.explode(cx, cy, 300, 'firework');
     
-    // Последовательные салюты в течение 10 секунд
     let fireworkTime = 0;
     const launchInterval = setInterval(() => {
+        if (!document.getElementById('casino-modal').classList.contains('show')) {
+            clearInterval(launchInterval);
+            return;
+        }
         engine.explode(
             Math.random() * rect.width, 
             Math.random() * (rect.height / 2), 
@@ -251,6 +276,7 @@ function runReveal(winner) {
 }
 
 window.renderCasinoResult = function(item, expires, withAnimation = false) {
+    // Важно: проверяем наличие лейаута, чтобы не перерисовывать всё через innerHTML
     if (!document.getElementById('cas-window')) {
         window.setupCasinoLayout();
     }
@@ -267,17 +293,20 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
 
     const poster = item.poster_url?.replace('/small/', '/medium/') || '';
     
-    if (withAnimation) windowEl.classList.add('casino-win-glow');
+    if (withAnimation) {
+        windowEl.classList.add('casino-win-glow');
+    }
     
     posterEl.src = poster;
     posterEl.style.display = 'block';
+    posterEl.style.opacity = '1';
     placeholderEl.style.display = 'none';
     
     titleEl.textContent = item.title;
     metaEl.textContent = `${item.year || ''} ${item.type ? `· ${item.type}` : ''}`;
 
     btnWatch.onclick = () => { 
-        window.App.closeCasino(); 
+        window.closeCasino(); 
         window.App.openShowLayer(item.show_id); 
     };
     btnReset.onclick = () => window.resetCasino();
@@ -298,8 +327,6 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
             btnReset.style.background = "var(--accent)";
             btnReset.style.color = "#fff";
             btnReset.style.borderColor = "var(--accent)";
-            btnReset.style.padding = "12px";
-            btnReset.style.fontSize = "14px";
         }
     };
 
@@ -351,22 +378,24 @@ window.closeCasino = function() {
 
 window.setupCasinoLayout = function() {
     const body = document.getElementById('casino-body');
-    // Создаем всю структуру сразу. Элементы управления скрыты через opacity в CSS.
+    body.style.transition = 'opacity 0.3s ease';
     body.innerHTML = `
-        <div class="casino-slot-window" id="cas-window">
-            <img id="cas-poster" src="" alt="" style="display:none;">
-            <div id="cas-placeholder" style="display:flex; align-items:center; justify-content:center; height:100%; font-size:100px; font-weight:900; color:var(--accent);">?</div>
-        </div>
-        <div class="casino-info-container">
-            <div class="casino-title" id="cas-title"></div>
-            <div class="casino-meta-info" id="cas-meta"></div>
-            <div id="cas-controls" class="casino-controls-reveal">
-                <button class="btn-primary" id="cas-btn-watch" style="margin-top:0;">Подробнее</button>
-                <div class="casino-timer-wrap">
-                    <div style="font-size:10px; color:var(--accent); font-weight:800; margin-bottom:4px;">СЛЕДУЮЩИЙ ШАНС</div>
-                    <div class="casino-timer-clock" id="casino-countdown">10:00</div>
+        <div id="cas-container" class="casino-slot-container active">
+            <div class="casino-slot-window" id="cas-window">
+                <img id="cas-poster" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover;">
+                <div id="cas-placeholder" style="display:flex; align-items:center; justify-content:center; height:100%; font-size:100px; font-weight:900; color:var(--accent);">?</div>
+            </div>
+            <div class="casino-info-container">
+                <div class="casino-title" id="cas-title"></div>
+                <div class="casino-meta-info" id="cas-meta"></div>
+                <div id="cas-controls" class="casino-controls-reveal">
+                    <button class="btn-primary" id="cas-btn-watch" style="margin-top:0;">Подробнее</button>
+                    <div class="casino-timer-wrap">
+                        <div style="font-size:10px; color:var(--accent); font-weight:800; margin-bottom:4px;">СЛЕДУЮЩИЙ ШАНС</div>
+                        <div class="casino-timer-clock" id="casino-countdown">10:00</div>
+                    </div>
+                    <button class="btn-reset" id="cas-btn-reset" style="margin-top: 15px;">🎰 СБРОС</button>
                 </div>
-                <button class="btn-reset" id="cas-btn-reset" style="margin-top: 15px;">🎰 СБРОС</button>
             </div>
         </div>
     `;

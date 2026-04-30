@@ -1,17 +1,34 @@
 .casino-modal-content {
     position: relative;
     overflow: hidden;
-    min-height: 580px; 
-    z-index: 1001;
+    min-height: 520px; /* Фиксируем минимальную высоту для стабильности */
+    width: 100%;
+    max-width: 500px;
+    z-index: 1002;
     display: flex;
     flex-direction: column;
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    transition: transform 0.4s var(--transition-bounce), opacity 0.3s ease;
+    background: var(--bg-card);
 }
+
+.casino-slot-container {
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.4s ease, transform 0.4s var(--transition-bounce);
+    display: none;
+}
+
+.casino-slot-container.active {
+    display: block;
+    opacity: 1;
+    transform: scale(1);
+}
+
 
 .casino-slot-window {
     width: clamp(160px, 45vw, 220px);
     aspect-ratio: 2/3;
-    margin: 0 auto; /* Убираем нижний отступ, управляем им через контейнер */
+    margin: 0 auto;
     border-radius: 24px;
     overflow: hidden;
     background: var(--bg-input);
@@ -19,8 +36,6 @@
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
     position: relative;
     z-index: 5;
-    transition: transform 0.4s var(--transition-bounce), border-color 0.3s;
-    flex-shrink: 0;
 }
 
 .casino-slot-window img {
@@ -48,16 +63,16 @@
 .casino-dimmed {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.85);
-    z-index: 1000;
+    background: rgba(0, 0, 0, 0.85); /* Чисто черный для контраста */
+    z-index: 1001; /* Выше стандартного оверлея (1000), но ниже контента */
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
     transition: opacity 0.5s ease, visibility 0.5s;
+    will-change: opacity;
 }
 
 .casino-dimmed.active {
-    opacity: 1;
     visibility: visible;
     pointer-events: auto;
 }
