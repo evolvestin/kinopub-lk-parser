@@ -631,54 +631,90 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     z-index: 10;
 }
 
-.detail-wishlist-btn svg {
-    width: 24px !important;
-    height: 24px !important;
-}
+.detail-wishlist-btn svg { width: 24px !important; height: 24px !important; }
+.detail-wishlist-btn:active { transform: scale(0.85) !important; }
 
-.detail-wishlist-btn:active {
-    transform: scale(0.85) !important;
-}
-
-/* На мобильных устройствах немного уменьшим смещение, чтобы кнопка не вылазила за экран */
 @media (max-width: 380px) {
-    .detail-wishlist-btn {
-        right: -10px !important;
-        bottom: -10px !important;
-    }
+    .detail-wishlist-btn { right: -10px !important; bottom: -10px !important; }
 }
 
 .wishlist-add-btn {
-    position: absolute;
-    bottom: 8px;
-    right: 8px;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: rgba(0,0,0,0.6);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    z-index: 5;
+    position: absolute; bottom: 8px; right: 8px; width: 32px; height: 32px;
+    border-radius: 8px; background: rgba(0,0,0,0.6); color: #fff;
+    border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center;
+    justify-content: center; cursor: pointer; z-index: 5;
     transition: transform var(--transition-bounce), background var(--transition-smooth);
 }
 .wishlist-add-btn:active { transform: scale(0.9); background: var(--accent); border-color: var(--accent); }
 .wishlist-add-btn svg { width: 18px; height: 18px; }
 
-.wl-folder { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
-.wl-folder-header { display: flex; align-items: center; padding: 12px; background: var(--bg-input); border-bottom: 1px solid var(--border); }
-.wl-folder-drag { padding: 4px; margin-right: 8px; color: var(--text-muted); cursor: grab; }
-.wl-folder-title { flex: 1; font-weight: 800; color: var(--text-primary); cursor: pointer; user-select: none; }
-.wl-btn { background: none; border: none; color: var(--text-muted); padding: 4px 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: color 0.2s; }
-.wl-btn:active { color: var(--text-primary); }
+/* Сетка папок a-la Google Drive */
+.wl-folders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+}
 
-.wl-item { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-card); }
-.wl-item:last-child { border-bottom: none; }
-.wl-item-drag { padding: 4px; margin-right: 8px; color: var(--text-muted); cursor: grab; }
-.wl-item-poster { width: 40px; height: 60px; object-fit: cover; border-radius: 6px; margin-right: 12px; cursor: pointer; }
-.wl-item-info { flex: 1; min-width: 0; cursor: pointer; }
-.wl-item-title { font-weight: 700; font-size: 14px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
-.wl-item-meta { font-size: 12px; color: var(--text-muted); }
+.wl-folder-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-bounce), border-color 0.2s, background 0.2s;
+    user-select: none;
+}
+.wl-folder-card:active { transform: scale(0.95); background: var(--bg-input); }
+.wl-folder-card.active { border-color: var(--accent); background: var(--accent-dim); }
+
+.wl-folder-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+}
+.wl-folder-info { flex: 1; min-width: 0; }
+.wl-folder-name { font-weight: 800; font-size: 14px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+.wl-folder-count { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
+
+/* Pickers for Modal */
+.wl-color-picker { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+.wl-color-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; transition: transform 0.2s; display: flex; align-items: center; justify-content: center;
+}
+.wl-color-btn.active { transform: scale(1.15); border-color: var(--text-primary); }
+.wl-color-btn::after { content: ''; width: 100%; height: 100%; border-radius: 50%; background: inherit; }
+
+.wl-icon-picker { display: flex; gap: 12px; flex-wrap: wrap; }
+.wl-icon-btn {
+    width: 44px; height: 44px; border-radius: 12px; background: var(--bg-input);
+    border: 1px solid var(--border); color: var(--text-muted); font-size: 20px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: all 0.2s;
+}
+.wl-icon-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); transform: scale(1.1); }
+
+/* SortableJS Ghost Classes */
+.sortable-ghost { opacity: 0.4; }
+.sortable-drag { cursor: grabbing !important; }
+
+/* Delete button overlay on list items */
+.wl-item-del {
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(231, 76, 60, 0.9);
+    color: white;
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 10;
+    opacity: 0; transition: opacity 0.2s, transform 0.2s;
+}
+.grid-item-wrap:hover .wl-item-del, .hist-item:hover .wl-item-del { opacity: 1; }
+.wl-item-del:active { transform: scale(0.9); }
+.hist-item { position: relative; } /* needed for absolute del btn in list view */

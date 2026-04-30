@@ -1581,8 +1581,12 @@ def webapp_wishlist_data(request):
 
         if action == 'get':
             if not WishlistFolder.objects.filter(user=view_user).exists():
-                WishlistFolder.objects.create(user=view_user, name='Фильмы', sort_order=1)
-                WishlistFolder.objects.create(user=view_user, name='Сериалы', sort_order=2)
+                WishlistFolder.objects.create(
+                    user=view_user, name='Фильмы', icon='film', color='#388bfd', sort_order=1
+                )
+                WishlistFolder.objects.create(
+                    user=view_user, name='Сериалы', icon='tv', color='#a371f7', sort_order=2
+                )
 
             folders = WishlistFolder.objects.filter(user=view_user).prefetch_related('items__show')
             data = []
@@ -1594,6 +1598,7 @@ def webapp_wishlist_data(request):
                             'id': item.id,
                             'show_id': item.show.id,
                             'title': item.show.title,
+                            'original_title': item.show.original_title,
                             'year': item.show.year,
                             'type': item.show.type,
                             'poster_url': get_poster_url(item.show.id, 'small'),
@@ -1603,6 +1608,8 @@ def webapp_wishlist_data(request):
                     {
                         'id': folder.id,
                         'name': folder.name,
+                        'icon': folder.icon,
+                        'color': folder.color,
                         'sort_order': folder.sort_order,
                         'items': items,
                     }
@@ -1611,13 +1618,17 @@ def webapp_wishlist_data(request):
 
         elif action == 'create_folder':
             name = body.get('name', '').strip()
+            icon = body.get('icon', 'folder')
+            color = body.get('color', '#60a5fa')
             if not name:
                 return JsonResponse({'error': 'Empty name'}, status=400)
             max_order = (
                 WishlistFolder.objects.filter(user=view_user).aggregate(m=Max('sort_order'))['m']
                 or 0
             )
-            WishlistFolder.objects.create(user=view_user, name=name, sort_order=max_order + 1)
+            WishlistFolder.objects.create(
+                user=view_user, name=name, icon=icon, color=color, sort_order=max_order + 1
+            )
             return JsonResponse({'status': 'ok'})
 
         elif action == 'delete_folder':
@@ -1625,11 +1636,15 @@ def webapp_wishlist_data(request):
             WishlistFolder.objects.filter(id=folder_id, user=view_user).delete()
             return JsonResponse({'status': 'ok'})
 
-        elif action == 'rename_folder':
+        elif action == 'edit_folder':
             folder_id = body.get('folder_id')
             name = body.get('name', '').strip()
+            icon = body.get('icon')
+            color = body.get('color')
             if name:
-                WishlistFolder.objects.filter(id=folder_id, user=view_user).update(name=name)
+                WishlistFolder.objects.filter(id=folder_id, user=view_user).update(
+                    name=name, icon=icon, color=color
+                )
             return JsonResponse({'status': 'ok'})
 
         elif action == 'add_item':

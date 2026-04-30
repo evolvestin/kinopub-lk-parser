@@ -23,6 +23,11 @@ window.handleImgErr = function(img, fallbackUrl, name) {
 };
 
 const Icons = {
+    folder: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
+    heart: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>',
+    clock: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
+    edit: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
+    trash: '<svg viewBox="0 0 24 24" width="1em" height="1em" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
     moon: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M264 480A232 232 0 0132 248c0-94 54-178.28 137.61-214.67a16 16 0 0121.06 21.06C181.07 76.43 176 97.43 176 120c0 110.28 89.72 200 200 200 22.57 0 43.57-5.07 65.61-14.67a16 16 0 0121.06 21.06C426.28 410 342 480 264 480z"/></svg>',
     sun: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 160c-52.9 0-96 43.1-96 96s43.1 96 96 96 96-43.1 96-96-43.1-96-96-96zm0 160c-35.3 0-64-28.7-64-64s28.7-64 64-64 64 28.7 64 64-28.7 64-64 64zM256 128c8.8 0 16-7.2 16-16V48c0-8.8-7.2-16-16-16s-16 7.2-16 16v64c0 8.8 7.2 16 16 16zM256 384c-8.8 0-16 7.2-16 16v64c0 8.8 7.2 16 16 16s16-7.2 16-16v-64c0-8.8-7.2-16-16-16zM464 240h-64c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM112 240H48c-8.8 0-16 7.2-16 16s7.2 16 16 16h64c8.8 0 16-7.2 16-16s-7.2-16-16-16zM403.1 108.9c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM176.8 335.2c-6.2-6.2-16.4-6.2-22.6 0l-45.3 45.3c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0l45.3-45.3c6.2-6.2 6.2-16.4 0-22.6zM403.1 403.1c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0zM176.8 176.8c6.2-6.2 6.2-16.4 0-22.6l-45.3-45.3c-6.2-6.2-16.4-6.2-22.6 0s-6.2 16.4 0 22.6l45.3 45.3c6.2 6.2 16.4 6.2 22.6 0z"/></svg>',
     user: '<svg viewBox="0 0 512 512" fill="currentColor"><path d="M256 288c79.53 0 144-64.47 144-144S335.53 0 256 0 112 64.47 112 144s64.47 144 144 144zm128 32h-24.1c-30.83 18.66-67.43 28-103.9 28s-73.07-9.34-103.9-28H128c-70.69 0-128 57.31-128 128v56c0 13.25 10.75 24 24 24h464c13.25 0 24-10.75 24-24v-56c0-70.69-57.31-128-128-128z"/></svg>',
@@ -1361,202 +1366,356 @@ async function submitShare() {
 }
 
 // WISHLIST LOGIC
+const FOLDER_COLORS = ['#388bfd', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#95a5a6', '#fd79a8'];
+const FOLDER_ICONS = ['folder', 'star', 'heart', 'film', 'tv', 'bookmark', 'clock', 'list'];
+
+let activeWlFolderId = null;
+let wlViewMode = localStorage.getItem('wl_view_mode') || 'grid';
+let wlFoldersSortable = null;
+let wlItemsSortable = null;
+
 async function sendWishlistAction(action, payload={}) {
     const r = await fetch('/api/webapp/wishlist/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ action, ...payload, init_data: tg?.initData || '' })
     });
-    if (!r.ok) throw new Error('Network response was not ok');
+    if (!r.ok) throw new Error('Network response error');
     return r.json();
 }
 
 async function loadWishlist() {
-    const container = document.getElementById('wishlist-folders-container');
-    container.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
+    const grid = document.getElementById('wl-folders-grid');
+    if (!wishlistFolders.length) grid.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
+    
     try {
         const data = await sendWishlistAction('get');
         wishlistFolders = data.folders || [];
-        renderWishlist();
+        
+        if (wishlistFolders.length > 0 && !activeWlFolderId) {
+            activeWlFolderId = wishlistFolders[0].id;
+        } else if (wishlistFolders.length === 0) {
+            activeWlFolderId = null;
+        } else {
+            // Проверка, существует ли еще активная папка
+            const exists = wishlistFolders.find(f => f.id === activeWlFolderId);
+            if (!exists) activeWlFolderId = wishlistFolders[0].id;
+        }
+        
+        renderWishlistFolders();
+        renderActiveWlFolder();
     } catch (e) {
-        container.innerHTML = '<div class="empty">Ошибка загрузки вишлиста</div>';
+        grid.innerHTML = '<div class="empty">Ошибка загрузки вишлиста</div>';
     }
 }
 
-function renderWishlist() {
-    const container = document.getElementById('wishlist-folders-container');
+function renderWishlistFolders() {
+    const grid = document.getElementById('wl-folders-grid');
     if (!wishlistFolders.length) {
-        container.innerHTML = '<div class="empty">Нет папок</div>';
+        grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Нет папок</div>';
+        if(wlFoldersSortable) { wlFoldersSortable.destroy(); wlFoldersSortable = null; }
         return;
     }
     
-    let html = '';
-    wishlistFolders.forEach(f => {
-        html += `
-        <div class="wl-folder" data-id="${f.id}">
-            <div class="wl-folder-header">
-                <div class="wl-folder-drag">${Icons.grip}</div>
-                <div class="wl-folder-title" onclick="window.App.toggleFolder(${f.id})">${f.name} <span style="opacity:0.5; font-size:12px; margin-left:6px;">${f.items.length}</span></div>
-                <button class="wl-btn" onclick="window.App.renameFolder(${f.id}, '${f.name.replace(/'/g, "\\'")}')">✎</button>
-                <button class="wl-btn" style="color:var(--danger)" onclick="window.App.deleteFolder(${f.id})">×</button>
+    grid.innerHTML = wishlistFolders.map(f => `
+        <div class="wl-folder-card ${f.id === activeWlFolderId ? 'active' : ''}" data-id="${f.id}" onclick="window.App.selectWlFolder(${f.id})">
+            <div class="wl-folder-icon" style="background: ${f.color}20; color: ${f.color};">
+                ${Icons[f.icon] || Icons.folder}
             </div>
-            <div class="wl-folder-items hidden" id="wl-items-${f.id}">
-                ${f.items.length ? '' : '<div class="empty" style="padding:10px;">Пусто</div>'}
-                ${f.items.map(item => `
-                    <div class="wl-item" data-id="${item.id}">
-                        <div class="wl-item-drag">${Icons.grip}</div>
-                        <img src="${item.poster_url}" class="wl-item-poster" onclick="window.App.openShowLayer(${item.show_id})">
-                        <div class="wl-item-info" onclick="window.App.openShowLayer(${item.show_id})">
-                            <div class="wl-item-title">${item.title}</div>
-                            <div class="wl-item-meta">${item.year || ''} · ${item.type || ''}</div>
-                        </div>
-                        <button class="wl-btn" style="color:var(--danger); padding:0 10px;" onclick="window.App.removeItem(${item.id})">×</button>
-                    </div>
-                `).join('')}
+            <div class="wl-folder-info">
+                <div class="wl-folder-name">${f.name}</div>
+                <div class="wl-folder-count">${f.items.length} ${plural(f.items.length, ['фильм','фильма','фильмов'])}</div>
             </div>
+        </div>
+    `).join('');
+
+    if (typeof Sortable !== 'undefined') {
+        if(wlFoldersSortable) wlFoldersSortable.destroy();
+        wlFoldersSortable = new Sortable(grid, {
+            animation: 200,
+            delay: 150, // для тач
+            delayOnTouchOnly: true,
+            ghostClass: 'sortable-ghost',
+            dragClass: 'sortable-drag',
+            onEnd: function (evt) {
+                const order = Array.from(grid.children).map(el => parseInt(el.dataset.id));
+                sendWishlistAction('reorder_folders', { order });
+            }
+        });
+    }
+}
+
+window.selectWlFolder = function(id) {
+    if (activeWlFolderId === id) return;
+    activeWlFolderId = id;
+    renderWishlistFolders(); // для обновления active класса
+    renderActiveWlFolder();
+};
+
+function getWlItemHtml(item, viewModeStr) {
+    const sid = item.show_id;
+    if (viewModeStr === 'list') {
+        const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy">` : `<div class="hist-poster"></div>`;
+        return `
+        <div class="hist-item anim-item clickable" data-id="${item.id}" onclick="window.App.openShowLayer(${sid})">
+            ${poster}
+            <div class="hist-info">
+                <div class="hist-title">${item.title}</div>
+                ${item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : ''}
+                <div class="hist-meta">
+                    ${item.year ? `<span>${item.year}</span>` : ''}
+                    ${item.type ? `<span>· ${item.type}</span>` : ''}
+                </div>
+            </div>
+            <button class="wl-item-del" onclick="event.stopPropagation(); window.App.removeWlItem(${item.id})">${Icons.trash}</button>
         </div>`;
-    });
-    container.innerHTML = html;
-    initTouchSort('#wishlist-folders-container', '.wl-folder', '.wl-folder-drag', saveFolderOrder);
-    wishlistFolders.forEach(f => {
-        initTouchSort(`#wl-items-${f.id}`, '.wl-item', '.wl-item-drag', () => saveItemOrder(f.id));
-    });
+    } else {
+        const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
+        const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
+        const yearHtml = item.year ? `<div class="grid-year">${item.year}</div>` : '';
+        
+        return `
+        <div class="grid-item-wrap anim-item" data-id="${item.id}" onclick="window.App.openShowLayer(${sid})">
+            <div class="grid-item">
+                ${posterHtml}
+                ${yearHtml}
+                <button class="wl-item-del" onclick="event.stopPropagation(); window.App.removeWlItem(${item.id})">${Icons.trash}</button>
+            </div>
+            <div class="grid-below-title">${item.title}</div>
+            ${item.original_title && item.original_title !== item.title ? `<div class="grid-below-orig">${item.original_title}</div>` : ''}
+        </div>`;
+    }
 }
 
-window.toggleFolder = function(id) {
-    document.getElementById(`wl-items-${id}`).classList.toggle('hidden');
+function renderActiveWlFolder() {
+    const content = document.getElementById('wl-active-folder-content');
+    const titleEl = document.getElementById('wl-active-folder-title');
+    const container = document.getElementById('wl-items-container');
+    
+    if (!activeWlFolderId) {
+        content.style.display = 'none';
+        return;
+    }
+    
+    content.style.display = 'block';
+    const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
+    
+    titleEl.innerHTML = `<span style="color:${folder.color}">${Icons[folder.icon] || Icons.folder}</span> ${folder.name}`;
+    
+    document.getElementById('wl-vt-grid').classList.toggle('active', wlViewMode === 'grid');
+    document.getElementById('wl-vt-list').classList.toggle('active', wlViewMode === 'list');
+
+    if (!folder.items.length) {
+        container.innerHTML = `<div class="empty"><div class="icon">${Icons.film}</div>Папка пуста</div>`;
+        if(wlItemsSortable) { wlItemsSortable.destroy(); wlItemsSortable = null; }
+        return;
+    }
+
+    let itemsHtml = folder.items.map(item => getWlItemHtml(item, wlViewMode)).join('');
+    
+    if (wlViewMode === 'list') {
+        container.innerHTML = `<div class="card" style="margin:0; padding:0; overflow:hidden;">${itemsHtml}</div>`;
+    } else {
+        container.innerHTML = `<div class="hist-grid">${itemsHtml}</div>`;
+    }
+
+    // SortableJS для элементов
+    if (typeof Sortable !== 'undefined') {
+        if(wlItemsSortable) wlItemsSortable.destroy();
+        const targetContainer = wlViewMode === 'list' ? container.firstChild : container.firstChild; // card или hist-grid
+        wlItemsSortable = new Sortable(targetContainer, {
+            animation: 200,
+            delay: 150,
+            delayOnTouchOnly: true,
+            ghostClass: 'sortable-ghost',
+            dragClass: 'sortable-drag',
+            onEnd: function (evt) {
+                const order = Array.from(targetContainer.children).map(el => parseInt(el.dataset.id));
+                // Обновляем локально
+                folder.items.sort((a,b) => order.indexOf(a.id) - order.indexOf(b.id));
+                sendWishlistAction('reorder_items', { folder_id: activeWlFolderId, order });
+            }
+        });
+    }
+}
+
+window.setWlViewMode = function(mode) {
+    wlViewMode = mode;
+    localStorage.setItem('wl_view_mode', mode);
+    renderActiveWlFolder();
 };
 
-window.createFolder = async function() {
-    const name = prompt('Название новой папки:');
-    if (!name) return;
-    await sendWishlistAction('create_folder', { name });
-    loadWishlist();
+window.removeWlItem = function(id) {
+    // Оптимистичное удаление
+    const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
+    if(folder) folder.items = folder.items.filter(i => i.id !== id);
+    
+    const el = document.querySelector(`[data-id="${id}"]`);
+    if(el) {
+        if (wlViewMode === 'list' && el.parentElement.children.length === 1) {
+            renderActiveWlFolder(); // если последний, ререндерим для пустого стейта
+        } else {
+            el.remove();
+        }
+    }
+    
+    renderWishlistFolders(); // апдейт счетчиков
+    sendWishlistAction('remove_item', { item_id: id });
+    showToast('Удалено');
 };
 
-window.renameFolder = async function(id, oldName) {
-    const name = prompt('Новое название папки:', oldName);
-    if (!name || name === oldName) return;
-    await sendWishlistAction('rename_folder', { folder_id: id, name });
-    loadWishlist();
+// --- Modal Logic ---
+let editFolderMode = 'create';
+
+function renderColorPicker(activeColor) {
+    const cont = document.getElementById('wl-color-picker');
+    cont.innerHTML = FOLDER_COLORS.map(c => `
+        <div class="wl-color-btn ${c === activeColor ? 'active' : ''}" style="background-color: ${c}" onclick="window.App.selectFolderColor('${c}')"></div>
+    `).join('');
+}
+function renderIconPicker(activeIcon) {
+    const cont = document.getElementById('wl-icon-picker');
+    cont.innerHTML = FOLDER_ICONS.map(i => `
+        <div class="wl-icon-btn ${i === activeIcon ? 'active' : ''}" onclick="window.App.selectFolderIcon('${i}')">${Icons[i]}</div>
+    `).join('');
+}
+
+window.selectFolderColor = function(color) {
+    document.querySelectorAll('.wl-color-btn').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById('wl-color-picker').dataset.color = color;
+};
+window.selectFolderIcon = function(icon) {
+    document.querySelectorAll('.wl-icon-btn').forEach(b => b.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById('wl-icon-picker').dataset.icon = icon;
 };
 
-window.deleteFolder = async function(id) {
+window.openFolderEditModal = function(isEdit = false) {
+    editFolderMode = isEdit ? 'edit' : 'create';
+    const titleEl = document.getElementById('wl-edit-title');
+    const nameInp = document.getElementById('wl-folder-name');
+    const delBtn = document.getElementById('wl-delete-folder-btn');
+    
+    let curName = '', curColor = FOLDER_COLORS[0], curIcon = FOLDER_ICONS[0];
+    
+    if (isEdit) {
+        const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
+        curName = folder.name; curColor = folder.color; curIcon = folder.icon;
+        titleEl.textContent = 'Настройки папки';
+        delBtn.style.display = 'block';
+    } else {
+        titleEl.textContent = 'Новая папка';
+        delBtn.style.display = 'none';
+    }
+    
+    nameInp.value = curName;
+    document.getElementById('wl-color-picker').dataset.color = curColor;
+    document.getElementById('wl-icon-picker').dataset.icon = curIcon;
+    
+    renderColorPicker(curColor);
+    renderIconPicker(curIcon);
+    
+    document.getElementById('wl-edit-modal').classList.add('show');
+};
+
+window.closeFolderEditModal = function() {
+    document.getElementById('wl-edit-modal').classList.remove('show');
+};
+
+window.editActiveFolder = function() {
+    if(activeWlFolderId) window.App.openFolderEditModal(true);
+};
+
+window.saveFolderEdit = async function() {
+    const name = document.getElementById('wl-folder-name').value.trim();
+    const color = document.getElementById('wl-color-picker').dataset.color;
+    const icon = document.getElementById('wl-icon-picker').dataset.icon;
+    
+    if (!name) { showToast('Введите название'); return; }
+    
+    window.App.closeFolderEditModal();
+    
+    if (editFolderMode === 'create') {
+        // Оптимистичное создание
+        const tempId = -Date.now();
+        wishlistFolders.push({ id: tempId, name, color, icon, items: [] });
+        activeWlFolderId = tempId;
+        renderWishlistFolders();
+        renderActiveWlFolder();
+        
+        await sendWishlistAction('create_folder', { name, icon, color });
+        loadWishlist(); // перезагружаем для получения реального ID
+    } else {
+        // Оптимистичное обновление
+        const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
+        folder.name = name; folder.color = color; folder.icon = icon;
+        renderWishlistFolders();
+        renderActiveWlFolder();
+        
+        sendWishlistAction('edit_folder', { folder_id: activeWlFolderId, name, icon, color });
+    }
+};
+
+window.deleteActiveFolder = async function() {
     if (!confirm('Удалить папку и всё её содержимое?')) return;
-    await sendWishlistAction('delete_folder', { folder_id: id });
-    loadWishlist();
+    window.App.closeFolderEditModal();
+    
+    const idToDelete = activeWlFolderId;
+    wishlistFolders = wishlistFolders.filter(f => f.id !== idToDelete);
+    activeWlFolderId = wishlistFolders.length ? wishlistFolders[0].id : null;
+    
+    renderWishlistFolders();
+    renderActiveWlFolder();
+    
+    sendWishlistAction('delete_folder', { folder_id: idToDelete });
 };
 
-window.removeItem = async function(id) {
-    await sendWishlistAction('remove_item', { item_id: id });
-    loadWishlist();
-};
-
-function saveFolderOrder() {
-    const container = document.getElementById('wishlist-folders-container');
-    const order = [...container.querySelectorAll('.wl-folder')].map(el => parseInt(el.dataset.id));
-    sendWishlistAction('reorder_folders', { order });
-}
-
-function saveItemOrder(folderId) {
-    const container = document.getElementById(`wl-items-${folderId}`);
-    const order = [...container.querySelectorAll('.wl-item')].map(el => parseInt(el.dataset.id));
-    sendWishlistAction('reorder_items', { folder_id: folderId, order });
-}
-
+// Modal for adding a show to a folder
 let activeShowForWishlist = null;
 window.showFolderModal = async function(showId, title) {
     activeShowForWishlist = showId;
     document.getElementById('wl-modal-title').textContent = title;
     const grid = document.getElementById('wl-modal-folders');
-    grid.innerHTML = '<div class="spinner"></div>';
+    grid.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div>';
     document.getElementById('wl-modal').classList.add('show');
     
     try {
         const data = await sendWishlistAction('get');
         if (data.folders) {
             grid.innerHTML = data.folders.map(f => `
-                <button class="nav-btn" style="width:100%; margin-bottom:8px; text-align:left;" onclick="window.App.addToFolder(${f.id})">
-                    📁 ${f.name}
-                </button>
+                <div class="wl-folder-card" style="margin-bottom:8px;" onclick="window.App.addToFolder(${f.id})">
+                    <div class="wl-folder-icon" style="background: ${f.color}20; color: ${f.color};">
+                        ${Icons[f.icon] || Icons.folder}
+                    </div>
+                    <div class="wl-folder-info">
+                        <div class="wl-folder-name">${f.name}</div>
+                        <div class="wl-folder-count">${f.items.length} элементов</div>
+                    </div>
+                </div>
             `).join('');
+            if(!data.folders.length) grid.innerHTML = '<div class="empty">Нет папок. Создайте их в Вишлисте.</div>';
         }
     } catch (e) {
-        grid.innerHTML = 'Ошибка';
+        grid.innerHTML = '<div class="empty">Ошибка</div>';
     }
 };
 
 window.closeFolderModal = function() {
-    document.getElementById('wl-modal').classList.remove('show');
+    const modal = document.getElementById('wl-modal');
+    if (modal) modal.classList.remove('show');
 };
 
 window.addToFolder = async function(folderId) {
     if (!activeShowForWishlist) return;
     try {
         await sendWishlistAction('add_item', { folder_id: folderId, show_id: activeShowForWishlist });
-        showToast('Добавлено в вишлист');
+        showToast('Успешно добавлено');
         closeFolderModal();
     } catch(e) {
         showToast('Ошибка при добавлении');
     }
 };
-
-function initTouchSort(containerSelector, itemSelector, handleSelector, onEnd) {
-    const container = document.querySelector(containerSelector);
-    if (!container) return;
-    let dragging = null, ghost = null, startY = 0, initialY = 0;
-
-    container.addEventListener('touchstart', e => {
-        const handle = e.target.closest(handleSelector);
-        if (!handle) return;
-        dragging = handle.closest(itemSelector);
-        if (!dragging) return;
-        const rect = dragging.getBoundingClientRect();
-        startY = e.touches[0].clientY;
-        initialY = rect.top;
-        
-        ghost = dragging.cloneNode(true);
-        ghost.style.position = 'fixed';
-        ghost.style.top = rect.top + 'px';
-        ghost.style.left = rect.left + 'px';
-        ghost.style.width = rect.width + 'px';
-        ghost.style.opacity = '0.8';
-        ghost.style.zIndex = '1000';
-        ghost.style.pointerEvents = 'none';
-        ghost.style.background = 'var(--bg-card)';
-        ghost.style.boxShadow = 'var(--shadow-glow)';
-        document.body.appendChild(ghost);
-        
-        dragging.style.opacity = '0.3';
-    }, {passive: false});
-
-    container.addEventListener('touchmove', e => {
-        if (!dragging || !ghost) return;
-        e.preventDefault();
-        const y = e.touches[0].clientY;
-        const delta = y - startY;
-        ghost.style.top = (initialY + delta) + 'px';
-
-        const items = [...container.querySelectorAll(itemSelector)].filter(i => i !== dragging);
-        const afterEl = items.find(i => {
-            const r = i.getBoundingClientRect();
-            return y < r.top + r.height / 2;
-        });
-        if (afterEl) {
-            container.insertBefore(dragging, afterEl);
-        } else {
-            container.appendChild(dragging);
-        }
-    }, {passive: false});
-
-    container.addEventListener('touchend', () => {
-        if (!dragging) return;
-        ghost.remove();
-        dragging.style.opacity = '1';
-        dragging = ghost = null;
-        if (onEnd) onEnd();
-    });
-}
 
 window.App = {
     toggleTheme: toggleTheme,
@@ -1575,12 +1734,17 @@ window.App = {
     openCollectionLayer: window.openCollectionLayer,
     doSearch: doSearch,
     switchMainView: switchMainView,
-    toggleFolder: window.toggleFolder,
-    createFolder: window.createFolder,
-    renameFolder: window.renameFolder,
-    deleteFolder: window.deleteFolder,
-    removeItem: window.removeItem,
     showFolderModal: window.showFolderModal,
     closeFolderModal: window.closeFolderModal,
-    addToFolder: window.addToFolder
+    addToFolder: window.addToFolder,
+    openFolderEditModal: window.openFolderEditModal,
+    closeFolderEditModal: window.closeFolderEditModal,
+    selectFolderColor: window.selectFolderColor,
+    selectFolderIcon: window.selectFolderIcon,
+    saveFolderEdit: window.saveFolderEdit,
+    editActiveFolder: window.editActiveFolder,
+    deleteActiveFolder: window.deleteActiveFolder,
+    selectWlFolder: window.selectWlFolder,
+    setWlViewMode: window.setWlViewMode,
+    removeWlItem: window.removeWlItem,
 };

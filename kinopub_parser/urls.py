@@ -34,11 +34,6 @@ urlpatterns = [
         views.webapp_get_shared_stats,
         name='webapp_get_shared_stats',
     ),
-    path(
-        'api/webapp/shared_stats/<str:stat_id>/',
-        views.webapp_get_shared_stats,
-        name='webapp_get_shared_stats',
-    ),
     path('api/webapp/show/<int:show_id>/', views.webapp_get_show_full, name='webapp_get_show_full'),
     path('api/webapp/wishlist/', views.webapp_wishlist_data, name='webapp_wishlist_data'),
     path('api/bot/check/<int:telegram_id>/', views.check_bot_user),
