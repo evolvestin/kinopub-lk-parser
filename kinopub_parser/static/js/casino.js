@@ -1,13 +1,12 @@
 class CasinoEngine {
     constructor() {
         this.canvas = document.getElementById('casino-canvas');
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { alpha: true });
         this.particles = [];
+        this.rockets = [];
         this.animationId = null;
-        this.colors = ['#2ecc71', '#3498db', '#f1c40f', '#e74c3c', '#ffffff', '#a371f7', '#ff00ff'];
-        this.clockInterval = null;
         this.isActive = false;
-        
+
         window.addEventListener('resize', () => this.resize());
         this.resize();
     }
@@ -15,92 +14,135 @@ class CasinoEngine {
     resize() {
         if (!this.canvas) return;
         const rect = this.canvas.closest('.modal-content').getBoundingClientRect();
-        this.canvas.width = rect.width * window.devicePixelRatio;
-        this.canvas.height = rect.height * window.devicePixelRatio;
-        this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
     }
 
-    createParticle(x, y, type = 'firework') {
-        const angle = Math.random() * Math.PI * 2;
-        const isConfetti = type === 'confetti';
-        const velocity = isConfetti ? (Math.random() * 3 + 1) : (Math.random() * 12 + 4);
-        
-        return {
-            x, y,
-            vx: Math.cos(angle) * velocity,
-            vy: isConfetti ? (Math.random() * 2 + 2) : (Math.sin(angle) * velocity),
-            life: 1.0,
-            decay: isConfetti ? (Math.random() * 0.01 + 0.005) : (Math.random() * 0.02 + 0.01),
-            size: isConfetti ? (Math.random() * 6 + 4) : (Math.random() * 4 + 2),
-            color: this.colors[Math.floor(Math.random() * this.colors.length)],
-            type: isConfetti ? 'rect' : 'circle',
-            gravity: isConfetti ? 0.05 : 0.25,
-            friction: 0.96,
-            rotation: Math.random() * Math.PI,
-            vRotation: (Math.random() - 0.5) * 0.2
-        };
-    }
-
-    explode(x, y, count, type = 'firework') {
-        for (let i = 0; i < count; i++) {
-            this.particles.push(this.createParticle(x, y, type));
-        }
-        if (!this.animationId) {
+    launch() {
+        if (!this.isActive) {
             this.isActive = true;
             this.draw();
+        }
+
+        const startX = this.canvas.width / 2 + (Math.random() * 100 - 50);
+        const startY = this.canvas.height;
+        const targetX = Math.random() * this.canvas.width * 0.8 + (this.canvas.width * 0.1);
+        const targetY = Math.random() * this.canvas.height * 0.3 + 50;
+
+        const hue = Math.floor(Math.random() * 360);
+        
+        this.rockets.push({
+            x: startX,
+            y: startY,
+            vx: (targetX - startX) / 45,
+            vy: (targetY - startY) / 45,
+            targetY: targetY,
+            hue: hue,
+            alpha: 1,
+            history: []
+        });
+    }
+
+    explode(x, y, hue) {
+        const count = 120;
+        const baseSize = Math.random() * 1.5 + 1;
+        
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 6 + 2;
+            const friction = 0.95 + Math.random() * 0.03;
+            
+            this.particles.push({
+                x: x,
+                y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                hue: hue + (Math.random() * 40 - 20),
+                brightness: 50 + Math.random() * 30,
+                alpha: 1,
+                decay: Math.random() * 0.015 + 0.007,
+                size: baseSize,
+                friction: friction,
+                gravity: 0.12,
+                twinkle: Math.random() > 0.4
+            });
         }
     }
 
     draw() {
         if (!this.isActive) return;
+
+        this.ctx.globalCompositeOperation = 'destination-out';
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
+        this.ctx.globalCompositeOperation = 'lighter';
+
+        for (let i = this.rockets.length - 1; i >= 0; i--) {
+            const r = this.rockets[i];
+            
+            r.history.push({ x: r.x, y: r.y });
+            if (r.history.length > 5) r.history.shift();
+
+            r.x += r.vx;
+            r.y += r.vy;
+            r.vy += 0.05;
+
+            this.ctx.beginPath();
+            this.ctx.strokeStyle = `hsla(${r.hue}, 100%, 70%, ${r.alpha})`;
+            this.ctx.lineWidth = 2;
+            if (r.history.length > 1) {
+                this.ctx.moveTo(r.history[0].x, r.history[0].y);
+                this.ctx.lineTo(r.x, r.y);
+            }
+            this.ctx.stroke();
+
+            if (r.vy >= 0 || r.y <= r.targetY) {
+                this.explode(r.x, r.y, r.hue);
+                this.rockets.splice(i, 1);
+            }
+        }
+
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
+            
             p.vx *= p.friction;
             p.vy *= p.friction;
             p.vy += p.gravity;
             p.x += p.vx;
             p.y += p.vy;
-            p.life -= p.decay;
-            p.rotation += p.vRotation;
+            p.alpha -= p.decay;
 
-            if (p.life <= 0) {
+            if (p.alpha <= 0) {
                 this.particles.splice(i, 1);
                 continue;
             }
 
-            this.ctx.globalAlpha = p.life;
-            this.ctx.fillStyle = p.color;
-            
-            this.ctx.save();
-            this.ctx.translate(p.x, p.y);
-            this.ctx.rotate(p.rotation);
-            
-            this.ctx.beginPath();
-            if (p.type === 'circle') {
-                this.ctx.arc(0, 0, p.size, 0, Math.PI * 2);
-            } else {
-                this.ctx.rect(-p.size/2, -p.size/2, p.size, p.size * 0.6);
+            let b = p.brightness;
+            if (p.twinkle && Math.random() > 0.8) {
+                b += 30;
             }
+
+            this.ctx.fillStyle = `hsla(${p.hue}, 100%, ${b}%, ${p.alpha})`;
+            this.ctx.beginPath();
+            this.ctx.arc(p.x, p.y, p.size * (0.5 + p.alpha * 0.5), 0, Math.PI * 2);
             this.ctx.fill();
-            this.ctx.restore();
         }
 
-        if (this.particles.length > 0) {
+        if (this.particles.length > 0 || this.rockets.length > 0) {
             this.animationId = requestAnimationFrame(() => this.draw());
         } else {
-            this.animationId = null;
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             this.isActive = false;
         }
     }
 
     stopAnimation() {
         this.particles = [];
+        this.rockets = [];
         this.isActive = false;
         if (this.animationId) cancelAnimationFrame(this.animationId);
-        this.animationId = null;
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
 }
 
@@ -161,7 +203,6 @@ window.startCasinoSpin = function(folderId) {
     const winner = pool[Math.floor(Math.random() * pool.length)];
     const body = document.getElementById('casino-body');
     
-    // Плавный переход от выбора к игре
     body.style.opacity = '0';
     
     setTimeout(() => {
@@ -185,14 +226,19 @@ window.startCasinoSpin = function(folderId) {
         placeholderEl.style.display = 'none';
         titleEl.textContent = 'КРУТИМ...';
 
-        let elapsed = 0, duration = 5000, delay = 50;
+        let elapsed = 0, duration = 4000, delay = 50;
 
         const tick = () => {
             const rnd = pool[Math.floor(Math.random() * pool.length)];
             posterEl.src = rnd.poster_url?.replace('/small/', '/medium/') || '';
             
             let progress = elapsed / duration;
-            if (dimmer) dimmer.style.opacity = (progress * 0.9).toString();
+            if (dimmer) dimmer.style.opacity = (progress * 0.7).toString();
+            
+            if (elapsed % 200 === 0 && progress < 0.8) {
+                engine.launch();
+            }
+            
             if (window.navigator.vibrate) window.navigator.vibrate(10);
             
             elapsed += delay;
@@ -212,67 +258,58 @@ function runMysteryPhase(winner) {
     const placeholderEl = document.getElementById('cas-placeholder');
     const titleEl = document.getElementById('cas-title');
     
-    // Мгновенная смена состояния без задержек, чтобы не было "дырки"
     posterEl.style.display = 'none';
     placeholderEl.style.display = 'flex';
     titleEl.textContent = 'КТО ЖЕ ТАМ...';
 
-    const modal = document.querySelector('.casino-modal-content');
-    const rect = modal.getBoundingClientRect();
-    
-    const interval = setInterval(() => {
-        if (!document.getElementById('casino-modal').classList.contains('show')) {
-            clearInterval(interval);
+    let count = 0;
+    const timer = setInterval(() => {
+        if (!document.getElementById('casino-modal').classList.contains('show') || count >= 3) {
+            clearInterval(timer);
             return;
         }
-        engine.explode(Math.random() * rect.width, -10, 3, 'confetti');
-    }, 100);
+        engine.launch();
+        count++;
+    }, 500);
 
     setTimeout(() => {
-        clearInterval(interval);
+        clearInterval(timer);
         runReveal(winner);
-    }, 1500);
+    }, 1600);
 }
 
 function runReveal(winner) {
     const expires = Date.now() + 10 * 60 * 1000;
     localStorage.setItem('kp_casino_res', JSON.stringify({ item: winner, expires }));
 
-    // Сначала рендерим результат, чтобы избежать пустоты
     window.renderCasinoResult(winner, expires, true);
 
-    const dimmer = document.getElementById('casino-global-dimmer');
-    if (dimmer) {
-        dimmer.style.opacity = '0';
-        setTimeout(() => dimmer.classList.remove('active'), 300);
-    }
-    
-    document.body.classList.add('app-shake-active');
-    setTimeout(() => document.body.classList.remove('app-shake-active'), 500);
-
-    const modal = document.querySelector('.casino-modal-content');
-    const rect = modal.getBoundingClientRect();
-    const cx = rect.width / 2, cy = rect.height / 3;
-
-    engine.explode(cx, cy, 300, 'firework');
-    
-    let fireworkTime = 0;
-    const launchInterval = setInterval(() => {
-        if (!document.getElementById('casino-modal').classList.contains('show')) {
-            clearInterval(launchInterval);
-            return;
+    const revealAnimations = () => {
+        const dimmer = document.getElementById('casino-global-dimmer');
+        if (dimmer) {
+            dimmer.style.opacity = '0';
+            setTimeout(() => dimmer.classList.remove('active'), 300);
         }
-        engine.explode(
-            Math.random() * rect.width, 
-            Math.random() * (rect.height / 2), 
-            80, 
-            'firework'
-        );
-        fireworkTime += 1000;
-        if (fireworkTime >= 10000) clearInterval(launchInterval);
-    }, 1000);
+        
+        document.body.classList.add('app-shake-active');
+        setTimeout(() => document.body.classList.remove('app-shake-active'), 500);
 
-    if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100, 50, 500]);
+        for (let i = 0; i < 6; i++) {
+            setTimeout(() => {
+                if (document.getElementById('casino-modal').classList.contains('show')) {
+                    engine.launch();
+                    engine.launch();
+                }
+            }, i * 300);
+        }
+
+        if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100, 50, 500]);
+    };
+
+    const img = new Image();
+    img.src = winner.poster_url?.replace('/small/', '/medium/') || '';
+    img.onload = revealAnimations;
+    img.onerror = revealAnimations;
 }
 
 window.renderCasinoResult = function(item, expires, withAnimation = false) {

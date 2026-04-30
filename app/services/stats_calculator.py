@@ -234,6 +234,7 @@ def _get_favorites(base_qs, dur_qs):
 
             result.append(
                 {
+                    'id': person.id,
                     'name': person.name,
                     'photo_url': person.photo_url,
                     'fallback_photo_url': person.canonical.kp_photo_url

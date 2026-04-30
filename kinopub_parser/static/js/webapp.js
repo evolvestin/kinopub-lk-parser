@@ -921,7 +921,9 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
     }
 
     let headerSectionHtml = '';
-    if (type === 'filter' && ['actors', 'directors', 'writers'].includes(extraKey)) {
+    const isPersonCategory = extraKey && (extraKey.startsWith('actors') || extraKey.startsWith('directors') || extraKey.startsWith('writers'));
+    
+    if (type === 'filter' && isPersonCategory) {
         const p = D[extraKey][extraIndex];
         const safeName = p.name.replace(/'/g, "\\'");
         const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
@@ -929,15 +931,20 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
             ? `<img src="${p.photo_url}" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;" onerror="window.handleImgErr(this, ${fb}, '${safeName}')">`
             : `<div class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px;">${p.name.charAt(0)}</div>`;
         
-        const labels = { 'actors': 'Актёр', 'directors': 'Режиссёр', 'writers': 'Сценарист' };
-        const profLabel = labels[extraKey] || '';
+        let profLabel = '';
+        if (extraKey.startsWith('actors')) profLabel = 'Актёр';
+        else if (extraKey.startsWith('directors')) profLabel = 'Режиссёр';
+        else if (extraKey.startsWith('writers')) profLabel = 'Сценарист';
         
         headerSectionHtml = `
-            <div class="card anim-item" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm);">
+            <div class="card anim-item clickable" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm); position:relative;">
                 ${imgHtml}
-                <div style="min-width:0;">
+                <div style="min-width:0; flex:1;">
                     <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">${p.name}</div>
                     <div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">${profLabel}</div>
+                </div>
+                <div style="color:var(--text-muted); opacity:0.5;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M9 18l6-6-6-6"/></svg>
                 </div>
             </div>`;
     } else if (type === 'filter' && extraKey === 'countries') {
@@ -1235,7 +1242,7 @@ window.openCollectionLayer = async function(type, id, titleFallback) {
             headerSectionHtml = `
                 <div class="card anim-item" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm);">
                     ${imgHtml}
-                    <div style="min-width:0;">
+                    <div style="min-width:0; flex:1;">
                         <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">${titleFallback}</div>
                         ${profsHtml}
                     </div>

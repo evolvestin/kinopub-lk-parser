@@ -576,7 +576,12 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 }
 .search-input:focus { border-color: var(--accent); box-shadow: var(--shadow-glow); }
 .search-input::placeholder { color: var(--text-muted); }
-.loader-inline { display: flex; justify-content: center; padding: 40px; }
+.loader-inline {
+    display: flex;
+    justify-content: center;
+    padding: 40px;
+    grid-column: 1 / -1;
+}
 
 /* WISHLIST CSS */
 .detail-wishlist-btn {
@@ -667,7 +672,7 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 .reorder-mode .wl-folder-card .wl-folder-inner,
 .reorder-items-mode .grid-item-wrap,
 .reorder-items-mode .hist-item {
-    animation: iosWiggle 0.35s infinite ease-in-out;
+    animation: iosWiggle 0.55s infinite ease-in-out;
     cursor: grab;
 }
 
@@ -722,7 +727,7 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 
 
 .sortable-fallback .grid-below-title {
-    margin-top: 60px !important;
+    margin-top: 12px !important;
 }
 
 /* Отключаем дребезжание и внутри fallback-элемента на всех уровнях */
