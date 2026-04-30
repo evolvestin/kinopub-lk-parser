@@ -129,6 +129,8 @@ const Icons = {
     rocket: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path style="fill:none;" d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 22 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22 0 0 1-4 2z"></path><path style="fill:none;" d="M9 12H4s.55-3.03 2-5.03a12 12 0 0 1 3-3"></path><path style="fill:none;" d="M12 15v5s3.03-.55 5.03-2a12 12 0 0 0 3-3"></path></svg>',
     target: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><circle style="fill:none;" cx="12" cy="12" r="6"></circle><circle style="fill:none;" cx="12" cy="12" r="2"></circle></svg>',
     done: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="20 6 9 17 4 12"></polyline></svg>',
+    dice: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect style="fill:none;" x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle style="fill:none;" cx="8.5" cy="8.5" r="1.5"></circle><circle style="fill:none;" cx="15.5" cy="15.5" r="1.5"></circle><circle style="fill:none;" cx="15.5" cy="8.5" r="1.5"></circle><circle style="fill:none;" cx="8.5" cy="15.5" r="1.5"></circle><circle style="fill:none;" cx="12" cy="12" r="1.5"></circle></svg>',
+
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -146,6 +148,7 @@ function initIcons() {
     i('ic-bookmark', 'bookmark'); i('ic-check', 'check');
     i('wl-vt-grid', 'grid'); i('wl-vt-list', 'list');
     i('wl-edit-btn', 'gear');
+    i('wl-casino-btn', 'dice');
     
     const reorderBtn = document.getElementById('wl-reorder-btn');
     if (reorderBtn) reorderBtn.innerHTML = Icons.reorder;
@@ -2011,4 +2014,8 @@ window.App = {
     toggleReorderMode: window.toggleReorderMode,
     toggleItemsReorderMode: window.toggleItemsReorderMode,
     confirmDeleteWlItem: window.confirmDeleteWlItem,
+    openCasino: window.openCasino,
+    closeCasino: window.closeCasino,
+    resetCasino: window.resetCasino,
+    startCasinoSpin: window.startCasinoSpin
 };

@@ -1,0 +1,154 @@
+.casino-modal-content {
+    position: relative;
+    overflow: hidden;
+    min-height: 580px; 
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+}
+
+.casino-slot-window {
+    width: clamp(160px, 45vw, 220px);
+    aspect-ratio: 2/3;
+    margin: 0 auto; /* Убираем нижний отступ, управляем им через контейнер */
+    border-radius: 24px;
+    overflow: hidden;
+    background: var(--bg-input);
+    border: 4px solid var(--border);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    position: relative;
+    z-index: 5;
+    transition: transform 0.4s var(--transition-bounce), border-color 0.3s;
+    flex-shrink: 0;
+}
+
+.casino-slot-window img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.casino-win-glow {
+    border-color: var(--accent) !important;
+    transform: scale(1.05);
+    box-shadow: 0 0 50px var(--accent-dim);
+}
+
+.casino-info-container {
+    margin-top: 20px;
+    height: 240px; /* Фиксируем высоту, чтобы постер стоял на месте */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Глобальное затемнение */
+.casino-dimmed {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.5s ease, visibility 0.5s;
+}
+
+.casino-dimmed.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* Приятная тряска всего приложения */
+@keyframes globalAppShake {
+    0%, 100% { transform: translate(0, 0) rotate(0); }
+    10% { transform: translate(-2px, -1px) rotate(-0.5deg); }
+    20% { transform: translate(-3px, 0px) rotate(0.5deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(0.5deg); }
+    50% { transform: translate(-1px, 2px) rotate(-0.5deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-0.5deg); }
+    80% { transform: translate(-1px, -1px) rotate(0.5deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+}
+
+.app-shake-active {
+    animation: globalAppShake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+.casino-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    min-height: 24px;
+}
+
+.casino-meta-info {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    min-height: 18px;
+}
+
+.casino-controls-reveal {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: opacity 0.5s ease, transform 0.5s var(--transition-bounce), visibility 0.5s;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none; /* Не кликабельны, пока скрыты */
+}
+
+.casino-controls-reveal.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.casino-btn-choice {
+    background: linear-gradient(135deg, var(--bg-card), var(--bg-input));
+    border: 1px solid var(--border);
+    margin-bottom: 10px;
+    text-align: left;
+    justify-content: flex-start;
+}
+
+.casino-timer-wrap {
+    margin-top: 20px;
+    background: var(--bg-input);
+    padding: 12px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+}
+
+.casino-timer-clock {
+    font-family: ui-monospace, monospace;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--text-primary);
+}
+
+.btn-reset {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+}

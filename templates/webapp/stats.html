@@ -10,6 +10,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <link rel="stylesheet" href="{% static 'css/webapp.css' %}">
+    <link rel="stylesheet" href="{% static 'css/casino.css' %}">
+    <script src="{% static 'js/casino.js' %}"></script>
 </head>
 <body>
     <div class="loader" id="loader"><div class="spinner"></div></div>
@@ -38,6 +40,7 @@
                 <div class="header" style="padding-bottom: 8px;">
                     <div class="header-name glow-text" id="wl-main-header">Избранное</div>
                     <div class="top-controls">
+                        <button class="wl-edit-btn" id="wl-casino-btn" onclick="window.App.openCasino()"></button>
                         <button class="wl-edit-btn" id="wl-reorder-btn" onclick="window.App.toggleReorderMode()" style="display:none; margin-right:4px;"></button>
                         <button class="theme-btn js-theme-toggle" onclick="window.App.toggleTheme()"></button>
                         <button class="share-btn" onclick="window.App.openFolderEditModal()" style="background: var(--accent); color: white; border-color: var(--accent);">
@@ -309,6 +312,20 @@
                 </button>
                 <button class="btn-primary" style="margin-top: 0; flex: 1;" onclick="window.App.saveFolderEdit()">Сохранить</button>
             </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="casino-modal">
+        <div class="modal-content casino-modal-content">
+            <canvas id="casino-canvas" style="position:absolute; inset:0; pointer-events:none; z-index:100;"></canvas>
+            <div class="modal-header">
+                <div class="modal-title" style="color:var(--accent); display:flex; align-items:center; gap:8px;">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                    Рулетка
+                </div>
+                <button class="modal-close" onclick="window.App.closeCasino()">×</button>
+            </div>
+            <div id="casino-body" style="padding:10px 0 20px; text-align:center; position:relative; z-index:10;"></div>
         </div>
     </div>
 
