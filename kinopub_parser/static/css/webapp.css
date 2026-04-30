@@ -90,16 +90,16 @@ body {
 
 .top-controls { display: flex; gap: 8px; }
 
-.theme-btn, .share-btn {
+.theme-btn, .share-btn, .wl-edit-btn {
     width: clamp(36px, 10vw, 44px); height: clamp(36px, 10vw, 44px); border-radius: 50%;
     background: var(--bg-input); border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; color: var(--text-primary); transition: transform var(--transition-bounce), background var(--transition-smooth);
     box-shadow: var(--shadow-sm);
 }
-.theme-btn:active, .share-btn:active { transform: scale(0.85); }
-.theme-btn .icon, .share-btn .icon { font-size: clamp(18px, 5vw, 22px); line-height: 1; }
-.theme-btn svg, .share-btn svg {
+.theme-btn:active, .share-btn:active, .wl-edit-btn:active { transform: scale(0.85); }
+.theme-btn .icon, .share-btn .icon, .wl-edit-btn .icon { font-size: clamp(18px, 5vw, 22px); line-height: 1; }
+.theme-btn svg, .share-btn svg, .wl-edit-btn svg {
     width: 20px;
     height: 20px;
     display: block;
@@ -656,6 +656,15 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 }
 
 .wl-folder-card {
+    cursor: pointer;
+    user-select: none;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    touch-action: manipulation;
+    transition: transform var(--transition-bounce);
+}
+
+.wl-folder-inner {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -663,13 +672,24 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     display: flex;
     align-items: center;
     gap: 12px;
-    cursor: pointer;
     box-shadow: var(--shadow-sm);
-    transition: transform var(--transition-bounce), border-color 0.2s, background 0.2s;
-    user-select: none;
+    transition: border-color 0.2s, background 0.2s;
+    height: 100%;
+    width: 100%;
 }
-.wl-folder-card:active { transform: scale(0.95); background: var(--bg-input); }
-.wl-folder-card.active { border-color: var(--accent); background: var(--accent-dim); }
+
+.wl-folder-card:active { transform: scale(0.95); }
+.wl-folder-card.active .wl-folder-inner { border-color: var(--accent); background: var(--accent-dim); }
+
+.reorder-mode .wl-folder-inner {
+    border-color: var(--border);
+    background: var(--bg-card);
+}
+
+.wl-folder-inner.wiggle {
+    animation: wiggle 0.3s infinite ease-in-out;
+}
+
 
 .wl-folder-icon {
     width: 36px; height: 36px; border-radius: 10px;
@@ -698,9 +718,18 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 }
 .wl-icon-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); transform: scale(1.1); }
 
+.sortable-fallback {
+    opacity: 0.9 !important;
+    border: 1px solid var(--accent) !important;
+}
+
 /* SortableJS Ghost Classes */
-.sortable-ghost { opacity: 0.4; }
-.sortable-drag { cursor: grabbing !important; }
+.sortable-ghost {
+    opacity: 0.4 !important;
+}
+.sortable-drag {
+    opacity: 0 !important;
+}
 
 /* Delete button overlay on list items */
 .wl-item-del {
@@ -718,3 +747,93 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 .grid-item-wrap:hover .wl-item-del, .hist-item:hover .wl-item-del { opacity: 1; }
 .wl-item-del:active { transform: scale(0.9); }
 .hist-item { position: relative; } /* needed for absolute del btn in list view */
+
+
+.grid-item-wrap, .hist-item {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.grid-poster, .hist-poster {
+    pointer-events: none;
+}
+
+#trash-zone {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    margin-left: -30px;
+    width: 60px;
+    height: 60px;
+    background: var(--danger);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    z-index: 9999;
+    transform: translateY(150px) scale(0.5);
+    opacity: 0;
+    transition: transform 0.4s var(--transition-bounce), opacity 0.3s;
+    box-shadow: 0 10px 25px rgba(231, 76, 60, 0.5);
+    pointer-events: none;
+}
+
+#trash-zone.visible {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#trash-zone svg {
+    width: 28px;
+    height: 28px;
+    pointer-events: none;
+}
+
+.trash-ghost {
+    opacity: 0 !important;
+}
+
+
+
+@keyframes wiggle {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(-1.5deg); }
+    50% { transform: rotate(0deg); }
+    75% { transform: rotate(1.5deg); }
+    100% { transform: rotate(0deg); }
+}
+
+.wiggle {
+    animation: wiggle 0.3s infinite ease-in-out;
+}
+
+.reorder-mode .wl-folder-card.active {
+    border-color: var(--border);
+    background: var(--bg-card);
+}
+
+.reorder-mode .wl-folder-card {
+    transition: opacity 0.2s, background 0.2s, border-color 0.2s !important;
+}
+
+#wl-active-folder-content {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.reorder-active-state #wl-active-folder-content {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+}
+
+
+.reorder-items-mode .grid-item-wrap,
+
+.reorder-items-mode .grid-item,
+.reorder-items-mode .hist-item {
+    animation: wiggle 0.3s infinite ease-in-out;
+}
