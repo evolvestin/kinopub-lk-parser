@@ -182,9 +182,20 @@ class Command(BaseCommand):
             else:
                 stale_services = []
                 active_count = 0
+                deleted_count = 0
+                
                 for hb_file in hb_files:
                     age = time.time() - os.path.getmtime(hb_file)
                     service_name = hb_file.name.replace('heartbeat_', '')
+                    
+                    if age > 86400:
+                        try:
+                            hb_file.unlink(missing_ok=True)
+                            deleted_count += 1
+                        except Exception:
+                            pass
+                        continue
+
                     if age > 600:
                         stale_services.append(service_name)
                     else:
@@ -198,9 +209,10 @@ class Command(BaseCommand):
                         f'{len(stale_services)} STALE</b> ({list_str})'
                     )
                 else:
-                    components_lines.append(
-                        f'✅ Heartbeat: <b>OK</b> ({active_count} services active)'
-                    )
+                    msg = f'✅ Heartbeat: <b>OK</b> ({active_count} services active)'
+                    if deleted_count > 0:
+                        msg += f' <small>(cleaned {deleted_count} old)</small>'
+                    components_lines.append(msg)
         except Exception as e:
             components_lines.append(f'⚠️ Heartbeat: <b>Error scanning dir</b> ({str(e)[:20]})')
 

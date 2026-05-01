@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import os
 from contextlib import contextmanager
 from datetime import timedelta
 
@@ -157,12 +158,23 @@ def cleanup_old_data_task():
     deleted_codes, _ = Code.objects.filter(received_at__lt=cutoff_codes).delete()
 
     # 3. Очистка метрик
-    # Метрики храним 7 дней
     cutoff_metrics = now - timedelta(days=7)
     deleted_metrics, _ = SiteMetric.objects.filter(created_at__lt=cutoff_metrics).delete()
 
+    # 4. Очистка старых файлов heartbeat
+    deleted_hb_files = 0
+    try:
+        heartbeat_dir = settings.HEARTBEAT_DIR
+        for hb_file in heartbeat_dir.glob('heartbeat_*'):
+            if time.time() - os.path.getmtime(hb_file) > 86400:
+                hb_file.unlink(missing_ok=True)
+                deleted_hb_files += 1
+    except Exception as e:
+        logging.error(f'Failed to cleanup heartbeat files: {e}')
+
     logging.info(
-        'Cleanup completed. Deleted metrics: %d, old codes: %d', deleted_metrics, deleted_codes
+        'Cleanup completed. Deleted metrics: %d, old codes: %d, hb files: %d', 
+        deleted_metrics, deleted_codes, deleted_hb_files
     )
 
     if deleted_codes > 0 or deleted_metrics > 0:

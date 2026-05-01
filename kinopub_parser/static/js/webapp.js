@@ -1004,7 +1004,10 @@ window.setViewModeLayer = function(mode) {
 
 function getHistoryItemHtml(item, idx, type, mode) {
     const sid = item.show_id;
-    // Убираем anim-item для предотвращения "подпрыгивания" при пакетной подгрузке (infinite scroll)
+    const delay = (idx % 100) * 0.05;
+    const animClass = 'anim-item';
+    const style = `style="animation-delay: ${delay}s"`;
+
     if (mode === 'list') {
         if (type === 'ratings') {
             const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
@@ -1012,14 +1015,14 @@ function getHistoryItemHtml(item, idx, type, mode) {
             const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
             const rColor = getRatingColor(item.rating);
             let seHtml = item.season && item.episode ? `<span class="hist-badge">s${item.season}e${item.episode.toString().padStart(2,'0')}</span>` : '';
-            return `<div class="hist-item clickable" onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
+            return `<div class="hist-item clickable ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
         } else {
             const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy">` : `<div class="hist-poster"></div>`;
             let metaHtml = '';
             if (item.season_number > 0) metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
             if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
             const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
-            return `<div class="hist-item clickable" onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
+            return `<div class="hist-item clickable ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
         }
     } else {
         const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
@@ -1028,7 +1031,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
         
         if (type === 'ratings') {
             const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-            return `<div class="grid-item-wrap" onclick="window.App.openShowLayer(${sid})"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div></div>`;
+            return `<div class="grid-item-wrap ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div></div>`;
         } else {
             let badgesHtml = '';
             if (item.season_number > 0) badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6);border:none;">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
@@ -1046,7 +1049,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
                 }
                 usersHtml = `<div class="grid-users">${avatars}</div>`;
             }
-            return `<div class="grid-item-wrap" onclick="window.App.openShowLayer(${sid})"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
+            return `<div class="grid-item-wrap ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
         }
     }
 }
@@ -1067,14 +1070,17 @@ function renderHistoryBatchLayer() {
     }
 
     const batch = curHistData.slice(currentHistoryOffset, currentHistoryOffset + historyBatchSize);
-    let html = batch.map((item, idx) => getHistoryItemHtml(item, currentHistoryOffset + idx, curHistType, viewMode)).join('');
+    let html = batch.map((item, idx) => getHistoryItemHtml(item, idx, curHistType, viewMode)).join('');
     
     if (currentHistoryOffset === 0 && viewMode === 'list') {
-        container.innerHTML = '<div class="card" style="margin:0; padding:0; overflow:hidden;">' + html + '</div>';
+        container.innerHTML = '<div class="card" style="margin:0; padding:0; border:none; background:transparent;">' + html + '</div>';
     } else if (currentHistoryOffset === 0 && viewMode === 'grid') {
         container.innerHTML = '<div class="hist-grid">' + html + '</div>';
     } else {
-        container.firstChild.insertAdjacentHTML('beforeend', html);
+        const target = container.querySelector('.card') || container.querySelector('.hist-grid');
+        if (target) {
+            target.insertAdjacentHTML('beforeend', html);
+        }
     }
 
     currentHistoryOffset += historyBatchSize;
@@ -1567,6 +1573,12 @@ window.toggleReorderMode = function() {
 
 function renderWishlistFolders() {
     const grid = document.getElementById('wl-folders-grid');
+    const wrapper = document.getElementById('wl-folders-wrapper');
+    
+    if (wrapper) {
+        wrapper.style.display = wishlistFolders.length > 1 ? 'block' : 'none';
+    }
+
     if (!wishlistFolders.length) {
         grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Нет папок</div>';
         if(wlFoldersSortable) { wlFoldersSortable.destroy(); wlFoldersSortable = null; }
@@ -1634,15 +1646,17 @@ window.selectWlFolder = function(id) {
     renderActiveWlFolder();
 };
 
-function getWlItemHtml(item, viewModeStr) {
+function getWlItemHtml(item, viewModeStr, idx) {
     const sid = item.show_id;
     const addedDate = item.added_at || '';
+    const delay = idx * 0.05;
+    const animClass = isItemsReorderMode ? '' : 'anim-item';
+    const style = isItemsReorderMode ? '' : `style="animation-delay: ${delay}s"`;
     
-    // Убираем anim-item из каждого отдельного элемента, так как теперь анимируется контейнер целиком
     if (viewModeStr === 'list') {
         const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy" draggable="false">` : `<div class="hist-poster"></div>`;
         return `
-        <div class="hist-item clickable" data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
+        <div class="hist-item clickable ${animClass}" ${style} data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
             ${poster}
             <div class="hist-info">
                 <div class="hist-title">${item.title}</div>
@@ -1660,7 +1674,7 @@ function getWlItemHtml(item, viewModeStr) {
         const yearHtml = item.year ? `<div class="grid-year">${item.year}</div>` : '';
         
         return `
-        <div class="grid-item-wrap" data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
+        <div class="grid-item-wrap ${animClass}" ${style} data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
             <div class="grid-item">
                 ${posterHtml}
                 ${yearHtml}
@@ -1720,17 +1734,12 @@ function renderActiveWlFolder() {
         return;
     }
 
-    // Применяем анимацию только если контейнер был пуст или мы явно переключаем папку
-    const shouldAnimate = true; 
-    let itemsHtml = folder.items.map(item => getWlItemHtml(item, wlViewMode)).join('');
-    
-    // Оборачиваем в анимацию весь блок, если это не режим перетаскивания
-    const animClass = (shouldAnimate && !isItemsReorderMode) ? 'anim-item' : '';
+    let itemsHtml = folder.items.map((item, idx) => getWlItemHtml(item, wlViewMode, idx)).join('');
     
     if (wlViewMode === 'list') {
-        container.innerHTML = `<div class="card ${animClass}" style="margin:0; padding:0; overflow:hidden; border:none; background:transparent;">${itemsHtml}</div>`;
+        container.innerHTML = `<div class="card" style="margin:0; padding:0; overflow:hidden; border:none; background:transparent;">${itemsHtml}</div>`;
     } else {
-        container.innerHTML = `<div class="hist-grid ${animClass}">${itemsHtml}</div>`;
+        container.innerHTML = `<div class="hist-grid">${itemsHtml}</div>`;
     }
 
     if (typeof Sortable !== 'undefined') {
@@ -1759,7 +1768,7 @@ function renderActiveWlFolder() {
                         fallback.style.width = evt.item.offsetWidth + 'px';
                         fallback.style.height = evt.item.offsetHeight + 'px';
                         
-                        const animatedChildren = fallback.querySelectorAll('.wiggle, .grid-item-wrap, .hist-item, .grid-item');
+                        const animatedChildren = fallback.querySelectorAll('.wiggle, .grid-item-wrap, .hist-item, .grid-item, .anim-item');
                         animatedChildren.forEach(el => {
                             el.style.animation = 'none';
                         });
@@ -1888,11 +1897,6 @@ window.saveFolderEdit = async function() {
         wishlistFolders.push({ id: tempId, name: name || '', color, icon, items: [] });
         activeWlFolderId = tempId;
         
-        const wrapper = document.getElementById('wl-folders-wrapper');
-        if (wrapper) {
-            wrapper.style.display = wishlistFolders.length > 1 ? 'block' : 'none';
-        }
-
         renderWishlistFolders();
         renderActiveWlFolder();
         
@@ -1922,6 +1926,12 @@ window.deleteActiveFolder = async function() {
     const idToDelete = activeWlFolderId;
     wishlistFolders = wishlistFolders.filter(f => f.id !== idToDelete);
     
+    if (wishlistFolders.length <= 1) {
+        const reorderBtn = document.getElementById('wl-reorder-btn');
+        if (reorderBtn) reorderBtn.style.display = 'none';
+        if (isReorderMode) toggleReorderMode();
+    }
+
     if (wishlistFolders.length === 0) {
         document.getElementById('wl-active-folder-content').style.display = 'none';
         document.getElementById('wl-folders-grid').innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
@@ -1932,11 +1942,6 @@ window.deleteActiveFolder = async function() {
 
     activeWlFolderId = wishlistFolders[0].id;
     
-    const wrapper = document.getElementById('wl-folders-wrapper');
-    if (wrapper) {
-        wrapper.style.display = wishlistFolders.length > 1 ? 'block' : 'none';
-    }
-
     renderWishlistFolders();
     renderActiveWlFolder();
     

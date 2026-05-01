@@ -186,8 +186,7 @@ window.openCasino = function() {
         return;
     }
 
-    let html = `<div style="font-size:22px; font-weight:900; margin-bottom:24px; color:#f1c40f;">🎰 Казино</div>`;
-    html += `<button class="btn-primary" style="margin-bottom:15px;" onclick="window.startCasinoSpin('all')">ВЕСЬ КАТАЛОГ</button>`;
+    let html = `<button class="btn-primary" style="margin-bottom:15px;" onclick="window.startCasinoSpin('all')">Весь каталог</button>`;
     
     validFolders.forEach(f => {
         html += `<button class="btn-primary casino-btn-choice" onclick="window.startCasinoSpin(${f.id})">
@@ -396,7 +395,7 @@ window.resetCasino = function() {
         clearInterval(engine.clockInterval);
     }
     window.closeCasino();
-    showToast('Казино сброшено');
+    showToast('Cброшено');
 };
 
 window.closeCasino = function() {
