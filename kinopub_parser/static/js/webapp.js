@@ -129,8 +129,6 @@ const Icons = {
     rocket: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path style="fill:none;" d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 22 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22 0 0 1-4 2z"></path><path style="fill:none;" d="M9 12H4s.55-3.03 2-5.03a12 12 0 0 1 3-3"></path><path style="fill:none;" d="M12 15v5s3.03-.55 5.03-2a12 12 0 0 0 3-3"></path></svg>',
     target: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><circle style="fill:none;" cx="12" cy="12" r="6"></circle><circle style="fill:none;" cx="12" cy="12" r="2"></circle></svg>',
     done: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="20 6 9 17 4 12"></polyline></svg>',
-    dice: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect style="fill:none;" x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle style="fill:none;" cx="8.5" cy="8.5" r="1.5"></circle><circle style="fill:none;" cx="15.5" cy="15.5" r="1.5"></circle><circle style="fill:none;" cx="15.5" cy="8.5" r="1.5"></circle><circle style="fill:none;" cx="8.5" cy="15.5" r="1.5"></circle><circle style="fill:none;" cx="12" cy="12" r="1.5"></circle></svg>',
-
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -148,7 +146,9 @@ function initIcons() {
     i('ic-bookmark', 'bookmark'); i('ic-check', 'check');
     i('wl-vt-grid', 'grid'); i('wl-vt-list', 'list');
     i('wl-edit-btn', 'gear');
-    i('wl-casino-btn', 'dice');
+    
+    const casinoBtn = document.getElementById('wl-casino-btn');
+    if (casinoBtn) casinoBtn.innerHTML = '🎰';
     
     const reorderBtn = document.getElementById('wl-reorder-btn');
     if (reorderBtn) reorderBtn.innerHTML = Icons.reorder;
@@ -264,18 +264,25 @@ async function init() {
     }
 }
 
+function getScrollContainer() {
+    return document.getElementById('views-container');
+}
+
 function switchMainView(view) {
     activeMainView = view;
-    document.getElementById('view-search').style.display = view === 'search' ? 'block' : 'none';
+    document.getElementById('view-search').style.display = view === 'search' ? 'flex' : 'none';
     document.getElementById('view-stats').style.display = view === 'stats' ? 'block' : 'none';
     document.getElementById('view-wishlist').style.display = view === 'wishlist' ? 'block' : 'none';
     
     document.getElementById('bn-search').classList.toggle('active', view === 'search');
     document.getElementById('bn-stats').classList.toggle('active', view === 'stats');
     document.getElementById('bn-wishlist').classList.toggle('active', view === 'wishlist');
-    window.scrollTo(0, 0);
+    
+    getScrollContainer().scrollTop = 0;
 
     if (view === 'wishlist') {
+        const container = document.getElementById('wl-items-container');
+        if (container) container.innerHTML = '';
         loadWishlist();
     }
 }
@@ -997,6 +1004,7 @@ window.setViewModeLayer = function(mode) {
 
 function getHistoryItemHtml(item, idx, type, mode) {
     const sid = item.show_id;
+    // Убираем anim-item для предотвращения "подпрыгивания" при пакетной подгрузке (infinite scroll)
     if (mode === 'list') {
         if (type === 'ratings') {
             const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
@@ -1004,14 +1012,14 @@ function getHistoryItemHtml(item, idx, type, mode) {
             const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
             const rColor = getRatingColor(item.rating);
             let seHtml = item.season && item.episode ? `<span class="hist-badge">s${item.season}e${item.episode.toString().padStart(2,'0')}</span>` : '';
-            return `<div class="hist-item anim-item clickable" onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
+            return `<div class="hist-item clickable" onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
         } else {
             const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy">` : `<div class="hist-poster"></div>`;
             let metaHtml = '';
             if (item.season_number > 0) metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
             if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
             const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
-            return `<div class="hist-item anim-item clickable" onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
+            return `<div class="hist-item clickable" onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
         }
     } else {
         const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
@@ -1020,7 +1028,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
         
         if (type === 'ratings') {
             const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-            return `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${sid})"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div></div>`;
+            return `<div class="grid-item-wrap" onclick="window.App.openShowLayer(${sid})"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div></div>`;
         } else {
             let badgesHtml = '';
             if (item.season_number > 0) badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6);border:none;">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
@@ -1038,7 +1046,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
                 }
                 usersHtml = `<div class="grid-users">${avatars}</div>`;
             }
-            return `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${sid})"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
+            return `<div class="grid-item-wrap" onclick="window.App.openShowLayer(${sid})"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
         }
     }
 }
@@ -1276,20 +1284,22 @@ function pushLayer(htmlContent, contextData = {}) {
     
     document.getElementById('dynamic-layers').appendChild(layer);
     
-    const prevScroll = window.scrollY;
+    const container = getScrollContainer();
+    const prevScroll = container.scrollTop;
+    
     if (viewStack.length > 0) {
         viewStack[viewStack.length - 1].scrollPos = prevScroll;
         viewStack[viewStack.length - 1].el.style.display = 'none';
     } else {
-        document.getElementById('view-' + activeMainView).style.display = 'none';
-        document.getElementById('bottom-nav').style.display = 'none';
         lastScrollPos = prevScroll;
     }
 
     viewStack.push({ el: layer, context: contextData, scrollPos: 0 });
-    window.scrollTo(0, 0);
-
-    if (tg?.BackButton) { tg.BackButton.show(); tg.BackButton.onClick(popLayer); }
+    
+    if (tg?.BackButton) { 
+        tg.BackButton.show(); 
+        tg.BackButton.onClick(popLayer); 
+    }
 }
 
 function popLayer() {
@@ -1298,19 +1308,21 @@ function popLayer() {
     const top = viewStack.pop();
     top.el.remove();
 
-    let targetScroll = 0;
     if (viewStack.length > 0) {
         const prev = viewStack[viewStack.length - 1];
         prev.el.style.display = 'block';
-        targetScroll = prev.scrollPos;
+        prev.el.scrollTop = prev.scrollPos;
     } else {
         document.getElementById('view-' + activeMainView).style.display = 'block';
         if (!isSharedMode) document.getElementById('bottom-nav').style.display = 'flex';
-        targetScroll = lastScrollPos;
-        if (tg?.BackButton) { tg.BackButton.hide(); tg.BackButton.offClick(popLayer); }
+        
+        getScrollContainer().scrollTop = lastScrollPos;
+        
+        if (tg?.BackButton) { 
+            tg.BackButton.hide(); 
+            tg.BackButton.offClick(popLayer); 
+        }
     }
-    
-    setTimeout(() => window.scrollTo(0, targetScroll), 10);
 }
 
 window.closeHistory = popLayer;
@@ -1515,7 +1527,9 @@ async function loadWishlist() {
         
         if (reorderBtn) {
             reorderBtn.style.display = wishlistFolders.length > 1 ? 'flex' : 'none';
-            if (isReorderMode && wishlistFolders.length <= 1) toggleReorderMode();
+            if (isReorderMode && wishlistFolders.length <= 1) {
+                toggleReorderMode();
+            }
         }
 
         if (wishlistFolders.length > 0 && !activeWlFolderId) {
@@ -1624,10 +1638,11 @@ function getWlItemHtml(item, viewModeStr) {
     const sid = item.show_id;
     const addedDate = item.added_at || '';
     
+    // Убираем anim-item из каждого отдельного элемента, так как теперь анимируется контейнер целиком
     if (viewModeStr === 'list') {
         const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy" draggable="false">` : `<div class="hist-poster"></div>`;
         return `
-        <div class="hist-item anim-item clickable" data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
+        <div class="hist-item clickable" data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
             ${poster}
             <div class="hist-info">
                 <div class="hist-title">${item.title}</div>
@@ -1645,7 +1660,7 @@ function getWlItemHtml(item, viewModeStr) {
         const yearHtml = item.year ? `<div class="grid-year">${item.year}</div>` : '';
         
         return `
-        <div class="grid-item-wrap anim-item" data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
+        <div class="grid-item-wrap" data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
             <div class="grid-item">
                 ${posterHtml}
                 ${yearHtml}
@@ -1689,6 +1704,12 @@ function renderActiveWlFolder() {
     document.getElementById('wl-vt-list').classList.toggle('active', wlViewMode === 'list');
 
     const reorderBtn = document.getElementById('wl-items-reorder-btn');
+    
+    reorderBtn.style.display = folder.items.length > 1 ? 'flex' : 'none';
+    if (isItemsReorderMode && folder.items.length <= 1) {
+        toggleItemsReorderMode();
+    }
+
     reorderBtn.style.background = isItemsReorderMode ? 'var(--accent)' : 'var(--bg-input)';
     reorderBtn.style.color = isItemsReorderMode ? '#fff' : 'var(--text-primary)';
     container.classList.toggle('reorder-items-mode', isItemsReorderMode);
@@ -1699,12 +1720,17 @@ function renderActiveWlFolder() {
         return;
     }
 
+    // Применяем анимацию только если контейнер был пуст или мы явно переключаем папку
+    const shouldAnimate = true; 
     let itemsHtml = folder.items.map(item => getWlItemHtml(item, wlViewMode)).join('');
     
+    // Оборачиваем в анимацию весь блок, если это не режим перетаскивания
+    const animClass = (shouldAnimate && !isItemsReorderMode) ? 'anim-item' : '';
+    
     if (wlViewMode === 'list') {
-        container.innerHTML = `<div class="card" style="margin:0; padding:0; overflow:hidden; border:none; background:transparent;">${itemsHtml}</div>`;
+        container.innerHTML = `<div class="card ${animClass}" style="margin:0; padding:0; overflow:hidden; border:none; background:transparent;">${itemsHtml}</div>`;
     } else {
-        container.innerHTML = `<div class="hist-grid">${itemsHtml}</div>`;
+        container.innerHTML = `<div class="hist-grid ${animClass}">${itemsHtml}</div>`;
     }
 
     if (typeof Sortable !== 'undefined') {
@@ -1769,18 +1795,13 @@ window.setWlViewMode = function(mode) {
 window.removeWlItem = function(id) {
     // Оптимистичное удаление
     const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
-    if(folder) folder.items = folder.items.filter(i => i.id !== id);
-    
-    const el = document.querySelector(`[data-id="${id}"]`);
-    if(el) {
-        if (wlViewMode === 'list' && el.parentElement.children.length === 1) {
-            renderActiveWlFolder(); // если последний, ререндерим для пустого стейта
-        } else {
-            el.remove();
-        }
+    if(folder) {
+        folder.items = folder.items.filter(i => i.id !== id);
     }
     
-    renderWishlistFolders(); // апдейт счетчиков
+    renderActiveWlFolder();
+    renderWishlistFolders();
+    
     sendWishlistAction('remove_item', { item_id: id });
     showToast('Удалено');
 };

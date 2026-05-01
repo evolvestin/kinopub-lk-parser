@@ -52,7 +52,7 @@
 
 .casino-info-container {
     margin-top: 20px;
-    height: 240px; /* Фиксируем высоту, чтобы постер стоял на месте */
+    height: 200px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -156,14 +156,25 @@
     color: var(--text-primary);
 }
 
-.btn-reset {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    padding: 8px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 700;
+.casino-debug-reset {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 1005;
+    background: rgba(231, 76, 60, 0.2);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
     cursor: pointer;
-    width: 100%;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+}
+
+.casino-debug-reset:hover {
+    background: var(--danger);
+    color: #fff;
 }

@@ -131,21 +131,21 @@ STATIC_URL = 'static/'
 STATIC_ROOT = data_dir / 'staticfiles'
 
 if DEBUG:
+    WHITENOISE_MAX_AGE = 0
+    WHITENOISE_AUTOREFRESH = True
+    WHITENOISE_USE_FINDERS = True
     STORAGES = {
-        'default': {
-            'BACKEND': 'django.core.files.storage.FileSystemStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
 else:
+    WHITENOISE_MAX_AGE = 31536000
+    WHITENOISE_AUTOREFRESH = False
+    WHITENOISE_USE_FINDERS = False
     STORAGES = {
-        'default': {
-            'BACKEND': 'django.core.files.storage.FileSystemStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
         },
     }
 
@@ -365,7 +365,7 @@ if ENVIRONMENT == 'PROD':
             },
             'fetch_person_photos': {
                 'task': 'app.tasks.fetch_person_photos_task',
-                'schedule': crontab(minute='*/30'),
+                'schedule': crontab(minute=0, hour='*/3'),
             },
             'sync_poiskkino_ratings': {
                 'task': 'app.tasks.sync_poiskkino_ratings_task',

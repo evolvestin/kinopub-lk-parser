@@ -160,7 +160,17 @@ window.openCasino = function() {
 
     const modal = document.getElementById('casino-modal');
     const body = document.getElementById('casino-body');
+    const headerIcon = document.getElementById('casino-header-icon');
+    const debugBtn = document.getElementById('casino-debug-reset');
+    
+    if (debugBtn) {
+        debugBtn.style.display = window.IS_DEBUG ? 'block' : 'none';
+    }
+    
+    if (headerIcon) headerIcon.innerHTML = '🎰';
     body.style.opacity = '1';
+
+    const validFolders = wishlistFolders.filter(f => f.items.length > 0);
 
     const cached = localStorage.getItem('kp_casino_res');
     if (cached) {
@@ -170,16 +180,20 @@ window.openCasino = function() {
         return;
     }
 
-    const validFolders = wishlistFolders.filter(f => f.items.length > 0);
-    
+    if (validFolders.length === 1) {
+        modal.classList.add('show');
+        window.startCasinoSpin(validFolders[0].id);
+        return;
+    }
+
     let html = `<div style="font-size:22px; font-weight:900; margin-bottom:24px; color:#f1c40f;">🎰 Казино</div>`;
-    html += `<button class="btn-primary" style="background:linear-gradient(135deg, #e74c3c, #c0392b); margin-bottom:15px;" onclick="window.startCasinoSpin('all')">ВЕСЬ КАТАЛОГ</button>`;
+    html += `<button class="btn-primary" style="margin-bottom:15px;" onclick="window.startCasinoSpin('all')">ВЕСЬ КАТАЛОГ</button>`;
     
     validFolders.forEach(f => {
         html += `<button class="btn-primary casino-btn-choice" onclick="window.startCasinoSpin(${f.id})">
             <span style="color:${f.color}; margin-right:10px;">${Icons[f.icon] || Icons.folder}</span>
-            <span style="flex:1;">${f.name}</span>
-            <span style="opacity:0.6; font-size:12px;">${f.items.length}</span>
+            <span style="flex:1; color: var(--text-primary);">${f.name}</span>
+            <span style="opacity:0.6; font-size:12px; color: var(--text-muted);">${f.items.length}</span>
         </button>`;
     });
 
@@ -313,7 +327,6 @@ function runReveal(winner) {
 }
 
 window.renderCasinoResult = function(item, expires, withAnimation = false) {
-    // Важно: проверяем наличие лейаута, чтобы не перерисовывать всё через innerHTML
     if (!document.getElementById('cas-window')) {
         window.setupCasinoLayout();
     }
@@ -325,7 +338,6 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
     const metaEl = document.getElementById('cas-meta');
     const controlsEl = document.getElementById('cas-controls');
     const btnWatch = document.getElementById('cas-btn-watch');
-    const btnReset = document.getElementById('cas-btn-reset');
     const countdownEl = document.getElementById('casino-countdown');
 
     const poster = item.poster_url?.replace('/small/', '/medium/') || '';
@@ -346,7 +358,6 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
         window.closeCasino(); 
         window.App.openShowLayer(item.show_id); 
     };
-    btnReset.onclick = () => window.resetCasino();
 
     controlsEl.classList.add('active');
 
@@ -358,12 +369,6 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
         if (countdownEl) {
             countdownEl.textContent = "ГОТОВО";
             countdownEl.style.color = "var(--accent)";
-        }
-        if (btnReset) {
-            btnReset.textContent = "🎰 ИГРАТЬ СНОВА";
-            btnReset.style.background = "var(--accent)";
-            btnReset.style.color = "#fff";
-            btnReset.style.borderColor = "var(--accent)";
         }
     };
 
@@ -387,9 +392,11 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
 
 window.resetCasino = function() {
     localStorage.removeItem('kp_casino_res');
-    if (engine.clockInterval) clearInterval(engine.clockInterval);
+    if (engine && engine.clockInterval) {
+        clearInterval(engine.clockInterval);
+    }
+    window.closeCasino();
     showToast('Казино сброшено');
-    window.openCasino();
 };
 
 window.closeCasino = function() {
@@ -431,7 +438,6 @@ window.setupCasinoLayout = function() {
                         <div style="font-size:10px; color:var(--accent); font-weight:800; margin-bottom:4px;">СЛЕДУЮЩИЙ ШАНС</div>
                         <div class="casino-timer-clock" id="casino-countdown">10:00</div>
                     </div>
-                    <button class="btn-reset" id="cas-btn-reset" style="margin-top: 15px;">🎰 СБРОС</button>
                 </div>
             </div>
         </div>

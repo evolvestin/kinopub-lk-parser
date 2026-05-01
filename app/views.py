@@ -906,7 +906,10 @@ def bot_assign_group_view(request):
 
 
 def webapp_index(request):
-    return render(request, 'webapp/stats.html')
+    context = {
+        'is_debug': settings.ENVIRONMENT == 'DEV'
+    }
+    return render(request, 'webapp/stats.html', context)
 
 
 @csrf_exempt
