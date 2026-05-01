@@ -1,12 +1,12 @@
 import functools
 import logging
+import os
 import re
 import shlex
 import subprocess
 import sys
 import tempfile
 import time
-import os
 from contextlib import contextmanager
 from datetime import timedelta
 
@@ -173,8 +173,10 @@ def cleanup_old_data_task():
         logging.error(f'Failed to cleanup heartbeat files: {e}')
 
     logging.info(
-        'Cleanup completed. Deleted metrics: %d, old codes: %d, hb files: %d', 
-        deleted_metrics, deleted_codes, deleted_hb_files
+        'Cleanup completed. Deleted metrics: %d, old codes: %d, hb files: %d',
+        deleted_metrics,
+        deleted_codes,
+        deleted_hb_files,
     )
 
     if deleted_codes > 0 or deleted_metrics > 0:

@@ -692,6 +692,25 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 .wl-icon-btn { width: 44px; height: 44px; border-radius: 12px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
 .wl-icon-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); transform: scale(1.1); }
 
+.wl-active-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px clamp(16px, 4vw, 20px) 10px;
+    background: rgba(20, 24, 31, 0.55);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: background var(--transition-smooth);
+}
+
+.light .wl-active-header {
+    background: rgba(246, 248, 250, 0.85);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
 .wl-item-del {
     position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
     border-radius: 8px; background: rgba(231, 76, 60, 0.9); color: white; border: none;

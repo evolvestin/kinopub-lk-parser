@@ -906,9 +906,7 @@ def bot_assign_group_view(request):
 
 
 def webapp_index(request):
-    context = {
-        'is_debug': settings.ENVIRONMENT == 'DEV'
-    }
+    context = {'is_debug': settings.ENVIRONMENT == 'DEV'}
     return render(request, 'webapp/stats.html', context)
 
 

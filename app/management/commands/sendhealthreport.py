@@ -183,11 +183,11 @@ class Command(BaseCommand):
                 stale_services = []
                 active_count = 0
                 deleted_count = 0
-                
+
                 for hb_file in hb_files:
                     age = time.time() - os.path.getmtime(hb_file)
                     service_name = hb_file.name.replace('heartbeat_', '')
-                    
+
                     if age > 86400:
                         try:
                             hb_file.unlink(missing_ok=True)

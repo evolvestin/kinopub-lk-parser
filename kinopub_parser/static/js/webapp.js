@@ -1538,6 +1538,11 @@ async function loadWishlist() {
             }
         }
 
+        const folderExists = wishlistFolders.some(f => f.id === activeWlFolderId);
+        if (!folderExists) {
+            activeWlFolderId = null;
+        }
+
         if (wishlistFolders.length > 0 && !activeWlFolderId) {
             activeWlFolderId = wishlistFolders[0].id;
         }
@@ -1933,6 +1938,7 @@ window.deleteActiveFolder = async function() {
     }
 
     if (wishlistFolders.length === 0) {
+        activeWlFolderId = null;
         document.getElementById('wl-active-folder-content').style.display = 'none';
         document.getElementById('wl-folders-grid').innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
         await sendWishlistAction('delete_folder', { folder_id: idToDelete });

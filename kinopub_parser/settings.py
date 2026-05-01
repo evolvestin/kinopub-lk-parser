@@ -137,8 +137,8 @@ if DEBUG:
     WHITENOISE_AUTOREFRESH = True
     WHITENOISE_USE_FINDERS = True
     STORAGES = {
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
         },
     }
 else:
@@ -146,8 +146,8 @@ else:
     WHITENOISE_AUTOREFRESH = False
     WHITENOISE_USE_FINDERS = False
     STORAGES = {
-        "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        'staticfiles': {
+            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
         },
     }
 

@@ -52,12 +52,12 @@
                     </div>
                 </div>
 
-                <div style="padding: 10px 16px;" id="wl-folders-wrapper">
+                <div style="padding: 10px clamp(16px, 4vw, 20px);" id="wl-folders-wrapper">
                     <div id="wl-folders-grid" class="wl-folders-grid"></div>
                 </div>
 
                 <div id="wl-active-folder-content" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px 16px;">
+                    <div class="wl-active-header">
                         <div id="wl-active-folder-title" style="font-size: 18px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px;"></div>
                         <div style="display: flex; gap: 10px; align-items: center; margin-left: auto;">
                             <div class="view-toggle" style="margin: 0; padding: 2px;">
@@ -68,7 +68,7 @@
                             <button class="wl-edit-btn" onclick="window.App.editActiveFolder()" id="wl-edit-btn"></button>
                         </div>
                     </div>
-                    <div id="wl-items-container" style="padding: 0 16px 120px;"></div>
+                    <div id="wl-items-container" style="padding: 0 clamp(16px, 4vw, 20px) 120px;"></div>
                 </div>
             </div>
 
