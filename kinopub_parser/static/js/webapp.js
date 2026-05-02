@@ -129,6 +129,8 @@ const Icons = {
     rocket: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path style="fill:none;" d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 22 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22 0 0 1-4 2z"></path><path style="fill:none;" d="M9 12H4s.55-3.03 2-5.03a12 12 0 0 1 3-3"></path><path style="fill:none;" d="M12 15v5s3.03-.55 5.03-2a12 12 0 0 0 3-3"></path></svg>',
     target: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><circle style="fill:none;" cx="12" cy="12" r="6"></circle><circle style="fill:none;" cx="12" cy="12" r="2"></circle></svg>',
     done: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="20 6 9 17 4 12"></polyline></svg>',
+    minus: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
+
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -157,29 +159,11 @@ function initIcons() {
     if (itemsReorderBtn) itemsReorderBtn.innerHTML = Icons.reorder;
 }
 
-function initTrashZone() {
-    const trashEl = document.getElementById('trash-zone');
-    if (!trashEl || typeof Sortable === 'undefined') return;
-    new Sortable(trashEl, {
-        group: 'wl-items',
-        ghostClass: 'trash-ghost',
-        forceFallback: true,
-        fallbackOnBody: true,
-        onAdd: function (evt) {
-            const itemId = parseInt(evt.item.dataset.id);
-            evt.item.remove();
-            window.App.removeWlItem(itemId);
-            if (window.navigator.vibrate) window.navigator.vibrate([50, 50, 50]);
-        }
-    });
-}
-
 
 if (document.readyState === 'loading') {
-    document.addEventListener("DOMContentLoaded", () => { initIcons(); initTrashZone(); });
+    document.addEventListener("DOMContentLoaded", () => { initIcons(); });
 } else {
     initIcons();
-    initTrashZone();
 }
 
 const tg = window.Telegram?.WebApp;
@@ -1597,6 +1581,9 @@ function renderWishlistFolders() {
              onpointerup="handleFolderPointerUp()"
              onpointerleave="handleFolderPointerUp()"
              onclick="if(!isFolderLongPress && !isReorderMode) window.App.selectWlFolder(${f.id})">
+            <div class="wl-delete-badge" onclick="event.stopPropagation(); window.App.deleteWlFolder(${f.id}, this.parentElement)">
+                ${Icons.minus}
+            </div>
             <div class="wl-folder-inner ${isReorderMode ? 'wiggle' : ''}">
                 <div class="wl-folder-icon" style="background: ${f.color}20; color: ${f.color};">
                     ${Icons[f.icon] || Icons.folder}
@@ -1627,11 +1614,10 @@ function renderWishlistFolders() {
                     if (fallback) {
                         fallback.style.width = evt.item.offsetWidth + 'px';
                         fallback.style.height = evt.item.offsetHeight + 'px';
-                        
                         const animatedChildren = fallback.querySelectorAll('.wiggle, .wl-folder-inner');
-                        animatedChildren.forEach(el => {
-                            el.style.animation = 'none';
-                        });
+                        animatedChildren.forEach(el => { el.style.animation = 'none'; });
+                        const badge = fallback.querySelector('.wl-delete-badge');
+                        if (badge) badge.style.display = 'none';
                     }
                 });
             },
@@ -1643,6 +1629,42 @@ function renderWishlistFolders() {
         });
     }
 }
+
+window.deleteWlFolder = async function(id, element) {
+    if (!confirm('Удалить папку и всё её содержимое?')) return;
+    
+    if (element) {
+        element.classList.add('anim-shrink');
+        element.addEventListener('animationend', async () => {
+            wishlistFolders = wishlistFolders.filter(f => f.id !== id);
+            
+            if (wishlistFolders.length <= 1) {
+                const reorderBtn = document.getElementById('wl-reorder-btn');
+                if (reorderBtn) reorderBtn.style.display = 'none';
+                if (isReorderMode) toggleReorderMode();
+            }
+
+            if (wishlistFolders.length === 0) {
+                activeWlFolderId = null;
+                document.getElementById('wl-active-folder-content').style.display = 'none';
+                document.getElementById('wl-folders-grid').innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
+                await sendWishlistAction('delete_folder', { folder_id: id });
+                await loadWishlist();
+                return;
+            }
+
+            if (activeWlFolderId === id) {
+                activeWlFolderId = wishlistFolders[0].id;
+            }
+            
+            renderWishlistFolders();
+            renderActiveWlFolder();
+        }, { once: true });
+    }
+
+    sendWishlistAction('delete_folder', { folder_id: id });
+    showToast('Папка удалена');
+};
 
 window.selectWlFolder = function(id) {
     if (activeWlFolderId === id) return;
@@ -1658,10 +1680,13 @@ function getWlItemHtml(item, viewModeStr, idx) {
     const animClass = isItemsReorderMode ? '' : 'anim-item';
     const style = isItemsReorderMode ? '' : `style="animation-delay: ${delay}s"`;
     
+    const deleteBtn = `<div class="wl-delete-badge" onclick="event.stopPropagation(); window.App.removeWlItem(${item.id}, this.parentElement)">${Icons.minus}</div>`;
+
     if (viewModeStr === 'list') {
         const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy" draggable="false">` : `<div class="hist-poster"></div>`;
         return `
         <div class="hist-item clickable ${animClass}" ${style} data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
+            ${deleteBtn}
             ${poster}
             <div class="hist-info">
                 <div class="hist-title">${item.title}</div>
@@ -1680,6 +1705,7 @@ function getWlItemHtml(item, viewModeStr, idx) {
         
         return `
         <div class="grid-item-wrap ${animClass}" ${style} data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
+            ${deleteBtn}
             <div class="grid-item">
                 ${posterHtml}
                 ${yearHtml}
@@ -1806,16 +1832,21 @@ window.setWlViewMode = function(mode) {
     renderActiveWlFolder();
 };
 
-window.removeWlItem = function(id) {
-    // Оптимистичное удаление
-    const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
-    if(folder) {
-        folder.items = folder.items.filter(i => i.id !== id);
+window.removeWlItem = function(id, element) {
+    if (!confirm('Удалить этот фильм из списка?')) return;
+    
+    if (element) {
+        element.classList.add('anim-shrink');
+        element.addEventListener('animationend', () => {
+            const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
+            if(folder) {
+                folder.items = folder.items.filter(i => i.id !== id);
+            }
+            renderActiveWlFolder();
+            renderWishlistFolders();
+        }, { once: true });
     }
-    
-    renderActiveWlFolder();
-    renderWishlistFolders();
-    
+
     sendWishlistAction('remove_item', { item_id: id });
     showToast('Удалено');
 };
@@ -2067,5 +2098,6 @@ window.App = {
     openCasino: window.openCasino,
     closeCasino: window.closeCasino,
     resetCasino: window.resetCasino,
-    startCasinoSpin: window.startCasinoSpin
+    startCasinoSpin: window.startCasinoSpin,
+    deleteWlFolder: window.deleteWlFolder,
 };

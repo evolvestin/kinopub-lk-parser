@@ -750,15 +750,56 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 
 .grid-item-wrap, .hist-item { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 
-#trash-zone {
-    position: fixed; bottom: 40px; left: 50%; margin-left: -30px; width: 60px; height: 60px;
-    background: var(--danger); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-size: 28px; z-index: 9999; transform: translateY(150px) scale(0.5); opacity: 0;
-    transition: transform 0.4s var(--transition-bounce), opacity 0.3s; box-shadow: 0 10px 25px rgba(231, 76, 60, 0.5); pointer-events: none;
+.wl-delete-badge {
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    width: 24px;
+    height: 24px;
+    background: #ff3b30;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    border: 2px solid var(--bg-card);
+    opacity: 0;
+    transform: scale(0);
+    transition: opacity 0.2s, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
 }
-#trash-zone.visible { transform: translateY(0) scale(1); opacity: 1; pointer-events: auto; }
-#trash-zone svg { width: 28px; height: 28px; pointer-events: none; }
 
+.wl-delete-badge svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 4px;
+}
+
+/* Показ кнопок в режиме редактирования */
+.reorder-mode .wl-delete-badge,
+.reorder-items-mode .wl-delete-badge {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+/* Анимация исчезновения */
+@keyframes shrinkOut {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0); opacity: 0; }
+}
+
+.anim-shrink {
+    animation: shrinkOut 0.4s cubic-bezier(0.4, 0, 1, 1) forwards !important;
+    pointer-events: none !important;
+}
+
+/* Корректировка контейнеров для бейджиков */
+.wl-folder-card, .grid-item-wrap, .hist-item {
+    position: relative;
+}
 /* ========================================= */
 /* === IOS-LIKE DRAG & DROP (SORTABLEJS) === */
 /* ========================================= */
