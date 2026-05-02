@@ -28,6 +28,7 @@ from redis import Redis
 
 from app.admin_site import admin_site
 from app.models import (
+    CasinoSpin,
     Code,
     Country,
     ExternalRating,
@@ -1823,3 +1824,11 @@ class WishlistFolderAdmin(admin.ModelAdmin):
     autocomplete_fields = ('user',)
     inlines = [WishlistItemInline]
     ordering = ('user', 'sort_order')
+
+
+@admin.register(CasinoSpin, site=admin_site)
+class CasinoSpinAdmin(admin.ModelAdmin):
+    list_display = ('user', 'show', 'created_at')
+    list_filter = ('user', 'created_at')
+    autocomplete_fields = ('user', 'show')
+    readonly_fields = ('created_at', 'updated_at')

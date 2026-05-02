@@ -478,3 +478,16 @@ class WishlistItem(BaseModel):
 
     def __str__(self):
         return f'{self.show.title} in {self.folder.name}'
+
+
+class CasinoSpin(BaseModel):
+    user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='casino_spins')
+    show = models.ForeignKey(Show, on_delete=models.CASCADE)
+
+    class Meta:
+        verbose_name = 'Casino Spin'
+        verbose_name_plural = 'Casino Spins'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user} - {self.show.title} at {self.created_at}'

@@ -2,6 +2,7 @@ import functools
 import hashlib
 import json
 import logging
+import random
 import urllib.parse
 import uuid
 from collections import defaultdict
@@ -21,6 +22,7 @@ from django.views.decorators.http import require_http_methods
 from redis import Redis
 
 from app.models import (
+    CasinoSpin,
     Country,
     ExternalRating,
     Genre,
@@ -1693,4 +1695,121 @@ def webapp_wishlist_data(request):
 
     except Exception as e:
         logging.error(f'WebApp Wishlist Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_casino(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+        action = body.get('action')
+
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        try:
+            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        except ViewUser.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        if action == 'status':
+            latest_spin = CasinoSpin.objects.filter(user=view_user).order_by('-created_at').first()
+            if latest_spin:
+                time_passed = (timezone.now() - latest_spin.created_at).total_seconds()
+                if time_passed < 600:
+                    show = latest_spin.show
+                    expires_ms = int(
+                        (latest_spin.created_at + timedelta(minutes=10)).timestamp() * 1000
+                    )
+                    return JsonResponse(
+                        {
+                            'active_spin': {
+                                'show': {
+                                    'show_id': show.id,
+                                    'title': show.title,
+                                    'original_title': show.original_title,
+                                    'year': show.year,
+                                    'type': show.type,
+                                    'poster_url': get_poster_url(show.id, 'small'),
+                                },
+                                'expires': expires_ms,
+                            }
+                        }
+                    )
+            return JsonResponse({'active_spin': None})
+
+        elif action == 'spin':
+            latest_spin = CasinoSpin.objects.filter(user=view_user).order_by('-created_at').first()
+            if latest_spin:
+                time_passed = (timezone.now() - latest_spin.created_at).total_seconds()
+                if time_passed < 600:
+                    return JsonResponse({'error': 'Cooldown active'}, status=400)
+
+            folder_id = body.get('folder_id')
+            if folder_id == 'all':
+                items = WishlistItem.objects.filter(folder__user=view_user).select_related('show')
+            else:
+                items = WishlistItem.objects.filter(
+                    folder__user=view_user, folder__id=folder_id
+                ).select_related('show')
+
+            if not items.exists():
+                return JsonResponse({'error': 'Empty folder'}, status=400)
+
+            winner_item = random.choice(list(items))
+            winner_show = winner_item.show
+
+            new_spin = CasinoSpin.objects.create(user=view_user, show=winner_show)
+            expires_ms = int((new_spin.created_at + timedelta(minutes=10)).timestamp() * 1000)
+
+            return JsonResponse(
+                {
+                    'show': {
+                        'show_id': winner_show.id,
+                        'title': winner_show.title,
+                        'original_title': winner_show.original_title,
+                        'year': winner_show.year,
+                        'type': winner_show.type,
+                        'poster_url': get_poster_url(winner_show.id, 'small'),
+                    },
+                    'expires': expires_ms,
+                }
+            )
+
+        elif action == 'history':
+            spins = (
+                CasinoSpin.objects.filter(user=view_user)
+                .order_by('-created_at')
+                .select_related('show')
+            )
+            history = []
+            for s in spins:
+                history.append(
+                    {
+                        'show_id': s.show.id,
+                        'show__title': s.show.title,
+                        'show__original_title': s.show.original_title,
+                        'show__year': s.show.year,
+                        'poster_url': get_poster_url(s.show.id, 'small'),
+                        'view_date': timezone.localtime(s.created_at).strftime('%Y-%m-%d %H:%M'),
+                        'season_number': 0,
+                        'episode_number': 0,
+                        'user_names': [],
+                    }
+                )
+            return JsonResponse({'history': history})
+
+        elif action == 'reset':
+            CasinoSpin.objects.filter(user=view_user).delete()
+            return JsonResponse({'status': 'ok'})
+
+        return JsonResponse({'error': 'Invalid action'}, status=400)
+
+    except Exception as e:
+        import logging
+
+        logging.error(f'Casino API Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)

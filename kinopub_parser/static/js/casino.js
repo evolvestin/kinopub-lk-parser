@@ -151,13 +151,6 @@ let engine;
 window.openCasino = function() {
     if (!engine) engine = new CasinoEngine();
     
-    let allItemsCount = 0;
-    wishlistFolders.forEach(f => allItemsCount += f.items.length);
-    if (allItemsCount === 0) {
-        showToast('Ваш список избранного пуст!');
-        return;
-    }
-
     const modal = document.getElementById('casino-modal');
     const body = document.getElementById('casino-body');
     const headerIcon = document.getElementById('casino-header-icon');
@@ -170,22 +163,53 @@ window.openCasino = function() {
     if (headerIcon) headerIcon.innerHTML = '🎰';
     body.style.opacity = '1';
 
-    const validFolders = wishlistFolders.filter(f => f.items.length > 0);
+    body.innerHTML = `
+        <button class="btn-primary" style="margin-bottom:15px;" onclick="window.checkCasinoStatus()">Запустить рулетку</button>
+        <button class="btn-primary" style="background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border);" onclick="window.loadCasinoHistory()">История</button>
+    `;
+    modal.classList.add('show');
+};
 
-    const cached = localStorage.getItem('kp_casino_res');
-    if (cached) {
-        const data = JSON.parse(cached);
-        window.renderCasinoResult(data.item, data.expires);
-        modal.classList.add('show');
+window.checkCasinoStatus = async function() {
+    const body = document.getElementById('casino-body');
+    body.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div>';
+
+    try {
+        const res = await fetch('/api/webapp/casino/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'status', init_data: tg?.initData || '' })
+        });
+        const data = await res.json();
+
+        if (data.active_spin) {
+            window.renderCasinoResult(data.active_spin.show, data.active_spin.expires);
+        } else {
+            window.showCasinoFolders();
+        }
+    } catch(e) {
+        showToast('Ошибка соединения');
+        window.closeCasino();
+    }
+};
+
+window.showCasinoFolders = function() {
+    let allItemsCount = 0;
+    wishlistFolders.forEach(f => allItemsCount += f.items.length);
+    if (allItemsCount === 0) {
+        showToast('Ваш список избранного пуст!');
+        window.closeCasino();
         return;
     }
 
+    const validFolders = wishlistFolders.filter(f => f.items.length > 0);
+
     if (validFolders.length === 1) {
-        modal.classList.add('show');
         window.startCasinoSpin(validFolders[0].id);
         return;
     }
 
+    const body = document.getElementById('casino-body');
     let html = `<button class="btn-primary" style="margin-bottom:15px;" onclick="window.startCasinoSpin('all')">Весь каталог</button>`;
     
     validFolders.forEach(f => {
@@ -197,73 +221,147 @@ window.openCasino = function() {
     });
 
     body.innerHTML = html;
-    modal.classList.add('show');
 };
 
-window.startCasinoSpin = function(folderId) {
-    let pool = [];
-    if (folderId === 'all') {
-        let map = new Map();
-        wishlistFolders.forEach(f => f.items.forEach(i => map.set(i.show_id, i)));
-        pool = Array.from(map.values());
-    } else {
-        const f = wishlistFolders.find(x => x.id === folderId);
-        if (f) pool = f.items;
-    }
-
-    if (!pool.length) return;
-
-    const winner = pool[Math.floor(Math.random() * pool.length)];
+window.startCasinoSpin = async function(folderId) {
     const body = document.getElementById('casino-body');
-    
     body.style.opacity = '0';
-    
-    setTimeout(() => {
-        window.setupCasinoLayout();
-        body.style.opacity = '1';
-        
-        let dimmer = document.getElementById('casino-global-dimmer');
-        if (!dimmer) {
-            dimmer = document.createElement('div');
-            dimmer.id = 'casino-global-dimmer';
-            dimmer.className = 'casino-dimmed';
-            document.body.appendChild(dimmer);
+
+    try {
+        const res = await fetch('/api/webapp/casino/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'spin', folder_id: folderId, init_data: tg?.initData || '' })
+        });
+        const data = await res.json();
+        if (data.error) {
+            showToast('Ошибка: ' + data.error);
+            window.closeCasino();
+            return;
         }
-        dimmer.classList.add('active');
 
-        const posterEl = document.getElementById('cas-poster');
-        const placeholderEl = document.getElementById('cas-placeholder');
-        const titleEl = document.getElementById('cas-title');
+        const winner = data.show;
+        const expires = data.expires;
+
+        let pool = [];
+        if (folderId === 'all') {
+            let map = new Map();
+            wishlistFolders.forEach(f => f.items.forEach(i => map.set(i.show_id, i)));
+            pool = Array.from(map.values());
+        } else {
+            const f = wishlistFolders.find(x => x.id === folderId);
+            if (f) pool = f.items;
+        }
+        if (!pool.length) pool = [winner];
+
+        setTimeout(() => {
+            window.setupCasinoLayout();
+            body.style.opacity = '1';
+            
+            let dimmer = document.getElementById('casino-global-dimmer');
+            if (!dimmer) {
+                dimmer = document.createElement('div');
+                dimmer.id = 'casino-global-dimmer';
+                dimmer.className = 'casino-dimmed';
+                document.body.appendChild(dimmer);
+            }
+            dimmer.classList.add('active');
+
+            const posterEl = document.getElementById('cas-poster');
+            const placeholderEl = document.getElementById('cas-placeholder');
+            const titleEl = document.getElementById('cas-title');
+            
+            posterEl.style.display = 'block';
+            placeholderEl.style.display = 'none';
+            titleEl.textContent = 'КРУТИМ...';
+
+            let elapsed = 0, duration = 4000, delay = 50;
+
+            const tick = () => {
+                const rnd = pool[Math.floor(Math.random() * pool.length)];
+                posterEl.src = rnd.poster_url?.replace('/small/', '/medium/') || '';
+                
+                let progress = elapsed / duration;
+                if (dimmer) dimmer.style.opacity = (progress * 0.7).toString();
+                
+                if (elapsed % 200 === 0 && progress < 0.8) {
+                    engine.launch();
+                }
+                
+                if (window.navigator.vibrate) window.navigator.vibrate(10);
+                
+                elapsed += delay;
+                if (elapsed < duration) {
+                    delay = 50 + (Math.pow(progress, 3) * 400); 
+                    setTimeout(tick, delay);
+                } else {
+                    window.runMysteryPhase(winner, expires);
+                }
+            };
+            tick();
+        }, 300);
+
+    } catch (e) {
+        showToast('Ошибка при запуске рулетки');
+        window.closeCasino();
+    }
+};
+
+
+window.runMysteryPhase = function(winner, expires) {
+    const posterEl = document.getElementById('cas-poster');
+    const placeholderEl = document.getElementById('cas-placeholder');
+    const titleEl = document.getElementById('cas-title');
+    
+    posterEl.style.display = 'none';
+    placeholderEl.style.display = 'flex';
+    titleEl.textContent = 'КТО ЖЕ ТАМ...';
+
+    let count = 0;
+    const timer = setInterval(() => {
+        if (!document.getElementById('casino-modal').classList.contains('show') || count >= 3) {
+            clearInterval(timer);
+            return;
+        }
+        engine.launch();
+        count++;
+    }, 500);
+
+    setTimeout(() => {
+        clearInterval(timer);
+        window.runReveal(winner, expires);
+    }, 1600);
+};
+
+window.runReveal = function(winner, expires) {
+    window.renderCasinoResult(winner, expires, true);
+
+    const revealAnimations = () => {
+        const dimmer = document.getElementById('casino-global-dimmer');
+        if (dimmer) {
+            dimmer.style.opacity = '0';
+            setTimeout(() => dimmer.classList.remove('active'), 300);
+        }
         
-        posterEl.style.display = 'block';
-        placeholderEl.style.display = 'none';
-        titleEl.textContent = 'КРУТИМ...';
+        document.body.classList.add('app-shake-active');
+        setTimeout(() => document.body.classList.remove('app-shake-active'), 500);
 
-        let elapsed = 0, duration = 4000, delay = 50;
+        for (let i = 0; i < 6; i++) {
+            setTimeout(() => {
+                if (document.getElementById('casino-modal').classList.contains('show')) {
+                    engine.launch();
+                    engine.launch();
+                }
+            }, i * 300);
+        }
 
-        const tick = () => {
-            const rnd = pool[Math.floor(Math.random() * pool.length)];
-            posterEl.src = rnd.poster_url?.replace('/small/', '/medium/') || '';
-            
-            let progress = elapsed / duration;
-            if (dimmer) dimmer.style.opacity = (progress * 0.7).toString();
-            
-            if (elapsed % 200 === 0 && progress < 0.8) {
-                engine.launch();
-            }
-            
-            if (window.navigator.vibrate) window.navigator.vibrate(10);
-            
-            elapsed += delay;
-            if (elapsed < duration) {
-                delay = 50 + (Math.pow(progress, 3) * 400); 
-                setTimeout(tick, delay);
-            } else {
-                runMysteryPhase(winner);
-            }
-        };
-        tick();
-    }, 300);
+        if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100, 50, 500]);
+    };
+
+    const img = new Image();
+    img.src = winner.poster_url?.replace('/small/', '/medium/') || '';
+    img.onload = revealAnimations;
+    img.onerror = revealAnimations;
 };
 
 function runMysteryPhase(winner) {
@@ -351,7 +449,7 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
     placeholderEl.style.display = 'none';
     
     titleEl.textContent = item.title;
-    metaEl.textContent = `${item.year || ''} ${item.type ? `· ${item.type}` : ''}`;
+    metaEl.textContent = `${item.year || ''} ${item.type ? '· ' + item.type : ''}`;
 
     btnWatch.onclick = () => { 
         window.closeCasino(); 
@@ -389,8 +487,38 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
     }
 };
 
-window.resetCasino = function() {
-    localStorage.removeItem('kp_casino_res');
+window.loadCasinoHistory = async function() {
+    window.closeCasino();
+    document.getElementById('loader').classList.remove('hidden');
+    document.getElementById('loader').style.opacity = '1';
+
+    try {
+        const res = await fetch('/api/webapp/casino/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'history', init_data: tg?.initData || '' })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        D.casino_history = data.history || [];
+        window.openHistoryLayer('casino', 'История рулетки');
+    } catch(e) {
+        showToast('Ошибка загрузки истории');
+    } finally {
+        hideLoader();
+    }
+};
+
+window.resetCasino = async function() {
+    try {
+        await fetch('/api/webapp/casino/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'reset', init_data: tg?.initData || '' })
+        });
+    } catch(e) {}
+
     if (engine && engine.clockInterval) {
         clearInterval(engine.clockInterval);
     }
@@ -402,7 +530,6 @@ window.closeCasino = function() {
     const modal = document.getElementById('casino-modal');
     const dimmer = document.getElementById('casino-global-dimmer');
     
-    // Запускаем плавное исчезновение
     modal.classList.remove('show');
     if (dimmer) dimmer.classList.remove('active');
     document.body.classList.remove('app-shake-active');
@@ -411,7 +538,6 @@ window.closeCasino = function() {
         engine.stopAnimation();
     }
 
-    // Ждем окончания CSS анимации (0.4s в стиле модалки) прежде чем чистить интервалы
     setTimeout(() => {
         if (engine && engine.clockInterval) {
             clearInterval(engine.clockInterval);

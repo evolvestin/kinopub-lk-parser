@@ -868,6 +868,9 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
     if (type === 'all') { 
         curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date)); 
     } 
+    else if (type === 'casino') {
+        curHistData = D.casino_history;
+    }
     else if (type === 'day') { 
         curHistData = [...D.history_movies, ...D.history_episodes].filter(i => i.view_date === extraDate); 
     } 

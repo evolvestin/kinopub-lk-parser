@@ -769,6 +769,7 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     transform: scale(0);
     transition: opacity 0.2s, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     pointer-events: none;
+    cursor: pointer;
 }
 
 .wl-delete-badge svg {
@@ -814,7 +815,7 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 }
 
 /* Применяем анимацию только когда включен режим редактирования */
-.reorder-mode .wl-folder-card .wl-folder-inner,
+.reorder-mode .wl-folder-card,
 .reorder-items-mode .grid-item-wrap,
 .reorder-items-mode .hist-item {
     animation: iosWiggle 0.55s infinite ease-in-out;
@@ -822,7 +823,7 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 }
 
 /* Сдвиг фазы, чтобы не дребезжали синхронно */
-.reorder-mode .wl-folder-card:nth-child(even) .wl-folder-inner,
+.reorder-mode .wl-folder-card:nth-child(even),
 .reorder-items-mode .grid-item-wrap:nth-child(even),
 .reorder-items-mode .hist-item:nth-child(even) {
     animation-delay: -0.15s;
