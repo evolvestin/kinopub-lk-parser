@@ -24,7 +24,21 @@ html {
     --shadow-glow: 0 8px 24px rgba(46, 204, 113, 0.15);
     --transition-bounce: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     --transition-smooth: 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    scrollbar-gutter: stable;
+}
+
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+    -webkit-tap-highlight-color: transparent; 
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 .light {
     --bg-main: #f6f8fa;
@@ -61,7 +75,6 @@ body {
 #views-container {
     flex: 1;
     overflow-y: scroll;
-    scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
     display: block;
     position: relative;
@@ -469,9 +482,14 @@ body.has-banner #app {
     background: rgba(20, 24, 31, 0.8);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: none;
+    mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
 }
-.light .layer-header { background: rgba(246, 248, 250, 0.8); border-bottom-color: rgba(0,0,0,0.05); }
+.light .layer-header {
+    background: rgba(246, 248, 250, 0.8);
+    border-bottom: none;
+}
 
 /* SHOW DETAIL VIEW */
 .hero-container { 
@@ -700,15 +718,17 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     justify-content: space-between;
     align-items: center;
     padding: 10px clamp(16px, 4vw, 20px) 10px;
-    background: rgba(20, 24, 31, 0.55);
+    background: rgba(20, 24, 31, 0.25);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     transition: background var(--transition-smooth);
+    mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
 }
 
 .light .wl-active-header {
     background: rgba(246, 248, 250, 0.85);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: none;
 }
 
 .wl-item-del {

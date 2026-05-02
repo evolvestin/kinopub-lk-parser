@@ -1616,6 +1616,9 @@ def webapp_wishlist_data(request):
             return JsonResponse({'folders': data})
 
         elif action == 'create_folder':
+            if WishlistFolder.objects.filter(user=view_user).count() >= 12:
+                return JsonResponse({'error': 'Достигнут лимит в 12 папок'}, status=400)
+
             name = body.get('name', '').strip() or ''
             icon = body.get('icon', 'folder')
             color = body.get('color', '#60a5fa')

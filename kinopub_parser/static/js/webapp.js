@@ -1848,6 +1848,12 @@ window.selectFolderIcon = function(icon) {
 };
 
 window.openFolderEditModal = function(isEdit = false, folderId = null) {
+    if (!isEdit && wishlistFolders.length >= 12) {
+        document.getElementById('wl-limit-modal').classList.add('show');
+        if (window.navigator.vibrate) window.navigator.vibrate([40, 100, 40]);
+        return;
+    }
+
     editFolderMode = isEdit ? 'edit' : 'create';
     const titleEl = document.getElementById('wl-edit-title');
     const nameInp = document.getElementById('wl-folder-name');
@@ -1880,6 +1886,10 @@ window.openFolderEditModal = function(isEdit = false, folderId = null) {
     renderIconPicker(curIcon);
     
     document.getElementById('wl-edit-modal').classList.add('show');
+};
+
+window.closeLimitModal = function() {
+    document.getElementById('wl-limit-modal').classList.remove('show');
 };
 
 window.closeFolderEditModal = function() {
@@ -2042,6 +2052,7 @@ window.App = {
     addToFolder: window.addToFolder,
     openFolderEditModal: window.openFolderEditModal,
     closeFolderEditModal: window.closeFolderEditModal,
+    closeLimitModal: window.closeLimitModal,
     selectFolderColor: window.selectFolderColor,
     selectFolderIcon: window.selectFolderIcon,
     saveFolderEdit: window.saveFolderEdit,
