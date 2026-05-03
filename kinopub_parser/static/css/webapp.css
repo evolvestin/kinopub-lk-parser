@@ -841,6 +841,12 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
+.reorder-active-state .wl-active-header,
+#view-wishlist:has(.reorder-items-mode) .wl-active-header {
+    mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+}
+
 .reorder-active-state #wl-active-folder-content {
     opacity: 0;
     pointer-events: none;

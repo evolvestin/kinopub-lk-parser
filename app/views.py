@@ -1803,7 +1803,15 @@ def webapp_casino(request):
             return JsonResponse({'history': history})
 
         elif action == 'reset':
-            CasinoSpin.objects.filter(user=view_user).delete()
+            now = timezone.now()
+            ten_minutes_ago = now - timedelta(minutes=10)
+            target_time = now - timedelta(minutes=11)
+            
+            CasinoSpin.objects.filter(
+                user=view_user, 
+                created_at__gte=ten_minutes_ago
+            ).update(created_at=target_time)
+            
             return JsonResponse({'status': 'ok'})
 
         return JsonResponse({'error': 'Invalid action'}, status=400)

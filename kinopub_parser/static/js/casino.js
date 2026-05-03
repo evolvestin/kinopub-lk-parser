@@ -148,7 +148,7 @@ class CasinoEngine {
 
 let engine;
 
-window.openCasino = function() {
+window.openCasino = async function() {
     if (!engine) engine = new CasinoEngine();
     
     const modal = document.getElementById('casino-modal');
@@ -163,11 +163,35 @@ window.openCasino = function() {
     if (headerIcon) headerIcon.innerHTML = '🎰';
     body.style.opacity = '1';
 
+    body.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div>';
+    modal.classList.add('show');
+
+    try {
+        const res = await fetch('/api/webapp/casino/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action: 'status', init_data: tg?.initData || '' })
+        });
+        const data = await res.json();
+
+        if (data.active_spin) {
+            window.renderCasinoResult(data.active_spin.show, data.active_spin.expires);
+        } else {
+            window.showCasinoMainMenu();
+        }
+    } catch(e) {
+        showToast('Ошибка соединения');
+        window.closeCasino();
+    }
+};
+
+window.showCasinoMainMenu = function() {
+    const body = document.getElementById('casino-body');
     body.innerHTML = `
-        <button class="btn-primary" style="margin-bottom:15px;" onclick="window.checkCasinoStatus()">Запустить рулетку</button>
+        <div style="color:var(--accent); font-weight:800; font-size:14px; margin-bottom:15px; text-transform:uppercase; letter-spacing:0.5px;">✅ Рулетка доступна</div>
+        <button class="btn-primary" style="margin-bottom:15px;" onclick="window.showCasinoFolders()">Запустить рулетку</button>
         <button class="btn-primary" style="background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border);" onclick="window.loadCasinoHistory()">История</button>
     `;
-    modal.classList.add('show');
 };
 
 window.checkCasinoStatus = async function() {
@@ -453,7 +477,7 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
 
     btnWatch.onclick = () => { 
         window.closeCasino(); 
-        window.App.openShowLayer(item.show_id); 
+        window.App.openShowLayer(item.show_id || item.id); 
     };
 
     controlsEl.classList.add('active');
@@ -464,8 +488,9 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
 
     const updateExpiredUI = () => {
         if (countdownEl) {
-            countdownEl.textContent = "ГОТОВО";
-            countdownEl.style.color = "var(--accent)";
+            countdownEl.innerHTML = '<button class="btn-primary" style="margin-top: 10px; padding: 10px; font-size: 14px; width: 100%;" onclick="window.showCasinoFolders()">Крутить снова</button>';
+            countdownEl.previousElementSibling.textContent = "✅ РУЛЕТКА ГОТОВА";
+            countdownEl.previousElementSibling.style.color = "var(--accent)";
         }
     };
 
@@ -554,12 +579,15 @@ window.setupCasinoLayout = function() {
                 <img id="cas-poster" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover;">
                 <div id="cas-placeholder" style="display:flex; align-items:center; justify-content:center; height:100%; font-size:100px; font-weight:900; color:var(--accent);">?</div>
             </div>
-            <div class="casino-info-container">
+            <div class="casino-info-container" style="height: auto; padding-bottom: 10px;">
                 <div class="casino-title" id="cas-title"></div>
                 <div class="casino-meta-info" id="cas-meta"></div>
                 <div id="cas-controls" class="casino-controls-reveal">
-                    <button class="btn-primary" id="cas-btn-watch" style="margin-top:0;">Подробнее</button>
-                    <div class="casino-timer-wrap">
+                    <div style="display: flex; gap: 10px; width: 100%;">
+                        <button class="btn-primary" id="cas-btn-watch" style="margin-top:0; flex: 1;">Подробнее</button>
+                        <button class="btn-primary" style="margin-top:0; flex: 1; background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border);" onclick="window.loadCasinoHistory()">История</button>
+                    </div>
+                    <div class="casino-timer-wrap" style="width: 100%;">
                         <div style="font-size:10px; color:var(--accent); font-weight:800; margin-bottom:4px;">СЛЕДУЮЩИЙ ШАНС</div>
                         <div class="casino-timer-clock" id="casino-countdown">10:00</div>
                     </div>
