@@ -474,7 +474,7 @@ class WishlistItem(BaseModel):
         verbose_name = 'Wishlist Item'
         verbose_name_plural = 'Wishlist Items'
         unique_together = ('folder', 'show')
-        ordering = ['sort_order', '-id']
+        ordering = ['-sort_order', '-id']
 
     def __str__(self):
         return f'{self.show.title} in {self.folder.name}'

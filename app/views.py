@@ -1687,8 +1687,9 @@ def webapp_wishlist_data(request):
             order_ids = body.get('order', [])
             folder = WishlistFolder.objects.filter(id=folder_id, user=view_user).first()
             if folder:
+                total = len(order_ids)
                 for idx, item_id in enumerate(order_ids):
-                    WishlistItem.objects.filter(id=item_id, folder=folder).update(sort_order=idx)
+                    WishlistItem.objects.filter(id=item_id, folder=folder).update(sort_order=total - idx)
             return JsonResponse({'status': 'ok'})
 
         return JsonResponse({'error': 'Invalid action'}, status=400)

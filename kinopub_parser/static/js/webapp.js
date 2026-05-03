@@ -130,7 +130,8 @@ const Icons = {
     target: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><circle style="fill:none;" cx="12" cy="12" r="6"></circle><circle style="fill:none;" cx="12" cy="12" r="2"></circle></svg>',
     done: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="20 6 9 17 4 12"></polyline></svg>',
     minus: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
-
+    chevron_down: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>',
+    sort_arrow: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>',
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -1496,6 +1497,7 @@ const FOLDER_ICONS = [
 
 let activeWlFolderId = null;
 let wlViewMode = localStorage.getItem('wl_view_mode') || 'grid';
+let wlSortMode = localStorage.getItem('wl_sort_mode') || 'default';
 let wlFoldersSortable = null;
 let wlItemsSortable = null;
 
@@ -1722,6 +1724,42 @@ function getWlItemHtml(item, viewModeStr, idx) {
     }
 }
 
+window.toggleSortDropdown = function(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('wl-sort-menu');
+    const isVisible = menu.classList.contains('show');
+    
+    document.querySelectorAll('.sort-dropdown-menu').forEach(m => m.classList.remove('show'));
+    
+    if (!isVisible) {
+        // Инъекция иконок в пункты меню при открытии
+        document.getElementById('si-reorder').innerHTML = Icons.reorder;
+        document.getElementById('si-added').innerHTML = Icons.sort_arrow;
+        document.getElementById('si-year').innerHTML = Icons.sort_arrow;
+
+        menu.classList.add('show');
+        const closeHandler = () => {
+            menu.classList.remove('show');
+            document.removeEventListener('click', closeHandler);
+        };
+        setTimeout(() => document.addEventListener('click', closeHandler), 10);
+    }
+};
+
+window.setSortOption = function(type) {
+    let newMode = 'default';
+    
+    if (type === 'added') {
+        newMode = (wlSortMode === 'added_desc') ? 'added_asc' : 'added_desc';
+    } else if (type === 'year') {
+        newMode = (wlSortMode === 'year_desc') ? 'year_asc' : 'year_desc';
+    } else {
+        newMode = 'default';
+    }
+    
+    window.App.setWlSortMode(newMode);
+};
+
 function renderActiveWlFolder() {
     const content = document.getElementById('wl-active-folder-content');
     const titleEl = document.getElementById('wl-active-folder-title');
@@ -1751,10 +1789,48 @@ function renderActiveWlFolder() {
     document.getElementById('wl-vt-grid').classList.toggle('active', wlViewMode === 'grid');
     document.getElementById('wl-vt-list').classList.toggle('active', wlViewMode === 'list');
 
+    const triggerBtn = document.getElementById('wl-sort-trigger');
+    let triggerText = 'Сортировка';
+    let triggerIcon = Icons.reorder;
+    let arrowClass = '';
+
+    if (wlSortMode.startsWith('added')) {
+        triggerText = 'По дате';
+        triggerIcon = Icons.sort_arrow;
+        arrowClass = wlSortMode.endsWith('asc') ? 'rotate-180' : '';
+    } else if (wlSortMode.startsWith('year')) {
+        triggerText = 'По году';
+        triggerIcon = Icons.sort_arrow;
+        arrowClass = wlSortMode.endsWith('asc') ? 'rotate-180' : '';
+    } else {
+        triggerText = 'Порядок';
+        triggerIcon = Icons.reorder;
+    }
+
+    triggerBtn.innerHTML = `
+        <span class="sort-icon-main ${arrowClass}">${triggerIcon}</span>
+        <span class="sort-text-label">${triggerText}</span>
+        <span class="sort-chevron">${Icons.chevron_down}</span>
+    `;
+
+    document.querySelectorAll('.sort-item').forEach(item => {
+        const opt = item.dataset.sort;
+        let isActive = false;
+        if (opt === 'default' && wlSortMode === 'default') isActive = true;
+        if (opt === 'added' && wlSortMode.startsWith('added')) isActive = true;
+        if (opt === 'year' && wlSortMode.startsWith('year')) isActive = true;
+        
+        item.classList.toggle('active', isActive);
+        
+        const arrow = item.querySelector('.sort-arrow-icon');
+        if (arrow && isActive) {
+            arrow.classList.toggle('rotate-180', wlSortMode.endsWith('asc'));
+        }
+    });
+
     const reorderBtn = document.getElementById('wl-items-reorder-btn');
-    
-    reorderBtn.style.display = folder.items.length > 1 ? 'flex' : 'none';
-    if (isItemsReorderMode && folder.items.length <= 1) {
+    reorderBtn.style.display = (folder.items.length > 1 && wlSortMode === 'default') ? 'flex' : 'none';
+    if (isItemsReorderMode && (folder.items.length <= 1 || wlSortMode !== 'default')) {
         toggleItemsReorderMode();
     }
 
@@ -1768,7 +1844,18 @@ function renderActiveWlFolder() {
         return;
     }
 
-    let itemsHtml = folder.items.map((item, idx) => getWlItemHtml(item, wlViewMode, idx)).join('');
+    let renderItems = [...folder.items];
+    if (wlSortMode === 'added_desc') {
+        renderItems.sort((a, b) => new Date(b.added_at) - new Date(a.added_at) || b.id - a.id);
+    } else if (wlSortMode === 'added_asc') {
+        renderItems.sort((a, b) => new Date(a.added_at) - new Date(b.added_at) || a.id - b.id);
+    } else if (wlSortMode === 'year_desc') {
+        renderItems.sort((a, b) => (b.year || 0) - (a.year || 0) || b.id - a.id);
+    } else if (wlSortMode === 'year_asc') {
+        renderItems.sort((a, b) => (a.year || 0) - (b.year || 0) || a.id - b.id);
+    }
+
+    let itemsHtml = renderItems.map((item, idx) => getWlItemHtml(item, wlViewMode, idx)).join('');
     
     if (wlViewMode === 'list') {
         container.innerHTML = `<div class="card" style="margin:0; padding:0; overflow:hidden; border:none; background:transparent;">${itemsHtml}</div>`;
@@ -1778,10 +1865,7 @@ function renderActiveWlFolder() {
 
     if (typeof Sortable !== 'undefined') {
         if(wlItemsSortable) wlItemsSortable.destroy();
-        
         const targetContainer = container.firstChild;
-        const trashEl = document.getElementById('trash-zone');
-
         wlItemsSortable = new Sortable(targetContainer, {
             group: 'wl-items',
             animation: 350,
@@ -1792,42 +1876,25 @@ function renderActiveWlFolder() {
             fallbackClass: 'sortable-fallback',
             ghostClass: 'sortable-ghost',
             onStart: function (evt) {
-                if (trashEl) trashEl.classList.add('visible');
                 if (window.navigator.vibrate) window.navigator.vibrate(10);
                 document.body.classList.add('sorting-active');
-
-                requestAnimationFrame(() => {
-                    const fallback = document.querySelector('.sortable-fallback');
-                    if (fallback) {
-                        fallback.style.width = evt.item.offsetWidth + 'px';
-                        fallback.style.height = evt.item.offsetHeight + 'px';
-                        
-                        const animatedChildren = fallback.querySelectorAll('.wiggle, .grid-item-wrap, .hist-item, .grid-item, .anim-item');
-                        animatedChildren.forEach(el => {
-                            el.style.animation = 'none';
-                        });
-                    }
-                });
             },
             onEnd: function (evt) {
-                if (trashEl) trashEl.classList.remove('visible');
                 document.body.classList.remove('sorting-active');
-                
-                if (evt.to === document.getElementById('trash-zone')) return;
-                
                 if (evt.to === targetContainer) {
                     const order = Array.from(targetContainer.children).map(el => parseInt(el.dataset.id));
-                    folder.items.sort((a,b) => order.indexOf(a.id) - order.indexOf(b.id));
                     sendWishlistAction('reorder_items', { folder_id: activeWlFolderId, order });
                 }
-            },
-            onUnchoose: function() {
-                if (trashEl) trashEl.classList.remove('visible');
-                document.body.classList.remove('sorting-active');
             }
         });
     }
 }
+
+window.setWlSortMode = function(mode) {
+    wlSortMode = mode;
+    localStorage.setItem('wl_sort_mode', mode);
+    renderActiveWlFolder();
+};
 
 window.setWlViewMode = function(mode) {
     wlViewMode = mode;
@@ -2094,6 +2161,7 @@ window.App = {
     deleteActiveFolder: window.deleteActiveFolder,
     selectWlFolder: window.selectWlFolder,
     setWlViewMode: window.setWlViewMode,
+    setWlSortMode: window.setWlSortMode,
     removeWlItem: window.removeWlItem,
     toggleReorderMode: window.toggleReorderMode,
     toggleItemsReorderMode: window.toggleItemsReorderMode,
