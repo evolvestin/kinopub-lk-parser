@@ -149,7 +149,7 @@
                             <div class="stat-val" id="s-wl-added">0</div>
                             <div class="stat-lbl">Добавлено в избранное</div>
                         </div>
-                        <div class="stat anim-item" style="animation-delay: 0.3s">
+                        <div class="stat anim-item clickable" style="animation-delay: 0.3s" onclick="window.App.openHistoryLayer('wishlist_watched', 'Просмотрено из избранного')">
                             <div class="stat-icon" id="ic-check"></div>
                             <div class="stat-val" id="s-wl-watched">0</div>
                             <div class="stat-lbl">Просмотрено из избранного</div>
@@ -360,8 +360,8 @@
     <div class="modal-overlay" id="wl-item-delete-modal">
         <div class="modal-content" style="text-align: center; padding: 24px; position: relative;">
             <div class="modal-title" style="margin-bottom: 16px; font-size: 18px; font-weight: 800;">Удаление из избранного</div>
-            <div style="font-size: 15px; color: var(--text-secondary); margin-bottom: 20px;">
-                Вы уверены, что хотите удалить фильм из списка?
+            <div id="wl-delete-confirm-text" style="font-size: 15px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.4;">
+                Вы уверены, что хотите удалить это шоу из списка?
             </div>
             <div style="position: relative; margin-bottom: 24px;">
                 <div id="wl-stats-informer" class="wl-help-popover">

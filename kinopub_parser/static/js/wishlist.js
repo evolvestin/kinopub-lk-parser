@@ -412,14 +412,65 @@ window.App = {
         const el = document.querySelector(`.hist-item[data-id="${id}"], .grid-item-wrap[data-id="${id}"]`);
         itemToDeleteId = id;
         itemToDeleteElement = el;
+
+        const item = wishlistFolders.flatMap(f => f.items).find(i => i.id === id);
+        if (item) {
+            const typeMap = {
+                'Series': 'сериал',
+                'Movie': 'фильм',
+                'Concert': 'концерт',
+                'Documentary Movie': 'док. фильм',
+                'Documentary Series': 'док. сериал',
+                'TV Show': 'ТВ-шоу',
+                '3D Movie': '3D фильм'
+            };
+            const ruType = typeMap[item.type] || 'шоу';
+            const textEl = document.getElementById('wl-delete-confirm-text');
+            if (textEl) {
+                textEl.innerHTML = `Вы уверены, что хотите удалить ${ruType} <b style="color:var(--text-primary)">«${item.title}»</b> из списка?`;
+            }
+        }
+
         document.getElementById('wl-del-keep-stats').checked = true;
         document.getElementById('wl-item-delete-modal').classList.add('show');
     },
     removeWlItem: function (id, element) {
         itemToDeleteId = id;
         itemToDeleteElement = element;
-        document.getElementById('wl-del-keep-stats').checked = true;
-        document.getElementById('wl-item-delete-modal').classList.add('show');
+        window.App.confirmDeleteWlItem(id);
+    },
+    removeWlStatItem: function(itemId, el) {
+        const msg = "Вы уверены? Это действие безвозвратно удалит шоу из статистики избранного.";
+        
+        if (window.Telegram?.WebApp?.showConfirm) {
+            window.Telegram.WebApp.showConfirm(msg, async function(confirmed) {
+                if (confirmed) await performDelete(itemId, el);
+            });
+        } else {
+            if (confirm(msg)) performDelete(itemId, el);
+        }
+
+        async function performDelete(id, element) {
+            if (element) {
+                element.style.transition = 'all 0.3s ease';
+                element.style.opacity = '0';
+                element.style.transform = 'scale(0.8)';
+                setTimeout(() => element.remove(), 300);
+            }
+            try {
+                await sendWishlistAction('remove_item', { item_id: id, keep_stats: false });
+                
+                const counterEl = document.getElementById('s-wl-watched');
+                if (counterEl) {
+                    let current = parseInt(counterEl.textContent) || 0;
+                    if (current > 0) counterEl.textContent = current - 1;
+                }
+                
+                if (D && D.wishlist_watched_items) {
+                    D.wishlist_watched_items = D.wishlist_watched_items.filter(i => i.wl_item_id !== id);
+                }
+            } catch (e) {}
+        }
     },
     closeItemDeleteModal: function () {
         document.getElementById('wl-item-delete-modal').classList.remove('show');

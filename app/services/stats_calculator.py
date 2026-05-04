@@ -495,7 +495,7 @@ def _get_weekday_chart(base_qs):
 
 
 def generate_user_stats(user, year=None):
-    cache_key = f'user_stats_v5:{user.id}:{year or "all"}'
+    cache_key = f'user_stats_v6:{user.id}:{year or "all"}'
     cached = cache.get(cache_key)
     if cached:
         return cached
@@ -516,7 +516,17 @@ def generate_user_stats(user, year=None):
         .distinct()
     )
 
-    all_years = sorted(list(set(history_years) | set(rating_years)), reverse=True)
+    wishlist_years = (
+        WishlistItem.objects.filter(Q(user=user) | Q(folder__user=user, user__isnull=True))
+        .annotate(y=ExtractYear('created_at'))
+        .values_list('y', flat=True)
+        .distinct()
+    )
+
+    all_years = sorted(
+        list(set(history_years) | set(rating_years) | set(wishlist_years)), 
+        reverse=True
+    )
 
     is_redundant = len(all_years) == 1 and all_years[0] == current_yr
     if is_redundant:
@@ -587,11 +597,34 @@ def generate_user_stats(user, year=None):
         include_in_stats=True
     )
     
-    summary['wishlist_added'] = user_wl_items.count()
-    summary['wishlist_watched'] = user_wl_items.filter(
+    added_qs = user_wl_items
+    watched_qs = user_wl_items.filter(
         show__viewhistory__users=user, 
         show__viewhistory__is_checked=True
-    ).distinct().count()
+    )
+
+    if year:
+        added_qs = added_qs.filter(created_at__year=year)
+        watched_qs = watched_qs.filter(show__viewhistory__view_date__year=year)
+
+    summary['wishlist_added'] = added_qs.count()
+
+    watched_items_qs = watched_qs.distinct().select_related('show')
+    wishlist_watched_items = []
+    for wl_item in watched_items_qs:
+        wishlist_watched_items.append({
+            'wl_item_id': wl_item.id,
+            'show_id': wl_item.show.id,
+            'show__title': wl_item.show.title,
+            'show__original_title': wl_item.show.original_title,
+            'show__year': wl_item.show.year,
+            'poster_url': get_poster_url(wl_item.show.id),
+            'view_date': timezone.localtime(wl_item.created_at).strftime('%Y-%m-%d'),
+            'user_names': [],
+            'user_photos': [],
+        })
+
+    summary['wishlist_watched'] = len(wishlist_watched_items)
 
     if is_redundant and str(year) == str(current_yr):
         summary['period_label'] = 'Все время'
@@ -620,6 +653,7 @@ def generate_user_stats(user, year=None):
             'weekday_chart': {'labels': [], 'data': []},
             'history_movies': [],
             'history_episodes': [],
+            'wishlist_watched_items': wishlist_watched_items,
             'ratings': {
                 'total': total_ratings,
                 'avg': round(avg_rating, 1),
@@ -714,6 +748,7 @@ def generate_user_stats(user, year=None):
         'weekday_chart': _get_weekday_chart(base_qs),
         'history_movies': movies_history,
         'history_episodes': episodes_history,
+        'wishlist_watched_items': wishlist_watched_items,
         'ratings': {
             'total': total_ratings,
             'avg': round(avg_rating, 1),

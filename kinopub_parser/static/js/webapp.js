@@ -1,4 +1,44 @@
 window.App = window.App || {};
+
+window.AppData = {
+    cache: new Map(),
+    isPreloading: false,
+    
+    getCacheKey(year) {
+        const uid = D?.meta?.id || 'anon';
+        return `ks_cache_${uid}_${year || 'all'}`;
+    },
+
+    saveToCache(year, data) {
+        if (window.IS_DEBUG) return;
+        const key = this.getCacheKey(year);
+        this.cache.set(key, data);
+        try {
+            sessionStorage.setItem(key, JSON.stringify({
+                data: data,
+                ts: Date.now()
+            }));
+        } catch (e) { console.warn('Cache save failed', e); }
+    },
+
+    getFromCache(year) {
+        if (window.IS_DEBUG) return null;
+        const key = this.getCacheKey(year);
+        if (this.cache.has(key)) return this.cache.get(key);
+        
+        const stored = sessionStorage.getItem(key);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            // Кэш валиден 30 минут в рамках сессии
+            if (Date.now() - parsed.ts < 30 * 60 * 1000) {
+                this.cache.set(key, parsed.data);
+                return parsed.data;
+            }
+        }
+        return null;
+    }
+};
+
 window.handleImgErr = function (img, fallbackUrl, name) {
     if (fallbackUrl && !img.dataset.fallbackTried) {
         img.dataset.fallbackTried = 'true';
@@ -303,29 +343,77 @@ async function loadShared(statId) {
     }
 }
 
-async function load(year) {
+async function load(year, isBackground = false) {
     if (year === undefined || year === null) year = curYear;
     curYear = year;
-    document.getElementById('loader').classList.remove('hidden');
+
+    // 1. Проверяем кэш
+    const cachedData = window.AppData.getFromCache(year);
+    if (cachedData) {
+        D = cachedData;
+        render();
+        // Если это не фоновая загрузка, мы уже все показали, лоадер не нужен
+        if (!isBackground) {
+            hideLoader();
+            return; 
+        }
+    }
+
+    // 2. Если данных нет или это фоновое обновление
+    if (!isBackground) {
+        document.getElementById('loader').classList.remove('hidden');
+        document.getElementById('loader').style.opacity = '1';
+    }
+
     try {
-        const p = year && year !== 'all' ? { period_type:'year', period_value: year } : { period_type:'year', period_value: 0 };
-        const r = await fetch('/api/webapp/detailed_stats/', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ...p, init_data: tg?.initData||'' }) });
-        if (!r.ok) throw new Error(`Ошибка HTTP сервера: ${r.status}`);
+        const p = year && year !== 'all' ? { period_type: 'year', period_value: year } : { period_type: 'year', period_value: 0 };
+        const r = await fetch('/api/webapp/detailed_stats/', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ ...p, init_data: tg?.initData || '' }) 
+        });
+        
+        if (!r.ok) throw new Error(`Server error: ${r.status}`);
         const j = await r.json();
         if (j.error) throw new Error(j.error);
         
         D = j;
+        window.AppData.saveToCache(year, j);
+        
         if (!availableYears.length && D.meta?.years) {
             availableYears = [...D.meta.years];
+            // После получения списка всех лет запускаем фоновую предзагрузку
+            preloadAllPeriods();
         }
+        
         render();
-    } catch(e) { 
+    } catch (e) { 
         console.error('Load error:', e); 
-        document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Ошибка загрузки данных:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
-        document.getElementById('app').classList.remove('hidden');
+        if (!isBackground) {
+            document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center;"><div style="font-size: 40px;">❌</div>Ошибка загрузки</div>`;
+        }
     } finally { 
-        hideLoader();
+        if (!isBackground) hideLoader();
     }
+}
+
+async function preloadAllPeriods() {
+    if (window.AppData.isPreloading || window.IS_DEBUG) return;
+    window.AppData.isPreloading = true;
+
+    const yearsToLoad = availableYears.filter(y => y !== curYear);
+    
+    for (const year of yearsToLoad) {
+        if (!window.AppData.getFromCache(year)) {
+            // Небольшая задержка, чтобы не спамить сервер одновременно
+            await new Promise(res => setTimeout(res, 1000));
+            await load(year, true);
+        }
+    }
+    
+    // Возвращаем curYear в исходное состояние, так как load его меняет
+    curYear = document.querySelector('#years .yr.on')?.textContent.trim() || 'all';
+    if (curYear === 'Всё время') curYear = 'all';
 }
 
 function hideLoader() {
@@ -556,11 +644,24 @@ function markYear() {
 }
 
 window.pickYear = y => { 
+    if (curYear === y) return;
+    
     curYear = y; 
     markYear(); 
+    
     if (isSharedMode) {
         D = SharedDataMap[y];
         render();
+        return;
+    }
+
+    // Проверяем кэш прямо здесь для мгновенного отклика
+    const cached = window.AppData.getFromCache(y);
+    if (cached) {
+        D = cached;
+        render();
+        // Прокручиваем наверх при смене года
+        getScrollContainer().scrollTop = 0;
     } else {
         load(y); 
     }
@@ -710,18 +811,21 @@ function fillBinges() {
 }
 
 function renderCharts() { 
-    if (typeof Chart === 'undefined') {
-        console.warn('Chart.js не загружен. Отрисовка графиков пропущена.');
-        return;
-    }
-    try {
-        renderMonthly(); 
-        renderWeekday(); 
-        renderDonut('c-genre', 'legend-genre', D.genres, 'genres_top', D.summary.total_minutes_watched);
-        if (D.group) renderDonut('c-group-genre', 'legend-group-genre', D.group.genres, 'group_genres_top', D.group.total_minutes_watched);
-    } catch (e) {
-        console.error('Ошибка при отрисовке графиков:', e);
-    }
+    if (typeof Chart === 'undefined') return;
+    
+    // Используем requestAnimationFrame для плавности при быстром переключении
+    requestAnimationFrame(() => {
+        try {
+            renderMonthly(); 
+            renderWeekday(); 
+            renderDonut('c-genre', 'legend-genre', D.genres, 'genres_top', D.summary.total_minutes_watched);
+            if (D.group) {
+                renderDonut('c-group-genre', 'legend-group-genre', D.group.genres, 'group_genres_top', D.group.total_minutes_watched);
+            }
+        } catch (e) {
+            console.error('Chart render error:', e);
+        }
+    });
 }
 
 const fSizeAx = Math.max(10, Math.min(13, window.innerWidth * 0.03));
@@ -831,6 +935,9 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
     else if (type === 'episodes') { 
         curHistData = D.history_episodes; 
     } 
+    else if (type === 'wishlist_watched') {
+        curHistData = D.wishlist_watched_items || [];
+    }
     else if (type === 'filter') { 
         const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] : [...D.history_movies, ...D.history_episodes]; 
         const allowedIds = D[extraKey][extraIndex].show_ids || []; 
@@ -937,6 +1044,11 @@ function getHistoryItemHtml(item, idx, type, mode) {
     const animClass = 'anim-item';
     const style = `style="animation-delay: ${delay}s"`;
 
+    let deleteBtn = '';
+    if (type === 'wishlist_watched') {
+        deleteBtn = `<div class="wl-delete-badge" style="opacity:1; transform:scale(1); pointer-events:auto; background:var(--danger);" onclick="event.stopPropagation(); window.App.removeWlStatItem(${item.wl_item_id}, this.closest('.grid-item-wrap') || this.closest('.hist-item'))">${Icons.trash}</div>`;
+    }
+
     if (mode === 'list') {
         if (type === 'ratings') {
             const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
@@ -951,7 +1063,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
             if (item.season_number > 0) metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
             if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
             const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
-            return `<div class="hist-item clickable ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
+            return `<div class="hist-item clickable ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})">${deleteBtn}${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
         }
     } else {
         const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
@@ -978,7 +1090,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
                 }
                 usersHtml = `<div class="grid-users">${avatars}</div>`;
             }
-            return `<div class="grid-item-wrap ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})"><div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
+            return `<div class="grid-item-wrap ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})">${deleteBtn}<div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
         }
     }
 }
