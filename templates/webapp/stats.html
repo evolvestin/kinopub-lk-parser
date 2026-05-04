@@ -62,19 +62,19 @@
                         <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
                             
                             <div class="sort-dropdown-container">
-                                <button id="wl-sort-trigger" class="sort-trigger-btn" onclick="toggleSortDropdown(event)">
+                                <button id="wl-sort-trigger" class="sort-trigger-btn" onclick="window.App.toggleSortDropdown(event)">
                                     <!-- Содержимое генерируется в JS -->
                                 </button>
                                 <div id="wl-sort-menu" class="sort-dropdown-menu">
-                                    <div class="sort-item" data-sort="default" onclick="setSortOption('default')">
+                                    <div class="sort-item" data-sort="default" onclick="window.App.setSortOption('default')">
                                         <span class="icon-box" id="si-reorder"></span>
                                         <span>Ручной порядок</span>
                                     </div>
-                                    <div class="sort-item" data-sort="added" onclick="setSortOption('added')">
+                                    <div class="sort-item" data-sort="added" onclick="window.App.setSortOption('added')">
                                         <span class="sort-arrow-icon" id="si-added"></span>
                                         <span>Дата добавления</span>
                                     </div>
-                                    <div class="sort-item" data-sort="year" onclick="setSortOption('year')">
+                                    <div class="sort-item" data-sort="year" onclick="window.App.setSortOption('year')">
                                         <span class="sort-arrow-icon" id="si-year"></span>
                                         <span>Год выпуска</span>
                                     </div>
@@ -372,6 +372,7 @@
     </div>
 
     <script src="{% static 'js/webapp.js' %}"></script>
+    <script src="{% static 'js/wishlist.js' %}"></script>
     <script>
         if (typeof init === 'function') {
             init();
