@@ -7,20 +7,17 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <style>
-    /* Восстановление отступов Django Admin, если они были сброшены через webapp.css */
     #header { padding: 10px 40px; }
     .breadcrumbs { padding: 10px 40px; margin: 0; }
     #content { padding: 20px 40px; }
     .module h2, .module caption { margin: 0; padding: 5px 10px; }
     
-    /* Область для компонентов WebApp */
     .webapp-container { max-width: 1400px; margin: 0 auto; padding-top: 20px; }
     .wa-nav-links { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
     .wa-nav-btn { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); padding: 8px 16px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; transition: transform 0.2s, background 0.2s; }
     .wa-nav-btn:hover { background: var(--border); transform: translateY(-2px); }
     .wa-nav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
     
-    /* Дополнительные корректировки для элементов админки */
     .admin-models-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
     .admin-li { padding: 10px 16px; border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; }
     .admin-li:last-child { border: none; }
@@ -174,9 +171,9 @@
     </div>
 </div>
 
-<script src="{% static 'js/webapp.js' %}"></script>
+<script src="{% static 'js/core.js' %}"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
+    function initAdminDash() {
         const globalStats = {{ global_stats_json|safe }};
         D = globalStats;
         
@@ -262,8 +259,21 @@
             document.getElementById('ratings-box').style.display = 'none';
         }
 
-        window.openHistoryLayer = function() { console.log('Layers disabled in admin'); };
+        window.openHistoryLayer = function() {};
         renderCharts();
-    });
+    }
+
+    let hasInitialized = false;
+    function checkReady() {
+        if (hasInitialized) return;
+        if (window.CORE_IS_LOADED && (document.readyState === 'interactive' || document.readyState === 'complete')) {
+            hasInitialized = true;
+            initAdminDash();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', checkReady);
+    window.addEventListener('core_loaded', checkReady);
+    checkReady();
 </script>
 {% endblock %}

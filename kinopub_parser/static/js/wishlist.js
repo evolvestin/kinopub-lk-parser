@@ -1,3 +1,4 @@
+window.App = window.App || {};
 let folderLongPressTimer;
 let isFolderLongPress = false;
 let itemLongPressTimer;

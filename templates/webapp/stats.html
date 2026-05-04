@@ -11,7 +11,6 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <link rel="stylesheet" href="{% static 'css/webapp.css' %}">
     <link rel="stylesheet" href="{% static 'css/casino.css' %}">
-    <script src="{% static 'js/casino.js' %}"></script>
     <script>
         window.IS_DEBUG = {{ is_debug|yesno:"true,false" }};
     </script>
@@ -22,7 +21,6 @@
     
     <div id="app" class="hidden">
         <div id="views-container">
-            <!-- Поиск -->
             <div class="view active-view" id="view-search" style="display: none;">
                 <div id="search-results">
                     <div class="empty">
@@ -38,7 +36,6 @@
                 </div>
             </div>
 
-            <!-- Избранное / Вишлист -->
             <div class="view" id="view-wishlist" style="display: none;">
                 <div class="header" style="padding-bottom: 8px;">
                     <div class="header-name glow-text" id="wl-main-header">Избранное</div>
@@ -63,7 +60,6 @@
                             
                             <div class="sort-dropdown-container">
                                 <button id="wl-sort-trigger" class="sort-trigger-btn" onclick="window.App.toggleSortDropdown(event)">
-                                    <!-- Содержимое генерируется в JS -->
                                 </button>
                                 <div id="wl-sort-menu" class="sort-dropdown-menu">
                                     <div class="sort-item" data-sort="default" onclick="window.App.setSortOption('default')">
@@ -93,7 +89,6 @@
                 </div>
             </div>
 
-            <!-- Статистика -->
             <div class="view" id="view-stats" style="display: none;">
                 <div class="header">
                     <div class="header-left">
@@ -271,7 +266,6 @@
         </div>
     </div>
 
-    <!-- Модальные окна -->
     <div class="modal-overlay" id="share-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -341,14 +335,7 @@
     <div class="modal-overlay" id="casino-modal">
         <div class="modal-content casino-modal-content">
             <canvas id="casino-canvas" style="position:absolute; inset:0; pointer-events:none; z-index:100;"></canvas>
-
-            <button id="casino-debug-reset" 
-                    class="casino-debug-reset" 
-                    style="display: none;" 
-                    onclick="window.App.resetCasino()">
-                DEBUG: RESET
-            </button>
-
+            <button id="casino-debug-reset" class="casino-debug-reset" style="display: none;" onclick="window.App.resetCasino()">DEBUG: RESET</button>
             <div class="modal-header">
                 <div class="modal-title" style="color:var(--accent); display:flex; align-items:center; gap:8px;">
                     <span id="casino-header-icon"></span>
@@ -371,16 +358,22 @@
         </div>
     </div>
 
-    <script src="{% static 'js/webapp.js' %}"></script>
-    <script src="{% static 'js/wishlist.js' %}"></script>
+    <script src="{% static 'js/casino.js' %}" defer></script>
+    <script src="{% static 'js/wishlist.js' %}" defer></script>
+    <script src="{% static 'js/webapp.js' %}" defer></script>
+
     <script>
-        if (typeof init === 'function') {
-            init();
-        } else {
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('app').innerHTML = '<div style="padding: 40px; text-align: center; color: #e74c3c;"><b>Критическая ошибка загрузки.</b></div>';
-            document.getElementById('app').classList.remove('hidden');
-        }
+        // Теперь нам не нужно ждать кастомного события 'core_loaded'.
+        // Атрибут defer гарантирует, что скрипты выполнятся к моменту DOMContentLoaded.
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof init === 'function') {
+                init();
+            } else {
+                // Фоллбэк на случай критической ошибки
+                const loader = document.getElementById('loader');
+                if (loader) loader.classList.add('hidden');
+            }
+        });
     </script>
 </body>
 </html>

@@ -1689,7 +1689,9 @@ def webapp_wishlist_data(request):
             if folder:
                 total = len(order_ids)
                 for idx, item_id in enumerate(order_ids):
-                    WishlistItem.objects.filter(id=item_id, folder=folder).update(sort_order=total - idx)
+                    WishlistItem.objects.filter(id=item_id, folder=folder).update(
+                        sort_order=total - idx
+                    )
             return JsonResponse({'status': 'ok'})
 
         return JsonResponse({'error': 'Invalid action'}, status=400)
@@ -1807,12 +1809,11 @@ def webapp_casino(request):
             now = timezone.now()
             ten_minutes_ago = now - timedelta(minutes=10)
             target_time = now - timedelta(minutes=11)
-            
-            CasinoSpin.objects.filter(
-                user=view_user, 
-                created_at__gte=ten_minutes_ago
-            ).update(created_at=target_time)
-            
+
+            CasinoSpin.objects.filter(user=view_user, created_at__gte=ten_minutes_ago).update(
+                created_at=target_time
+            )
+
             return JsonResponse({'status': 'ok'})
 
         return JsonResponse({'error': 'Invalid action'}, status=400)

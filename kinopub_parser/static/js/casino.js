@@ -1,3 +1,4 @@
+window.App = window.App || {};
 class CasinoEngine {
     constructor() {
         this.canvas = document.getElementById('casino-canvas');

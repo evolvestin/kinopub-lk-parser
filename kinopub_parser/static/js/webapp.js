@@ -1,3 +1,4 @@
+window.App = window.App || {};
 window.handleImgErr = function (img, fallbackUrl, name) {
     if (fallbackUrl && !img.dataset.fallbackTried) {
         img.dataset.fallbackTried = 'true';
@@ -131,15 +132,12 @@ function toggleTheme() {
 }
 
 (function initTheme() {
-    if (tg && tg.colorScheme === 'light') isDark = false;
+    if (window.tg && tg.colorScheme === 'light') isDark = false;
     const stored = localStorage.getItem('kt');
     if (stored === 'l') isDark = false;
     if (stored === 'd') isDark = true;
     
     if (!isDark) document.body.classList.add('light');
-    document.addEventListener("DOMContentLoaded", () => {
-        document.querySelectorAll('.theme-btn').forEach(btn => btn.innerHTML = isDark ? Icons.moon : Icons.sun);
-    });
 })();
 
 function cc() {
@@ -1424,6 +1422,7 @@ async function submitShare() {
 }
 
 window.App = {
+    ...window.App,
     toggleTheme: toggleTheme,
     openShareModal: openShareModal,
     closeShareModal: closeShareModal,
@@ -1444,4 +1443,41 @@ window.App = {
     closeCasino: window.closeCasino,
     resetCasino: window.resetCasino,
     startCasinoSpin: window.startCasinoSpin,
+};
+
+window.init = async function() {
+    // 1. Устанавливаем иконки темы
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.innerHTML = isDark ? Icons.moon : Icons.sun;
+    });
+
+    // 2. Инициализируем иконки интерфейса
+    initIcons();
+
+    // 3. Запускаем основную логику загрузки данных
+    const startParam = tg?.initDataUnsafe?.start_param || '';
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedIdFromUrl = urlParams.get('shared_id');
+    const showIdFromUrl = urlParams.get('show_id') || (startParam.startsWith('show_') ? startParam.replace('show_', '') : null);
+    const viewFromUrl = urlParams.get('view');
+
+    if (sharedIdFromUrl || startParam.startsWith('stat_')) {
+        isSharedMode = true;
+        document.body.classList.add('has-banner');
+        document.getElementById('share-btn').classList.add('hidden');
+        document.getElementById('bottom-nav').style.display = 'none';
+        switchMainView('stats');
+        
+        const sid = sharedIdFromUrl || startParam.replace('stat_', '');
+        await loadShared(sid);
+    } else {
+        await load();
+        const role = D?.meta?.role || 'guest';
+        document.getElementById('bottom-nav').style.display = 'flex';
+        document.body.classList.add('has-nav');
+        if (role === 'guest') document.getElementById('bn-stats').classList.add('hidden');
+        
+        switchMainView(viewFromUrl || 'search');
+        if (showIdFromUrl) window.App.openShowLayer(showIdFromUrl);
+    }
 };
