@@ -175,11 +175,11 @@ function renderActiveWlFolder() {
 
     if (!activeWlFolderId) {
         if (mainHeader) mainHeader.textContent = 'Избранное';
-        content.style.display = 'none';
+        if (content) content.style.display = 'none';
         return;
     }
 
-    content.style.display = 'block';
+    if (content) content.style.display = 'block';
     const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
 
     if (mainHeader) {

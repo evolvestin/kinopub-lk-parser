@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Max, Q, Prefetch
+from django.db.models import Max, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -1675,7 +1675,8 @@ def webapp_wishlist_data(request):
                 item.save(update_fields=['is_active', 'include_in_stats', 'user'])
             else:
                 max_order = (
-                    WishlistItem.objects.filter(folder=folder).aggregate(m=Max('sort_order'))['m'] or 0
+                    WishlistItem.objects.filter(folder=folder).aggregate(m=Max('sort_order'))['m']
+                    or 0
                 )
                 WishlistItem.objects.create(
                     user=view_user, folder=folder, show=show, sort_order=max_order + 1
@@ -1837,3 +1838,43 @@ def webapp_casino(request):
 
         logging.error(f'Casino API Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@staff_member_required
+@require_http_methods(['GET'])
+def admin_get_folder_content(request, folder_id):
+    """API для админки: получение содержимого папки без TG-авторизации."""
+    try:
+        folder = WishlistFolder.objects.get(id=folder_id)
+        items_qs = (
+            WishlistItem.objects.filter(folder=folder, is_active=True)
+            .select_related('show')
+            .order_by('-sort_order', '-id')
+        )
+
+        items_data = []
+        for item in items_qs:
+            items_data.append(
+                {
+                    'id': item.id,
+                    'show_id': item.show.id,
+                    'title': item.show.title,
+                    'original_title': item.show.original_title,
+                    'year': item.show.year,
+                    'type': item.show.type,
+                    'poster_url': get_poster_url(item.show.id, 'small'),
+                    'added_at': item.created_at.strftime('%Y-%m-%d'),
+                }
+            )
+
+        return JsonResponse(
+            {
+                'id': folder.id,
+                'name': folder.name,
+                'icon': folder.icon,
+                'color': folder.color,
+                'items': items_data,
+            }
+        )
+    except WishlistFolder.DoesNotExist:
+        return JsonResponse({'error': 'Folder not found'}, status=404)

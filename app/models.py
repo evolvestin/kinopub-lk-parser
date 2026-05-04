@@ -467,8 +467,12 @@ class WishlistFolder(BaseModel):
 
 
 class WishlistItem(BaseModel):
-    user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='wishlist_items', null=True, blank=True)
-    folder = models.ForeignKey(WishlistFolder, on_delete=models.SET_NULL, null=True, blank=True, related_name='items')
+    user = models.ForeignKey(
+        ViewUser, on_delete=models.CASCADE, related_name='wishlist_items', null=True, blank=True
+    )
+    folder = models.ForeignKey(
+        WishlistFolder, on_delete=models.SET_NULL, null=True, blank=True, related_name='items'
+    )
     show = models.ForeignKey(Show, on_delete=models.CASCADE)
     sort_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)

@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0039_casinospin'),
     ]
@@ -13,7 +12,11 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AlterModelOptions(
             name='wishlistitem',
-            options={'ordering': ['-sort_order', '-id'], 'verbose_name': 'Wishlist Item', 'verbose_name_plural': 'Wishlist Items'},
+            options={
+                'ordering': ['-sort_order', '-id'],
+                'verbose_name': 'Wishlist Item',
+                'verbose_name_plural': 'Wishlist Items',
+            },
         ),
         migrations.AlterUniqueTogether(
             name='wishlistitem',
@@ -37,11 +40,23 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='wishlistitem',
             name='user',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='wishlist_items', to='app.viewuser'),
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name='wishlist_items',
+                to='app.viewuser',
+            ),
         ),
         migrations.AlterField(
             model_name='wishlistitem',
             name='folder',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='items', to='app.wishlistfolder'),
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name='items',
+                to='app.wishlistfolder',
+            ),
         ),
     ]

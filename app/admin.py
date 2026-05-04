@@ -1818,12 +1818,58 @@ class WishlistItemInline(admin.TabularInline):
 
 @admin.register(WishlistFolder, site=admin_site)
 class WishlistFolderAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'sort_order', 'created_at')
-    list_filter = ('user',)
+    list_display = ('name', 'user', 'get_items_count', 'sort_order', 'created_at')
+    list_filter = ('user', 'is_deleted')
     search_fields = ('name', 'user__username', 'user__name')
     autocomplete_fields = ('user',)
     inlines = [WishlistItemInline]
     ordering = ('user', 'sort_order')
+    readonly_fields = ('created_at', 'updated_at', 'folder_preview')
+
+    fieldsets = (
+        (None, {'fields': ('user', 'name', 'is_deleted')}),
+        ('Оформление', {'fields': ('icon', 'color', 'sort_order')}),
+        (
+            'Содержимое папки',
+            {
+                'fields': ('folder_preview',),
+                'description': 'Интерактивный предпросмотр содержимого из WebApp',
+            },
+        ),
+        ('Даты', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+    )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(items_count=Count('items', filter=Q(items__is_active=True)))
+        )
+
+    @admin.display(description='Items', ordering='items_count')
+    def get_items_count(self, obj):
+        return obj.items_count
+
+    @admin.display(description='Предпросмотр контента')
+    def folder_preview(self, obj):
+        if not obj.id:
+            return 'Сохраните папку, чтобы увидеть содержимое.'
+        return format_html(
+            '<div id="view-wishlist" class="admin-wishlist-integration">'
+            '  <div id="wl-active-folder-content">'
+            '    <div class="wl-active-header" style="background: var(--primary); padding: 10px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--border-color);">'
+            '        <div id="wl-active-folder-title" style="font-weight: 800; display: flex; align-items: center; gap: 8px; color: var(--primary-fg);"></div>'
+            '        <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">'
+            '            <div class="view-toggle" style="margin: 0; padding: 2px; background: var(--secondary);">'
+            '                <button type="button" class="vt-btn active" id="wl-vt-grid" onclick="window.App.setWlViewMode(\'grid\')"></button>'
+            '                <button type="button" class="vt-btn" id="wl-vt-list" onclick="window.App.setWlViewMode(\'list\')"></button>'
+            '            </div>'
+            '        </div>'
+            '    </div>'
+            '    <div id="wl-items-container"></div>'
+            '  </div>'
+            '</div>'
+        )
 
 
 @admin.register(CasinoSpin, site=admin_site)

@@ -796,6 +796,10 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     cursor: pointer;
 }
 
+.wl-delete-badge:active {
+    transform: scale(0.95) !important;
+}
+
 .wl-delete-badge svg {
     width: 14px;
     height: 14px;

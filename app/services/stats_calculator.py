@@ -18,7 +18,6 @@ from django.db.models import (
     Sum,
     When,
 )
-from app.models import WishlistItem
 from django.db.models.functions import (
     Coalesce,
     ExtractMonth,
@@ -335,7 +334,7 @@ def _get_heatmap(dur_qs, year, all_years):
         years_to_process = [int(year)]
     else:
         years_to_process = [int(y) for y in all_years if str(y).isdigit()]
-        
+
     result = []
 
     data = {
@@ -524,8 +523,7 @@ def generate_user_stats(user, year=None):
     )
 
     all_years = sorted(
-        list(set(history_years) | set(rating_years) | set(wishlist_years)), 
-        reverse=True
+        list(set(history_years) | set(rating_years) | set(wishlist_years)), reverse=True
     )
 
     is_redundant = len(all_years) == 1 and all_years[0] == current_yr
@@ -593,14 +591,12 @@ def generate_user_stats(user, year=None):
     summary = _get_yearly_summary(base_qs, dur_qs, year)
 
     user_wl_items = WishlistItem.objects.filter(
-        Q(user=user) | Q(folder__user=user, user__isnull=True),
-        include_in_stats=True
+        Q(user=user) | Q(folder__user=user, user__isnull=True), include_in_stats=True
     )
-    
+
     added_qs = user_wl_items
     watched_qs = user_wl_items.filter(
-        show__viewhistory__users=user, 
-        show__viewhistory__is_checked=True
+        show__viewhistory__users=user, show__viewhistory__is_checked=True
     )
 
     if year:
@@ -612,17 +608,19 @@ def generate_user_stats(user, year=None):
     watched_items_qs = watched_qs.distinct().select_related('show')
     wishlist_watched_items = []
     for wl_item in watched_items_qs:
-        wishlist_watched_items.append({
-            'wl_item_id': wl_item.id,
-            'show_id': wl_item.show.id,
-            'show__title': wl_item.show.title,
-            'show__original_title': wl_item.show.original_title,
-            'show__year': wl_item.show.year,
-            'poster_url': get_poster_url(wl_item.show.id),
-            'view_date': timezone.localtime(wl_item.created_at).strftime('%Y-%m-%d'),
-            'user_names': [],
-            'user_photos': [],
-        })
+        wishlist_watched_items.append(
+            {
+                'wl_item_id': wl_item.id,
+                'show_id': wl_item.show.id,
+                'show__title': wl_item.show.title,
+                'show__original_title': wl_item.show.original_title,
+                'show__year': wl_item.show.year,
+                'poster_url': get_poster_url(wl_item.show.id),
+                'view_date': timezone.localtime(wl_item.created_at).strftime('%Y-%m-%d'),
+                'user_names': [],
+                'user_photos': [],
+            }
+        )
 
     summary['wishlist_watched'] = len(wishlist_watched_items)
 

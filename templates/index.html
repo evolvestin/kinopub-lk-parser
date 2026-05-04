@@ -132,13 +132,13 @@
     <div class="dashboard-container">
         <div id="system-status-container">
             <div style="padding-left: 35px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;">
-                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <div class="icon" id="ic-stat-history" style="width:16px; height:16px;"></div>
                 Системный статус
             </div>
             <div class="status-grid">
                 <div class="status-card">
                     <div class="status-icon-wrap" style="background: rgba(56, 139, 253, 0.15); color: #388bfd;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+                        <div class="icon" id="ic-stat-history"></div>
                     </div>
                     <div class="status-info">
                         <div class="status-label">Последний просмотр</div>
@@ -148,7 +148,7 @@
 
                 <div class="status-card">
                     <div class="status-icon-wrap" style="background: rgba(163, 113, 247, 0.15); color: #a371f7;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        <div class="icon" id="ic-stat-parser"></div>
                     </div>
                     <div class="status-info">
                         <div class="status-label">Запуск парсера</div>
@@ -158,7 +158,7 @@
                 
                 <div class="status-card">
                     <div class="status-icon-wrap" style="background: rgba(46, 160, 67, 0.15); color: #2ea043;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+                        <div class="icon" id="ic-stat-shows"></div>
                     </div>
                     <div class="status-info">
                         <div class="status-label">Новые релизы</div>
@@ -168,7 +168,7 @@
                 
                 <div class="status-card">
                     <div class="status-icon-wrap" style="background: rgba(241, 196, 15, 0.15); color: #f1c40f;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        <div class="icon" id="ic-stat-ratings"></div>
                     </div>
                     <div class="status-info">
                         <div class="status-label">Рейтинги (KP/IMDb)</div>
@@ -178,7 +178,7 @@
                 
                 <div class="status-card">
                     <div class="status-icon-wrap" style="background: rgba(163, 113, 247, 0.15); color: #a371f7;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <div class="icon" id="ic-stat-durations"></div>
                     </div>
                     <div class="status-info">
                         <div class="status-label">Хронометраж</div>
@@ -188,7 +188,7 @@
                 
                 <div class="status-card">
                     <div class="status-icon-wrap" style="background: rgba(231, 76, 60, 0.15); color: #e74c3c;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <div class="icon" id="ic-stat-photos"></div>
                     </div>
                     <div class="status-info">
                         <div class="status-label">Фото персон</div>
@@ -198,7 +198,7 @@
 
                 <div class="status-card">
                     <div class="status-icon-wrap" style="background: rgba(46, 204, 113, 0.15); color: #2ecc71;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-10.6 8.5 8.5 0 0 1 7 3.7"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        <div class="icon" id="ic-stat-tg"></div>
                     </div>
                     <div class="status-info">
                         <div class="status-label">Активность Telegram</div>
@@ -208,7 +208,7 @@
 
                 <div class="status-card">
                     <div class="status-icon-wrap" style="background: rgba(96, 165, 250, 0.15); color: #60a5fa;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        <div class="icon" id="ic-stat-users"></div>
                     </div>
                     <div class="status-info">
                         <div class="status-label">Пользователи бота</div>
@@ -218,7 +218,7 @@
 
                 <div class="status-card">
                     <div class="status-icon-wrap" style="background: rgba(96, 165, 250, 0.15); color: #60a5fa;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <div class="icon" id="ic-stat-errors"></div>
                     </div>
                     <div class="status-info">
                         <div class="status-label">Ошибки (24ч)</div>
@@ -229,15 +229,13 @@
         </div>
 
         <div style="padding-left: 35px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: var(--info)"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <div class="icon" id="it-star-internal" style="color: var(--info)"></div>
             Метаданные
         </div>
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#9b59b6">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
-                    </div>
+                    <div class="icon" id="ic-met-total-shows" style="color:#9b59b6"></div>
                     Всего шоу
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -252,9 +250,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#e67e22">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                    </div>
+                    <div class="icon" id="ic-met-missing-year" style="color:#e67e22"></div>
                     Год не указан
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -269,9 +265,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#ef1960">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-missing-status" style="color:#ef1960"></div>
                     Статус не указан
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -286,9 +280,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--info)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-collisions" style="color:var(--info)"></div>
                     Коллизии названий
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -303,9 +295,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#6887ff">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                    </div>
+                    <div class="icon" id="ic-met-missing-durations" style="color:#6887ff"></div>
                     Длительность не указана
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -320,9 +310,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#1abc9c">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                    </div>
+                    <div class="icon" id="ic-met-missing-plot" style="color:#1abc9c"></div>
                     Нет описания
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -337,15 +325,13 @@
         </div>
 
         <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: #f1c40f"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+            <div class="icon" id="it-gen-internal" style="color: #f1c40f"></div>
             Жанры
         </div>
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--info)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-total-genres" style="color:var(--info)"></div>
                     Всего жанров
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -356,9 +342,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#f1c40f">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-                    </div>
+                    <div class="icon" id="ic-met-no-genres" style="color:#f1c40f"></div>
                     Нет жанра
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -369,9 +353,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--danger)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-unmapped-genres" style="color:var(--danger)"></div>
                     Нераспознанные жанры
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -382,15 +364,13 @@
 
         <!-- БЛОК 1: РЕЙТИНГИ -->
         <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: var(--accent)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            <div class="icon" id="it-star-internal" style="color: var(--accent)"></div>
             Рейтинги
         </div>
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--danger)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                    </div>
+                    <div class="icon" id="ic-met-missing-kp" style="color:var(--danger)"></div>
                     Нет рейтинга KP
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -405,9 +385,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--info)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                    </div>
+                    <div class="icon" id="ic-met-has-kp" style="color:var(--info)"></div>
                     Есть рейтинг KP
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -422,9 +400,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#f1c40f">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-missing-imdb" style="color:#f1c40f"></div>
                     Нет рейтинга IMDb
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -439,9 +415,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--accent)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                    </div>
+                    <div class="icon" id="ic-met-has-imdb" style="color:var(--accent)"></div>
                     Есть рейтинг IMDb
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -457,16 +431,14 @@
 
         <!-- БЛОК 3: -->
         <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: #388bfd"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+            <div class="icon" id="it-cou-internal" style="color: #388bfd"></div>
             География
         </div>
 
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#388bfd">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-total-countries" style="color:#388bfd"></div>
                     Всего стран
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -480,9 +452,7 @@
             </div>
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#2ea043">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-no-countries" style="color:#2ea043"></div>
                     Нет страны
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -496,9 +466,7 @@
             </div>
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--danger)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
-                    </div>
+                    <div class="icon" id="ic-met-missing-country-meta" style="color:var(--danger)"></div>
                     Страны без ISO кода
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -514,15 +482,13 @@
 
         <!-- БЛОК 4: Люди -->
         <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" style="color: #9b59b6"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <div class="icon" id="ic-users" style="color: #9b59b6"></div>
             Люди и роли
         </div>
         <div class="metrics-grid">
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#ef1960">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-duplicate-photo" style="color:#ef1960"></div>
                     Дубликаты людей
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -537,9 +503,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#388bfd">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-persons-by-type" style="color:#388bfd"></div>
                     Уникальные люди
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -554,9 +518,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#e67e22">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                    </div>
+                    <div class="icon" id="ic-met-persons-avatar" style="color:#e67e22"></div>
                     Фото людей
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -571,9 +533,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#1abc9c">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-professions" style="color:#1abc9c"></div>
                     Роли в кино
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -588,9 +548,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:#a371f7">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-en-professions" style="color:#a371f7"></div>
                     Роли в кино (EN)
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>
@@ -605,9 +563,7 @@
 
             <div class="card hoverable anim-item">
                 <div class="label label-clickable" onclick="toggleMetricDesc(this)">
-                    <div class="icon" style="color:var(--danger)">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                    </div>
+                    <div class="icon" id="ic-met-unused-persons" style="color:var(--danger)"></div>
                     Балласт
                     <div class="js-ic-help" style="margin-left:auto; opacity:0.5; width: 18px; height: 18px; display: flex;"></div>
                 </div>

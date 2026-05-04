@@ -133,6 +133,24 @@ function initIcons() {
     i('wl-vt-grid', 'grid'); i('wl-vt-list', 'list');
     i('wl-edit-btn', 'gear');
     
+    i('ic-stat-history', 'chart'); i('ic-stat-parser', 'zap');
+    i('ic-stat-shows', 'play_circle'); i('ic-stat-ratings', 'star');
+    i('ic-stat-durations', 'time'); i('ic-stat-photos', 'user');
+    i('ic-stat-tg', 'check'); i('ic-stat-users', 'users');
+    i('ic-stat-errors', 'ghost');
+
+    i('ic-met-total-shows', 'tv'); i('ic-met-missing-year', 'cal');
+    i('ic-met-missing-status', 'target'); i('ic-met-collisions', 'edit');
+    i('ic-met-missing-durations', 'time'); i('ic-met-missing-plot', 'list');
+    i('ic-met-total-genres', 'masks'); i('ic-met-no-genres', 'frown');
+    i('ic-met-unmapped-genres', 'skull'); i('ic-met-missing-kp', 'frown');
+    i('ic-met-has-kp', 'smile'); i('ic-met-missing-imdb', 'frown');
+    i('ic-met-has-imdb', 'smile'); i('ic-met-total-countries', 'globe');
+    i('ic-met-no-countries', 'minus'); i('ic-met-missing-country-meta', 'target');
+    i('ic-met-duplicate-photo', 'users'); i('ic-met-persons-by-type', 'user');
+    i('ic-met-persons-avatar', 'eye'); i('ic-met-professions', 'rocket');
+    i('ic-met-en-professions', 'gear'); i('ic-met-unused-persons', 'trash');
+    
     const casinoBtn = document.getElementById('wl-casino-btn');
     if (casinoBtn) casinoBtn.innerHTML = '🎰';
     
@@ -1046,7 +1064,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
 
     let deleteBtn = '';
     if (type === 'wishlist_watched') {
-        deleteBtn = `<div class="wl-delete-badge" style="opacity:1; transform:scale(1); pointer-events:auto; background:var(--danger);" onclick="event.stopPropagation(); window.App.removeWlStatItem(${item.wl_item_id}, this.closest('.grid-item-wrap') || this.closest('.hist-item'))">${Icons.trash}</div>`;
+        deleteBtn = `<div class="wl-delete-badge" style="opacity:1; transform:scale(1); pointer-events:auto; background:var(--danger);" onclick="event.stopPropagation(); window.App.removeWlStatItem(${item.wl_item_id}, this.closest('.grid-item-wrap') || this.closest('.hist-item'))">${Icons.minus}</div>`;
     }
 
     if (mode === 'list') {
