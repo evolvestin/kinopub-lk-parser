@@ -101,6 +101,10 @@ function initIcons() {
 
     const itemsReorderBtn = document.getElementById('wl-items-reorder-btn');
     if (itemsReorderBtn) itemsReorderBtn.innerHTML = Icons.reorder;
+
+    document.querySelectorAll('.js-ic-help').forEach(el => {
+        el.innerHTML = Icons.help;
+    });
 }
 
 if (document.readyState === 'loading') {

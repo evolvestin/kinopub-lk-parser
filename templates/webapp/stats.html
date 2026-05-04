@@ -144,7 +144,7 @@
                             <div class="stat-lbl">Фильмов</div>
                             <div class="stat-sub" id="s-uni" style="background: rgba(210, 153, 34, 0.15); color: #d29922"></div>
                         </div>
-                        <div class="stat anim-item" style="animation-delay: 0.25s">
+                        <div class="stat anim-item clickable" style="animation-delay: 0.25s" onclick="window.App.switchMainView('wishlist')">
                             <div class="stat-icon" id="ic-bookmark"></div>
                             <div class="stat-val" id="s-wl-added">0</div>
                             <div class="stat-lbl">Добавлено в избранное</div>
@@ -373,8 +373,7 @@
                         <div class="chk-box"></div>
                         <span class="chk-text">Учитывать в статистике</span>
                     </label>
-                    <div class="help-icon-trigger" onclick="window.App.showStatsHelp(event)" style="display: flex; color: var(--text-muted); cursor: pointer;">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    <div class="help-icon-trigger js-ic-help" onclick="window.App.showStatsHelp(event)" style="display: flex; color: var(--text-muted); cursor: pointer; width: 18px; height: 18px;">
                     </div>
                 </div>
             </div>
@@ -390,16 +389,15 @@
     <script src="{% static 'js/webapp.js' %}?v={{ APP_VERSION }}" defer></script>
 
     <script>
-        // Теперь нам не нужно ждать кастомного события 'core_loaded'.
-        // Атрибут defer гарантирует, что скрипты выполнятся к моменту DOMContentLoaded.
         document.addEventListener('DOMContentLoaded', () => {
-            if (typeof init === 'function') {
-                init();
-            } else {
-                // Фоллбэк на случай критической ошибки
-                const loader = document.getElementById('loader');
-                if (loader) loader.classList.add('hidden');
-            }
+            switchPeriod('now');
+            document.getElementById('details-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'details-modal') closeModal();
+            });
+            // Изменение 2: Закрытие модалки удаления при клике вне её контента
+            document.getElementById('wl-item-delete-modal').addEventListener('click', (e) => {
+                if (e.target.id === 'wl-item-delete-modal') window.App.closeItemDeleteModal();
+            });
         });
     </script>
 </body>
