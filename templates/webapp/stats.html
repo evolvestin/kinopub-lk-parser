@@ -9,8 +9,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    <link rel="stylesheet" href="{% static 'css/webapp.css' %}">
-    <link rel="stylesheet" href="{% static 'css/casino.css' %}">
+    <link rel="stylesheet" href="{% static 'css/webapp.css' %}?v={{ APP_VERSION }}">
+    <link rel="stylesheet" href="{% static 'css/casino.css' %}?v={{ APP_VERSION }}">
     <script>
         window.IS_DEBUG = {{ is_debug|yesno:"true,false" }};
     </script>
@@ -147,13 +147,12 @@
                         <div class="stat anim-item" style="animation-delay: 0.25s">
                             <div class="stat-icon" id="ic-bookmark"></div>
                             <div class="stat-val" id="s-wl-added">0</div>
-                            <div class="stat-lbl">В избранном</div>
+                            <div class="stat-lbl">Добавлено в избранное</div>
                         </div>
                         <div class="stat anim-item" style="animation-delay: 0.3s">
                             <div class="stat-icon" id="ic-check"></div>
                             <div class="stat-val" id="s-wl-watched">0</div>
-                            <div class="stat-lbl">Просмотрено</div>
-                            <div class="stat-sub" style="background: var(--accent-dim); color: var(--accent)">Из избранного</div>
+                            <div class="stat-lbl">Просмотрено из избранного</div>
                         </div>
                     </div>
 
@@ -358,9 +357,37 @@
         </div>
     </div>
 
-    <script src="{% static 'js/casino.js' %}" defer></script>
-    <script src="{% static 'js/wishlist.js' %}" defer></script>
-    <script src="{% static 'js/webapp.js' %}" defer></script>
+    <div class="modal-overlay" id="wl-item-delete-modal">
+        <div class="modal-content" style="text-align: center; padding: 24px; position: relative;">
+            <div class="modal-title" style="margin-bottom: 16px; font-size: 18px; font-weight: 800;">Удаление из избранного</div>
+            <div style="font-size: 15px; color: var(--text-secondary); margin-bottom: 20px;">
+                Вы уверены, что хотите удалить фильм из списка?
+            </div>
+            <div style="position: relative; margin-bottom: 24px;">
+                <div id="wl-stats-informer" class="wl-help-popover">
+                    Если галочка стоит, удаляемый фильм всё равно будет учитываться в общем счетчике <b>«Добавлено в избранное»</b> вашей статистики. Если её убрать — счетчик уменьшится.
+                </div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <label class="chk-row" style="margin: 0;">
+                        <input type="checkbox" id="wl-del-keep-stats" checked>
+                        <div class="chk-box"></div>
+                        <span class="chk-text">Учитывать в статистике</span>
+                    </label>
+                    <div class="help-icon-trigger" onclick="window.App.showStatsHelp(event)" style="display: flex; color: var(--text-muted); cursor: pointer;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn-primary" style="margin-top: 0; background: var(--bg-input); color: var(--text-primary); box-shadow: none;" onclick="window.App.closeItemDeleteModal()">Отмена</button>
+                <button class="btn-primary" style="margin-top: 0; background: var(--danger); box-shadow: 0 8px 24px rgba(231, 76, 60, 0.2);" onclick="window.App.confirmItemDelete()">Удалить</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/casino.js' %}?v={{ APP_VERSION }}" defer></script>
+    <script src="{% static 'js/wishlist.js' %}?v={{ APP_VERSION }}" defer></script>
+    <script src="{% static 'js/webapp.js' %}?v={{ APP_VERSION }}" defer></script>
 
     <script>
         // Теперь нам не нужно ждать кастомного события 'core_loaded'.

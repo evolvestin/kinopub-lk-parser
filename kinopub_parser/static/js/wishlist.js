@@ -12,6 +12,8 @@ let wlSortMode = localStorage.getItem('wl_sort_mode') || 'default';
 let wlFoldersSortable = null;
 let wlItemsSortable = null;
 let wishlistFolders = [];
+let itemToDeleteId = null;
+let itemToDeleteElement = null;
 
 const FOLDER_COLORS = ['#388bfd', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#95a5a6', '#fd79a8'];
 const FOLDER_ICONS = [
@@ -407,12 +409,30 @@ window.App = {
         }
     },
     confirmDeleteWlItem: function (id) {
-        if (confirm('Удалить этот фильм из списка?')) {
-            window.App.removeWlItem(id);
-        }
+        const el = document.querySelector(`.hist-item[data-id="${id}"], .grid-item-wrap[data-id="${id}"]`);
+        itemToDeleteId = id;
+        itemToDeleteElement = el;
+        document.getElementById('wl-del-keep-stats').checked = true;
+        document.getElementById('wl-item-delete-modal').classList.add('show');
     },
     removeWlItem: function (id, element) {
-        if (!confirm('Удалить этот фильм из списка?')) return;
+        itemToDeleteId = id;
+        itemToDeleteElement = element;
+        document.getElementById('wl-del-keep-stats').checked = true;
+        document.getElementById('wl-item-delete-modal').classList.add('show');
+    },
+    closeItemDeleteModal: function () {
+        document.getElementById('wl-item-delete-modal').classList.remove('show');
+        itemToDeleteId = null;
+        itemToDeleteElement = null;
+    },
+    confirmItemDelete: function () {
+        if (!itemToDeleteId) return;
+        const keepStats = document.getElementById('wl-del-keep-stats').checked;
+        const id = itemToDeleteId;
+        const element = itemToDeleteElement;
+
+        window.App.closeItemDeleteModal();
 
         if (element) {
             element.classList.add('anim-shrink');
@@ -426,7 +446,7 @@ window.App = {
             }, { once: true });
         }
 
-        sendWishlistAction('remove_item', { item_id: id });
+        sendWishlistAction('remove_item', { item_id: id, keep_stats: keepStats });
         showToast('Удалено');
     },
     deleteWlFolder: async function (id, element) {

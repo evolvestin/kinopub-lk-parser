@@ -455,6 +455,7 @@ class WishlistFolder(BaseModel):
     icon = models.CharField(max_length=50, default='folder')
     color = models.CharField(max_length=20, default='#60a5fa')
     sort_order = models.IntegerField(default=0)
+    is_deleted = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Wishlist Folder'
@@ -466,18 +467,21 @@ class WishlistFolder(BaseModel):
 
 
 class WishlistItem(BaseModel):
-    folder = models.ForeignKey(WishlistFolder, on_delete=models.CASCADE, related_name='items')
+    user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='wishlist_items', null=True, blank=True)
+    folder = models.ForeignKey(WishlistFolder, on_delete=models.SET_NULL, null=True, blank=True, related_name='items')
     show = models.ForeignKey(Show, on_delete=models.CASCADE)
     sort_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    include_in_stats = models.BooleanField(default=True)
 
     class Meta:
         verbose_name = 'Wishlist Item'
         verbose_name_plural = 'Wishlist Items'
-        unique_together = ('folder', 'show')
         ordering = ['-sort_order', '-id']
 
     def __str__(self):
-        return f'{self.show.title} in {self.folder.name}'
+        folder_name = self.folder.name if self.folder else 'Deleted Folder'
+        return f'{self.show.title} in {folder_name}'
 
 
 class CasinoSpin(BaseModel):

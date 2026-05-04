@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Max, Q
+from django.db.models import Max, Q, Prefetch
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -1588,7 +1588,10 @@ def webapp_wishlist_data(request):
                     user=view_user, name='Избранное', icon='star', color='#f1c40f', sort_order=1
                 )
 
-            folders = WishlistFolder.objects.filter(user=view_user).prefetch_related('items__show')
+            active_items_qs = WishlistItem.objects.filter(is_active=True).select_related('show')
+            folders = WishlistFolder.objects.filter(user=view_user).prefetch_related(
+                Prefetch('items', queryset=active_items_qs)
+            )
             data = []
             for folder in folders:
                 items = []
@@ -1663,17 +1666,28 @@ def webapp_wishlist_data(request):
             show = Show.objects.filter(id=show_id).first()
             if not show:
                 return JsonResponse({'error': 'Show not found'}, status=404)
-            max_order = (
-                WishlistItem.objects.filter(folder=folder).aggregate(m=Max('sort_order'))['m'] or 0
-            )
-            WishlistItem.objects.get_or_create(
-                folder=folder, show=show, defaults={'sort_order': max_order + 1}
-            )
+
+            item = WishlistItem.objects.filter(folder=folder, show=show).first()
+            if item:
+                item.is_active = True
+                item.include_in_stats = True
+                item.user = view_user
+                item.save(update_fields=['is_active', 'include_in_stats', 'user'])
+            else:
+                max_order = (
+                    WishlistItem.objects.filter(folder=folder).aggregate(m=Max('sort_order'))['m'] or 0
+                )
+                WishlistItem.objects.create(
+                    user=view_user, folder=folder, show=show, sort_order=max_order + 1
+                )
             return JsonResponse({'status': 'ok'})
 
         elif action == 'remove_item':
             item_id = body.get('item_id')
-            WishlistItem.objects.filter(id=item_id, folder__user=view_user).delete()
+            keep_stats = body.get('keep_stats', True)
+            WishlistItem.objects.filter(
+                Q(id=item_id) & (Q(user=view_user) | Q(folder__user=view_user))
+            ).update(is_active=False, include_in_stats=keep_stats)
             return JsonResponse({'status': 'ok'})
 
         elif action == 'reorder_folders':

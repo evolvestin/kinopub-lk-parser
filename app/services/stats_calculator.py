@@ -18,6 +18,7 @@ from django.db.models import (
     Sum,
     When,
 )
+from app.models import WishlistItem
 from django.db.models.functions import (
     Coalesce,
     ExtractMonth,
@@ -27,7 +28,7 @@ from django.db.models.functions import (
 )
 from django.utils import timezone
 
-from app.models import Person, ShowDuration, UserRating, ViewHistory, ViewUserGroup
+from app.models import Person, ShowDuration, UserRating, ViewHistory, ViewUserGroup, WishlistItem
 from shared.constants import (
     ACTOR_ROLES,
     DIRECTOR_ROLES,
@@ -69,10 +70,11 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
     total_seconds = durs['total_seconds'] or 0
     total_minutes = total_seconds // 60
 
-    if year:
+    if year and str(year).isdigit():
         try:
-            total_days_in_period = 366 if calendar.isleap(int(year)) else 365
-            if int(year) == timezone.now().year:
+            year_val = int(year)
+            total_days_in_period = 366 if calendar.isleap(year_val) else 365
+            if year_val == timezone.now().year:
                 total_days_in_period = timezone.now().timetuple().tm_yday
         except (ValueError, TypeError):
             total_days_in_period = 1
@@ -124,7 +126,7 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
         'unique_movies': counts['unique_movies'] or 0,
         'activity_percent': activity_percent,
         'daily_average_min': daily_avg,
-        'period_label': str(year) if year else 'Все время',
+        'period_label': str(year) if year and str(year).isdigit() else 'Все время',
         'first_view_date': counts['first_view'].strftime('%Y-%m-%d')
         if counts['first_view']
         else None,
@@ -329,7 +331,11 @@ def _get_heatmap(dur_qs, year, all_years):
     if not all_years:
         return []
 
-    years_to_process = [int(year)] if year else [int(y) for y in all_years if y]
+    if year and str(year).isdigit():
+        years_to_process = [int(year)]
+    else:
+        years_to_process = [int(y) for y in all_years if str(y).isdigit()]
+        
     result = []
 
     data = {
@@ -576,18 +582,16 @@ def generate_user_stats(user, year=None):
 
     summary = _get_yearly_summary(base_qs, dur_qs, year)
 
-    from app.models import WishlistItem
-
-    wl_added = WishlistItem.objects.filter(folder__user=user).count()
-    wl_watched = (
-        WishlistItem.objects.filter(
-            folder__user=user, show__viewhistory__users=user, show__viewhistory__is_checked=True
-        )
-        .distinct()
-        .count()
+    user_wl_items = WishlistItem.objects.filter(
+        Q(user=user) | Q(folder__user=user, user__isnull=True),
+        include_in_stats=True
     )
-    summary['wishlist_added'] = wl_added
-    summary['wishlist_watched'] = wl_watched
+    
+    summary['wishlist_added'] = user_wl_items.count()
+    summary['wishlist_watched'] = user_wl_items.filter(
+        show__viewhistory__users=user, 
+        show__viewhistory__is_checked=True
+    ).distinct().count()
 
     if is_redundant and str(year) == str(current_yr):
         summary['period_label'] = 'Все время'

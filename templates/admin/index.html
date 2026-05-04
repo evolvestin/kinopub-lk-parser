@@ -3,7 +3,7 @@
 
 {% block extrastyle %}
 {{ block.super }}
-<link rel="stylesheet" href="{% static 'css/webapp.css' %}">
+<link rel="stylesheet" href="{% static 'css/webapp.css' %}?v={{ APP_VERSION }}">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <style>
@@ -171,8 +171,9 @@
     </div>
 </div>
 
-<script src="{% static 'js/core.js' %}"></script>
 <script>
+    window.IS_ADMIN_DASHBOARD = true;
+
     function initAdminDash() {
         const globalStats = {{ global_stats_json|safe }};
         D = globalStats;
@@ -263,17 +264,8 @@
         renderCharts();
     }
 
-    let hasInitialized = false;
-    function checkReady() {
-        if (hasInitialized) return;
-        if (window.CORE_IS_LOADED && (document.readyState === 'interactive' || document.readyState === 'complete')) {
-            hasInitialized = true;
-            initAdminDash();
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', checkReady);
-    window.addEventListener('core_loaded', checkReady);
-    checkReady();
+    document.addEventListener('DOMContentLoaded', () => {
+        initAdminDash();
+    });
 </script>
 {% endblock %}

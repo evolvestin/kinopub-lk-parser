@@ -71,9 +71,10 @@ const Icons = {
     rocket: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path style="fill:none;" d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"></path><path style="fill:none;" d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 22 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22 0 0 1-4 2z"></path><path style="fill:none;" d="M9 12H4s.55-3.03 2-5.03a12 12 0 0 1 3-3"></path><path style="fill:none;" d="M12 15v5s3.03-.55 5.03-2a12 12 0 0 0 3-3"></path></svg>',
     target: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><circle style="fill:none;" cx="12" cy="12" r="6"></circle><circle style="fill:none;" cx="12" cy="12" r="2"></circle></svg>',
     done: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="20 6 9 17 4 12"></polyline></svg>',
-    minus: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
-    chevron_down: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>',
-    sort_arrow: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>',
+    minus: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line style="fill:none;" x1="5" y1="12" x2="19" y2="12"></line></svg>',
+    chevron_down: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="6 9 12 15 18 9"></polyline></svg>',
+    sort_arrow: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line style="fill:none;" x1="12" y1="5" x2="12" y2="19"></line><polyline style="fill:none;" points="19 12 12 19 5 12"></polyline></svg>',
+    help: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><path style="fill:none;" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line style="fill:none;" x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -1443,9 +1444,40 @@ window.App = {
     closeCasino: window.closeCasino,
     resetCasino: window.resetCasino,
     startCasinoSpin: window.startCasinoSpin,
+    showStatsHelp: function(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        const informer = document.getElementById('wl-stats-informer');
+        if (!informer) return;
+
+        if (informer.classList.contains('show')) {
+            informer.classList.remove('show');
+            return;
+        }
+
+        informer.classList.add('show');
+
+        const closeHandler = () => {
+            informer.classList.remove('show');
+            document.removeEventListener('click', closeHandler);
+        };
+
+        setTimeout(() => document.addEventListener('click', closeHandler), 10);
+    },
+    closeItemDeleteModal: function() {
+        document.getElementById('wl-item-delete-modal').classList.remove('show');
+        const informer = document.getElementById('wl-stats-informer');
+        if (informer) informer.classList.remove('show');
+        itemToDeleteId = null;
+        itemToDeleteElement = null;
+    },
 };
 
 window.init = async function() {
+    if (window.IS_ADMIN_DASHBOARD) return;
+
     // 1. Устанавливаем иконки темы
     document.querySelectorAll('.theme-btn').forEach(btn => {
         btn.innerHTML = isDark ? Icons.moon : Icons.sun;
@@ -1481,3 +1513,16 @@ window.init = async function() {
         if (showIdFromUrl) window.App.openShowLayer(showIdFromUrl);
     }
 };
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.IS_ADMIN_DASHBOARD) return;
+    
+    if (typeof init === 'function') {
+        init();
+    } else {
+        // Фоллбэк на случай критической ошибки
+        const loader = document.getElementById('loader');
+        if (loader) loader.classList.add('hidden');
+    }
+});
