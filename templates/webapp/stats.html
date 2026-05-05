@@ -22,6 +22,7 @@
     <div id="app" class="hidden">
         <div id="views-container">
             <div class="view active-view" id="view-search" style="display: none;">
+                <!-- Результаты поиска теперь имеют свой скролл-контейнер через CSS -->
                 <div id="search-results">
                     <div class="empty">
                         <div class="icon" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px;">
@@ -30,6 +31,7 @@
                         Введите название для поиска
                     </div>
                 </div>
+                <!-- Контейнер поиска теперь стабильно прижат к низу вьюхи через flex -->
                 <div class="search-container" style="display: flex; gap: 12px; align-items: center;">
                     <input type="text" id="search-input" class="search-input" style="flex: 1;" placeholder="Фильмы, сериалы, актеры..." oninput="window.App.doSearch(this.value)">
                     <button class="theme-btn js-theme-toggle" onclick="window.App.toggleTheme()"></button>
@@ -55,8 +57,8 @@
 
                 <div id="wl-active-folder-content" style="display: none;">
                     <div class="wl-active-header">
-                        <div id="wl-active-folder-title" style="font-size: 18px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px;"></div>
-                        <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
+                        <div id="wl-active-folder-title"></div>
+                        <div style="display: flex; gap: 8px; align-items: center; margin-left: auto; flex-shrink: 0;">
                             
                             <div class="sort-dropdown-container">
                                 <button id="wl-sort-trigger" class="sort-trigger-btn" onclick="window.App.toggleSortDropdown(event)">
@@ -85,7 +87,7 @@
                             <button class="wl-edit-btn" onclick="window.App.editActiveFolder()" id="wl-edit-btn"></button>
                         </div>
                     </div>
-                    <div id="wl-items-container" style="padding: 0 clamp(16px, 4vw, 20px) 120px;"></div>
+                    <div id="wl-items-container" style="padding: 0 clamp(16px, 4vw, 20px) 24px;"></div>
                 </div>
             </div>
 

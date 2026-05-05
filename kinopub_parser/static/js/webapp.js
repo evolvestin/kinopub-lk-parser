@@ -1032,7 +1032,7 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
         ${headerHtml}
         ${headerSectionHtml}
         <div id="layer-hist-container" style="padding: 16px;"></div>
-        <div id="layer-hist-sentinel" style="height: 40px; width: 100%;"></div>
+        <div id="layer-hist-sentinel" style="height: 1px; width: 100%;"></div>
     `;
 
     pushLayer(bodyHtml, { type: 'history' });
