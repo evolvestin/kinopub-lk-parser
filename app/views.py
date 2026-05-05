@@ -1622,13 +1622,13 @@ def webapp_wishlist_data(request):
             )
 
         if action == 'get':
-            if not WishlistFolder.objects.filter(user=view_user).exists():
+            if not WishlistFolder.objects.filter(user=view_user, is_deleted=False).exists():
                 WishlistFolder.objects.create(
                     user=view_user, name='Избранное', icon='star', color='#f1c40f', sort_order=1
                 )
 
             active_items_qs = WishlistItem.objects.filter(is_active=True).select_related('show')
-            folders = WishlistFolder.objects.filter(user=view_user).prefetch_related(
+            folders = WishlistFolder.objects.filter(user=view_user, is_deleted=False).prefetch_related(
                 Prefetch('items', queryset=active_items_qs)
             )
             
@@ -1668,14 +1668,14 @@ def webapp_wishlist_data(request):
             return JsonResponse({'folders': data})
 
         elif action == 'create_folder':
-            if WishlistFolder.objects.filter(user=view_user).count() >= 12:
+            if WishlistFolder.objects.filter(user=view_user, is_deleted=False).count() >= 12:
                 return JsonResponse({'error': 'Достигнут лимит в 12 папок'}, status=400)
 
             name = body.get('name', '').strip() or ''
             icon = body.get('icon', 'folder')
             color = body.get('color', '#60a5fa')
             max_order = (
-                WishlistFolder.objects.filter(user=view_user).aggregate(m=Max('sort_order'))['m']
+                WishlistFolder.objects.filter(user=view_user, is_deleted=False).aggregate(m=Max('sort_order'))['m']
                 or 0
             )
             folder = WishlistFolder.objects.create(
@@ -1685,9 +1685,11 @@ def webapp_wishlist_data(request):
 
         elif action == 'delete_folder':
             folder_id = body.get('folder_id')
-            WishlistFolder.objects.filter(id=folder_id, user=view_user).delete()
+            
+            WishlistItem.objects.filter(folder_id=folder_id, folder__user=view_user).update(is_active=False)
+            WishlistFolder.objects.filter(id=folder_id, user=view_user).update(is_deleted=True)
 
-            if not WishlistFolder.objects.filter(user=view_user).exists():
+            if not WishlistFolder.objects.filter(user=view_user, is_deleted=False).exists():
                 WishlistFolder.objects.create(
                     user=view_user, name='Избранное', icon='star', color='#f1c40f', sort_order=1
                 )
@@ -1699,7 +1701,7 @@ def webapp_wishlist_data(request):
             name = body.get('name', '').strip() or ''
             icon = body.get('icon')
             color = body.get('color')
-            WishlistFolder.objects.filter(id=folder_id, user=view_user).update(
+            WishlistFolder.objects.filter(id=folder_id, user=view_user, is_deleted=False).update(
                 name=name, icon=icon, color=color
             )
             return JsonResponse({'status': 'ok'})
@@ -1707,17 +1709,26 @@ def webapp_wishlist_data(request):
         elif action == 'add_item':
             folder_id = body.get('folder_id')
             show_id = body.get('show_id')
-            folder = WishlistFolder.objects.filter(id=folder_id, user=view_user).first()
+            folder = WishlistFolder.objects.filter(id=folder_id, user=view_user, is_deleted=False).first()
             if not folder:
                 return JsonResponse({'error': 'Folder not found'}, status=404)
             show = Show.objects.filter(id=show_id).first()
             if not show:
                 return JsonResponse({'error': 'Show not found'}, status=404)
 
+            already_in_stats = WishlistItem.objects.filter(
+                user=view_user,
+                show=show,
+                is_active=True,
+                include_in_stats=True
+            ).exclude(folder=folder).exists()
+
+            should_include = not already_in_stats
+
             item = WishlistItem.objects.filter(folder=folder, show=show).first()
             if item:
                 item.is_active = True
-                item.include_in_stats = True
+                item.include_in_stats = should_include
                 item.user = view_user
                 item.save(update_fields=['is_active', 'include_in_stats', 'user'])
             else:
@@ -1726,7 +1737,11 @@ def webapp_wishlist_data(request):
                     or 0
                 )
                 WishlistItem.objects.create(
-                    user=view_user, folder=folder, show=show, sort_order=max_order + 1
+                    user=view_user,
+                    folder=folder,
+                    show=show,
+                    sort_order=max_order + 1,
+                    include_in_stats=should_include
                 )
             return JsonResponse({'status': 'ok'})
 
@@ -1749,13 +1764,13 @@ def webapp_wishlist_data(request):
         elif action == 'reorder_folders':
             order_ids = body.get('order', [])
             for idx, fid in enumerate(order_ids):
-                WishlistFolder.objects.filter(id=fid, user=view_user).update(sort_order=idx)
+                WishlistFolder.objects.filter(id=fid, user=view_user, is_deleted=False).update(sort_order=idx)
             return JsonResponse({'status': 'ok'})
 
         elif action == 'reorder_items':
             folder_id = body.get('folder_id')
             order_ids = body.get('order', [])
-            folder = WishlistFolder.objects.filter(id=folder_id, user=view_user).first()
+            folder = WishlistFolder.objects.filter(id=folder_id, user=view_user, is_deleted=False).first()
             if folder:
                 total = len(order_ids)
                 for idx, item_id in enumerate(order_ids):

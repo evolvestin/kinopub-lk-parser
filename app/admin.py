@@ -1878,3 +1878,20 @@ class CasinoSpinAdmin(admin.ModelAdmin):
     list_filter = ('user', 'created_at')
     autocomplete_fields = ('user', 'show')
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(WishlistItem, site=admin_site)
+class WishlistItemAdmin(admin.ModelAdmin):
+    list_display = (
+        'show',
+        'folder',
+        'user',
+        'is_active',
+        'include_in_stats',
+        'sort_order',
+        'created_at',
+    )
+    list_filter = ('is_active', 'include_in_stats', 'user', 'folder')
+    search_fields = ('show__title', 'show__original_title', 'user__username', 'folder__name')
+    autocomplete_fields = ('user', 'folder', 'show')
+    readonly_fields = ('created_at', 'updated_at')

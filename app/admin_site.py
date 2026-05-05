@@ -31,56 +31,71 @@ class CustomAdminSite(admin.AdminSite):
     def get_app_list(self, request, app_label=None):
         app_list = super().get_app_list(request)
 
-        log_models = []
-        system_models = [
+        model_map = {}
+        for app in app_list:
+            for model in app['models']:
+                model_map[model['object_name']] = model
+
+        # Определение категорий
+        categories = [
             {
-                'name': 'Task Control',
-                'object_name': 'task_control',
-                'admin_url': reverse('admin:task_control'),
-                'add_url': None,
-                'view_only': True,
+                'name': '⚙️ Система и Задачи',
+                'app_label': 'system',
+                'models': [
+                    {
+                        'name': 'Контроль задач',
+                        'object_name': 'task_control',
+                        'admin_url': reverse('admin:task_control'),
+                        'view_only': True,
+                    },
+                    'TaskRun',
+                    'SiteMetric',
+                ]
+            },
+            {
+                'name': '🎬 Каталог контента',
+                'app_label': 'catalog',
+                'models': ['Show', 'Person', 'ShowCrew', 'ShowDuration', 'Country', 'Genre']
+            },
+            {
+                'name': '👥 Пользователи и Активность',
+                'app_label': 'activity',
+                'models': ['ViewUser', 'ViewUserGroup', 'ViewHistory', 'UserRating', 'CasinoSpin']
+            },
+            {
+                'name': '🔖 Избранное (Wishlists)',
+                'app_label': 'wishlists',
+                'models': ['WishlistFolder', 'WishlistItem']
+            },
+            {
+                'name': '🛡 Доступ и Логи',
+                'app_label': 'logs',
+                'models': ['User', 'Group', 'Code', 'LogEntry', 'TelegramLog']
             }
         ]
 
-        app_models_kept = []
+        new_app_list = []
+        for cat in categories:
+            category_models = []
+            for m_ref in cat['models']:
+                if isinstance(m_ref, dict):
+                    category_models.append(m_ref)
+                elif m_ref in model_map:
+                    category_models.append(model_map[m_ref])
 
-        for app in app_list:
-            if app['app_label'] == 'app':
-                for m in app['models']:
-                    if m['object_name'] in ('LogEntry', 'TelegramLog'):
-                        log_models.append(m)
-                    elif m['object_name'] == 'TaskRun':
-                        system_models.append(m)
-                    else:
-                        app_models_kept.append(m)
-                app['models'] = app_models_kept
-
-        if log_models:
-            app_list.append(
-                {
-                    'name': 'Логи',
-                    'app_label': 'logs',
+            if category_models:
+                new_app_list.append({
+                    'name': cat['name'],
+                    'app_label': cat['app_label'],
                     'app_url': '',
                     'has_module_perms': True,
-                    'models': log_models,
-                }
-            )
-
-        app_list.insert(
-            0,
-            {
-                'name': 'System',
-                'app_label': 'system',
-                'app_url': '',
-                'has_module_perms': True,
-                'models': system_models,
-            },
-        )
+                    'models': category_models,
+                })
 
         if app_label:
-            return [app for app in app_list if app['app_label'] == app_label]
+            return [app for app in new_app_list if app['app_label'] == app_label]
 
-        return app_list
+        return new_app_list
 
     def custom_index(self, request, extra_context=None):
         app_list = self.get_app_list(request)
