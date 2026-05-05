@@ -58,8 +58,8 @@ body {
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     padding-bottom: 0;
-    overflow: hidden;
-    height: 100dvh;
+    overflow-x: hidden;
+    min-height: 100dvh;
 }
 
 #app {

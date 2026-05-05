@@ -1,0 +1,105 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/webapp.css' %}?v={{ APP_VERSION }}">
+<style>
+    .admin-wishlist-integration {
+        margin: 0 auto;
+        background: var(--body-bg);
+        border-radius: 38px;
+        padding: 0;
+        width: 575px;
+        height: 700px;
+        border: 10px solid #1b1f26;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        position: relative;
+        outline: 1px solid var(--border-color);
+    }
+
+    /* Заставляем внутреннюю обертку занять всю высоту телефона */
+    #wl-active-folder-content {
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        background: var(--bg-main);
+    }
+
+    /* Фиксируем шапку, а списку отдаем остаток высоты и скролл */
+    .wl-active-header {
+        flex-shrink: 0 !important;
+        background: var(--primary) !important;
+        border-bottom: 1px solid var(--border-color) !important;
+        padding: 12px !important;
+    }
+
+    #wl-items-container {
+        flex: 1 !important;
+        overflow-y: auto !important;
+        padding: 10px !important;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #wl-items-container::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Скрываем только лишние UI-элементы */
+    .wl-delete-badge, 
+    .wishlist-add-btn, 
+    .wl-edit-btn, 
+    .theme-btn, 
+    .bottom-nav {
+        display: none !important;
+    }
+</style>
+{% endblock %}
+
+{% block admin_change_form_document_ready %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script>
+    window.tg = { initData: "" };
+    window.IS_ADMIN_DASHBOARD = true;
+    
+    window.App = window.App || {};
+    window.App.openShowLayer = function(id) {
+        window.open(`/admin/app/show/${id}/change/`, '_blank');
+    };
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        const folderId = "{{ object_id }}";
+        if (!folderId || folderId === "None") return;
+
+        const container = document.getElementById('wl-items-container');
+        if (!container) return;
+        
+        container.innerHTML = '<div class="loader-inline"><div class="spinner"></div></div>';
+
+        try {
+            const r = await fetch(`/api/admin/wishlist/folder/${folderId}/`);
+            if (!r.ok) throw new Error();
+            const data = await r.json();
+            
+            window.activeWlFolderId = parseInt(folderId);
+            window.wishlistFolders = [data]; 
+            
+            // Ждем небольшую паузу для завершения парсинга webapp.js
+            setTimeout(() => {
+                if (typeof initIcons === 'function') initIcons();
+                if (typeof renderActiveWlFolder === 'function') renderActiveWlFolder();
+            }, 50);
+            
+        } catch (e) {
+            container.innerHTML = '<div class="empty">Ошибка загрузки содержимого</div>';
+        }
+    });
+</script>
+<script src="/static/js/webapp.js?v={{ APP_VERSION }}"></script>
+<script src="/static/js/wishlist.js?v={{ APP_VERSION }}"></script>
+{% endblock %}

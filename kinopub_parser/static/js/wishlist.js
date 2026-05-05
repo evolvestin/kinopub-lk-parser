@@ -173,52 +173,61 @@ function renderActiveWlFolder() {
     const container = document.getElementById('wl-items-container');
     const mainHeader = document.getElementById('wl-main-header');
 
-    if (!activeWlFolderId) {
+    const folders = window.wishlistFolders || wishlistFolders;
+    const activeId = window.activeWlFolderId || activeWlFolderId;
+
+    if (!activeId) {
         if (mainHeader) mainHeader.textContent = 'Избранное';
         if (content) content.style.display = 'none';
         return;
     }
 
+    const folder = folders.find(f => f.id === activeId);
+    if (!folder) return;
+
     if (content) content.style.display = 'block';
-    const folder = wishlistFolders.find(f => f.id === activeWlFolderId);
 
     if (mainHeader) {
-        if (wishlistFolders.length === 1) {
+        if (folders.length === 1) {
             mainHeader.innerHTML = `<span style="color:${folder.color}; margin-right: 10px; display: inline-flex; vertical-align: middle;">${Icons[folder.icon] || Icons.folder}</span>${folder.name}`;
         } else {
             mainHeader.textContent = 'Мои списки';
         }
     }
 
-    titleEl.innerHTML = `<span style="color:${folder.color}">${Icons[folder.icon] || Icons.folder}</span> ${folder.name}`;
-    titleEl.style.display = wishlistFolders.length > 1 ? 'flex' : 'none';
-
-    document.getElementById('wl-vt-grid').classList.toggle('active', wlViewMode === 'grid');
-    document.getElementById('wl-vt-list').classList.toggle('active', wlViewMode === 'list');
-
-    const triggerBtn = document.getElementById('wl-sort-trigger');
-    let triggerText = 'Сортировка';
-    let triggerIcon = Icons.reorder;
-    let arrowClass = '';
-
-    if (wlSortMode.startsWith('added')) {
-        triggerText = 'По дате';
-        triggerIcon = Icons.sort_arrow;
-        arrowClass = wlSortMode.endsWith('asc') ? 'rotate-180' : '';
-    } else if (wlSortMode.startsWith('year')) {
-        triggerText = 'По году';
-        triggerIcon = Icons.sort_arrow;
-        arrowClass = wlSortMode.endsWith('asc') ? 'rotate-180' : '';
-    } else {
-        triggerText = 'Порядок';
-        triggerIcon = Icons.reorder;
+    if (titleEl) {
+        titleEl.innerHTML = `<span style="color:${folder.color}">${Icons[folder.icon] || Icons.folder}</span> ${folder.name}`;
+        titleEl.style.display = folders.length > 1 ? 'flex' : 'none';
     }
 
-    triggerBtn.innerHTML = `
-        <span class="sort-icon-main ${arrowClass}">${triggerIcon}</span>
-        <span class="sort-text-label">${triggerText}</span>
-        <span class="sort-chevron">${Icons.chevron_down}</span>
-    `;
+    document.getElementById('wl-vt-grid')?.classList.toggle('active', wlViewMode === 'grid');
+    document.getElementById('wl-vt-list')?.classList.toggle('active', wlViewMode === 'list');
+
+    const triggerBtn = document.getElementById('wl-sort-trigger');
+    if (triggerBtn) {
+        let triggerText = 'Сортировка';
+        let triggerIcon = Icons.reorder;
+        let arrowClass = '';
+
+        if (wlSortMode.startsWith('added')) {
+            triggerText = 'По дате';
+            triggerIcon = Icons.sort_arrow;
+            arrowClass = wlSortMode.endsWith('asc') ? 'rotate-180' : '';
+        } else if (wlSortMode.startsWith('year')) {
+            triggerText = 'По году';
+            triggerIcon = Icons.sort_arrow;
+            arrowClass = wlSortMode.endsWith('asc') ? 'rotate-180' : '';
+        } else {
+            triggerText = 'Порядок';
+            triggerIcon = Icons.reorder;
+        }
+
+        triggerBtn.innerHTML = `
+            <span class="sort-icon-main ${arrowClass}">${triggerIcon}</span>
+            <span class="sort-text-label">${triggerText}</span>
+            <span class="sort-chevron">${Icons.chevron_down}</span>
+        `;
+    }
 
     document.querySelectorAll('.sort-item').forEach(item => {
         const opt = item.dataset.sort;
@@ -236,17 +245,19 @@ function renderActiveWlFolder() {
     });
 
     const reorderBtn = document.getElementById('wl-items-reorder-btn');
-    reorderBtn.style.display = (folder.items.length > 1 && wlSortMode === 'default') ? 'flex' : 'none';
-    if (isItemsReorderMode && (folder.items.length <= 1 || wlSortMode !== 'default')) {
-        window.App.toggleItemsReorderMode();
+    if (reorderBtn) {
+        reorderBtn.style.display = (folder.items.length > 1 && wlSortMode === 'default') ? 'flex' : 'none';
+        if (isItemsReorderMode && (folder.items.length <= 1 || wlSortMode !== 'default')) {
+            window.App.toggleItemsReorderMode();
+        }
+        reorderBtn.style.background = isItemsReorderMode ? 'var(--accent)' : 'var(--bg-input)';
+        reorderBtn.style.color = isItemsReorderMode ? '#fff' : 'var(--text-primary)';
     }
-
-    reorderBtn.style.background = isItemsReorderMode ? 'var(--accent)' : 'var(--bg-input)';
-    reorderBtn.style.color = isItemsReorderMode ? '#fff' : 'var(--text-primary)';
-    container.classList.toggle('reorder-items-mode', isItemsReorderMode);
+    
+    container?.classList.toggle('reorder-items-mode', isItemsReorderMode);
 
     if (!folder.items.length) {
-        container.innerHTML = `<div class="empty"><div class="icon">${Icons.film}</div>Папка пуста</div>`;
+        if (container) container.innerHTML = `<div class="empty"><div class="icon">${Icons.film}</div>Папка пуста</div>`;
         if (wlItemsSortable) { wlItemsSortable.destroy(); wlItemsSortable = null; }
         return;
     }
@@ -264,36 +275,40 @@ function renderActiveWlFolder() {
 
     let itemsHtml = renderItems.map((item, idx) => getWlItemHtml(item, wlViewMode, idx)).join('');
 
-    if (wlViewMode === 'list') {
-        container.innerHTML = `<div class="card" style="margin:0; padding:0; overflow:hidden; border:none; background:transparent;">${itemsHtml}</div>`;
-    } else {
-        container.innerHTML = `<div class="hist-grid">${itemsHtml}</div>`;
+    if (container) {
+        if (wlViewMode === 'list') {
+            container.innerHTML = `<div class="card" style="margin:0; padding:0; overflow:hidden; border:none; background:transparent;">${itemsHtml}</div>`;
+        } else {
+            container.innerHTML = `<div class="hist-grid">${itemsHtml}</div>`;
+        }
     }
 
-    if (typeof Sortable !== 'undefined') {
+    if (typeof Sortable !== 'undefined' && container) {
         if (wlItemsSortable) wlItemsSortable.destroy();
-        const targetContainer = container.firstChild;
-        wlItemsSortable = new Sortable(targetContainer, {
-            group: 'wl-items',
-            animation: 350,
-            easing: "cubic-bezier(0.25, 1, 0.5, 1)",
-            disabled: !isItemsReorderMode,
-            forceFallback: true,
-            fallbackOnBody: true,
-            fallbackClass: 'sortable-fallback',
-            ghostClass: 'sortable-ghost',
-            onStart: function (evt) {
-                if (window.navigator.vibrate) window.navigator.vibrate(10);
-                document.body.classList.add('sorting-active');
-            },
-            onEnd: function (evt) {
-                document.body.classList.remove('sorting-active');
-                if (evt.to === targetContainer) {
-                    const order = Array.from(targetContainer.children).map(el => parseInt(el.dataset.id));
-                    sendWishlistAction('reorder_items', { folder_id: activeWlFolderId, order });
+        const targetContainer = container.querySelector('.hist-grid, .card');
+        if (targetContainer) {
+            wlItemsSortable = new Sortable(targetContainer, {
+                group: 'wl-items',
+                animation: 350,
+                easing: "cubic-bezier(0.25, 1, 0.5, 1)",
+                disabled: !isItemsReorderMode,
+                forceFallback: true,
+                fallbackOnBody: true,
+                fallbackClass: 'sortable-fallback',
+                ghostClass: 'sortable-ghost',
+                onStart: function (evt) {
+                    if (window.navigator.vibrate) window.navigator.vibrate(10);
+                    document.body.classList.add('sorting-active');
+                },
+                onEnd: function (evt) {
+                    document.body.classList.remove('sorting-active');
+                    if (evt.to === targetContainer) {
+                        const order = Array.from(targetContainer.children).map(el => parseInt(el.dataset.id));
+                        sendWishlistAction('reorder_items', { folder_id: activeId, order });
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 }
 

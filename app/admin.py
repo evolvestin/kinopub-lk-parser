@@ -22,8 +22,10 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce
 from django.http import HttpResponseRedirect
+from django.template.loader import render_to_string
 from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 from redis import Redis
 
 from app.admin_site import admin_site
@@ -1825,6 +1827,7 @@ class WishlistFolderAdmin(admin.ModelAdmin):
     inlines = [WishlistItemInline]
     ordering = ('user', 'sort_order')
     readonly_fields = ('created_at', 'updated_at', 'folder_preview')
+    change_form_template = 'admin/wishlistfolder_change_form.html'
 
     fieldsets = (
         (None, {'fields': ('user', 'name', 'is_deleted')}),
@@ -1854,22 +1857,7 @@ class WishlistFolderAdmin(admin.ModelAdmin):
     def folder_preview(self, obj):
         if not obj.id:
             return 'Сохраните папку, чтобы увидеть содержимое.'
-        return format_html(
-            '<div id="view-wishlist" class="admin-wishlist-integration">'
-            '  <div id="wl-active-folder-content">'
-            '    <div class="wl-active-header" style="background: var(--primary); padding: 10px; border-radius: 12px; margin-bottom: 15px; border: 1px solid var(--border-color);">'
-            '        <div id="wl-active-folder-title" style="font-weight: 800; display: flex; align-items: center; gap: 8px; color: var(--primary-fg);"></div>'
-            '        <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">'
-            '            <div class="view-toggle" style="margin: 0; padding: 2px; background: var(--secondary);">'
-            '                <button type="button" class="vt-btn active" id="wl-vt-grid" onclick="window.App.setWlViewMode(\'grid\')"></button>'
-            '                <button type="button" class="vt-btn" id="wl-vt-list" onclick="window.App.setWlViewMode(\'list\')"></button>'
-            '            </div>'
-            '        </div>'
-            '    </div>'
-            '    <div id="wl-items-container"></div>'
-            '  </div>'
-            '</div>'
-        )
+        return mark_safe(render_to_string('admin/wishlistfolder_preview.html', {'obj': obj}))
 
 
 @admin.register(CasinoSpin, site=admin_site)

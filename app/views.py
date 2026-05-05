@@ -1933,6 +1933,9 @@ def admin_get_folder_content(request, folder_id):
             .order_by('-sort_order', '-id')
         )
 
+        show_ids = [item.show_id for item in items_qs]
+        user_ratings = _get_user_ratings_for_shows(folder.user, show_ids)
+
         items_data = []
         for item in items_qs:
             items_data.append(
@@ -1945,6 +1948,7 @@ def admin_get_folder_content(request, folder_id):
                     'type': item.show.type,
                     'poster_url': get_poster_url(item.show.id, 'small'),
                     'added_at': item.created_at.strftime('%Y-%m-%d'),
+                    'user_rating': user_ratings.get(item.show_id),
                 }
             )
 
