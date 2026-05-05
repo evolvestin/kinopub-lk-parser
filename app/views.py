@@ -12,7 +12,7 @@ from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Max, Prefetch, Q
+from django.db.models import Avg, Max, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -87,6 +87,19 @@ def _toggle_user_in_view(user, view_id):
     return action
 
 
+def _get_user_ratings_for_shows(user, show_ids):
+    """Возвращает маппинг {show_id: rating} для оценок пользователя (среднее по всем оценкам шоу/эпизодов)."""
+    if not user or not show_ids:
+        return {}
+    
+    ratings = UserRating.objects.filter(
+        user=user, 
+        show_id__in=show_ids
+    ).values('show_id').annotate(avg_rating=Avg('rating'))
+    
+    return {r['show_id']: round(r['avg_rating'], 1) for r in ratings}
+
+
 def _serialize_show_details(show, user=None):
     """Собирает словарь с данными о шоу и рейтингами."""
     internal_rating, user_ratings = show.get_internal_rating_data()
@@ -94,11 +107,12 @@ def _serialize_show_details(show, user=None):
     personal_episodes_count = 0
 
     if user:
-        user_rating_obj = UserRating.objects.filter(
-            user=user, show=show, season_number__isnull=True
-        ).first()
-        if user_rating_obj:
-            personal_rating = user_rating_obj.rating
+        personal_rating = UserRating.objects.filter(
+            user=user, show=show
+        ).aggregate(avg=Avg('rating'))['avg']
+        
+        if personal_rating is not None:
+            personal_rating = round(personal_rating, 1)
 
         personal_episodes_count = UserRating.objects.filter(
             user=user, show=show, season_number__isnull=False
@@ -455,13 +469,18 @@ def bot_search_shows(request):
         .prefetch_related('countries', 'genres', 'ratings__user')
         .distinct()[:20]
     )
+    
+    user = None
+    if telegram_id := request.GET.get('telegram_id'):
+        user = ViewUser.objects.filter(telegram_id=telegram_id).first()
+    
+    show_ids = [s.id for s in shows]
+    user_ratings = _get_user_ratings_for_shows(user, show_ids)
 
     results = []
-
     for show in shows:
         poster_url = get_poster_url(show.id)
-
-        internal_rating, user_ratings = show.get_internal_rating_data()
+        internal_rating, user_ratings_list = show.get_internal_rating_data()
 
         results.append(
             {
@@ -479,7 +498,8 @@ def bot_search_shows(request):
                 'countries': [str(c) for c in show.countries.all()[:3]],
                 'genres': show.display_genres[:3],
                 'internal_rating': internal_rating,
-                'user_ratings': user_ratings,
+                'user_ratings': user_ratings_list,
+                'user_rating': user_ratings.get(show.id),
             }
         )
 
@@ -1264,6 +1284,16 @@ def webapp_get_collection(request, collection_type, item_id):
             return JsonResponse({'error': 'Invalid collection type'}, status=400)
 
         shows = shows.order_by('-year', '-id').distinct()[:50]
+        
+        # Идентификация пользователя
+        view_user = None
+        init_data = request.GET.get('init_data')
+        if init_data:
+            tg_user = validate_telegram_init_data(init_data)
+            if tg_user:
+                view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
+        
+        user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])
 
         results = []
         for show in shows:
@@ -1275,6 +1305,7 @@ def webapp_get_collection(request, collection_type, item_id):
                     'year': show.year,
                     'type': show.type,
                     'poster_url': get_poster_url(show.id, 'medium'),
+                    'user_rating': user_ratings.get(show.id),
                 }
             )
 
@@ -1303,6 +1334,9 @@ def webapp_search(request):
         shows = Show.objects.filter(
             Q(title__icontains=query) | Q(original_title__icontains=query)
         ).order_by('-year', '-id')[:15]
+        
+        view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
+        user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])
 
         persons = (
             Person.objects.filter(Q(name__icontains=query) | Q(en_name__icontains=query))
@@ -1320,6 +1354,7 @@ def webapp_search(request):
                     'year': s.year,
                     'type': s.type,
                     'poster_url': get_poster_url(s.id, 'medium'),
+                    'user_rating': user_ratings.get(s.id),
                 }
             )
 
@@ -1596,6 +1631,13 @@ def webapp_wishlist_data(request):
             folders = WishlistFolder.objects.filter(user=view_user).prefetch_related(
                 Prefetch('items', queryset=active_items_qs)
             )
+            
+            all_show_ids = []
+            for f in folders:
+                all_show_ids.extend([item.show_id for item in f.items.all()])
+            
+            user_ratings = _get_user_ratings_for_shows(view_user, list(set(all_show_ids)))
+
             data = []
             for folder in folders:
                 items = []
@@ -1610,6 +1652,7 @@ def webapp_wishlist_data(request):
                             'type': item.show.type,
                             'poster_url': get_poster_url(item.show.id, 'small'),
                             'added_at': item.created_at.strftime('%Y-%m-%d'),
+                            'user_rating': user_ratings.get(item.show_id),
                         }
                     )
                 data.append(
@@ -1754,6 +1797,11 @@ def webapp_casino(request):
                     expires_ms = int(
                         (latest_spin.created_at + timedelta(minutes=10)).timestamp() * 1000
                     )
+                    
+                    user_rating = UserRating.objects.filter(
+                        user=view_user, show=show, season_number__isnull=True
+                    ).first()
+
                     return JsonResponse(
                         {
                             'active_spin': {
@@ -1764,6 +1812,7 @@ def webapp_casino(request):
                                     'year': show.year,
                                     'type': show.type,
                                     'poster_url': get_poster_url(show.id, 'small'),
+                                    'user_rating': user_rating.rating if user_rating else None,
                                 },
                                 'expires': expires_ms,
                             }
@@ -1794,6 +1843,10 @@ def webapp_casino(request):
 
             new_spin = CasinoSpin.objects.create(user=view_user, show=winner_show)
             expires_ms = int((new_spin.created_at + timedelta(minutes=10)).timestamp() * 1000)
+            
+            user_rating = UserRating.objects.filter(
+                user=view_user, show=winner_show, season_number__isnull=True
+            ).first()
 
             return JsonResponse(
                 {
@@ -1804,6 +1857,7 @@ def webapp_casino(request):
                         'year': winner_show.year,
                         'type': winner_show.type,
                         'poster_url': get_poster_url(winner_show.id, 'small'),
+                        'user_rating': user_rating.rating if user_rating else None,
                     },
                     'expires': expires_ms,
                 }

@@ -319,9 +319,17 @@ function renderSearchResults(data) {
         data.shows.forEach(s => {
             const poster = s.poster_url ? `<img src="${s.poster_url}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
             const safeTitle = s.title.replace(/'/g, "\\'");
+            
+            // Добавляем бейдж оценки
+            let ratingBadge = '';
+            if (s.user_rating) {
+                ratingBadge = `<div class="rating-badge" style="position:absolute; top:8px; left:8px; z-index:5; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); color:var(--accent);">${Icons.star}${s.user_rating}</div>`;
+            }
+
             html += `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${s.id})">
                 <div class="grid-item">
                     ${poster}
+                    ${ratingBadge}
                     ${s.year ? `<div class="grid-year">${s.year}</div>` : ''}
                     <button class="wishlist-add-btn" onclick="event.stopPropagation(); window.App.showFolderModal(${s.id}, '${safeTitle}')">${Icons.bookmark_plus}</button>
                 </div>
@@ -919,9 +927,9 @@ window.mainTab = function(t) {
     document.getElementById('sec-group').classList.toggle('hidden', t!=='group'); 
 };
 
-let curHistData =[], curHistType = '';
+let curHistData = [], curHistType = '';
 let currentHistoryOffset = 0;
-const historyBatchSize = 100;
+const historyBatchSize = 80;
 let historyObserver = null;
 let isRenderingBatch = false;
 let viewMode = localStorage.getItem('kp_view_mode') || 'grid';
@@ -1129,12 +1137,16 @@ function renderHistoryBatchLayer() {
     }
 
     const batch = curHistData.slice(currentHistoryOffset, currentHistoryOffset + historyBatchSize);
-    let html = batch.map((item, idx) => getHistoryItemHtml(item, idx, curHistType, viewMode)).join('');
     
-    if (currentHistoryOffset === 0 && viewMode === 'list') {
-        container.innerHTML = '<div class="card" style="margin:0; padding:0; border:none; background:transparent;">' + html + '</div>';
-    } else if (currentHistoryOffset === 0 && viewMode === 'grid') {
-        container.innerHTML = '<div class="hist-grid">' + html + '</div>';
+    /* Используем DocumentFragment или строковую сборку перед вставкой в DOM */
+    const html = batch.map((item, idx) => getHistoryItemHtml(item, currentHistoryOffset + idx, curHistType, viewMode)).join('');
+    
+    if (currentHistoryOffset === 0) {
+        if (viewMode === 'list') {
+            container.innerHTML = '<div class="card" style="margin:0; padding:0; border:none; background:transparent;">' + html + '</div>';
+        } else {
+            container.innerHTML = '<div class="hist-grid">' + html + '</div>';
+        }
     } else {
         const target = container.querySelector('.card') || container.querySelector('.hist-grid');
         if (target) {
@@ -1145,14 +1157,16 @@ function renderHistoryBatchLayer() {
     currentHistoryOffset += historyBatchSize;
     isRenderingBatch = false;
 
-    if (currentHistoryOffset < curHistData.length && currentHistoryOffset === historyBatchSize) {
+    /* Настройка обсервера для бесконечного скролла */
+    if (currentHistoryOffset < curHistData.length) {
         const sentinel = topLayer.el.querySelector('#layer-hist-sentinel');
+        if (historyObserver) historyObserver.disconnect();
+        
         historyObserver = new IntersectionObserver((entries) => {
             if (entries[0].isIntersecting) renderHistoryBatchLayer();
-        }, { rootMargin: '1000px' });
+        }, { root: topLayer.el, rootMargin: '800px' });
+        
         if (sentinel) historyObserver.observe(sentinel);
-    } else if (currentHistoryOffset >= curHistData.length && historyObserver) {
-        historyObserver.disconnect();
     }
 }
 
@@ -1278,17 +1292,24 @@ window.openCollectionLayer = async function(type, id, titleFallback) {
     document.getElementById('loader').style.opacity = '1';
 
     try {
-        const r = await fetch(`/api/webapp/collection/${type}/${id}/`);
+        const r = await fetch(`/api/webapp/collection/${type}/${id}/?init_data=${encodeURIComponent(tg?.initData || '')}`);
         if (!r.ok) throw new Error('Not found');
         const data = await r.json();
 
         let gridHtml = data.items.map(item => {
             const mediumPoster = item.poster_url || '';
             const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
+            
+            let ratingBadge = '';
+            if (item.user_rating) {
+                ratingBadge = `<div class="rating-badge" style="position:absolute; top:8px; left:8px; z-index:5; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); color:var(--accent);">${Icons.star}${item.user_rating}</div>`;
+            }
+
             return `
             <div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${item.id})">
                 <div class="grid-item">
                     ${posterHtml}
+                    ${ratingBadge}
                     ${item.year ? `<div class="grid-year">${item.year}</div>` : ''}
                 </div>
                 <div class="grid-below-title">${item.title}</div>

@@ -308,6 +308,12 @@ function getWlItemHtml(item, viewModeStr, idx) {
 
     if (viewModeStr === 'list') {
         const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy" draggable="false">` : `<div class="hist-poster"></div>`;
+        
+        let ratingHtml = '';
+        if (item.user_rating) {
+            ratingHtml = `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
+        }
+
         return `
         <div class="hist-item clickable ${animClass}" ${style} data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
             ${deleteBtn}
@@ -318,6 +324,7 @@ function getWlItemHtml(item, viewModeStr, idx) {
                 <div class="hist-meta">
                     ${item.year ? `<span>${item.year}</span>` : ''}
                     ${item.type ? `<span>· ${item.type}</span>` : ''}
+                    ${ratingHtml}
                     <span style="opacity: 0.6;">· ${addedDate}</span>
                 </div>
             </div>
@@ -327,11 +334,17 @@ function getWlItemHtml(item, viewModeStr, idx) {
         const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy" draggable="false">` : '<div class="grid-poster"></div>';
         const yearHtml = item.year ? `<div class="grid-year">${item.year}</div>` : '';
 
+        let ratingBadge = '';
+        if (item.user_rating) {
+            ratingBadge = `<div class="rating-badge" style="position:absolute; top:8px; left:8px; z-index:5; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); color:var(--accent);">${Icons.star}${item.user_rating}</div>`;
+        }
+
         return `
         <div class="grid-item-wrap ${animClass}" ${style} data-id="${item.id}" onclick="if(!isItemsReorderMode) window.App.openShowLayer(${sid})">
             ${deleteBtn}
             <div class="grid-item">
                 ${posterHtml}
+                ${ratingBadge}
                 ${yearHtml}
                 <div class="grid-overlay">
                     <div class="grid-date" style="color: var(--text-muted);">${addedDate}</div>
