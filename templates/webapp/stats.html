@@ -158,6 +158,21 @@
                         </div>
                     </div>
 
+                    <div class="card hoverable anim-item" style="animation-delay: 0.3s;" id="ratings-box">
+                        <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star-internal"></div>Оценки</div>
+                        <div class="critic-header">
+                            <div class="critic-title-box">
+                                <div class="critic-badge" id="cr-badge"></div>
+                                <div class="critic-avg" id="cr-avg">0.0<span>/ 10</span></div>
+                            </div>
+                            <div class="critic-total" id="cr-total"></div>
+                        </div>
+                        <div class="chart-box" style="height: 180px; margin-bottom: 16px;"><canvas id="c-ratings-dist"></canvas></div>
+                        <div class="stat clickable" style="flex-direction: row; justify-content: center; align-items: center; padding: 16px; margin-top: 12px; border-radius: 15px;" onclick="window.App.openHistoryLayer('ratings', 'Все оценки')">
+                            <span style="font-weight: 800; color: var(--text-primary); font-size: clamp(14px, 4vw, 16px);">Все оценки</span>
+                        </div>
+                    </div>
+
                     <div class="card hoverable anim-item" id="card-dynamics" style="animation-delay: 0.25s">
                         <div class="label"><div class="icon" style="color:var(--info)" id="ic-chart-internal"></div>Динамика</div>
                         <div class="chart-box"><canvas id="c-monthly"></canvas></div>
@@ -231,21 +246,6 @@
                     <div class="card hoverable anim-item" style="animation-delay: 0.25s;" id="card-binges">
                         <div class="label"><div class="icon" style="color: #a371f7;" id="it-bin-internal"></div>Марафоны</div>
                         <div id="binges-list"></div>
-                    </div>
-
-                    <div class="card hoverable anim-item" style="animation-delay: 0.3s;" id="ratings-box">
-                        <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star-internal"></div>Оценки</div>
-                        <div class="critic-header">
-                            <div class="critic-title-box">
-                                <div class="critic-badge" id="cr-badge"></div>
-                                <div class="critic-avg" id="cr-avg">0.0<span>/ 10</span></div>
-                            </div>
-                            <div class="critic-total" id="cr-total"></div>
-                        </div>
-                        <div class="chart-box" style="height: 180px; margin-bottom: 16px;"><canvas id="c-ratings-dist"></canvas></div>
-                        <div class="stat clickable" style="flex-direction: row; justify-content: center; align-items: center; padding: 16px; margin-top: 12px; border-radius: 15px;" onclick="window.App.openHistoryLayer('ratings', 'Все оценки')">
-                            <span style="font-weight: 800; color: var(--text-primary); font-size: clamp(14px, 4vw, 16px);">Все оценки</span>
-                        </div>
                     </div>
                 </div>
 

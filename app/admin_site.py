@@ -50,12 +50,21 @@ class CustomAdminSite(admin.AdminSite):
                     },
                     'TaskRun',
                     'SiteMetric',
+                    'SharedStat',
                 ]
             },
             {
                 'name': '🎬 Каталог контента',
                 'app_label': 'catalog',
-                'models': ['Show', 'Person', 'ShowCrew', 'ShowDuration', 'Country', 'Genre']
+                'models': [
+                    'Show',
+                    'ExternalRating',
+                    'Person',
+                    'ShowCrew',
+                    'ShowDuration',
+                    'Country',
+                    'Genre'
+                ]
             },
             {
                 'name': '👥 Пользователи и Активность',

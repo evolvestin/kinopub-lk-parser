@@ -1820,7 +1820,7 @@ class WishlistItemInline(admin.TabularInline):
 
 @admin.register(WishlistFolder, site=admin_site)
 class WishlistFolderAdmin(admin.ModelAdmin):
-    list_display = ('name', 'user', 'get_items_count', 'sort_order', 'created_at')
+    list_display = ('name', 'user', 'get_items_count', 'sort_order', 'get_is_active', 'created_at')
     list_filter = ('user', 'is_deleted')
     search_fields = ('name', 'user__username', 'user__name')
     autocomplete_fields = ('user',)
@@ -1852,6 +1852,10 @@ class WishlistFolderAdmin(admin.ModelAdmin):
     @admin.display(description='Items', ordering='items_count')
     def get_items_count(self, obj):
         return obj.items_count
+
+    @admin.display(description='Активна', boolean=True, ordering='is_deleted')
+    def get_is_active(self, obj):
+        return not obj.is_deleted
 
     @admin.display(description='Предпросмотр')
     def folder_preview(self, obj):
