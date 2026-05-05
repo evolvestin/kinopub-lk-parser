@@ -473,19 +473,17 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
     posterEl.style.opacity = '1';
     placeholderEl.style.display = 'none';
     
-    // Добавляем бейдж оценки в окно казино
-    let ratingBadge = windowEl.querySelector('.rating-badge');
+    let badgesContainer = windowEl.querySelector('.grid-badges');
     if (item.user_rating) {
-        if (!ratingBadge) {
-            ratingBadge = document.createElement('div');
-            ratingBadge.className = 'rating-badge';
-            ratingBadge.style.cssText = 'position:absolute; top:12px; left:12px; z-index:10; background:rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.2); color:var(--accent); padding:4px 8px; font-size:14px;';
-            windowEl.appendChild(ratingBadge);
+        if (!badgesContainer) {
+            badgesContainer = document.createElement('div');
+            badgesContainer.className = 'grid-badges';
+            windowEl.appendChild(badgesContainer);
         }
-        ratingBadge.innerHTML = `${Icons.star}${item.user_rating}`;
-        ratingBadge.style.display = 'flex';
-    } else if (ratingBadge) {
-        ratingBadge.style.display = 'none';
+        badgesContainer.innerHTML = `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${Icons.star}${item.user_rating}</span>`;
+        badgesContainer.style.display = 'flex';
+    } else if (badgesContainer) {
+        badgesContainer.style.display = 'none';
     }
     
     titleEl.textContent = item.title;

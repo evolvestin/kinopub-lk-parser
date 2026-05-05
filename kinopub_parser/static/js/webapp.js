@@ -320,16 +320,15 @@ function renderSearchResults(data) {
             const poster = s.poster_url ? `<img src="${s.poster_url}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
             const safeTitle = s.title.replace(/'/g, "\\'");
             
-            // Добавляем бейдж оценки
-            let ratingBadge = '';
+            let badgesHtml = '';
             if (s.user_rating) {
-                ratingBadge = `<div class="rating-badge" style="position:absolute; top:8px; left:8px; z-index:5; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); color:var(--accent);">${Icons.star}${s.user_rating}</div>`;
+                badgesHtml = `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${Icons.star}${s.user_rating}</span>`;
             }
 
             html += `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${s.id})">
                 <div class="grid-item">
                     ${poster}
-                    ${ratingBadge}
+                    <div class="grid-badges">${badgesHtml}</div>
                     ${s.year ? `<div class="grid-year">${s.year}</div>` : ''}
                     <button class="wishlist-add-btn" onclick="event.stopPropagation(); window.App.showFolderModal(${s.id}, '${safeTitle}')">${Icons.bookmark_plus}</button>
                 </div>

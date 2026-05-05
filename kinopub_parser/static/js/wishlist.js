@@ -334,9 +334,9 @@ function getWlItemHtml(item, viewModeStr, idx) {
         const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy" draggable="false">` : '<div class="grid-poster"></div>';
         const yearHtml = item.year ? `<div class="grid-year">${item.year}</div>` : '';
 
-        let ratingBadge = '';
+        let badgesHtml = '';
         if (item.user_rating) {
-            ratingBadge = `<div class="rating-badge" style="position:absolute; top:8px; left:8px; z-index:5; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); color:var(--accent);">${Icons.star}${item.user_rating}</div>`;
+            badgesHtml = `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${Icons.star}${item.user_rating}</span>`;
         }
 
         return `
@@ -344,7 +344,7 @@ function getWlItemHtml(item, viewModeStr, idx) {
             ${deleteBtn}
             <div class="grid-item">
                 ${posterHtml}
-                ${ratingBadge}
+                <div class="grid-badges">${badgesHtml}</div>
                 ${yearHtml}
                 <div class="grid-overlay">
                     <div class="grid-date" style="color: var(--text-muted);">${addedDate}</div>
