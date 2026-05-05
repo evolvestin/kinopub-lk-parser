@@ -458,7 +458,11 @@ window.App = {
                 setTimeout(() => element.remove(), 300);
             }
             try {
-                await sendWishlistAction('remove_item', { item_id: id, keep_stats: false });
+                await sendWishlistAction('remove_item', { 
+                    item_id: id, 
+                    keep_stats: false,
+                    is_stat_removal: true 
+                });
                 
                 const counterEl = document.getElementById('s-wl-watched');
                 if (counterEl) {

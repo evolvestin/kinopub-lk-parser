@@ -63,6 +63,7 @@ from app.services.telegram_auth import validate_telegram_init_data
 from app.telegram_bot import TelegramSender
 from shared.constants import (
     GENRES_MAPPING,
+    PROFESSIONS_PLURAL_MAP_RU,
     RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
     UserRole,
@@ -1161,6 +1162,8 @@ def webapp_get_show_full(request, show_id):
             )
 
         preferred_order = [
+            'Актёр',
+            'Актёр дубляжа',
             'Режиссёр',
             'Сценарист',
             'Продюссер',
@@ -1168,18 +1171,19 @@ def webapp_get_show_full(request, show_id):
             'Композитор',
             'Художник',
             'Монтажёр',
-            'Актёр',
-            'Актёр дубляжа',
         ]
 
         ordered_crew = []
         for prof in preferred_order:
             if prof in crew_grouped and crew_grouped[prof]:
-                ordered_crew.append({'profession': prof, 'persons': crew_grouped[prof]})
+                persons = crew_grouped[prof]
+                label = PROFESSIONS_PLURAL_MAP_RU.get(prof, prof) if len(persons) > 1 else prof
+                ordered_crew.append({'profession': label, 'persons': persons})
 
         for prof, persons in crew_grouped.items():
             if prof not in preferred_order:
-                ordered_crew.append({'profession': prof, 'persons': persons})
+                label = PROFESSIONS_PLURAL_MAP_RU.get(prof, prof) if len(persons) > 1 else prof
+                ordered_crew.append({'profession': label, 'persons': persons})
 
         genre_map = {}
         for g in show.genres.all():
@@ -1686,9 +1690,17 @@ def webapp_wishlist_data(request):
         elif action == 'remove_item':
             item_id = body.get('item_id')
             keep_stats = body.get('keep_stats', True)
-            WishlistItem.objects.filter(
+            is_stat_removal = body.get('is_stat_removal', False)
+            
+            queryset = WishlistItem.objects.filter(
                 Q(id=item_id) & (Q(user=view_user) | Q(folder__user=view_user))
-            ).update(is_active=False, include_in_stats=keep_stats)
+            )
+            
+            if is_stat_removal:
+                queryset.update(include_in_stats=False)
+            else:
+                queryset.update(is_active=False, include_in_stats=keep_stats)
+                
             return JsonResponse({'status': 'ok'})
 
         elif action == 'reorder_folders':

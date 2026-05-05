@@ -40,6 +40,20 @@ PROFESSION_TRANS_MAP = {
     'Композитор': 'Composer',
 }
 
+PROFESSIONS_PLURAL_MAP_RU = {
+    'Актёр': 'Актёры',
+    'Актёр дубляжа': 'Актёры дубляжа',
+    'Режиссёр': 'Режиссёры',
+    'Продюссер': 'Продюссеры',
+    'Сценарист': 'Сценаристы',
+    'Художник': 'Художники',
+    'Монтажёр': 'Монтажёры',
+    'Оператор': 'Операторы',
+    'Композитор': 'Композиторы',
+    'Создатель': 'Создатели',
+    'Другое': 'Другие',
+}
+
 RAW_TO_NORMALIZED_RU = {raw: norm for norm, raws in PROFESSIONS_MAPPING_RU.items() for raw in raws}
 RAW_TO_NORMALIZED_EN = {raw: norm for norm, raws in PROFESSIONS_MAPPING_EN.items() for raw in raws}
 

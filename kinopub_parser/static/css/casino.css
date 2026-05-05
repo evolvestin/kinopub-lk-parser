@@ -180,6 +180,6 @@
 }
 
 #wl-casino-btn {
-    font-size: clamp(13px, 6.5vw, 16px);
+    font-size: clamp(15px, 6.5vw, 18px);
     line-height: 1;
 }
