@@ -1,4 +1,12 @@
-<div id="view-wishlist" class="admin-wishlist-integration">
+<div class="preview-meta-info">
+    {% if is_default %}
+    ⚠️ Используется стандартное разрешение (Admin Default): <b>{{ width }}x{{ height }}</b>
+    {% else %}
+    📱 Разрешение устройства пользователя: <b>{{ width }}x{{ height }}</b>
+    {% endif %}
+</div>
+
+<div id="view-wishlist" class="admin-wishlist-integration" style="width: {{ width }}px; height: {{ height }}px; max-width: 95%;">
   <div id="wl-active-folder-content">
     <div class="wl-active-header">
         <div id="wl-active-folder-title"></div>

@@ -5,13 +5,25 @@
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'css/webapp.css' %}?v={{ APP_VERSION }}">
 <style>
+    .preview-meta-info {
+        margin: 10px auto 15px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--body-fg);
+        font-family: monospace;
+        background: var(--darkened-bg);
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        width: fit-content;
+    }
+
     .admin-wishlist-integration {
         margin: 0 auto;
         background: var(--body-bg);
         border-radius: 38px;
         padding: 0;
-        width: 575px;
-        height: 700px;
+        /* Размеры будут установлены через inline style в preview.html или JS */
         border: 10px solid #1b1f26;
         overflow: hidden;
         display: flex;
@@ -21,7 +33,6 @@
         outline: 1px solid var(--border-color);
     }
 
-    /* Заставляем внутреннюю обертку занять всю высоту телефона */
     #wl-active-folder-content {
         height: 100% !important;
         display: flex !important;
@@ -29,7 +40,6 @@
         background: var(--bg-main);
     }
 
-    /* Фиксируем шапку, а списку отдаем остаток высоты и скролл */
     .wl-active-header {
         flex-shrink: 0 !important;
         background: var(--primary) !important;
@@ -49,7 +59,6 @@
         display: none;
     }
 
-    /* Скрываем только лишние UI-элементы */
     .wl-delete-badge, 
     .wishlist-add-btn, 
     .wl-edit-btn, 

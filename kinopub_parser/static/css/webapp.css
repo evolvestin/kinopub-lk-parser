@@ -50,6 +50,17 @@ html {
     --shadow-glow: 0 8px 24px rgba(35, 134, 54, 0.2);
 }
 
+html.is-webapp, 
+body.is-webapp {
+    height: 100dvh !important;
+    width: 100vw !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    position: fixed !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
 body {
     background: var(--bg-main);
     color: var(--text-secondary);
@@ -57,7 +68,6 @@ body {
     font-size: clamp(14px, 4vw, 16px);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-    padding-bottom: 0;
     overflow-x: hidden;
     min-height: 100dvh;
 }
@@ -76,6 +86,7 @@ body {
     -webkit-overflow-scrolling: touch;
     display: block;
     position: relative;
+    overscroll-behavior-y: contain;
 }
 
 
@@ -622,7 +633,6 @@ body.has-banner #app {
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
 /* BOTTOM NAVIGATION & SEARCH */
-body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
 
 .bottom-nav {
     flex-shrink: 0;
@@ -806,7 +816,7 @@ body { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
     font-size: 18px;
     font-weight: 800;
     color: var(--text-primary);
-    display: block !important;
+    display: block;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

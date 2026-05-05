@@ -130,6 +130,9 @@ class ViewUser(BaseModel):
     language = models.CharField(max_length=10, default='en')
     photo_url = models.URLField(max_length=500, null=True, blank=True)
     is_bot_active = models.BooleanField(default=True, verbose_name='Bot Active')
+    
+    screen_width = models.IntegerField(null=True, blank=True)
+    screen_height = models.IntegerField(null=True, blank=True)
 
     role = models.CharField(
         max_length=20, choices=[(r.value, r.name) for r in UserRole], default=UserRole.GUEST
@@ -141,7 +144,7 @@ class ViewUser(BaseModel):
         null=True, blank=True, help_text='ID сообщения в админ-канале для управления ролью'
     )
 
-    def update_personal_details(self, username, name, language, is_active=None, photo_url=None):
+    def update_personal_details(self, username, name, language, is_active=None, photo_url=None, screen_width=None, screen_height=None):
         updated_fields = []
 
         if self.username != username:
@@ -163,6 +166,14 @@ class ViewUser(BaseModel):
         if photo_url is not None and self.photo_url != photo_url:
             self.photo_url = photo_url
             updated_fields.append('photo_url')
+            
+        if screen_width is not None and self.screen_width != screen_width:
+            self.screen_width = screen_width
+            updated_fields.append('screen_width')
+            
+        if screen_height is not None and self.screen_height != screen_height:
+            self.screen_height = screen_height
+            updated_fields.append('screen_height')
 
         if updated_fields:
             self.save()

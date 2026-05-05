@@ -1853,11 +1853,22 @@ class WishlistFolderAdmin(admin.ModelAdmin):
     def get_items_count(self, obj):
         return obj.items_count
 
-    @admin.display(description='Предпросмотр контента')
+    @admin.display(description='Предпросмотр')
     def folder_preview(self, obj):
         if not obj.id:
             return 'Сохраните папку, чтобы увидеть содержимое.'
-        return mark_safe(render_to_string('admin/wishlistfolder_preview.html', {'obj': obj}))
+            
+        width = obj.user.screen_width or 500
+        height = obj.user.screen_height or 844
+        is_default = obj.user.screen_width is None
+        
+        context = {
+            'obj': obj,
+            'width': width,
+            'height': height,
+            'is_default': is_default
+        }
+        return mark_safe(render_to_string('admin/wishlistfolder_preview.html', context))
 
 
 @admin.register(CasinoSpin, site=admin_site)

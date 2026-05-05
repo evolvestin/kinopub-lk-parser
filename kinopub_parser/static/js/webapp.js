@@ -372,19 +372,16 @@ async function load(year, isBackground = false) {
     if (year === undefined || year === null) year = curYear;
     curYear = year;
 
-    // 1. Проверяем кэш
     const cachedData = window.AppData.getFromCache(year);
     if (cachedData) {
         D = cachedData;
         render();
-        // Если это не фоновая загрузка, мы уже все показали, лоадер не нужен
         if (!isBackground) {
             hideLoader();
             return; 
         }
     }
 
-    // 2. Если данных нет или это фоновое обновление
     if (!isBackground) {
         document.getElementById('loader').classList.remove('hidden');
         document.getElementById('loader').style.opacity = '1';
@@ -392,10 +389,18 @@ async function load(year, isBackground = false) {
 
     try {
         const p = year && year !== 'all' ? { period_type: 'year', period_value: year } : { period_type: 'year', period_value: 0 };
+        
+        const payload = { 
+            ...p, 
+            init_data: tg?.initData || '',
+            screen_width: window.innerWidth,
+            screen_height: window.innerHeight
+        };
+
         const r = await fetch('/api/webapp/detailed_stats/', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify({ ...p, init_data: tg?.initData || '' }) 
+            body: JSON.stringify(payload) 
         });
         
         if (!r.ok) throw new Error(`Server error: ${r.status}`);
@@ -407,7 +412,6 @@ async function load(year, isBackground = false) {
         
         if (!availableYears.length && D.meta?.years) {
             availableYears = [...D.meta.years];
-            // После получения списка всех лет запускаем фоновую предзагрузку
             preloadAllPeriods();
         }
         

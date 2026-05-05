@@ -986,6 +986,8 @@ def webapp_get_detailed_stats(request):
                 name=tg_user.get('first_name'),
                 language=tg_user.get('language_code'),
                 photo_url=tg_user.get('photo_url'),
+                screen_width=body.get('screen_width'),
+                screen_height=body.get('screen_height'),
             )
         except ViewUser.DoesNotExist:
             view_user = ViewUser.objects.create(
@@ -994,6 +996,8 @@ def webapp_get_detailed_stats(request):
                 name=tg_user.get('first_name'),
                 language=tg_user.get('language_code', 'ru'),
                 role=UserRole.GUEST,
+                screen_width=body.get('screen_width'),
+                screen_height=body.get('screen_height'),
             )
 
         stats = generate_user_stats(view_user, year=year)
@@ -1730,7 +1734,8 @@ def webapp_wishlist_data(request):
                 item.is_active = True
                 item.include_in_stats = should_include
                 item.user = view_user
-                item.save(update_fields=['is_active', 'include_in_stats', 'user'])
+                item.created_at = timezone.now()
+                item.save(update_fields=['is_active', 'include_in_stats', 'user', 'created_at'])
             else:
                 max_order = (
                     WishlistItem.objects.filter(folder=folder).aggregate(m=Max('sort_order'))['m']
