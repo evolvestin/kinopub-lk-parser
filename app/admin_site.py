@@ -51,7 +51,7 @@ class CustomAdminSite(admin.AdminSite):
                     'TaskRun',
                     'SiteMetric',
                     'SharedStat',
-                ]
+                ],
             },
             {
                 'name': '🎬 Каталог контента',
@@ -63,24 +63,24 @@ class CustomAdminSite(admin.AdminSite):
                     'ShowCrew',
                     'ShowDuration',
                     'Country',
-                    'Genre'
-                ]
+                    'Genre',
+                ],
             },
             {
                 'name': '👥 Пользователи и Активность',
                 'app_label': 'activity',
-                'models': ['ViewUser', 'ViewUserGroup', 'ViewHistory', 'UserRating', 'CasinoSpin']
+                'models': ['ViewUser', 'ViewUserGroup', 'ViewHistory', 'UserRating', 'CasinoSpin'],
             },
             {
                 'name': '🔖 Избранное (Wishlists)',
                 'app_label': 'wishlists',
-                'models': ['WishlistFolder', 'WishlistItem']
+                'models': ['WishlistFolder', 'WishlistItem'],
             },
             {
                 'name': '🛡 Доступ и Логи',
                 'app_label': 'logs',
-                'models': ['User', 'Group', 'Code', 'LogEntry', 'TelegramLog']
-            }
+                'models': ['User', 'Group', 'Code', 'LogEntry', 'TelegramLog'],
+            },
         ]
 
         new_app_list = []
@@ -93,13 +93,15 @@ class CustomAdminSite(admin.AdminSite):
                     category_models.append(model_map[m_ref])
 
             if category_models:
-                new_app_list.append({
-                    'name': cat['name'],
-                    'app_label': cat['app_label'],
-                    'app_url': '',
-                    'has_module_perms': True,
-                    'models': category_models,
-                })
+                new_app_list.append(
+                    {
+                        'name': cat['name'],
+                        'app_label': cat['app_label'],
+                        'app_url': '',
+                        'has_module_perms': True,
+                        'models': category_models,
+                    }
+                )
 
         if app_label:
             return [app for app in new_app_list if app['app_label'] == app_label]

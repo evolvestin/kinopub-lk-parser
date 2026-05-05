@@ -88,15 +88,16 @@ def _toggle_user_in_view(user, view_id):
 
 
 def _get_user_ratings_for_shows(user, show_ids):
-    """Возвращает маппинг {show_id: rating} для оценок пользователя (среднее по всем оценкам шоу/эпизодов)."""
+    """Возвращает маппинг {show_id: rating} для оценок пользователя (среднее по всем оценкам)."""
     if not user or not show_ids:
         return {}
-    
-    ratings = UserRating.objects.filter(
-        user=user, 
-        show_id__in=show_ids
-    ).values('show_id').annotate(avg_rating=Avg('rating'))
-    
+
+    ratings = (
+        UserRating.objects.filter(user=user, show_id__in=show_ids)
+        .values('show_id')
+        .annotate(avg_rating=Avg('rating'))
+    )
+
     return {r['show_id']: round(r['avg_rating'], 1) for r in ratings}
 
 
@@ -107,10 +108,10 @@ def _serialize_show_details(show, user=None):
     personal_episodes_count = 0
 
     if user:
-        personal_rating = UserRating.objects.filter(
-            user=user, show=show
-        ).aggregate(avg=Avg('rating'))['avg']
-        
+        personal_rating = UserRating.objects.filter(user=user, show=show).aggregate(
+            avg=Avg('rating')
+        )['avg']
+
         if personal_rating is not None:
             personal_rating = round(personal_rating, 1)
 
@@ -469,11 +470,11 @@ def bot_search_shows(request):
         .prefetch_related('countries', 'genres', 'ratings__user')
         .distinct()[:20]
     )
-    
+
     user = None
     if telegram_id := request.GET.get('telegram_id'):
         user = ViewUser.objects.filter(telegram_id=telegram_id).first()
-    
+
     show_ids = [s.id for s in shows]
     user_ratings = _get_user_ratings_for_shows(user, show_ids)
 
@@ -1288,7 +1289,7 @@ def webapp_get_collection(request, collection_type, item_id):
             return JsonResponse({'error': 'Invalid collection type'}, status=400)
 
         shows = shows.order_by('-year', '-id').distinct()[:50]
-        
+
         # Идентификация пользователя
         view_user = None
         init_data = request.GET.get('init_data')
@@ -1296,7 +1297,7 @@ def webapp_get_collection(request, collection_type, item_id):
             tg_user = validate_telegram_init_data(init_data)
             if tg_user:
                 view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
-        
+
         user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])
 
         results = []
@@ -1338,7 +1339,7 @@ def webapp_search(request):
         shows = Show.objects.filter(
             Q(title__icontains=query) | Q(original_title__icontains=query)
         ).order_by('-year', '-id')[:15]
-        
+
         view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
         user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])
 
@@ -1632,14 +1633,14 @@ def webapp_wishlist_data(request):
                 )
 
             active_items_qs = WishlistItem.objects.filter(is_active=True).select_related('show')
-            folders = WishlistFolder.objects.filter(user=view_user, is_deleted=False).prefetch_related(
-                Prefetch('items', queryset=active_items_qs)
-            )
-            
+            folders = WishlistFolder.objects.filter(
+                user=view_user, is_deleted=False
+            ).prefetch_related(Prefetch('items', queryset=active_items_qs))
+
             all_show_ids = []
             for f in folders:
                 all_show_ids.extend([item.show_id for item in f.items.all()])
-            
+
             user_ratings = _get_user_ratings_for_shows(view_user, list(set(all_show_ids)))
 
             data = []
@@ -1679,7 +1680,9 @@ def webapp_wishlist_data(request):
             icon = body.get('icon', 'folder')
             color = body.get('color', '#60a5fa')
             max_order = (
-                WishlistFolder.objects.filter(user=view_user, is_deleted=False).aggregate(m=Max('sort_order'))['m']
+                WishlistFolder.objects.filter(user=view_user, is_deleted=False).aggregate(
+                    m=Max('sort_order')
+                )['m']
                 or 0
             )
             folder = WishlistFolder.objects.create(
@@ -1689,8 +1692,10 @@ def webapp_wishlist_data(request):
 
         elif action == 'delete_folder':
             folder_id = body.get('folder_id')
-            
-            WishlistItem.objects.filter(folder_id=folder_id, folder__user=view_user).update(is_active=False)
+
+            WishlistItem.objects.filter(folder_id=folder_id, folder__user=view_user).update(
+                is_active=False
+            )
             WishlistFolder.objects.filter(id=folder_id, user=view_user).update(is_deleted=True)
 
             if not WishlistFolder.objects.filter(user=view_user, is_deleted=False).exists():
@@ -1713,19 +1718,22 @@ def webapp_wishlist_data(request):
         elif action == 'add_item':
             folder_id = body.get('folder_id')
             show_id = body.get('show_id')
-            folder = WishlistFolder.objects.filter(id=folder_id, user=view_user, is_deleted=False).first()
+            folder = WishlistFolder.objects.filter(
+                id=folder_id, user=view_user, is_deleted=False
+            ).first()
             if not folder:
                 return JsonResponse({'error': 'Folder not found'}, status=404)
             show = Show.objects.filter(id=show_id).first()
             if not show:
                 return JsonResponse({'error': 'Show not found'}, status=404)
 
-            already_in_stats = WishlistItem.objects.filter(
-                user=view_user,
-                show=show,
-                is_active=True,
-                include_in_stats=True
-            ).exclude(folder=folder).exists()
+            already_in_stats = (
+                WishlistItem.objects.filter(
+                    user=view_user, show=show, is_active=True, include_in_stats=True
+                )
+                .exclude(folder=folder)
+                .exists()
+            )
 
             should_include = not already_in_stats
 
@@ -1746,7 +1754,7 @@ def webapp_wishlist_data(request):
                     folder=folder,
                     show=show,
                     sort_order=max_order + 1,
-                    include_in_stats=should_include
+                    include_in_stats=should_include,
                 )
             return JsonResponse({'status': 'ok'})
 
@@ -1754,28 +1762,32 @@ def webapp_wishlist_data(request):
             item_id = body.get('item_id')
             keep_stats = body.get('keep_stats', True)
             is_stat_removal = body.get('is_stat_removal', False)
-            
+
             queryset = WishlistItem.objects.filter(
                 Q(id=item_id) & (Q(user=view_user) | Q(folder__user=view_user))
             )
-            
+
             if is_stat_removal:
                 queryset.update(include_in_stats=False)
             else:
                 queryset.update(is_active=False, include_in_stats=keep_stats)
-                
+
             return JsonResponse({'status': 'ok'})
 
         elif action == 'reorder_folders':
             order_ids = body.get('order', [])
             for idx, fid in enumerate(order_ids):
-                WishlistFolder.objects.filter(id=fid, user=view_user, is_deleted=False).update(sort_order=idx)
+                WishlistFolder.objects.filter(id=fid, user=view_user, is_deleted=False).update(
+                    sort_order=idx
+                )
             return JsonResponse({'status': 'ok'})
 
         elif action == 'reorder_items':
             folder_id = body.get('folder_id')
             order_ids = body.get('order', [])
-            folder = WishlistFolder.objects.filter(id=folder_id, user=view_user, is_deleted=False).first()
+            folder = WishlistFolder.objects.filter(
+                id=folder_id, user=view_user, is_deleted=False
+            ).first()
             if folder:
                 total = len(order_ids)
                 for idx, item_id in enumerate(order_ids):
@@ -1817,7 +1829,7 @@ def webapp_casino(request):
                     expires_ms = int(
                         (latest_spin.created_at + timedelta(minutes=10)).timestamp() * 1000
                     )
-                    
+
                     user_rating = UserRating.objects.filter(
                         user=view_user, show=show, season_number__isnull=True
                     ).first()
@@ -1863,7 +1875,7 @@ def webapp_casino(request):
 
             new_spin = CasinoSpin.objects.create(user=view_user, show=winner_show)
             expires_ms = int((new_spin.created_at + timedelta(minutes=10)).timestamp() * 1000)
-            
+
             user_rating = UserRating.objects.filter(
                 user=view_user, show=winner_show, season_number__isnull=True
             ).first()

@@ -627,11 +627,12 @@ def generate_user_stats(user, year=None):
     # Добавляем получение оценок для просмотренных элементов вишлиста
     watched_show_ids = [item['show_id'] for item in wishlist_watched_items]
     wl_user_ratings = {
-        r.show_id: r.rating for r in UserRating.objects.filter(
+        r.show_id: r.rating
+        for r in UserRating.objects.filter(
             user=user, show_id__in=watched_show_ids, season_number__isnull=True
         )
     }
-    
+
     for item in wishlist_watched_items:
         item['user_rating'] = wl_user_ratings.get(item['show_id'])
 
