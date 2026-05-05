@@ -1,5 +1,13 @@
 window.App = window.App || {};
 
+window.handleKpPlaceholder = function (img, name) {
+    // Проверка на специфические размеры заглушки Кинопоиска (no-poster.gif)
+    // Эти размеры определены в ходе исследования: 208x304
+    if (img.naturalWidth === 208 && img.naturalHeight === 304) {
+        window.handleImgErr(img, null, name);
+    }
+};
+
 window.AppData = {
     cache: new Map(),
     isPreloading: false,
@@ -307,8 +315,13 @@ function renderSearchResults(data) {
         html += '<div class="h-scroll-container" style="padding-bottom:16px;">';
         data.persons.forEach(p => {
             const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
-            const img = p.photo_url ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" onerror="window.handleImgErr(this, ${fb}, '${p.name.replace(/'/g, "\\'")}')">` : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
-            html += `<div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${p.name.replace(/'/g, "\\'")}')">${img}<div class="person-name">${p.name}</div></div>`;
+            const safeName = p.name.replace(/'/g, "\\'");
+            const img = p.photo_url 
+                ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" 
+                    onerror="window.handleImgErr(this, ${fb}, '${safeName}')" 
+                    onload="window.handleKpPlaceholder(this, '${safeName}')">` 
+                : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
+            html += `<div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')">${img}<div class="person-name">${p.name}</div></div>`;
         });
         html += '</div>';
     }
@@ -812,7 +825,9 @@ function fillList(id, items, ico, unit, categoryKey, mode = 'series') {
         let visual = '';
         if (it.photo_url) {
             const fb = it.fallback_photo_url ? `'${it.fallback_photo_url}'` : 'null';
-            visual = `<img src="${it.photo_url}" style="width:clamp(24px, 6vw, 32px);height:clamp(24px, 6vw, 32px);border-radius:50%;object-fit:cover;margin-right:6px;vertical-align:middle;display:inline-block;" onerror="window.handleImgErr(this, ${fb}, '${safeName}')">`;
+            visual = `<img src="${it.photo_url}" style="width:clamp(24px, 6vw, 32px);height:clamp(24px, 6vw, 32px);border-radius:50%;object-fit:cover;margin-right:6px;vertical-align:middle;display:inline-block;" 
+                onerror="window.handleImgErr(this, ${fb}, '${safeName}')"
+                onload="window.handleKpPlaceholder(this, '${safeName}')">`;
         } else if (it.emoji) {
             visual = `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>`;
         } else if (ico) {
@@ -1190,9 +1205,14 @@ window.openShowLayer = async function(showId) {
                 <div class="h-scroll-container" style="padding-bottom:16px;">
                     ${group.persons.map(p => {
                         const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
-                        const imgHtml = p.photo_url ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" onerror="window.handleImgErr(this, ${fb}, '${p.name.replace(/'/g, "\\'")}')">` : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
+                        const safeName = p.name.replace(/'/g, "\\'");
+                        const imgHtml = p.photo_url 
+                            ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" 
+                                onerror="window.handleImgErr(this, ${fb}, '${safeName}')"
+                                onload="window.handleKpPlaceholder(this, '${safeName}')">` 
+                            : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
                         return `
-                        <div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${p.name.replace(/'/g, "\\'")}')">
+                        <div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')">
                             ${imgHtml}
                             <div class="person-name">${p.name}</div>
                         </div>`;
@@ -1277,9 +1297,9 @@ window.openShowLayer = async function(showId) {
 
             ${show.plot ? `<div class="plot-box">${show.plot}</div>` : ''}
             
-            ${crewHtml}
             ${genresHtml}
             ${countriesHtml}
+            ${crewHtml}
         `;
 
         pushLayer(html, { type: 'show' });
@@ -1329,7 +1349,9 @@ window.openCollectionLayer = async function(type, id, titleFallback) {
             const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
             const safeName = titleFallback.replace(/'/g, "\\'");
             const imgHtml = p.photo_url 
-                ? `<img src="${p.photo_url}" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;" onerror="window.handleImgErr(this, ${fb}, '${safeName}')">`
+                ? `<img src="${p.photo_url}" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;" 
+                    onerror="window.handleImgErr(this, ${fb}, '${safeName}')"
+                    onload="window.handleKpPlaceholder(this, '${safeName}')">`
                 : `<div class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px;">${titleFallback.charAt(0)}</div>`;
             
             const profsHtml = p.professions && p.professions.length > 0 
