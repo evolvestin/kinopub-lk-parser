@@ -616,11 +616,11 @@ class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
         'get_season',
         'get_episode',
         'get_users',
+        'get_source_display_styled',
         'get_is_checked_display',
         'created_at',
-        'updated_at',
     )
-    list_filter = ('is_checked', 'date_precision', 'view_date', 'users')
+    list_filter = ('source', 'is_checked', 'date_precision', 'view_date', 'users')
     search_fields = ('show__title', 'show__original_title')
     autocomplete_fields = ('show',)
     filter_horizontal = ('users',)
@@ -634,7 +634,15 @@ class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = qs.annotate(_first_user_id=Min('users__id'))
-        return qs.order_by(F('view_date').desc(nulls_last=True), '-season_number', '-episode_number')
+        return qs.order_by(
+            F('view_date').desc(nulls_last=True), '-season_number', '-episode_number'
+        )
+
+    @admin.display(description='Источник', ordering='source')
+    def get_source_display_styled(self, obj):
+        if obj.source == ViewHistory.SOURCE_KINOPUB:
+            return format_html('<span style="color: #3498db; font-weight: bold;">☁️ KinoPub</span>')
+        return format_html('<span style="color: #2ecc71; font-weight: bold;">👤 Manual</span>')
 
     @admin.display(description='Users', ordering='_first_user_id')
     def get_users(self, obj):

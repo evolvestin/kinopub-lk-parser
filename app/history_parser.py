@@ -836,6 +836,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
                     view_date=item['view_date'],
                     season_number=item['season'],
                     episode_number=item['episode'],
+                    source=ViewHistory.SOURCE_KINOPUB,
                 )
             )
             existing_set.add(key)

@@ -368,11 +368,7 @@ class TelegramSender:
                 )
             except Exception as e:
                 logger.error(f'Failed to send individual log entry: {e}')
-    
+
     def send_message_to_user(self, telegram_id: int, text: str):
-        payload = {
-            'chat_id': telegram_id,
-            'text': text,
-            'parse_mode': 'HTML'
-        }
+        payload = {'chat_id': telegram_id, 'text': text, 'parse_mode': 'HTML'}
         return self._request('send_message', payload)

@@ -831,15 +831,17 @@ body.has-banner #app {
 }
 
 #wl-active-folder-title {
-    font-size: 18px;
+    font-size: clamp(8px, 4.2vw, 16px);
     font-weight: 800;
     color: var(--text-primary);
-    display: block;
+    display: flex;
+    align-items: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
     flex: 1;
+    margin-right: 12px;
 }
 
 #wl-active-folder-title span {

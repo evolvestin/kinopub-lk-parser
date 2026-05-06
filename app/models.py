@@ -303,6 +303,13 @@ class Show(BaseModel):
 
 
 class ViewHistory(BaseModel):
+    SOURCE_MANUAL = 'manual'
+    SOURCE_KINOPUB = 'kinopub'
+    SOURCE_CHOICES = [
+        (SOURCE_MANUAL, 'Manual'),
+        (SOURCE_KINOPUB, 'KinoPub'),
+    ]
+
     show = models.ForeignKey(Show, on_delete=models.CASCADE)
     view_date = models.DateField(null=True, blank=True)
     date_precision = models.CharField(max_length=10, default='exact')
@@ -311,6 +318,13 @@ class ViewHistory(BaseModel):
     users = models.ManyToManyField(ViewUser, related_name='history', blank=True)
     is_checked = models.BooleanField(default=True, verbose_name='Учтено')
     telegram_message_id = models.IntegerField(null=True, blank=True)
+    source = models.CharField(
+        max_length=10,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_MANUAL,
+        db_index=True,
+        verbose_name='Источник',
+    )
 
     class Meta:
         indexes = [

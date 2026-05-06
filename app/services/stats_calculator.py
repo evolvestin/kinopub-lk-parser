@@ -84,7 +84,9 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
             total_days_in_period = 1
 
     active_days = counts['active_days'] or 0
-    activity_percent = round((active_days / total_days_in_period) * 100, 1) if total_days_in_period else 0
+    activity_percent = (
+        round((active_days / total_days_in_period) * 100, 1) if total_days_in_period else 0
+    )
     daily_avg = round(total_minutes / total_days_in_period, 1) if total_days_in_period else 0
 
     monthly_stats = (
@@ -340,7 +342,9 @@ def _get_heatmap(dur_qs, year, all_years):
 
     data = {
         d['view_date']: d['mins']
-        for d in dur_qs.filter(date_precision='exact').values('view_date').annotate(mins=Sum('final_duration') / 60)
+        for d in dur_qs.filter(date_precision='exact')
+        .values('view_date')
+        .annotate(mins=Sum('final_duration') / 60)
         if d['view_date']
     }
 
@@ -697,11 +701,14 @@ def generate_user_stats(user, year=None):
     ):
         movies_history.append(
             {
+                'id': h.id,  # Добавлено
                 'show_id': h.show_id,
                 'show__title': h.show.title,
                 'show__original_title': h.show.original_title,
                 'show__year': h.show.year,
                 'view_date': format_precision_date(h.view_date, h.date_precision),
+                'raw_date': h.view_date.strftime('%Y-%m-%d') if h.view_date else None,
+                'date_precision': h.date_precision,
                 'user_rating': h.user_rating,
                 'poster_url': get_poster_url(h.show_id),
                 'user_ids': list(h.users.values_list('id', flat=True)),
@@ -729,6 +736,7 @@ def generate_user_stats(user, year=None):
     ):
         episodes_history.append(
             {
+                'id': h.id,  # Добавлено
                 'show_id': h.show_id,
                 'show__title': h.show.title,
                 'show__original_title': h.show.original_title,
@@ -736,6 +744,8 @@ def generate_user_stats(user, year=None):
                 'season_number': h.season_number,
                 'episode_number': h.episode_number,
                 'view_date': format_precision_date(h.view_date, h.date_precision),
+                'raw_date': h.view_date.strftime('%Y-%m-%d') if h.view_date else None,
+                'date_precision': h.date_precision,
                 'user_rating': h.user_rating,
                 'user_show_rating': h.user_show_rating,
                 'poster_url': get_poster_url(h.show_id),
@@ -856,6 +866,7 @@ def generate_group_stats(user, year=None):
 
     for h in base_qs.order_by(F('view_date').desc(nulls_last=True), '-id'):
         entry = {
+            'id': h.id,  # Добавлено
             'show_id': h.show_id,
             'show__title': h.show.title,
             'show__original_title': h.show.original_title,

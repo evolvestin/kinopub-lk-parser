@@ -1089,8 +1089,16 @@ function getHistoryItemHtml(item, idx, type, mode) {
     const style = `style="animation-delay: ${delay}s"`;
 
     let deleteBtn = '';
-    if (type === 'wishlist_watched') {
-        deleteBtn = `<div class="wl-delete-badge" style="opacity:1; transform:scale(1); pointer-events:auto; background:var(--danger);" onclick="event.stopPropagation(); window.App.removeWlStatItem(${item.wl_item_id}, this.closest('.grid-item-wrap') || this.closest('.hist-item'))">${Icons.minus}</div>`;
+    if (!isSharedMode && type !== 'ratings') {
+        const itemData = JSON.stringify({
+            view_history_id: item.id
+        }).replace(/"/g, '&quot;');
+        
+        deleteBtn = `<div class="wl-delete-badge" style="opacity:1; transform:scale(1); pointer-events:auto; background:var(--danger);" 
+            onclick="event.stopPropagation(); window.App.removeHistoryItem(this, ${itemData})">${Icons.minus}</div>`;
+    } else if (type === 'wishlist_watched') {
+        deleteBtn = `<div class="wl-delete-badge" style="opacity:1; transform:scale(1); pointer-events:auto; background:var(--danger);" 
+            onclick="event.stopPropagation(); window.App.removeWlStatItem(${item.wl_item_id}, this.closest('.grid-item-wrap') || this.closest('.hist-item'))">${Icons.minus}</div>`;
     }
 
     if (mode === 'list') {
@@ -1633,6 +1641,48 @@ window.App = {
     closeCasino: window.closeCasino,
     resetCasino: window.resetCasino,
     startCasinoSpin: window.startCasinoSpin,
+    removeHistoryItem: function(btn, payload) {
+        const msg = "Удалить этот просмотр из вашей истории?";
+        const element = btn.closest('.grid-item-wrap') || btn.closest('.hist-item');
+        
+        const performDelete = async () => {
+            if (element) {
+                element.style.transition = 'all 0.3s ease';
+                element.style.opacity = '0';
+                element.style.transform = 'scale(0.8)';
+                setTimeout(() => element.remove(), 300);
+            }
+            
+            try {
+                const r = await fetch('/api/webapp/remove_view/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        init_data: tg?.initData || '',
+                        ...payload
+                    })
+                });
+                if (!r.ok) throw new Error('Ошибка API');
+                
+                window.AppData.cache.clear();
+                showToast('Просмотр удален');
+            } catch(e) {
+                showToast('Не удалось удалить');
+                if (element) {
+                    element.style.opacity = '1';
+                    element.style.transform = 'scale(1)';
+                }
+            }
+        };
+
+        if (window.Telegram?.WebApp?.showConfirm) {
+            window.Telegram.WebApp.showConfirm(msg, (confirmed) => {
+                if (confirmed) performDelete();
+            });
+        } else {
+            if (confirm(msg)) performDelete();
+        }
+    },
     showStatsHelp: function(e) {
         if (e) {
             e.preventDefault();
@@ -1783,10 +1833,8 @@ window.init = async function() {
         await loadShared(sid);
     } else {
         await load();
-        const role = D?.meta?.role || 'guest';
         document.getElementById('bottom-nav').style.display = 'flex';
         document.body.classList.add('has-nav');
-        if (role === 'guest') document.getElementById('bn-stats').classList.add('hidden');
         
         switchMainView(viewFromUrl || 'search');
         if (showIdFromUrl) window.App.openShowLayer(showIdFromUrl);

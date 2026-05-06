@@ -43,6 +43,7 @@ urlpatterns = [
     path('api/webapp/wishlist/', views.webapp_wishlist_data, name='webapp_wishlist_data'),
     path('api/webapp/casino/', views.webapp_casino, name='webapp_casino'),
     path('api/webapp/add_view/', views.webapp_add_view, name='webapp_add_view'),
+    path('api/webapp/remove_view/', views.webapp_remove_view, name='webapp_remove_view'),
     path('api/bot/check/<int:telegram_id>/', views.check_bot_user),
     path('api/bot/register/', views.register_bot_user),
     path('api/bot/set_role/', views.set_bot_user_role),

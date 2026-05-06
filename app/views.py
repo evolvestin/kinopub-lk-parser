@@ -108,10 +108,10 @@ def _serialize_show_details(show, user=None):
     personal_episodes_count = 0
 
     if user:
-        personal_rating = UserRating.objects.filter(
-            user=user, show=show
-        ).aggregate(avg=Avg('rating'))['avg']
-        
+        personal_rating = UserRating.objects.filter(user=user, show=show).aggregate(
+            avg=Avg('rating')
+        )['avg']
+
         if personal_rating is not None:
             personal_rating = round(personal_rating, 1)
 
@@ -658,7 +658,7 @@ def bot_toggle_view_check(request):
                     candidate.is_checked = True
                     candidate.save(update_fields=['is_checked'])
                     TelegramSender().update_history_message(candidate)
-                    message += f' Восстановлен статус просмотра.'
+                    message += ' Восстановлен статус просмотра.'
                     break
 
         return JsonResponse({'status': 'ok', 'message': message, 'is_checked': view.is_checked})
@@ -2015,7 +2015,7 @@ def webapp_add_view(request):
             season_number=season,
             episode_number=episode,
             view_date=view_date,
-            date_precision=date_mode
+            date_precision=date_mode,
         ).first()
 
         if not vh:
@@ -2025,7 +2025,8 @@ def webapp_add_view(request):
                 season_number=season,
                 episode_number=episode,
                 date_precision=date_mode,
-                is_checked=True
+                is_checked=True,
+                source=ViewHistory.SOURCE_MANUAL,
             )
             vh._skip_broadcast = True
             vh.save()
@@ -2036,12 +2037,13 @@ def webapp_add_view(request):
             vh.users.add(view_user)
 
         from app.tasks import send_view_confirmation_task
+
         show_title = vh.show.title or vh.show.original_title
         send_view_confirmation_task.delay(
-            view_user.telegram_id, 
-            show_title, 
-            season if season > 0 else None, 
-            episode if episode > 0 else None
+            view_user.telegram_id,
+            show_title,
+            season if season > 0 else None,
+            episode if episode > 0 else None,
         )
 
         return JsonResponse({'status': 'ok'})
@@ -2050,3 +2052,58 @@ def webapp_add_view(request):
         logging.error(f'WebApp Add View Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
 
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_remove_view(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        try:
+            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        except ViewUser.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        history_id = body.get('view_history_id')
+        if not history_id:
+            # Обратная совместимость на время деплоя/кэша
+            show_id = body.get('show_id')
+            season = int(body.get('season') or 0)
+            episode = int(body.get('episode') or 0)
+            date_mode = body.get('date_mode', 'exact')
+            date_val = body.get('date_val')
+
+            view_date = None
+            if date_mode == 'exact' and date_val:
+                view_date = datetime.strptime(date_val, '%Y-%m-%d').date()
+            elif date_mode == 'month' and date_val:
+                view_date = datetime.strptime(date_val, '%Y-%m').date()
+            elif date_mode == 'year' and date_val:
+                view_date = datetime.strptime(date_val, '%Y').date()
+
+            vh = ViewHistory.objects.filter(
+                show_id=show_id,
+                season_number=season,
+                episode_number=episode,
+                view_date=view_date,
+                date_precision=date_mode,
+            ).first()
+        else:
+            vh = ViewHistory.objects.filter(id=history_id).first()
+
+        if vh:
+            vh.users.remove(view_user)
+            if vh.source == ViewHistory.SOURCE_KINOPUB and vh.telegram_message_id:
+                TelegramSender().update_history_message(vh)
+
+            return JsonResponse({'status': 'ok'})
+
+        return JsonResponse({'error': 'View record not found in database'}, status=404)
+
+    except Exception as e:
+        logging.error(f'WebApp Remove View Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Internal server error'}, status=500)
