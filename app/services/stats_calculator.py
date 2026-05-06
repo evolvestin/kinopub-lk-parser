@@ -37,7 +37,7 @@ from shared.constants import (
     SERIES_TYPES,
     WRITER_ROLES,
 )
-from shared.formatters import format_duration
+from shared.formatters import format_duration, format_precision_date
 from shared.media import get_poster_url
 
 logger = logging.getLogger(__name__)
@@ -84,11 +84,12 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
             total_days_in_period = 1
 
     active_days = counts['active_days'] or 0
-    activity_percent = round((active_days / total_days_in_period) * 100, 1)
-    daily_avg = round(total_minutes / total_days_in_period, 1)
+    activity_percent = round((active_days / total_days_in_period) * 100, 1) if total_days_in_period else 0
+    daily_avg = round(total_minutes / total_days_in_period, 1) if total_days_in_period else 0
 
     monthly_stats = (
-        base_qs.annotate(m=TruncMonth('view_date'))
+        base_qs.filter(date_precision__in=['exact', 'month'])
+        .annotate(m=TruncMonth('view_date'))
         .values('m')
         .annotate(cnt=Count('id'))
         .order_by('-cnt')
@@ -294,7 +295,7 @@ def _get_favorites(base_qs, dur_qs):
 
 def _get_binge_records(base_qs):
     binge_qs = (
-        base_qs.filter(season_number__gt=0)
+        base_qs.filter(season_number__gt=0, date_precision='exact')
         .values('show_id', 'show__title', 'show__original_title', 'view_date')
         .annotate(episodes_count=Count('id'))
         .filter(episodes_count__gte=3)
@@ -339,7 +340,7 @@ def _get_heatmap(dur_qs, year, all_years):
 
     data = {
         d['view_date']: d['mins']
-        for d in dur_qs.values('view_date').annotate(mins=Sum('final_duration') / 60)
+        for d in dur_qs.filter(date_precision='exact').values('view_date').annotate(mins=Sum('final_duration') / 60)
         if d['view_date']
     }
 
@@ -396,7 +397,8 @@ def _get_monthly_chart(base_qs, dur_qs, year=None):
         limit_month = now.month if year_val == now.year else 12
 
         monthly_counts = (
-            base_qs.annotate(m_num=ExtractMonth('view_date'))
+            base_qs.filter(date_precision__in=['exact', 'month'])
+            .annotate(m_num=ExtractMonth('view_date'))
             .values('m_num')
             .annotate(
                 views=Count('id'),
@@ -407,7 +409,8 @@ def _get_monthly_chart(base_qs, dur_qs, year=None):
         count_map = {mc['m_num']: mc for mc in monthly_counts if mc['m_num']}
 
         monthly_hours = (
-            dur_qs.annotate(m_num=ExtractMonth('view_date'))
+            dur_qs.filter(date_precision__in=['exact', 'month'])
+            .annotate(m_num=ExtractMonth('view_date'))
             .values('m_num')
             .annotate(hours=Sum('final_duration') / 3600.0)
         )
@@ -422,7 +425,8 @@ def _get_monthly_chart(base_qs, dur_qs, year=None):
             movies_data.append(entry.get('movies', 0))
     else:
         timeline_counts = (
-            base_qs.annotate(m_trunc=TruncMonth('view_date'))
+            base_qs.filter(date_precision__in=['exact', 'month'])
+            .annotate(m_trunc=TruncMonth('view_date'))
             .values('m_trunc')
             .annotate(
                 views=Count('id'),
@@ -447,7 +451,8 @@ def _get_monthly_chart(base_qs, dur_qs, year=None):
         count_map = {item['m_trunc']: item for item in timeline_counts}
 
         timeline_hours = (
-            dur_qs.annotate(m_trunc=TruncMonth('view_date'))
+            dur_qs.filter(date_precision__in=['exact', 'month'])
+            .annotate(m_trunc=TruncMonth('view_date'))
             .values('m_trunc')
             .annotate(hours=Sum('final_duration') / 3600.0)
         )
@@ -480,7 +485,10 @@ def _get_monthly_chart(base_qs, dur_qs, year=None):
 
 def _get_weekday_chart(base_qs):
     wd_stats = (
-        base_qs.annotate(wd=ExtractWeekDay('view_date')).values('wd').annotate(cnt=Count('id'))
+        base_qs.filter(date_precision='exact')
+        .annotate(wd=ExtractWeekDay('view_date'))
+        .values('wd')
+        .annotate(cnt=Count('id'))
     )
 
     day_map = {2: 0, 3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 1: 6}
@@ -685,7 +693,7 @@ def generate_user_stats(user, year=None):
     for h in (
         base_qs.filter(season_number=0)
         .annotate(user_rating=Subquery(user_movie_rating))
-        .order_by('-view_date', '-id')
+        .order_by(F('view_date').desc(nulls_last=True), '-id')
     ):
         movies_history.append(
             {
@@ -693,7 +701,7 @@ def generate_user_stats(user, year=None):
                 'show__title': h.show.title,
                 'show__original_title': h.show.original_title,
                 'show__year': h.show.year,
-                'view_date': h.view_date.strftime('%Y-%m-%d'),
+                'view_date': format_precision_date(h.view_date, h.date_precision),
                 'user_rating': h.user_rating,
                 'poster_url': get_poster_url(h.show_id),
                 'user_ids': list(h.users.values_list('id', flat=True)),
@@ -717,7 +725,7 @@ def generate_user_stats(user, year=None):
     for h in (
         base_qs.filter(season_number__gt=0)
         .annotate(user_rating=Subquery(user_ep_rating), user_show_rating=Subquery(user_show_rating))
-        .order_by('-view_date', '-id')
+        .order_by(F('view_date').desc(nulls_last=True), '-id')
     ):
         episodes_history.append(
             {
@@ -727,7 +735,7 @@ def generate_user_stats(user, year=None):
                 'show__year': h.show.year,
                 'season_number': h.season_number,
                 'episode_number': h.episode_number,
-                'view_date': h.view_date.strftime('%Y-%m-%d'),
+                'view_date': format_precision_date(h.view_date, h.date_precision),
                 'user_rating': h.user_rating,
                 'user_show_rating': h.user_show_rating,
                 'poster_url': get_poster_url(h.show_id),
@@ -846,13 +854,13 @@ def generate_group_stats(user, year=None):
     history_movies = []
     history_episodes = []
 
-    for h in base_qs.order_by('-view_date', '-id'):
+    for h in base_qs.order_by(F('view_date').desc(nulls_last=True), '-id'):
         entry = {
             'show_id': h.show_id,
             'show__title': h.show.title,
             'show__original_title': h.show.original_title,
             'show__year': h.show.year,
-            'view_date': h.view_date.strftime('%Y-%m-%d'),
+            'view_date': format_precision_date(h.view_date, h.date_precision),
             'poster_url': get_poster_url(h.show_id),
             'user_ids': list(h.users.values_list('id', flat=True)),
             'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],

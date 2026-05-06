@@ -304,7 +304,8 @@ class Show(BaseModel):
 
 class ViewHistory(BaseModel):
     show = models.ForeignKey(Show, on_delete=models.CASCADE)
-    view_date = models.DateField()
+    view_date = models.DateField(null=True, blank=True)
+    date_precision = models.CharField(max_length=10, default='exact')
     season_number = models.IntegerField(default=0, null=True, blank=True)
     episode_number = models.IntegerField(default=0, null=True, blank=True)
     users = models.ManyToManyField(ViewUser, related_name='history', blank=True)

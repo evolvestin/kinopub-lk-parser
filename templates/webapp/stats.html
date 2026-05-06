@@ -386,19 +386,71 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="add-view-modal">
+        <div class="modal-content" style="padding: 24px; position: relative;">
+            <div class="modal-title" style="font-size: 14px; opacity: 0.7; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; margin-bottom: 8px;">
+                Отметить просмотр
+            </div>
+            <div id="add-view-title" style="font-size: clamp(18px, 5vw, 22px); font-weight: 900; color: var(--accent); margin-bottom: 24px; line-height: 1.2; text-align: center; letter-spacing: -0.5px;"></div>
+
+            <div id="add-view-se-container" style="display:none; gap:12px; margin-bottom:20px;">
+                <div style="flex:1;">
+                    <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:6px; text-transform:uppercase;">Сезон</div>
+                    <input type="number" id="add-view-season" class="search-input" placeholder="1" min="1">
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:6px; text-transform:uppercase;">Эпизод</div>
+                    <input type="number" id="add-view-episode" class="search-input" placeholder="1" min="1">
+                </div>
+            </div>
+
+            <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:8px; text-transform:uppercase;">Когда смотрели?</div>
+            <div class="view-toggle" style="margin-bottom:16px; padding:3px; background:var(--bg-input);">
+                <button class="vt-btn active" style="flex:1; padding:8px 4px; font-size:12px;" onclick="window.App.setAddViewMode('exact', this)">Точная дата</button>
+                <button class="vt-btn" style="flex:1; padding:8px 4px; font-size:12px;" onclick="window.App.setAddViewMode('month', this)">Месяц</button>
+                <button class="vt-btn" style="flex:1; padding:8px 4px; font-size:12px;" onclick="window.App.setAddViewMode('year', this)">Год</button>
+                <button class="vt-btn" style="flex:1; padding:8px 4px; font-size:12px;" onclick="window.App.setAddViewMode('unknown', this)">Не помню</button>
+            </div>
+
+            <div id="add-view-date-inputs" style="margin-bottom: 24px;">
+                <input type="date" id="add-view-exact" class="search-input" style="width:100%;">
+                <input type="month" id="add-view-month" class="search-input" style="width:100%; display:none;">
+                <input type="number" id="add-view-year" class="search-input" placeholder="YYYY" style="width:100%; display:none;" min="1900" max="2100">
+                <div id="add-view-unknown-text" style="display:none; font-size:13px; color:var(--text-secondary); text-align:center; padding: 10px; background: var(--bg-input); border-radius: 12px; border: 1px dashed var(--border);">Просмотр будет учтен в статистике "Всё время" и закреплен в самом низу истории.</div>
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+                <button class="btn-primary" style="margin-top: 0; background: var(--bg-input); color: var(--text-primary); box-shadow: none; flex: 1;" onclick="window.App.closeAddViewModal()">Отмена</button>
+                <button class="btn-primary" id="btn-add-view-submit" style="margin-top:0; flex: 2;" onclick="window.App.submitAddView()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
     <script src="{% static 'js/casino.js' %}?v={{ APP_VERSION }}" defer></script>
     <script src="{% static 'js/wishlist.js' %}?v={{ APP_VERSION }}" defer></script>
     <script src="{% static 'js/webapp.js' %}?v={{ APP_VERSION }}" defer></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            switchPeriod('now');
-            document.getElementById('details-modal').addEventListener('click', (e) => {
-                if (e.target.id === 'details-modal') closeModal();
-            });
-            // Изменение 2: Закрытие модалки удаления при клике вне её контента
-            document.getElementById('wl-item-delete-modal').addEventListener('click', (e) => {
-                if (e.target.id === 'wl-item-delete-modal') window.App.closeItemDeleteModal();
+            if (typeof switchPeriod === 'function') switchPeriod('now');
+
+            const modalCloseMap = {
+                'details-modal': () => (typeof closeModal === 'function') && closeModal(),
+                'wl-item-delete-modal': () => window.App.closeItemDeleteModal(),
+                'add-view-modal': () => window.App.closeAddViewModal(),
+                'wl-modal': () => window.App.closeFolderModal(),
+                'wl-edit-modal': () => window.App.closeFolderEditModal(),
+                'wl-limit-modal': () => window.App.closeLimitModal(),
+                'casino-modal': () => window.App.closeCasino()
+            };
+
+            Object.keys(modalCloseMap).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('click', (e) => {
+                        if (e.target.id === id) modalCloseMap[id]();
+                    });
+                }
             });
         });
     </script>

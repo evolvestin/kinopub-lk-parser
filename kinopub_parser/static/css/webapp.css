@@ -319,7 +319,25 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 .legend-name { font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .legend-val { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-left: auto; }
 
-.toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--bg-input); color: var(--text-primary); padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 700; border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 1000; transition: transform var(--transition-bounce), opacity var(--transition-smooth); opacity: 0; pointer-events: none; white-space: nowrap; }
+.toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    z-index: 3000;
+    transition: transform var(--transition-bounce), opacity var(--transition-smooth);
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+}
 .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
 .cmp { display: flex; justify-content: space-between; align-items: center; padding: clamp(10px, 3vw, 12px) 0; border-bottom: 1px dashed var(--border); }
@@ -1259,3 +1277,34 @@ body.has-banner #app {
     border-right: 1px solid var(--accent);
     border-bottom: 1px solid var(--accent);
 }
+
+
+.detail-add-view-btn {
+    position: absolute !important;
+    top: 40px !important;
+    right: -18px !important;
+    left: auto !important;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 50% !important;
+    background: var(--info) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 15px rgba(96, 165, 250, 0.4) !important;
+    border: 3px solid var(--bg-main) !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    cursor: pointer;
+    transition: transform var(--transition-bounce), background var(--transition-smooth);
+}
+
+.detail-add-view-btn:active {
+    transform: scale(0.85) !important;
+}
+
+.detail-add-view-btn svg {
+    width: 24px !important;
+    height: 24px !important;
+}
+@media (max-width: 380px) { .detail-add-view-btn { right: -10px !important; top: 44px !important; } }

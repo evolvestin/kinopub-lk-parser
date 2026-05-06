@@ -6,13 +6,13 @@ import random
 import urllib.parse
 import uuid
 from collections import defaultdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Avg, Max, Prefetch, Q
+from django.db.models import Avg, F, Max, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -68,7 +68,7 @@ from shared.constants import (
     RAW_TO_NORMALIZED_RU,
     UserRole,
 )
-from shared.formatters import format_se
+from shared.formatters import format_precision_date, format_se
 from shared.media import get_poster_url
 
 
@@ -108,10 +108,10 @@ def _serialize_show_details(show, user=None):
     personal_episodes_count = 0
 
     if user:
-        personal_rating = UserRating.objects.filter(user=user, show=show).aggregate(
-            avg=Avg('rating')
-        )['avg']
-
+        personal_rating = UserRating.objects.filter(
+            user=user, show=show
+        ).aggregate(avg=Avg('rating'))['avg']
+        
         if personal_rating is not None:
             personal_rating = round(personal_rating, 1)
 
@@ -119,11 +119,10 @@ def _serialize_show_details(show, user=None):
             user=user, show=show, season_number__isnull=False
         ).count()
 
-    # Сбор истории просмотров
     history_qs = (
         ViewHistory.objects.filter(show=show)
         .prefetch_related('users')
-        .order_by('-view_date', '-id')
+        .order_by(F('view_date').desc(nulls_last=True), '-id')
     )
 
     view_history_list = []
@@ -136,7 +135,7 @@ def _serialize_show_details(show, user=None):
         view_history_list.append(
             {
                 'id': h.id,
-                'date': h.view_date.strftime('%Y-%m-%d'),
+                'date': format_precision_date(h.view_date, h.date_precision),
                 'season': h.season_number,
                 'episode': h.episode_number,
                 'users': [
@@ -650,7 +649,7 @@ def bot_toggle_view_check(request):
                     is_checked=False,
                 )
                 .exclude(id=view.id)
-                .order_by('-view_date', '-id')
+                .order_by(F('view_date').desc(nulls_last=True), '-id')
             )
 
             for candidate in candidates:
@@ -659,7 +658,7 @@ def bot_toggle_view_check(request):
                     candidate.is_checked = True
                     candidate.save(update_fields=['is_checked'])
                     TelegramSender().update_history_message(candidate)
-                    message += f' Восстановлен статус просмотра от {candidate.view_date}.'
+                    message += f' Восстановлен статус просмотра.'
                     break
 
         return JsonResponse({'status': 'ok', 'message': message, 'is_checked': view.is_checked})
@@ -1980,3 +1979,74 @@ def admin_get_folder_content(request, folder_id):
         )
     except WishlistFolder.DoesNotExist:
         return JsonResponse({'error': 'Folder not found'}, status=404)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_add_view(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        try:
+            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        except ViewUser.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        show_id = body.get('show_id')
+        season = int(body.get('season') or 0)
+        episode = int(body.get('episode') or 0)
+        date_mode = body.get('date_mode', 'exact')
+        date_val = body.get('date_val')
+
+        view_date = None
+        if date_mode == 'exact' and date_val:
+            view_date = datetime.strptime(date_val, '%Y-%m-%d').date()
+        elif date_mode == 'month' and date_val:
+            view_date = datetime.strptime(date_val, '%Y-%m').date()
+        elif date_mode == 'year' and date_val:
+            view_date = datetime.strptime(date_val, '%Y').date()
+
+        vh = ViewHistory.objects.filter(
+            show_id=show_id,
+            season_number=season,
+            episode_number=episode,
+            view_date=view_date,
+            date_precision=date_mode
+        ).first()
+
+        if not vh:
+            vh = ViewHistory(
+                show_id=show_id,
+                view_date=view_date,
+                season_number=season,
+                episode_number=episode,
+                date_precision=date_mode,
+                is_checked=True
+            )
+            vh._skip_broadcast = True
+            vh.save()
+        else:
+            vh._skip_broadcast = True
+
+        if not vh.users.filter(id=view_user.id).exists():
+            vh.users.add(view_user)
+
+        from app.tasks import send_view_confirmation_task
+        show_title = vh.show.title or vh.show.original_title
+        send_view_confirmation_task.delay(
+            view_user.telegram_id, 
+            show_title, 
+            season if season > 0 else None, 
+            episode if episode > 0 else None
+        )
+
+        return JsonResponse({'status': 'ok'})
+
+    except Exception as e:
+        logging.error(f'WebApp Add View Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)
+

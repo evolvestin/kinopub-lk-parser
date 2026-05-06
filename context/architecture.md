@@ -26,3 +26,14 @@ Any code generating new database records must follow this "Save-As-Is" architect
     *   Use `get_genre_norm()` for Django QuerySets (aggregations, counts, group by).
     *   Use `normalize_genre_name()` for Python-side processing (properties, list filtering).
 3.  **Metrics Consistency**: Any metric displayed on the dashboard that counts "Unique" items must apply these normalization functions to avoid reporting duplicates caused by casing differences.
+
+
+## Manual User Actions Policy
+
+**RULE**: Actions initiated manually by the user via the WebApp (e.g., adding a view, rating, wishlist changes) MUST NOT trigger automated broadcasts to public or shared Telegram channels.
+
+1.  **Reasoning**: Users should have the privacy to manage their data without forced public logging. Public channels are reserved for automated system events (like parser hits).
+2.  **Implementation**: Use the `_skip_broadcast` attribute on model instances before saving to notify signal handlers that channel notifications should be suppressed.
+3.  **Feedback**: Confirmation of manual actions must be sent directly to the user (private message) or displayed as UI feedback (Toasts/Modals), preferably via background tasks to keep the UI responsive.
+
+

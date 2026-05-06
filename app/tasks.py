@@ -26,6 +26,7 @@ from app.services.metrics import (
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
+from shared.html_helper import bold
 
 
 @contextmanager
@@ -519,3 +520,20 @@ def update_site_metrics_task():
     data = generate_global_metrics_snapshot()
     SiteMetric.objects.create(key='global_snapshot', data=data)
     logging.info('Global site metrics snapshot updated successfully.')
+
+
+@shared_task
+@safe_execution
+def send_view_confirmation_task(telegram_id, show_title, season=None, episode=None):
+    sender = TelegramSender()
+    
+    se_text = ""
+    if season and episode:
+        from shared.formatters import format_se
+        se_text = f" ({format_se(season, episode)})"
+        
+    message = (
+        f"✅ Вы отметили просмотр: {show_title}{se_text}"
+    )
+    sender.send_message_to_user(telegram_id, message)
+    

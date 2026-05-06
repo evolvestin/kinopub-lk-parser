@@ -1275,6 +1275,9 @@ window.openShowLayer = async function(showId) {
                 <div style="position: relative; z-index: 3; height: 85%; max-width: 65%; display: flex; align-items: flex-end;">
                     ${posterUrl ? `<img src="${posterUrl}" class="hero-poster" style="max-width: 100%; height: 100%; margin: 0; box-shadow: none;" alt="poster">` : ''}
                     <button class="wishlist-add-btn detail-wishlist-btn anim-item" style="animation-delay: 0.6s;" onclick="window.App.showFolderModal(${show.id}, '${safeTitle}')">${Icons.bookmark_plus}</button>
+                    <button class="detail-add-view-btn anim-item" style="animation-delay: 0.7s;" onclick="window.App.openAddViewModal(${show.id}, '${safeTitle}', '${show.type}')">
+                        ${Icons.eye}
+                    </button>
                 </div>
             </div>
             
@@ -1296,7 +1299,7 @@ window.openShowLayer = async function(showId) {
             </div>
 
             ${show.plot ? `<div class="plot-box">${show.plot}</div>` : ''}
-            
+
             ${genresHtml}
             ${countriesHtml}
             ${crewHtml}
@@ -1602,6 +1605,12 @@ async function submitShare() {
     }
 }
 
+let addViewData = {
+    showId: null,
+    type: null,
+    mode: 'exact'
+};
+
 window.App = {
     ...window.App,
     toggleTheme: toggleTheme,
@@ -1653,6 +1662,96 @@ window.App = {
         itemToDeleteId = null;
         itemToDeleteElement = null;
     },
+    openAddViewModal: function(showId, title, type) {
+        addViewData.showId = showId;
+        addViewData.type = type;
+        
+        document.getElementById('add-view-title').textContent = title;
+
+        const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(type);
+        document.getElementById('add-view-se-container').style.display = isSeries ? 'flex' : 'none';
+        document.getElementById('add-view-season').value = '';
+        document.getElementById('add-view-episode').value = '';
+
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        
+        document.getElementById('add-view-exact').value = `${year}-${month}-${day}`;
+        document.getElementById('add-view-month').value = `${year}-${month}`;
+        document.getElementById('add-view-year').value = year;
+
+        window.App.setAddViewMode('exact');
+
+        document.getElementById('add-view-modal').classList.add('show');
+    },
+    setAddViewMode: function(mode, btn) {
+        addViewData.mode = mode;
+        const btns = document.querySelectorAll('#add-view-modal .vt-btn');
+        btns.forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        else if (btns.length > 0) btns[0].classList.add('active');
+
+        document.getElementById('add-view-exact').style.display = mode === 'exact' ? 'block' : 'none';
+        document.getElementById('add-view-month').style.display = mode === 'month' ? 'block' : 'none';
+        document.getElementById('add-view-year').style.display = mode === 'year' ? 'block' : 'none';
+        document.getElementById('add-view-unknown-text').style.display = mode === 'unknown' ? 'block' : 'none';
+    },
+    closeAddViewModal: function() {
+        document.getElementById('add-view-modal').classList.remove('show');
+    },
+    submitAddView: async function() {
+        const btn = document.getElementById('btn-add-view-submit');
+        const origHtml = btn.innerHTML;
+
+        const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(addViewData.type);
+        let season = 0, episode = 0;
+        if (isSeries) {
+            season = parseInt(document.getElementById('add-view-season').value);
+            episode = parseInt(document.getElementById('add-view-episode').value);
+            if (!season || !episode) {
+                showToast('Укажите сезон и эпизод');
+                return;
+            }
+        }
+
+        let dateVal = null;
+        if (addViewData.mode === 'exact') dateVal = document.getElementById('add-view-exact').value;
+        if (addViewData.mode === 'month') dateVal = document.getElementById('add-view-month').value;
+        if (addViewData.mode === 'year') dateVal = document.getElementById('add-view-year').value;
+
+        btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;"></div>';
+        btn.disabled = true;
+
+        try {
+            const r = await fetch('/api/webapp/add_view/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    init_data: tg?.initData || '',
+                    show_id: addViewData.showId,
+                    season: season,
+                    episode: episode,
+                    date_mode: addViewData.mode,
+                    date_val: dateVal
+                })
+            });
+            const j = await r.json();
+            if (j.error) throw new Error(j.error);
+
+            showToast('Просмотр добавлен!');
+            window.App.closeAddViewModal();
+            
+            window.AppData.cache.clear();
+            load(curYear);
+        } catch(e) {
+            showToast('Ошибка: ' + e.message);
+        } finally {
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+        }
+    }
 };
 
 window.init = async function() {

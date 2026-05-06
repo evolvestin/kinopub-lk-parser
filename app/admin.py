@@ -612,6 +612,7 @@ class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
     list_display = (
         'show',
         'view_date',
+        'date_precision',
         'get_season',
         'get_episode',
         'get_users',
@@ -619,11 +620,13 @@ class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
         'created_at',
         'updated_at',
     )
-    list_filter = ('is_checked', 'view_date', 'users')
+    list_filter = ('is_checked', 'date_precision', 'view_date', 'users')
     search_fields = ('show__title', 'show__original_title')
     autocomplete_fields = ('show',)
     filter_horizontal = ('users',)
     readonly_fields = (
+        'view_date',
+        'date_precision',
         'created_at',
         'updated_at',
     )
@@ -631,7 +634,7 @@ class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         qs = qs.annotate(_first_user_id=Min('users__id'))
-        return qs.order_by('-view_date', '-season_number', '-episode_number')
+        return qs.order_by(F('view_date').desc(nulls_last=True), '-season_number', '-episode_number')
 
     @admin.display(description='Users', ordering='_first_user_id')
     def get_users(self, obj):

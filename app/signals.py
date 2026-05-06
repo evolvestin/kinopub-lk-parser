@@ -32,13 +32,16 @@ def delete_view_user_message(sender, instance, **kwargs):
 @receiver(view_history_created)
 def handle_new_view_history(sender, instance, **kwargs):
     try:
+        if getattr(instance, '_skip_broadcast', False):
+            return
+
         sender_service = TelegramSender()
 
         if not instance.users.exists():
             last_view = (
                 sender.objects.filter(show=instance.show, users__isnull=False)
                 .exclude(id=instance.id)
-                .order_by('-view_date', '-season_number', '-episode_number')
+                .order_by(F('view_date').desc(nulls_last=True), '-season_number', '-episode_number')
                 .first()
             )
 
@@ -51,26 +54,27 @@ def handle_new_view_history(sender, instance, **kwargs):
             if user.telegram_id:
                 sender_service.send_private_history_notification(user.telegram_id, instance)
 
-        six_months_ago = instance.view_date - timedelta(days=180)
+        if instance.view_date:
+            six_months_ago = instance.view_date - timedelta(days=180)
 
-        older_duplicates = sender.objects.filter(
-            show=instance.show,
-            season_number=instance.season_number,
-            episode_number=instance.episode_number,
-            view_date__lt=instance.view_date,
-            view_date__gte=six_months_ago,
-            is_checked=True,
-        )
+            older_duplicates = sender.objects.filter(
+                show=instance.show,
+                season_number=instance.season_number,
+                episode_number=instance.episode_number,
+                view_date__lt=instance.view_date,
+                view_date__gte=six_months_ago,
+                is_checked=True,
+            )
 
-        current_users_set = set(instance.users.values_list('id', flat=True))
+            current_users_set = set(instance.users.values_list('id', flat=True))
 
-        for old_view in older_duplicates:
-            old_users_set = set(old_view.users.values_list('id', flat=True))
+            for old_view in older_duplicates:
+                old_users_set = set(old_view.users.values_list('id', flat=True))
 
-            if current_users_set == old_users_set:
-                old_view.is_checked = False
-                old_view.save(update_fields=['is_checked'])
-                sender_service.update_history_message(old_view)
+                if current_users_set == old_users_set:
+                    old_view.is_checked = False
+                    old_view.save(update_fields=['is_checked'])
+                    sender_service.update_history_message(old_view)
 
     except Exception as e:
         logging.error(f'Failed to handle new view history signal: {e}')
@@ -127,27 +131,41 @@ def record_task_start(sender, **kwargs):
 @receiver(m2m_changed, sender=ViewHistory.users.through)
 def invalidate_stats_on_user_change(sender, instance, action, pk_set, **kwargs):
     if action in ('post_add', 'post_remove', 'post_clear'):
-        year = instance.view_date.year
+        year = instance.view_date.year if instance.view_date else None
         user_ids = set(pk_set) if pk_set else set()
         user_ids.update(instance.users.values_list('id', flat=True))
 
         for uid in user_ids:
-            cache.delete(f'user_stats:{uid}:{year}')
+            if year:
+                cache.delete(f'user_stats:{uid}:{year}')
+                cache.delete(f'user_stats_v6:{uid}:{year}')
+                cache.delete(f'group_stats_v6:{uid}:{year}')
             cache.delete(f'user_stats:{uid}:all')
+            cache.delete(f'user_stats_v6:{uid}:all')
+            cache.delete(f'group_stats_v6:{uid}:all')
 
 
 @receiver(post_save, sender=ViewHistory)
 def invalidate_stats_on_history_change(sender, instance, created, **kwargs):
-    year = instance.view_date.year
-    # Очищаем кэш для всех пользователей, привязанных к этой записи
+    year = instance.view_date.year if instance.view_date else None
     for user in instance.users.all():
-        cache.delete(f'user_stats:{user.id}:{year}')
+        if year:
+            cache.delete(f'user_stats:{user.id}:{year}')
+            cache.delete(f'user_stats_v6:{user.id}:{year}')
+            cache.delete(f'group_stats_v6:{user.id}:{year}')
         cache.delete(f'user_stats:{user.id}:all')
+        cache.delete(f'user_stats_v6:{user.id}:all')
+        cache.delete(f'group_stats_v6:{user.id}:all')
 
 
 @receiver(post_delete, sender=ViewHistory)
 def invalidate_stats_on_history_delete(sender, instance, **kwargs):
-    year = instance.view_date.year
+    year = instance.view_date.year if instance.view_date else None
     for user in instance.users.all():
-        cache.delete(f'user_stats:{user.id}:{year}')
+        if year:
+            cache.delete(f'user_stats:{user.id}:{year}')
+            cache.delete(f'user_stats_v6:{user.id}:{year}')
+            cache.delete(f'group_stats_v6:{user.id}:{year}')
         cache.delete(f'user_stats:{user.id}:all')
+        cache.delete(f'user_stats_v6:{user.id}:all')
+        cache.delete(f'group_stats_v6:{user.id}:all')

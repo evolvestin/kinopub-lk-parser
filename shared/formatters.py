@@ -18,6 +18,16 @@ def format_duration(seconds: int | float | None) -> str:
     return ' '.join(parts)
 
 
+def format_precision_date(view_date, precision: str) -> str:
+    if not view_date:
+        return 'Неизвестно'
+    if precision == 'year':
+        return view_date.strftime('%Y')
+    if precision == 'month':
+        return view_date.strftime('%Y-%m')
+    return view_date.strftime('%Y-%m-%d')
+
+
 def format_se(season: int | None, episode: int | None) -> str:
     """
     Форматирует номер сезона и эпизода:
