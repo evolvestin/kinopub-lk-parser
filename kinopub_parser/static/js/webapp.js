@@ -1125,13 +1125,20 @@ function getHistoryItemHtml(item, idx, type, mode) {
     const animClass = 'anim-item';
     const style = `style="animation-delay: ${delay}s"`;
 
+    // Нормализация данных из разных источников (История vs Рейтинги)
+    const title = item.show__title || item.title;
+    const originalTitle = item.show__original_title || item.original_title;
+    const itemYear = item.show__year || item.year;
+    const displayDate = item.view_date || item.date;
+    const rating = item.user_rating || item.rating;
+    
+    // Номер сезона и эпизода
+    const sNum = item.season_number || item.season;
+    const eNum = item.episode_number || item.episode;
+
     let deleteBtn = '';
-    if (!isSharedMode && type !== 'ratings') {
-        const itemData = JSON.stringify({
-            view_history_id: item.id
-        }).replace(/"/g, '&quot;');
-        
-        // Убраны инлайновые стили видимости
+    if (!isSharedMode && type !== 'ratings' && type !== 'wishlist_watched') {
+        const itemData = JSON.stringify({ view_history_id: item.id }).replace(/"/g, '&quot;');
         deleteBtn = `<div class="wl-delete-badge" style="background:var(--danger);" 
             onclick="event.stopPropagation(); window.App.removeHistoryItem(this, ${itemData})">${Icons.minus}</div>`;
     } else if (type === 'wishlist_watched') {
@@ -1140,48 +1147,58 @@ function getHistoryItemHtml(item, idx, type, mode) {
     }
 
     if (mode === 'list') {
-        if (type === 'ratings') {
-            const origTitle = item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : '';
-            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy">` : `<div class="hist-poster"></div>`;
-            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-            const rColor = getRatingColor(item.rating);
-            let seHtml = item.season && item.episode ? `<span class="hist-badge">s${item.season}e${item.episode.toString().padStart(2,'0')}</span>` : '';
-            return `<div class="hist-item clickable ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})">${poster}<div class="hist-info" style="flex:1;"><div class="hist-title">${item.title}</div>${origTitle}<div class="hist-meta">${seHtml}</div><div class="rating-time">${Icons.time} ${item.date}</div></div><div class="big-rating-badge" style="background: ${rColor};">${rVal}</div></div>`;
-        } else {
-            const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy">` : `<div class="hist-poster"></div>`;
-            let metaHtml = '';
-            if (item.season_number > 0) metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
-            if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
-            const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
-            return `<div class="hist-item clickable ${animClass}" ${style} data-id="${item.id}" onclick="if(!isHistoryEditMode) window.App.openShowLayer(${sid})">${deleteBtn}${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
-        }
+        const poster = item.poster_url ? `<img src="${item.poster_url}" class="hist-poster" loading="lazy">` : `<div class="hist-poster"></div>`;
+        
+        let metaHtml = '';
+        if (sNum > 0) metaHtml += `<span class="hist-badge">s${sNum}e${eNum.toString().padStart(2,'0')}</span>`;
+        if (rating) metaHtml += `<span class="rating-badge">${Icons.star}${rating}</span>`;
+        
+        const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
+        const origTitleHtml = (originalTitle && originalTitle !== title) ? `<div class="hist-orig">${originalTitle}</div>` : '';
+
+        return `
+            <div class="hist-item clickable ${animClass}" ${style} data-id="${item.id}" onclick="if(!isHistoryEditMode) window.App.openShowLayer(${sid})">
+                ${deleteBtn}
+                ${poster}
+                <div class="hist-info">
+                    <div class="hist-title">${title}</div>
+                    ${origTitleHtml}
+                    <div class="hist-meta">${metaHtml}<span>${displayDate}</span></div>
+                    ${viewers}
+                </div>
+            </div>`;
     } else {
         const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
         const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
-        const yearHtml = (item.year || item.show__year) ? `<div class="grid-year">${item.year || item.show__year}</div>` : '';
+        const yearHtml = itemYear ? `<div class="grid-year">${itemYear}</div>` : '';
         
-        if (type === 'ratings') {
-            const rVal = Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1);
-            return `<div class="grid-item-wrap ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})"><div class="grid-item rating-card">${posterHtml}${yearHtml}<div class="big-rating-badge" style="background: ${getRatingColor(item.rating)};">${rVal}</div><div class="grid-overlay"><div class="grid-date">${item.date}</div></div></div><div class="grid-below-title">${item.title}</div></div>`;
-        } else {
-            let badgesHtml = '';
-            if (item.season_number > 0) badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6);border:none;">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
-            if (item.user_rating) badgesHtml += `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${Icons.star}${item.user_rating}</span>`;
-            
-            let usersHtml = '';
-            if (item.user_names && item.user_names.length > 0) {
-                let avatars = '';
-                for (let i = 0; i < item.user_names.length; i++) {
-                    const name = item.user_names[i] || '?';
-                    const photo = item.user_photos && item.user_photos[i];
-                    const userId = (item.user_ids && item.user_ids[i]);
-                    if (photo) avatars += `<img src="${photo}" class="grid-user-avatar">`;
-                    else avatars += `<div class="grid-user-avatar" style="background:${getUserColor(userId || 0)};">${isSharedMode && userId>0 ? userId : name.charAt(0).toUpperCase()}</div>`;
-                }
-                usersHtml = `<div class="grid-users">${avatars}</div>`;
+        let badgesHtml = '';
+        if (sNum > 0) badgesHtml += `<span class="hist-badge" style="background:rgba(0,0,0,0.6);border:none;">s${sNum}e${eNum.toString().padStart(2,'0')}</span>`;
+        if (rating) badgesHtml += `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${Icons.star}${rating}</span>`;
+        
+        let usersHtml = '';
+        if (item.user_names && item.user_names.length > 0) {
+            let avatars = '';
+            for (let i = 0; i < item.user_names.length; i++) {
+                const name = item.user_names[i] || '?';
+                const photo = item.user_photos && item.user_photos[i];
+                const userId = (item.user_ids && item.user_ids[i]);
+                if (photo) avatars += `<img src="${photo}" class="grid-user-avatar">`;
+                else avatars += `<div class="grid-user-avatar" style="background:${getUserColor(userId || 0)};">${isSharedMode && userId > 0 ? userId : name.charAt(0).toUpperCase()}</div>`;
             }
-            return `<div class="grid-item-wrap ${animClass}" ${style} data-id="${item.id}" onclick="if(!isHistoryEditMode) window.App.openShowLayer(${sid})">${deleteBtn}<div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
+            usersHtml = `<div class="grid-users">${avatars}</div>`;
         }
+
+        return `
+            <div class="grid-item-wrap ${animClass}" ${style} data-id="${item.id}" onclick="if(!isHistoryEditMode) window.App.openShowLayer(${sid})">
+                ${deleteBtn}
+                <div class="grid-item">
+                    ${posterHtml}${yearHtml}
+                    <div class="grid-badges">${badgesHtml}</div>
+                    <div class="grid-overlay">${usersHtml}<div class="grid-date">${displayDate}</div></div>
+                </div>
+                <div class="grid-below-title">${title}</div>
+            </div>`;
     }
 }
 
@@ -1946,12 +1963,23 @@ window.init = async function() {
         const sid = sharedIdFromUrl || startParam.replace('stat_', '');
         await loadShared(sid);
     } else {
-        await load();
+        // Если есть прямая ссылка на фильм, загружаем данные пользователя "в фоне",
+        // не скрывая лоадер и не показывая основное приложение раньше времени.
+        const isDeepLink = !!showIdFromUrl;
+        await load(undefined, isDeepLink);
+
         document.getElementById('bottom-nav').style.display = 'flex';
         document.body.classList.add('has-nav');
         
+        // Настраиваем фоновый вид под будущим слоем
         switchMainView(viewFromUrl || 'search');
-        if (showIdFromUrl) window.App.openShowLayer(showIdFromUrl);
+
+        if (isDeepLink) {
+            // Загружаем и открываем слой с фильмом. 
+            // await гарантирует, что мы дождемся завершения отрисовки.
+            // openShowLayer сам вызовет hideLoader() в блоке finally.
+            await window.App.openShowLayer(showIdFromUrl);
+        }
     }
 };
 
