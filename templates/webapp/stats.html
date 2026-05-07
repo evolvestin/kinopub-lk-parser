@@ -43,7 +43,11 @@
                     <div class="header-name glow-text" id="wl-main-header">Избранное</div>
                     <div class="top-controls">
                         <button class="wl-edit-btn" id="wl-casino-btn" onclick="window.App.openCasino()"></button>
-                        <button class="wl-edit-btn" id="wl-reorder-btn" onclick="window.App.toggleReorderMode()" style="display:none; margin-right:4px;"></button>
+                        <button class="wl-edit-btn" id="wl-reorder-btn" onclick="window.App.toggleReorderMode()" style="display:none;"></button>
+                        <div class="view-toggle" id="wl-global-view-toggle" style="margin: 0; padding: 2px; display: none;">
+                            <button class="vt-btn active" id="wl-vt-grid" onclick="window.App.setWlViewMode('grid')"></button>
+                            <button class="vt-btn" id="wl-vt-list" onclick="window.App.setWlViewMode('list')"></button>
+                        </div>
                         <button class="theme-btn js-theme-toggle" onclick="window.App.toggleTheme()"></button>
                         <button class="share-btn" onclick="window.App.openFolderEditModal()" style="background: var(--accent); color: white; border-color: var(--accent);">
                             <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -79,10 +83,6 @@
                                 </div>
                             </div>
 
-                            <div class="view-toggle" style="margin: 0; padding: 2px;">
-                                <button class="vt-btn active" id="wl-vt-grid" onclick="window.App.setWlViewMode('grid')"></button>
-                                <button class="vt-btn" id="wl-vt-list" onclick="window.App.setWlViewMode('list')"></button>
-                            </div>
                             <button class="wl-edit-btn" id="wl-items-reorder-btn" onclick="window.App.toggleItemsReorderMode()"></button>
                             <button class="wl-edit-btn" onclick="window.App.editActiveFolder()" id="wl-edit-btn"></button>
                         </div>

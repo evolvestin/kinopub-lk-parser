@@ -172,6 +172,7 @@ function renderActiveWlFolder() {
     const titleEl = document.getElementById('wl-active-folder-title');
     const container = document.getElementById('wl-items-container');
     const mainHeader = document.getElementById('wl-main-header');
+    const globalToggle = document.getElementById('wl-global-view-toggle');
 
     const folders = window.wishlistFolders || wishlistFolders;
     const activeId = window.activeWlFolderId || activeWlFolderId;
@@ -179,6 +180,7 @@ function renderActiveWlFolder() {
     if (!activeId) {
         if (mainHeader) mainHeader.textContent = 'Избранное';
         if (content) content.style.display = 'none';
+        if (globalToggle) globalToggle.style.display = 'none';
         return;
     }
 
@@ -186,6 +188,7 @@ function renderActiveWlFolder() {
     if (!folder) return;
 
     if (content) content.style.display = 'block';
+    if (globalToggle) globalToggle.style.display = 'flex';
 
     if (mainHeader) {
         if (folders.length === 1) {

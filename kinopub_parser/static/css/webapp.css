@@ -152,8 +152,19 @@ body {
 
 .top-controls {
     display: flex;
+    align-items: center;
     gap: 8px;
     flex-shrink: 0;
+}
+
+#wl-global-view-toggle {
+    height: clamp(36px, 10vw, 44px);
+    border-radius: 14px;
+}
+
+#wl-global-view-toggle .vt-btn {
+    padding: 0 10px;
+    height: 100%;
 }
 
 .theme-btn, .share-btn, .wl-edit-btn {
@@ -550,6 +561,14 @@ body.has-banner #app {
     align-items: center;
     padding: 12px 16px;
     background: none;
+    min-height: 64px;
+}
+
+.layer-header > div:first-child,
+.layer-header > div:last-child {
+    flex: 1;
+    display: flex;
+    min-width: 0;
 }
 
 .layer-header::before {
@@ -1310,3 +1329,149 @@ body.has-banner #app {
     height: 24px !important;
 }
 @media (max-width: 380px) { .detail-add-view-btn { right: -10px !important; top: 44px !important; } }
+
+
+
+/* Режим редактирования истории */
+.history-edit-mode .wl-delete-badge {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+}
+
+.history-edit-mode .grid-item-wrap,
+.history-edit-mode .hist-item {
+    animation: iosWiggle 0.55s infinite ease-in-out;
+}
+
+.history-edit-mode .grid-item-wrap:nth-child(even),
+.history-edit-mode .hist-item:nth-child(even) {
+    animation-delay: -0.15s;
+}
+
+/* Элементы управления внутри слоев (кнопка корзины) */
+#hist-del-toggle {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#hist-del-toggle svg {
+    width: 18px;
+    height: 18px;
+}
+
+
+.hist-group-header {
+    grid-column: 1 / -1;
+    padding: 24px 4px 8px;
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+    position: sticky;
+    top: 50px;
+    background: var(--bg-main);
+    z-index: 10;
+    margin-top: 4px;
+    text-transform: uppercase;
+}
+
+.light .hist-group-header {
+    background: rgba(246, 248, 250, 0.95);
+}
+
+.hist-item + .hist-group-header {
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.layer-header-center {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 12px;
+    text-align: center;
+    max-width: 50%;
+}
+
+.layer-title-main {
+    font-weight: 800;
+    color: var(--text-primary);
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    text-align: center;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.layer-group-label {
+    position: absolute;
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    white-space: nowrap;
+}
+
+.layer-header.has-group .layer-title-main {
+    transform: translateY(-8px) scale(0.85);
+}
+
+.layer-header.has-group .layer-group-label {
+    opacity: 0.8;
+    transform: translateY(6px);
+}
+
+.hist-group-divider {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    position: relative;
+}
+
+.hist-group-divider::before,
+.hist-group-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+}
+
+.hist-group-divider::before {
+    background: linear-gradient(to left, var(--border), transparent);
+}
+
+.hist-group-divider::after {
+    background: linear-gradient(to right, var(--border), transparent);
+}
+
+.hist-group-divider-text {
+    background: var(--accent-dim);
+    color: var(--accent);
+    padding: 4px 12px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px var(--accent-dim);
+    white-space: nowrap;
+}

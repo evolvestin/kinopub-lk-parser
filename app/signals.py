@@ -6,6 +6,7 @@ from celery.signals import task_postrun, task_prerun
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models import F
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import Signal, receiver
 from django.utils import timezone
@@ -13,9 +14,6 @@ from django.utils import timezone
 from app.models import TaskRun, ViewHistory, ViewUser
 from app.telegram_bot import TelegramSender
 from shared.constants import DATETIME_FORMAT
-from django.db.models import (
-    F
-)
 
 view_history_created = Signal()
 

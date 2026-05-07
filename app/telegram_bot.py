@@ -164,8 +164,6 @@ class TelegramSender:
         internal_rating, user_ratings = show.get_internal_rating_data()
 
         show_history = True
-        if for_user and for_user.role == UserRole.GUEST:
-            show_history = False
 
         lines.extend(
             [

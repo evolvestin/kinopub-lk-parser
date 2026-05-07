@@ -1,5 +1,10 @@
 window.App = window.App || {};
 
+const RU_MONTHS = [
+    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+];
+
 window.handleKpPlaceholder = function (img, name) {
     // Проверка на специфические размеры заглушки Кинопоиска (no-poster.gif)
     // Эти размеры определены в ходе исследования: 208x304
@@ -521,33 +526,27 @@ function render() {
     const hasGroup = !!D.group;
     toggle('main-tabs', hasGroup);
 
-    const userRole = String(D.meta.role || 'guest').toLowerCase();
-    const isGuest = userRole === 'guest';
+    toggle('label-overview', true);
+    toggle('grid-overview', true);
+
+    document.getElementById('s-time').textContent  = s.duration_display || '0м';
+    document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
+    document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
+    document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
+    document.getElementById('s-ep').textContent = vEp;
+    const epLbl = document.getElementById('s-ep').nextElementSibling;
+    if (epLbl) epLbl.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+    const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
+    document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
+    document.getElementById('s-mov').textContent = vMov;
+    const movLbl = document.getElementById('s-mov').nextElementSibling;
+    if (movLbl) movLbl.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
+    document.getElementById('s-uni').textContent = s.movies_duration || '0м';
     
-    const showOverview = !isGuest;
-    toggle('label-overview', showOverview);
-    toggle('grid-overview', showOverview);
+    document.getElementById('s-wl-added').textContent = s.wishlist_added || 0;
+    document.getElementById('s-wl-watched').textContent = s.wishlist_watched || 0;
 
-    if (showOverview) {
-        document.getElementById('s-time').textContent  = s.duration_display || '0м';
-        document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
-        document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
-        document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
-        document.getElementById('s-ep').textContent = vEp;
-        const epLbl = document.getElementById('s-ep').nextElementSibling;
-        if (epLbl) epLbl.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
-        const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
-        document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
-        document.getElementById('s-mov').textContent = vMov;
-        const movLbl = document.getElementById('s-mov').nextElementSibling;
-        if (movLbl) movLbl.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
-        document.getElementById('s-uni').textContent = s.movies_duration || '0м';
-        
-        document.getElementById('s-wl-added').textContent = s.wishlist_added || 0;
-        document.getElementById('s-wl-watched').textContent = s.wishlist_watched || 0;
-    }
-
-    const showWelcome = !isGuest && vViews === 0;
+    const showWelcome = vViews === 0;
     let welcomeEl = document.getElementById('welcome-empty-state');
     if (showWelcome) {
         if (!welcomeEl) {
@@ -951,9 +950,11 @@ const historyBatchSize = 80;
 let historyObserver = null;
 let isRenderingBatch = false;
 let viewMode = localStorage.getItem('kp_view_mode') || 'grid';
+let isHistoryEditMode = false;
 
 window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, extraIndex) {
     curHistType = type;
+    isHistoryEditMode = false;
     
     if (type === 'all') { 
         curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date)); 
@@ -1007,6 +1008,11 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
         curHistType = 'ratings'; 
     }
 
+    let grouping = 'none';
+    const len = curHistData.length;
+    if (len >= 300) grouping = 'month';
+    else if (len >= 50) grouping = 'year';
+
     let headerSectionHtml = '';
     const isPersonCategory = extraKey && (extraKey.startsWith('actors') || extraKey.startsWith('directors') || extraKey.startsWith('writers'));
     
@@ -1024,7 +1030,7 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
         else if (extraKey.startsWith('writers')) profLabel = 'Сценарист';
         
         headerSectionHtml = `
-            <div class="card anim-item clickable" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm); position:relative;">
+            <div class="card anim-item clickable" onclick="window.App.openShowLayer(${p.id})" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm); position:relative;">
                 ${imgHtml}
                 <div style="min-width:0; flex:1;">
                     <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">${p.name}</div>
@@ -1042,15 +1048,26 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
         headerSectionHtml = `<div class="label"><div class="icon" style="color:var(--info)">${Icons.masks}</div>Жанр: ${title}</div>`;
     }
 
+    const deleteBtnVisible = (!isSharedMode && type !== 'ratings');
+    const deleteToggleBtn = deleteBtnVisible ? `<button class="wl-edit-btn" id="hist-del-toggle" onclick="window.App.toggleHistoryEditMode()">${Icons.trash}</button>` : '';
+
     const headerHtml = `
-    <div class="layer-header">
-        <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 16px;">
-            <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
-        </button>
-        <span style="font-weight:800; color:var(--text-primary); font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:50%;">${title}</span>
-        <div class="view-toggle" style="margin:0; padding:2px;">
-            <button class="vt-btn ${viewMode === 'grid' ? 'active' : ''}" onclick="window.App.setViewModeLayer('grid')">${Icons.grid}</button>
-            <button class="vt-btn ${viewMode === 'list' ? 'active' : ''}" onclick="window.App.setViewModeLayer('list')">${Icons.list}</button>
+    <div class="layer-header" id="layer-header-node">
+        <div>
+            <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 12px; flex-shrink:0;">
+                <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:4px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
+            </button>
+        </div>
+        <div class="layer-header-center">
+            <div class="layer-title-main">${title}</div>
+            <div class="layer-group-label" id="sticky-group-text"></div>
+        </div>
+        <div style="justify-content:flex-end; gap:8px;">
+            ${deleteToggleBtn}
+            <div class="view-toggle" style="margin:0; padding:2px;">
+                <button class="vt-btn ${viewMode === 'grid' ? 'active' : ''}" onclick="window.App.setViewModeLayer('grid')">${Icons.grid}</button>
+                <button class="vt-btn ${viewMode === 'list' ? 'active' : ''}" onclick="window.App.setViewModeLayer('list')">${Icons.list}</button>
+            </div>
         </div>
     </div>`;
 
@@ -1058,12 +1075,31 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
         ${headerHtml}
         ${headerSectionHtml}
         <div id="layer-hist-container" style="padding: 16px;"></div>
-        <div id="layer-hist-sentinel" style="height: 1px; width: 100%;"></div>
+        <div id="layer-hist-sentinel" style="height: 100px; width: 100%; margin-top: -100px; pointer-events: none;"></div>
     `;
 
-    pushLayer(bodyHtml, { type: 'history' });
+    pushLayer(bodyHtml, { 
+        type: 'history', 
+        grouping: grouping,
+        lastGroupKey: null 
+    });
+    
     currentHistoryOffset = 0;
+    
+    const topLayer = viewStack[viewStack.length - 1];
+    if (historyObserver) historyObserver.disconnect();
+    historyObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) renderHistoryBatchLayer();
+    }, { root: topLayer.el, rootMargin: '1000px' });
+    
+    const sentinel = topLayer.el.querySelector('#layer-hist-sentinel');
+    if (sentinel) historyObserver.observe(sentinel);
+
     renderHistoryBatchLayer();
+
+    if (grouping !== 'none') {
+        initStickyGroupObserver();
+    }
 };
 
 window.setViewModeLayer = function(mode) {
@@ -1094,10 +1130,11 @@ function getHistoryItemHtml(item, idx, type, mode) {
             view_history_id: item.id
         }).replace(/"/g, '&quot;');
         
-        deleteBtn = `<div class="wl-delete-badge" style="opacity:1; transform:scale(1); pointer-events:auto; background:var(--danger);" 
+        // Убраны инлайновые стили видимости
+        deleteBtn = `<div class="wl-delete-badge" style="background:var(--danger);" 
             onclick="event.stopPropagation(); window.App.removeHistoryItem(this, ${itemData})">${Icons.minus}</div>`;
     } else if (type === 'wishlist_watched') {
-        deleteBtn = `<div class="wl-delete-badge" style="opacity:1; transform:scale(1); pointer-events:auto; background:var(--danger);" 
+        deleteBtn = `<div class="wl-delete-badge" style="background:var(--danger);" 
             onclick="event.stopPropagation(); window.App.removeWlStatItem(${item.wl_item_id}, this.closest('.grid-item-wrap') || this.closest('.hist-item'))">${Icons.minus}</div>`;
     }
 
@@ -1115,7 +1152,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
             if (item.season_number > 0) metaHtml += `<span class="hist-badge">s${item.season_number}e${item.episode_number.toString().padStart(2,'0')}</span>`;
             if (item.user_rating) metaHtml += `<span class="rating-badge">${Icons.star}${item.user_rating}</span>`;
             const viewers = (item.user_names && item.user_names.length > 1) ? `<div class="li-sub" style="font-size:11px;">👥 ${item.user_names.join(', ')}</div>` : '';
-            return `<div class="hist-item clickable ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})">${deleteBtn}${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
+            return `<div class="hist-item clickable ${animClass}" ${style} data-id="${item.id}" onclick="if(!isHistoryEditMode) window.App.openShowLayer(${sid})">${deleteBtn}${poster}<div class="hist-info"><div class="hist-title">${item.show__title}</div><div class="hist-meta">${metaHtml}<span>${item.view_date}</span></div>${viewers}</div></div>`;
         }
     } else {
         const mediumPoster = item.poster_url ? item.poster_url.replace('/small/', '/medium/') : '';
@@ -1142,58 +1179,120 @@ function getHistoryItemHtml(item, idx, type, mode) {
                 }
                 usersHtml = `<div class="grid-users">${avatars}</div>`;
             }
-            return `<div class="grid-item-wrap ${animClass}" ${style} onclick="window.App.openShowLayer(${sid})">${deleteBtn}<div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
+            return `<div class="grid-item-wrap ${animClass}" ${style} data-id="${item.id}" onclick="if(!isHistoryEditMode) window.App.openShowLayer(${sid})">${deleteBtn}<div class="grid-item">${posterHtml}${yearHtml}<div class="grid-badges">${badgesHtml}</div><div class="grid-overlay">${usersHtml}<div class="grid-date">${item.view_date}</div></div></div><div class="grid-below-title">${item.show__title}</div></div>`;
         }
     }
 }
 
 function renderHistoryBatchLayer() {
     if (isRenderingBatch || currentHistoryOffset >= curHistData.length) return;
-    isRenderingBatch = true;
     
     const topLayer = viewStack[viewStack.length - 1];
-    if (!topLayer || topLayer.context.type !== 'history') {
-        isRenderingBatch = false; return;
-    }
+    if (!topLayer || topLayer.context.type !== 'history') return;
     
+    isRenderingBatch = true;
+    
+    const start = currentHistoryOffset;
+    const end = start + historyBatchSize;
+    const batch = curHistData.slice(start, end);
+    
+    currentHistoryOffset = end; 
+
     const container = topLayer.el.querySelector('#layer-hist-container');
     if (curHistData.length === 0) {
         container.innerHTML = `<div class="empty"><div class="icon">${Icons.dash}</div>Нет данных</div>`;
-        isRenderingBatch = false; return;
+        isRenderingBatch = false;
+        return;
     }
 
-    const batch = curHistData.slice(currentHistoryOffset, currentHistoryOffset + historyBatchSize);
+    const grouping = topLayer.context.grouping;
+    let html = '';
     
-    /* Используем DocumentFragment или строковую сборку перед вставкой в DOM */
-    const html = batch.map((item, idx) => getHistoryItemHtml(item, currentHistoryOffset + idx, curHistType, viewMode)).join('');
-    
-    if (currentHistoryOffset === 0) {
-        if (viewMode === 'list') {
-            container.innerHTML = '<div class="card" style="margin:0; padding:0; border:none; background:transparent;">' + html + '</div>';
-        } else {
-            container.innerHTML = '<div class="hist-grid">' + html + '</div>';
+    batch.forEach((item, idx) => {
+        if (grouping !== 'none') {
+            const dateStr = item.view_date || item.date;
+            if (dateStr) {
+                const dateObj = new Date(dateStr);
+                let groupKey = '';
+                if (grouping === 'month') {
+                    groupKey = `${RU_MONTHS[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+                } else if (grouping === 'year') {
+                    groupKey = `${dateObj.getFullYear()}`;
+                }
+
+                if (groupKey && groupKey !== topLayer.context.lastGroupKey) {
+                    topLayer.context.lastGroupKey = groupKey;
+                    html += `
+                        <div class="hist-group-divider anim-item" data-label="${groupKey}">
+                            <span class="hist-group-divider-text">${groupKey}</span>
+                        </div>`;
+                }
+            }
         }
+        html += getHistoryItemHtml(item, start + idx, curHistType, viewMode);
+    });
+    
+    if (start === 0) {
+        const wrapClass = viewMode === 'list' ? 'card' : 'hist-grid';
+        const wrapStyle = viewMode === 'list' ? 'margin:0; padding:0; border:none; background:transparent;' : '';
+        container.innerHTML = `<div class="${wrapClass}" style="${wrapStyle}">${html}</div>`;
     } else {
         const target = container.querySelector('.card') || container.querySelector('.hist-grid');
-        if (target) {
-            target.insertAdjacentHTML('beforeend', html);
+        if (target) target.insertAdjacentHTML('beforeend', html);
+    }
+
+    requestAnimationFrame(() => {
+        isRenderingBatch = false;
+        
+        if (grouping !== 'none') {
+            topLayer.el.dispatchEvent(new Event('scroll'));
         }
-    }
 
-    currentHistoryOffset += historyBatchSize;
-    isRenderingBatch = false;
+        if (currentHistoryOffset >= curHistData.length && historyObserver) {
+            historyObserver.disconnect();
+        }
+    });
+}
 
-    /* Настройка обсервера для бесконечного скролла */
-    if (currentHistoryOffset < curHistData.length) {
-        const sentinel = topLayer.el.querySelector('#layer-hist-sentinel');
-        if (historyObserver) historyObserver.disconnect();
-        
-        historyObserver = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting) renderHistoryBatchLayer();
-        }, { root: topLayer.el, rootMargin: '800px' });
-        
-        if (sentinel) historyObserver.observe(sentinel);
-    }
+function initStickyGroupObserver() {
+    const topLayer = viewStack[viewStack.length - 1];
+    if (!topLayer) return;
+
+    const header = topLayer.el.querySelector('#layer-header-node');
+    const label = topLayer.el.querySelector('#sticky-group-text');
+    const container = topLayer.el; 
+
+    const updateStickyHeader = () => {
+        const dividers = Array.from(container.querySelectorAll('.hist-group-divider'));
+        const headerHeight = 64; 
+        const scrollTop = container.scrollTop;
+
+        let activeDivider = null;
+
+        for (let i = dividers.length - 1; i >= 0; i--) {
+            const div = dividers[i];
+            if (div.offsetTop <= scrollTop + headerHeight + 5) {
+                activeDivider = div;
+                break;
+            }
+        }
+
+        if (activeDivider) {
+            const groupText = activeDivider.dataset.label;
+            if (label.textContent !== groupText) {
+                label.textContent = groupText;
+            }
+
+            const isDividerUnderHeader = activeDivider.offsetTop <= scrollTop + (headerHeight / 2);
+            header.classList.toggle('has-group', isDividerUnderHeader);
+        } else {
+            header.classList.remove('has-group');
+        }
+    };
+
+    container.addEventListener('scroll', updateStickyHeader, { passive: true });
+    
+    updateStickyHeader();
 }
 
 window.openShowLayer = async function(showId) {
@@ -1640,6 +1739,20 @@ window.App = {
     openCasino: window.openCasino,
     closeCasino: window.closeCasino,
     resetCasino: window.resetCasino,
+    toggleHistoryEditMode: function() {
+        isHistoryEditMode = !isHistoryEditMode;
+        const btn = document.getElementById('hist-del-toggle');
+        const container = document.getElementById('layer-hist-container');
+        
+        if (btn) {
+            btn.style.background = isHistoryEditMode ? 'var(--accent)' : 'var(--bg-input)';
+            btn.style.color = isHistoryEditMode ? '#fff' : 'var(--text-primary)';
+        }
+        
+        if (container) {
+            container.classList.toggle('history-edit-mode', isHistoryEditMode);
+        }
+    },
     startCasinoSpin: window.startCasinoSpin,
     removeHistoryItem: function(btn, payload) {
         const msg = "Удалить этот просмотр из вашей истории?";
@@ -1807,15 +1920,12 @@ window.App = {
 window.init = async function() {
     if (window.IS_ADMIN_DASHBOARD) return;
 
-    // 1. Устанавливаем иконки темы
     document.querySelectorAll('.theme-btn').forEach(btn => {
         btn.innerHTML = isDark ? Icons.moon : Icons.sun;
     });
 
-    // 2. Инициализируем иконки интерфейса
     initIcons();
 
-    // 3. Запускаем основную логику загрузки данных
     const startParam = tg?.initDataUnsafe?.start_param || '';
     const urlParams = new URLSearchParams(window.location.search);
     const sharedIdFromUrl = urlParams.get('shared_id');
