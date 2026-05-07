@@ -68,22 +68,11 @@ window.handleImgErr = function (img, fallbackUrl, name) {
         img.dataset.fallbackTried = 'true';
         img.src = fallbackUrl;
     } else {
-        const div = document.createElement('div');
-        div.className = img.className || '';
-        div.style.cssText = img.style.cssText;
-        div.style.display = 'inline-flex';
-        div.style.alignItems = 'center';
-        div.style.justifyContent = 'center';
-        div.style.background = 'var(--bg-input)';
-        div.style.color = 'var(--text-muted)';
-        div.style.fontWeight = '800';
-        
-        if (!div.style.width && div.classList.contains('person-avatar')) {
-            div.style.fontSize = '24px';
-        }
-        
-        div.textContent = name ? name.charAt(0).toUpperCase() : '?';
-        img.replaceWith(div);
+        const wrapper = document.createElement('div');
+        wrapper.className = (img.className || '') + ' is-placeholder';
+        wrapper.style.cssText = img.style.cssText;
+        wrapper.innerHTML = Icons.person_placeholder;
+        img.replaceWith(wrapper);
     }
 };
 
@@ -139,6 +128,7 @@ const Icons = {
     chevron_down: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline style="fill:none;" points="6 9 12 15 18 9"></polyline></svg>',
     sort_arrow: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line style="fill:none;" x1="12" y1="5" x2="12" y2="19"></line><polyline style="fill:none;" points="19 12 12 19 5 12"></polyline></svg>',
     help: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><path style="fill:none;" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line style="fill:none;" x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+    person_placeholder: '<svg viewBox="0 0 2048 2048" xmlns="http://www.w3.org/2000/svg"><path transform="translate(994,64)" d="m0 0h61l40 2 36 3 39 5 35 6 38 8 43 11 42 13 42 15 39 16 26 12 21 10 19 10 29 16 23 14 17 11 24 16 17 12 12 9 13 10 15 12 11 9 28 24 4 3v2l4 2 10 10 8 7 31 31 7 8 16 17 9 11 13 15 10 13 11 14 15 20 13 18 11 17 13 20 9 15 15 26 12 23 10 19 14 29 12 28 14 36 14 41 9 30 12 48 7 35 8 49 4 35 3 40 1 29v33l-1 37-3 47-5 43-8 47-8 38-13 50-15 47-13 34-13 32-11 24-12 25-17 33-10 17-12 20-14 22-10 15-20 28-12 17-13 16-9 11-13 15-9 10-7 8-12 13-15 16-21 21h-2v2h-2v2l-8 7-13 12-11 9-10 9-13 10-13 11-17 13-18 13-30 20-19 12-25 15-18 10-24 13-32 16-34 15-27 11-36 13-45 14-56 14-36 7-44 7-32 4-35 3-35 2h-68l-46-3-49-5-47-8-43-9-45-12-38-12-36-13-30-12-36-16-56-27-15-9-25-16-19-12-10-7-12-8-14-10-17-13-28-22-13-11-10-9-8-7-10-9-15-14-39-39-7-8-15-16-7-8-12-14-14-17-15-20-14-19-13-19-19-29-15-25-16-28-19-38-13-28-15-36-9-24-12-36-9-30-11-44-9-42-7-44-5-41-3-37-1-19v-64l2-37 4-39 5-37 8-45 8-37 13-49 17-52 14-36 12-28 13-28 15-30 11-20 16-27 8-13 19-29 10-14 9-13 11-15 8-11 11-13 9-11 9-10 9-11 9-10 7-8 6-7h2l2-4 39-39 8-7 11-10 11-9 15-13 14-11 16-13 18-13 16-11 20-14 19-12 20-12 17-10 23-13 38-19 27-12 27-11 29-11 36-12 34-10 44-11 47-9 47-7 46-4z" fill="currentColor"/><path transform="translate(993,543)" d="m0 0h65l45 3 21 2 21 4 29 10 26 11 33 16 16 8 19 10 23 14 16 12 15 13 15 14 21 21 6 5 7 8 23 23v2h2l7 8 12 14 11 15 12 21 14 26 16 33 16 37 12 36 3 16 3 35 1 22v70l-2 45-3 31-4 17-11 31-13 30-17 35-14 27-14 24-10 14-12 14-9 9-7 8-17 17-1 2h-2v2l-8 7-20 20-8 7-14 14-11 9-9 7-17 10-42 22-31 15-34 14-33 11-24 4-36 3-47 2h-32l-46-2-36-3-21-5-34-13-21-9-20-9-19-10-9-4h-3l-8 16-11 18-9 16-14 24-17 29-13 22-11 19-17 29-15 25-17 29-18 30-16 27-15 25-15 26-10 17-10 18-13 25-8 18-2 1-10-6v-22l-1-58-1-96v-550l2-122 2-52 3-34 3-15 6-18 11-29 16-34 14-28 13-22 11-17 6-11 9-13 9-11h2l2-4 6-6h2l2-4 56-56h2v-2l8-7 8-8 11-9 15-10 22-13 23-12 17-9 26-12 37-14 21-7 25-4 23-2z" fill="#CAD0D8"/><path transform="translate(1014,895)" d="m0 0h16l19 3 20 6 16 7 14 8 13 11 11 12 9 14 11 23 5 15 2 10 1 12v13l-2 17-4 16-7 18-10 18-11 12-12 12-15 10-21 10-20 6-12 2-11 1h-10l-21-3-16-5-21-10-13-9-16-15-11-14-7-12-8-20-4-15-2-11-1-16 2-18 5-20 8-20 7-12 9-12 12-12 18-13 19-10 18-6z" fill="currentColor"/></svg>',
 };
 
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
@@ -336,7 +326,7 @@ function renderSearchResults(data) {
                 ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" 
                     onerror="window.handleImgErr(this, ${fb}, '${safeName}')" 
                     onload="window.handleKpPlaceholder(this, '${safeName}')">` 
-                : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
+                : `<div class="person-avatar">${Icons.person_placeholder}</div>`;
             html += `<div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')">${img}<div class="person-name">${p.name}</div></div>`;
         });
         html += '</div>';
@@ -1328,7 +1318,7 @@ window.openShowLayer = async function(showId) {
                             ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" 
                                 onerror="window.handleImgErr(this, ${fb}, '${safeName}')"
                                 onload="window.handleKpPlaceholder(this, '${safeName}')">` 
-                            : `<div class="person-avatar">${p.name.charAt(0)}</div>`;
+                            : `<div class="person-avatar">${Icons.person_placeholder}</div>`;
                         return `
                         <div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')">
                             ${imgHtml}
@@ -1344,17 +1334,8 @@ window.openShowLayer = async function(showId) {
         if (show.genres && show.genres.length > 0) {
             genresHtml = `
             <div class="label" style="padding-top:0"><div class="icon" style="color:var(--info)">${Icons.star}</div>Жанры</div>
-            <div class="h-scroll-container">
-                ${show.genres.map(g => `<div class="genre-pill" onclick="window.App.openCollectionLayer('genre', ${g.id}, '${g.name}')">${g.name}</div>`).join('')}
-            </div>`;
-        }
-
-        let countriesHtml = '';
-        if (show.countries && show.countries.length > 0) {
-            countriesHtml = `
-            <div class="label" style="padding-top:0"><div class="icon" style="color:#39d353">${Icons.globe}</div>Страны</div>
             <div class="h-scroll-container" style="padding-bottom:30px;">
-                ${show.countries.map(c => `<div class="genre-pill" onclick="window.App.openCollectionLayer('country', ${c.id}, '${c.name}')">${c.emoji ? c.emoji + ' ' : ''}${c.name}</div>`).join('')}
+                ${show.genres.map(g => `<div class="genre-pill" onclick="window.App.openCollectionLayer('genre', ${g.id}, '${g.name}')">${g.name}</div>`).join('')}
             </div>`;
         }
 
@@ -1385,6 +1366,16 @@ window.openShowLayer = async function(showId) {
 
         const safeTitle = show.title.replace(/'/g, "\\'");
         
+        // Формируем теги стран
+        let countriesMetaHtml = '';
+        if (show.countries && show.countries.length > 0) {
+            countriesMetaHtml = `<div class="show-meta-tags" style="animation-delay: 0.3s">` + 
+                show.countries.map(c => {
+                    const safeCountryName = c.name.replace(/'/g, "\\'");
+                    return `<div class="sm-tag clickable" onclick="window.App.openCollectionLayer('country', ${c.id}, '${safeCountryName}')">${c.emoji ? c.emoji + ' ' : ''}${c.name}</div>`;
+                }).join('') + `</div>`;
+        }
+
         const html = `
             ${getLayerHeader('О шоу')}
             <div class="hero-container">
@@ -1403,23 +1394,26 @@ window.openShowLayer = async function(showId) {
                 <div class="show-title">${show.title}</div>
                 ${show.original_title && show.original_title !== show.title ? `<div class="show-orig">${show.original_title}</div>` : ''}
                 
-                <div class="show-meta-tags">
+                ${countriesMetaHtml}
+
+                <div class="show-meta-tags" style="animation-delay: 0.35s">
                     <div class="sm-tag">${show.year || '?'}</div>
                     <div class="sm-tag" style="color: var(--info); border-color: var(--info-dim); background: var(--info-dim)">${window.SHOW_TYPE_RU[show.type] || show.type || 'Show'}</div>
                     ${show.status ? `<div class="sm-tag">${window.SHOW_STATUS_RU[show.status] || show.status}</div>` : ''}
                 </div>
-                
-                <div class="show-meta-tags" style="animation-delay: 0.35s">
+
+                <div class="show-meta-tags" style="animation-delay: 0.4s">
                     ${show.kinopoisk_rating ? `<div class="sm-tag" style="background:rgba(241, 90, 36, 0.15); color:#f15a24; border:none">KP ${show.kinopoisk_rating}</div>` : ''}
                     ${show.imdb_rating ? `<div class="sm-tag" style="background:rgba(245, 197, 24, 0.15); color:#f5c518; border:none">IMDb ${show.imdb_rating}</div>` : ''}
                     ${show.internal_rating ? `<div class="sm-tag" style="background:var(--accent-dim); color:var(--accent); border:none">★ ${show.internal_rating.toFixed(1)}</div>` : ''}
                 </div>
+
+
             </div>
 
             ${show.plot ? `<div class="plot-box">${show.plot}</div>` : ''}
 
             ${genresHtml}
-            ${countriesHtml}
             ${crewHtml}
         `;
 
@@ -1473,7 +1467,7 @@ window.openCollectionLayer = async function(type, id, titleFallback) {
                 ? `<img src="${p.photo_url}" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;" 
                     onerror="window.handleImgErr(this, ${fb}, '${safeName}')"
                     onload="window.handleKpPlaceholder(this, '${safeName}')">`
-                : `<div class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px;">${titleFallback.charAt(0)}</div>`;
+                : `<div class="person-avatar" style="width:60px; height:60px; flex-shrink:0;">${Icons.person_placeholder}</div>`;
             
             const profsHtml = p.professions && p.professions.length > 0 
                 ? `<div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">${p.professions.join(' · ')}</div>`
@@ -1562,11 +1556,10 @@ window.closeHistory = popLayer;
 function getLayerHeader(title) {
     return `
     <div class="layer-header">
-        <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 16px;">
+        <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 16px; margin-right: 12px;">
             <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
         </button>
-        <span style="font-weight:800; color:var(--text-primary); font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:50%;">${title}</span>
-        <div style="width: 80px;"></div>
+        <span style="font-weight:800; color:var(--text-primary); font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex: 1;">${title}</span>
     </div>`;
 }
 

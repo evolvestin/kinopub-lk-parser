@@ -221,8 +221,8 @@ SHOW_STATUS_DISPLAY_RU = {
     'Finished': 'Завершен',
     'Ongoing': 'В эфире',
     'Filming': 'Съемки',
-    'Post Production': 'Постпродакшн',
-    'Pre Production': 'Препродакшн',
+    'Post Production': 'Постпродакшен',
+    'Pre Production': 'Препродакшен',
 }
 
 SHOW_TYPES_TRACKED_VIA_NEW_EPISODES = [
