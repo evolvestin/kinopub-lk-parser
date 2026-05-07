@@ -20,6 +20,7 @@ from django.db.models import (
     Value,
     When,
 )
+from shared.constants import SHOW_TYPE_DISPLAY_RU, SHOW_STATUS_DISPLAY_RU
 from django.db.models.functions import Coalesce
 from django.http import HttpResponseRedirect
 from django.template.loader import render_to_string
@@ -302,13 +303,43 @@ class ShowCrewInline(admin.TabularInline):
         return obj.normalized_en_profession if obj.id else '-'
 
 
+class ShowTypeFilter(admin.SimpleListFilter):
+    title = 'Type'
+    parameter_name = 'type'
+
+    def lookups(self, request, model_admin):
+        qs = model_admin.get_queryset(request)
+        types = qs.values_list('type', flat=True).distinct()
+        return [(t, SHOW_TYPE_DISPLAY_RU.get(t, t)) for t in types if t]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(type=self.value())
+        return queryset
+
+
+class ShowStatusFilter(admin.SimpleListFilter):
+    title = 'Status'
+    parameter_name = 'status'
+
+    def lookups(self, request, model_admin):
+        qs = model_admin.get_queryset(request)
+        statuses = qs.values_list('status', flat=True).distinct()
+        return [(s, SHOW_STATUS_DISPLAY_RU.get(s, s)) for s in statuses if s]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(status=self.value())
+        return queryset
+
+
 @admin.register(Show, site=admin_site)
 class ShowAdmin(admin.ModelAdmin):
     list_display = (
         'title',
         'original_title',
-        'type',
-        'status',
+        'get_type_display_ru',
+        'get_status_display_ru',
         'year',
         'get_ext_kp_rating',
         'get_ext_imdb_rating',
@@ -320,7 +351,7 @@ class ShowAdmin(admin.ModelAdmin):
         'updated_at',
     )
     list_editable = ('ignore_collision',)
-    list_filter = ('type', 'status', AverageRatingFilter, 'year', 'ignore_collision')
+    list_filter = (ShowTypeFilter, ShowStatusFilter, AverageRatingFilter, 'year', 'ignore_collision')
     search_fields = ('title', 'original_title', 'plot')
     inlines = [
         ExternalRatingInline,
@@ -335,8 +366,8 @@ class ShowAdmin(admin.ModelAdmin):
         'title',
         'original_title',
         'plot',
-        'type',
-        'status',
+        'get_type_display_ru',
+        'get_status_display_ru',
         'year',
         'kinopoisk_url',
         'get_ext_kp_rating',
@@ -366,6 +397,14 @@ class ShowAdmin(admin.ModelAdmin):
             _avg_rating=Avg('ratings__rating'),
         )
         return queryset
+
+    @admin.display(description='Type', ordering='type')
+    def get_type_display_ru(self, obj):
+        return SHOW_TYPE_DISPLAY_RU.get(obj.type, obj.type)
+
+    @admin.display(description='Status', ordering='status')
+    def get_status_display_ru(self, obj):
+        return SHOW_STATUS_DISPLAY_RU.get(obj.status, obj.status)
 
     @admin.display(description='KP', ordering='ext_rating__kp')
     def get_ext_kp_rating(self, obj):

@@ -207,6 +207,24 @@ SHOW_TYPE_MAPPING = {
     ShowType.MOVIE_3D: '3D Movie',
 }
 
+SHOW_TYPE_DISPLAY_RU = {
+    'Series': 'Сериал',
+    'Movie': 'Фильм',
+    'Concert': 'Концерт',
+    'Documentary Movie': 'Док. фильм',
+    'Documentary Series': 'Док. сериал',
+    'TV Show': 'ТВ-шоу',
+    '3D Movie': '3D фильм',
+}
+
+SHOW_STATUS_DISPLAY_RU = {
+    'Finished': 'Завершен',
+    'Ongoing': 'В эфире',
+    'Filming': 'Съемки',
+    'Post Production': 'Постпродакшн',
+    'Pre Production': 'Препродакшн',
+}
+
 SHOW_TYPES_TRACKED_VIA_NEW_EPISODES = [
     ShowType.SERIES,
     ShowType.DOCUMENTARY_SERIES,

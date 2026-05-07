@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import timedelta
-
+from shared.constants import SHOW_TYPE_DISPLAY_RU
 from django.conf import settings
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, Lower, StrIndex
@@ -76,6 +76,12 @@ def get_total_countries_with_shows_list():
     )
 
 
+def _format_type(t):
+    if not t:
+        return 'Неизвестно'
+    return SHOW_TYPE_DISPLAY_RU.get(t, t)
+
+
 def calculate_has_kp_metric():
     stats = (
         Show.objects.filter(ext_rating__kp__isnull=False)
@@ -83,7 +89,7 @@ def calculate_has_kp_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_has_kp_list(show_type: str):
@@ -99,7 +105,7 @@ def calculate_has_imdb_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_has_imdb_list(show_type: str):
@@ -110,7 +116,7 @@ def get_has_imdb_list(show_type: str):
 
 def calculate_total_shows_metric():
     stats = Show.objects.values('type').annotate(total=Count('id')).order_by('-total')
-    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_total_shows_list(show_type: str):
@@ -122,7 +128,7 @@ def calculate_missing_imdb_metric():
 
     stats = qs.values('type').annotate(total_missing=Count('id')).order_by('-total_missing')
 
-    data = [{'name': item['type'] or 'Unknown', 'value': item['total_missing']} for item in stats]
+    data = [{'name': _format_type(item['type']), 'value': item['total_missing']} for item in stats]
     return data
 
 
@@ -143,7 +149,7 @@ def calculate_missing_kp_metric():
 
     stats = qs.values('type').annotate(total_missing=Count('id')).order_by('-total_missing')
 
-    data = [{'name': item['type'] or 'Unknown', 'value': item['total_missing']} for item in stats]
+    data = [{'name': _format_type(item['type']), 'value': item['total_missing']} for item in stats]
     return data
 
 
@@ -242,7 +248,7 @@ def calculate_title_collision_metric():
 
     data = [
         {
-            'type': item['type'] or 'Unknown',
+            'type': _format_type(item['type']),
             'total': item['total'],
             'collisions': item['contains_orig'],
             'unique': item['unique_titles'],
@@ -281,7 +287,7 @@ def calculate_missing_year_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_missing_year_list(show_type: str):
@@ -297,7 +303,7 @@ def calculate_missing_plot_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_missing_plot_list(show_type: str):
@@ -315,7 +321,7 @@ def calculate_no_genres_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_no_genres_list(show_type: str):
@@ -331,7 +337,7 @@ def calculate_no_countries_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_no_countries_list(show_type: str):
@@ -347,7 +353,7 @@ def calculate_total_persons_by_show_type_metric():
         .annotate(total=Count('canonical_id', distinct=True))
         .order_by('-total')
     )
-    return [{'name': item['show__type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['show__type']), 'value': item['total']} for item in stats]
 
 
 def get_total_persons_by_show_type_list(show_type: str):
@@ -492,7 +498,7 @@ def get_professions_stats_list(profession: str):
 def calculate_missing_status_metric():
     qs = Show.objects.filter(type__in=SERIES_TYPES).filter(Q(status__isnull=True) | Q(status=''))
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
-    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_missing_status_list(show_type: str):
@@ -687,7 +693,7 @@ def calculate_missing_durations_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': item['type'] or 'Unknown', 'value': item['total']} for item in stats]
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_missing_durations_list(show_type: str):

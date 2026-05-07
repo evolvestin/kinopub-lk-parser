@@ -1,7 +1,7 @@
 from shared.constants import SERIES_TYPES
 from shared.formatters import format_se
 from shared.html_helper import bold, html_link, html_secure, italic
-
+from shared.constants import SHOW_TYPE_DISPLAY_RU, SHOW_STATUS_DISPLAY_RU, SERIES_TYPES
 RATINGS_TRUNCATE_COUNT = 6
 
 
@@ -47,9 +47,9 @@ def get_show_card_text(
     if year:
         meta_data.append(f'📅 {year}')
     if show_type:
-        meta_data.append(f'🎭 {show_type}')
+        meta_data.append(f'🎭 {SHOW_TYPE_DISPLAY_RU.get(show_type, show_type)}')
     if status:
-        meta_data.append(status)
+        meta_data.append(SHOW_STATUS_DISPLAY_RU.get(status, status))
 
     if meta_data:
         lines.append(' | '.join(meta_data))

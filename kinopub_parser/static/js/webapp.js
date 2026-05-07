@@ -1,5 +1,16 @@
 window.App = window.App || {};
 
+window.SHOW_TYPE_RU = {
+    'Series': 'Сериал', 'Movie': 'Фильм', 'Concert': 'Концерт',
+    'Documentary Movie': 'Док. фильм', 'Documentary Series': 'Док. сериал',
+    'TV Show': 'ТВ-шоу', '3D Movie': '3D фильм'
+};
+
+window.SHOW_STATUS_RU = {
+    'Finished': 'Завершен', 'Ongoing': 'В эфире', 'Filming': 'Съемки',
+    'Post Production': 'Постпродакшн', 'Pre Production': 'Препродакшн'
+};
+
 const RU_MONTHS = [
     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
     "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
@@ -1394,8 +1405,8 @@ window.openShowLayer = async function(showId) {
                 
                 <div class="show-meta-tags">
                     <div class="sm-tag">${show.year || '?'}</div>
-                    <div class="sm-tag" style="color: var(--info); border-color: var(--info-dim); background: var(--info-dim)">${show.type || 'Show'}</div>
-                    ${show.status ? `<div class="sm-tag">${show.status}</div>` : ''}
+                    <div class="sm-tag" style="color: var(--info); border-color: var(--info-dim); background: var(--info-dim)">${window.SHOW_TYPE_RU[show.type] || show.type || 'Show'}</div>
+                    ${show.status ? `<div class="sm-tag">${window.SHOW_STATUS_RU[show.status] || show.status}</div>` : ''}
                 </div>
                 
                 <div class="show-meta-tags" style="animation-delay: 0.35s">

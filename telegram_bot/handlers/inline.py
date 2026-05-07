@@ -16,7 +16,7 @@ from services.bot_instance import BotInstance
 from shared.card_formatter import get_show_card_text
 from shared.constants import UserRole
 from shared.html_helper import bold
-
+from shared.constants import UserRole, SHOW_TYPE_DISPLAY_RU
 router = Router()
 
 
@@ -135,7 +135,8 @@ async def inline_search_handler(query: InlineQuery):
             link_preview_options=LinkPreviewOptions(is_disabled=True),
         )
 
-        description = f'{year} | {item.get("type", "Show")}'
+        display_type = SHOW_TYPE_DISPLAY_RU.get(item.get("type"), item.get("type", "Show"))
+        description = f'{year} | {display_type}'
         if original_title and original_title != title:
             description += f' | {original_title}'
 

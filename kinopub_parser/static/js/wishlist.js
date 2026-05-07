@@ -341,7 +341,7 @@ function getWlItemHtml(item, viewModeStr, idx) {
                 ${item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : ''}
                 <div class="hist-meta">
                     ${item.year ? `<span>${item.year}</span>` : ''}
-                    ${item.type ? `<span>· ${item.type}</span>` : ''}
+                    ${item.type ? `<span>· ${window.SHOW_TYPE_RU[item.type] || item.type}</span>` : ''}
                     ${ratingHtml}
                     <span style="opacity: 0.6;">· ${addedDate}</span>
                 </div>
@@ -446,16 +446,7 @@ window.App = {
 
         const item = wishlistFolders.flatMap(f => f.items).find(i => i.id === id);
         if (item) {
-            const typeMap = {
-                'Series': 'сериал',
-                'Movie': 'фильм',
-                'Concert': 'концерт',
-                'Documentary Movie': 'док. фильм',
-                'Documentary Series': 'док. сериал',
-                'TV Show': 'ТВ-шоу',
-                '3D Movie': '3D фильм'
-            };
-            const ruType = typeMap[item.type] || 'шоу';
+            const ruType = window.SHOW_TYPE_RU[item.type] || 'шоу';
             const textEl = document.getElementById('wl-delete-confirm-text');
             if (textEl) {
                 textEl.innerHTML = `Вы уверены, что хотите удалить ${ruType} <b style="color:var(--text-primary)">«${item.title}»</b> из списка?`;
