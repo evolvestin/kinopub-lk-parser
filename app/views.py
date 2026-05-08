@@ -2259,8 +2259,14 @@ def webapp_rate_show(request):
         view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
         show_id = body.get('show_id')
         rating = float(body.get('rating'))
-        season = body.get('season')  # Может быть None
-        episode = body.get('episode') # Может быть None
+        
+        season = body.get('season')
+        episode = body.get('episode')
+        
+        if season == 0 or season == '0':
+            season = None
+        if episode == 0 or episode == '0':
+            episode = None
         
         show = Show.objects.get(id=show_id)
 
@@ -2297,7 +2303,6 @@ def webapp_rate_show(request):
         logging.error(f'WebApp Rate Show Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
 
-
 @csrf_exempt
 @require_http_methods(['POST'])
 def webapp_delete_rating(request):
@@ -2310,8 +2315,14 @@ def webapp_delete_rating(request):
 
         view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
         show_id = body.get('show_id')
+        
         season = body.get('season')
         episode = body.get('episode')
+
+        if season == 0 or season == '0':
+            season = None
+        if episode == 0 or episode == '0':
+            episode = None
 
         UserRating.objects.filter(
             user=view_user,

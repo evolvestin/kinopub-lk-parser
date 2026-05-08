@@ -7,109 +7,165 @@ window.App.rateData = {
     season: null,
     episode: null,
     title: '',
+    currentVal: 5.0,
+    isDragging: false,
     episodesData: [],
-    currentShowRating: null
+    needsRefresh: false
 };
 
 window.App.openRateModal = function(showId, title, currentRating, type = null) {
+    const hasExisting = (currentRating && currentRating !== 'null' && currentRating !== null);
+    
     this.rateData = {
+        ...this.rateData,
         showId: showId,
         showType: type || 'Movie',
-        level: 'show',
-        season: null,
-        episode: null,
         title: title,
-        currentShowRating: currentRating,
-        episodesData: [],
-        needsRefresh: false
+        currentVal: hasExisting ? parseFloat(currentRating) : 1.0,
+        hasExistingRating: hasExisting,
+        needsRefresh: false,
+        season: null,
+        episode: null
     };
 
-    if (!type) {
-        const show = D?.history_movies?.find(s => s.show_id === showId) || 
-                     D?.history_episodes?.find(s => s.show_id === showId);
-        
-        if (show) this.rateData.showType = show.show__type || 'Movie';
-    }
-    
+    document.getElementById('rate-show-title').textContent = title;
     const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(this.rateData.showType);
     document.getElementById('rate-mode-toggle').style.display = isSeries ? 'flex' : 'none';
-    document.getElementById('rate-show-title').textContent = title;
     
+    this.initSlider();
     this.setRateLevel('show');
     document.getElementById('rate-show-modal').classList.add('show');
 };
 
+
+window.App.initSlider = function() {
+    const hitArea = document.getElementById('rate-slider-hit');
+    if (!hitArea) return;
+
+    const handleMove = (e) => {
+        if (!this.rateData.isDragging && e.type === 'pointermove') return;
+        
+        const rect = hitArea.querySelector('.rate-slider-track').getBoundingClientRect();
+        const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+        let x = clientX - rect.left;
+        let percent = Math.max(0, Math.min(1, x / rect.width));
+        
+        // Маппинг на шкалу 1-10 с шагом 0.5
+        let val = 1 + (percent * 9);
+        val = Math.round(val * 2) / 2;
+        
+        if (val !== this.rateData.currentVal) {
+            this.rateData.currentVal = val;
+            this.updateSliderUI(true);
+            if (window.navigator.vibrate) window.navigator.vibrate(5);
+        }
+    };
+
+    hitArea.onpointerdown = (e) => {
+        this.rateData.isDragging = true;
+        hitArea.setPointerCapture(e.pointerId);
+        handleMove(e);
+    };
+
+    hitArea.onpointermove = handleMove;
+
+    hitArea.onpointerup = () => {
+        this.rateData.isDragging = false;
+    };
+
+    this.updateSliderUI();
+};
+
+window.App.updateSliderUI = function(withPulse = false) {
+    const val = this.rateData.currentVal;
+    const percent = ((val - 1) / 9) * 100;
+    
+    const fill = document.getElementById('rate-slider-fill');
+    const handle = document.getElementById('rate-slider-handle');
+    const huge = document.getElementById('rate-huge-val');
+    const container = document.getElementById('rate-slider-container');
+    const delBtn = document.getElementById('btn-delete-rating');
+
+    fill.style.width = `${percent}%`;
+    handle.style.left = `${percent}%`;
+    huge.innerHTML = `${val.toFixed(1 === val % 1 ? 0 : 1)}<span>/ 10</span>`;
+
+    if (withPulse) {
+        huge.classList.remove('rate-pulse');
+        void huge.offsetWidth;
+        huge.classList.add('rate-pulse');
+    }
+
+    container.classList.remove('score-low', 'score-mid', 'score-high');
+    if (val < 5) container.classList.add('score-low');
+    else if (val < 8) container.classList.add('score-mid');
+    else container.classList.add('score-high');
+
+    const isInputView = (this.rateData.level === 'show' || this.rateData.level === 'score');
+    delBtn.style.display = (isInputView && this.rateData.hasExistingRating) ? 'block' : 'none';
+};
+
 window.App.setRateLevel = function(level, params = {}) {
     this.rateData.level = level;
-    const grid = document.getElementById('rate-show-grid');
+    const slider = document.getElementById('rate-slider-container');
     const epNav = document.getElementById('rate-episodes-nav');
     const backBtn = document.getElementById('rate-back-btn');
     const breadcrumb = document.getElementById('rate-breadcrumb');
     const modeToggle = document.getElementById('rate-mode-toggle');
+    const submitBtn = document.getElementById('btn-submit-rating');
     const delBtn = document.getElementById('btn-delete-rating');
 
-    grid.style.display = 'none';
+    slider.style.display = 'none';
     epNav.style.display = 'none';
-    backBtn.style.display = 'none';
+    submitBtn.style.display = 'none';
     delBtn.style.display = 'none';
+    
+    backBtn.style.display = (level !== 'show') ? 'block' : 'none';
 
     if (level === 'show') {
-        breadcrumb.textContent = 'Общая оценка проекта';
+        this.rateData.season = null;
+        this.rateData.episode = null;
+        breadcrumb.textContent = 'Общая оценка';
+        slider.style.display = 'flex';
+        submitBtn.style.display = 'block';
         modeToggle.querySelector('#rate-mode-main').classList.add('active');
         modeToggle.querySelector('#rate-mode-ep').classList.remove('active');
-        this.renderScoreGrid(this.rateData.currentShowRating);
+        this.updateSliderUI();
     } 
     else if (level === 'seasons') {
+        this.rateData.season = null;
+        this.rateData.episode = null;
         breadcrumb.textContent = 'Выбор сезона';
-        backBtn.style.display = 'block';
+        epNav.style.display = 'block';
         modeToggle.querySelector('#rate-mode-main').classList.remove('active');
         modeToggle.querySelector('#rate-mode-ep').classList.add('active');
         this.loadAndRenderSeasons();
     }
     else if (level === 'episodes') {
         this.rateData.season = params.season;
+        this.rateData.episode = null;
         breadcrumb.textContent = `Сезон ${params.season}`;
-        backBtn.style.display = 'block';
+        epNav.style.display = 'block';
         this.renderEpisodes(params.season);
     }
     else if (level === 'score') {
         this.rateData.season = params.season;
         this.rateData.episode = params.episode;
+        
+        const hasExisting = (params.rating && params.rating !== 'null' && params.rating !== null);
+        this.rateData.hasExistingRating = hasExisting;
+        this.rateData.currentVal = hasExisting ? parseFloat(params.rating) : 1.0;
+        
         breadcrumb.textContent = `S${params.season} E${params.episode}`;
-        backBtn.style.display = 'block';
-        this.renderScoreGrid(params.rating);
+        slider.style.display = 'flex';
+        submitBtn.style.display = 'block';
+        this.updateSliderUI();
     }
-};
-
-window.App.renderScoreGrid = function(activeValue) {
-    const grid = document.getElementById('rate-show-grid');
-    const delBtn = document.getElementById('btn-delete-rating');
-    grid.style.display = 'grid';
-    
-    const isValidValue = (activeValue !== null && activeValue !== undefined && activeValue !== 'null');
-    const currentVal = isValidValue ? parseFloat(activeValue) : null;
-    
-    if (isValidValue) {
-        delBtn.style.display = 'block';
-        delBtn.innerHTML = 'Удалить';
-        delBtn.disabled = false;
-    }
-
-    let html = '';
-    for (let i = 2; i <= 20; i++) {
-        const val = i / 2;
-        const label = Number.isInteger(val) ? val.toString() : val.toFixed(1);
-        const isActive = (currentVal !== null && Math.abs(val - currentVal) < 0.01) ? 'active' : '';
-        html += `<button class="rating-grid-btn ${isActive}" onclick="window.App.submitRating(${val}, event)">${label}</button>`;
-    }
-    grid.innerHTML = html;
 };
 
 window.App.loadAndRenderSeasons = async function() {
     const epNav = document.getElementById('rate-episodes-nav');
-    epNav.style.display = 'block';
     epNav.innerHTML = '<div class="loader-inline"><div class="spinner"></div></div>';
-
     try {
         const r = await fetch('/api/webapp/get_episodes/', {
             method: 'POST',
@@ -117,60 +173,52 @@ window.App.loadAndRenderSeasons = async function() {
             body: JSON.stringify({ show_id: this.rateData.showId, init_data: tg?.initData || '' })
         });
         const data = await r.json();
+        
+        if (!data.seasons || data.seasons.length === 0) {
+            epNav.innerHTML = '<div class="empty">Данные о сезонах отсутствуют.<br><small style="opacity:0.6; font-weight:normal;">Требуется обновление хронометража</small></div>';
+            return;
+        }
+
         this.rateData.episodesData = data.seasons;
 
         let html = '<div class="rating-grid-wa" style="grid-template-columns: repeat(3, 1fr);">';
         data.seasons.forEach(s => {
-            const ratedCount = s.episodes.filter(e => e.rating).length;
-            const badge = ratedCount ? `<span style="font-size:10px; opacity:0.8; display:block; color:var(--accent);">★ ${ratedCount}/${s.episodes.length}</span>` : `<span style="font-size:10px; opacity:0.5; display:block;">0/${s.episodes.length}</span>`;
-            html += `<button class="rating-grid-btn" style="height:auto; padding:10px 0;" onclick="window.App.setRateLevel('episodes', {season: ${s.season_number}})">
+            const rated = s.episodes.filter(e => e.rating).length;
+            const badge = rated ? `<span style="color:var(--accent);font-size:10px;display:block;">★ ${rated}/${s.episodes.length}</span>` : `<span style="opacity:0.5;font-size:10px;display:block;">0/${s.episodes.length}</span>`;
+            html += `<button class="rating-grid-btn" style="height:auto;" onclick="window.App.setRateLevel('episodes', {season: ${s.season_number}})">
                 Сезон ${s.season_number}${badge}
             </button>`;
         });
-        html += '</div>';
-        epNav.innerHTML = html;
-    } catch(e) {
-        epNav.innerHTML = '<div class="empty">Ошибка загрузки серий</div>';
+        epNav.innerHTML = html + '</div>';
+    } catch(e) { 
+        epNav.innerHTML = '<div class="empty">Ошибка загрузки данных</div>'; 
     }
 };
 
 window.App.renderEpisodes = function(seasonNum) {
     const epNav = document.getElementById('rate-episodes-nav');
-    epNav.style.display = 'block';
     const season = this.rateData.episodesData.find(s => s.season_number === seasonNum);
-    
     let html = '<div class="rating-grid-wa" style="grid-template-columns: repeat(4, 1fr);">';
     season.episodes.forEach(e => {
         const isActive = e.rating ? 'active' : '';
-        const label = e.rating ? `<span style="font-size:11px; display:block; color:inherit; font-weight:900;">★ ${e.rating}</span>` : `E${e.episode_number}`;
-        html += `<button class="rating-grid-btn ${isActive}" onclick="window.App.setRateLevel('score', {season: ${seasonNum}, episode: ${e.episode_number}, rating: ${e.rating}})">
-            ${label}
-        </button>`;
+        const label = e.rating ? `<span style="font-weight:900;">★ ${e.rating}</span>` : `E${e.episode_number}`;
+        html += `<button class="rating-grid-btn ${isActive}" onclick="window.App.setRateLevel('score', {season: ${seasonNum}, episode: ${e.episode_number}, rating: ${e.rating}})">${label}</button>`;
     });
-    html += '</div>';
-    epNav.innerHTML = html;
+    epNav.innerHTML = html + '</div>';
 };
 
-window.App.rateGoBack = function() {
-    if (this.rateData.level === 'score') this.setRateLevel('episodes', {season: this.rateData.season});
-    else if (this.rateData.level === 'episodes') this.setRateLevel('seasons');
-    else if (this.rateData.level === 'seasons') this.setRateLevel('show');
+window.App.submitRatingFromSlider = function() {
+    this.submitRating(this.rateData.currentVal);
 };
 
-window.App.closeRateModal = function() {
-    document.getElementById('rate-show-modal').classList.remove('show');
-    if (this.rateData && this.rateData.needsRefresh) {
-        window.App.openShowLayer(this.rateData.showId);
-    }
-};
-
-window.App.submitRating = async function(rating, event) {
-    const btn = event.currentTarget;
-    const origContent = btn.innerHTML;
-    btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin:0;"></div>';
+window.App.submitRating = async function(rating) {
+    const btn = document.getElementById('btn-submit-rating');
+    const origText = btn.textContent;
+    btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:#fff;margin:0;"></div>';
+    btn.disabled = true;
     
     try {
-        const r = await fetch('/api/webapp/rate/', {
+        await fetch('/api/webapp/rate/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -181,45 +229,26 @@ window.App.submitRating = async function(rating, event) {
                 episode: this.rateData.episode
             })
         });
-        if (!r.ok) throw new Error();
         
         showToast('Оценка сохранена');
         window.AppData.cache.clear();
         this.rateData.needsRefresh = true;
         
         if (this.rateData.episode) {
-            const season = this.rateData.episodesData.find(s => s.season_number === this.rateData.season);
-            if (season) {
-                const ep = season.episodes.find(e => e.episode_number === this.rateData.episode);
-                if (ep) ep.rating = rating;
-            }
-            this.setRateLevel('episodes', {season: this.rateData.season});
+            this.setRateLevel('seasons');
         } else {
-            this.rateData.currentShowRating = rating;
             this.closeRateModal();
-            load(curYear);
-            window.App.openShowLayer(this.rateData.showId);
         }
-    } catch(e) {
-        btn.innerHTML = origContent;
-        showToast('Ошибка сохранения');
+    } catch(e) { showToast('Ошибка'); } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
     }
 };
 
 window.App.deleteRating = async function() {
-    const msg = this.rateData.episode 
-        ? `Удалить оценку эпизода S${this.rateData.season} E${this.rateData.episode}?`
-        : 'Удалить общую оценку проекта?';
-
-    if (!confirm(msg)) return;
-    
-    const btn = document.getElementById('btn-delete-rating');
-    const origContent = btn.innerHTML;
-    btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px;margin:0;border-top-color:var(--danger);"></div>';
-    btn.disabled = true;
-
+    if (!confirm('Удалить оценку?')) return;
     try {
-        const r = await fetch('/api/webapp/delete_rating/', {
+        await fetch('/api/webapp/delete_rating/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -229,27 +258,24 @@ window.App.deleteRating = async function() {
                 episode: this.rateData.episode
             })
         });
-        
         showToast('Оценка удалена');
         window.AppData.cache.clear();
         this.rateData.needsRefresh = true;
+        if (this.rateData.episode) this.setRateLevel('seasons');
+        else this.closeRateModal();
+    } catch(e) {}
+};
 
-        if (this.rateData.episode) {
-            const season = this.rateData.episodesData.find(s => s.season_number === this.rateData.season);
-            if (season) {
-                const ep = season.episodes.find(e => e.episode_number === this.rateData.episode);
-                if (ep) ep.rating = null;
-            }
-            this.setRateLevel('episodes', {season: this.rateData.season});
-        } else {
-            this.rateData.currentShowRating = null;
-            this.closeRateModal();
-            load(curYear);
-            window.App.openShowLayer(this.rateData.showId);
-        }
-    } catch(e) {
-        showToast('Ошибка удаления');
-        btn.innerHTML = origContent;
-        btn.disabled = false;
+window.App.rateGoBack = function() {
+    if (this.rateData.level === 'score') this.setRateLevel('episodes', {season: this.rateData.season});
+    else if (this.rateData.level === 'episodes') this.setRateLevel('seasons');
+    else if (this.rateData.level === 'seasons') this.setRateLevel('show');
+};
+
+window.App.closeRateModal = function() {
+    document.getElementById('rate-show-modal').classList.remove('show');
+    if (this.rateData.needsRefresh) {
+        if (activeMainView === 'stats') load(curYear);
+        window.App.openShowLayer(this.rateData.showId);
     }
 };

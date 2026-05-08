@@ -66,3 +66,104 @@
 #rate-mode-toggle {
     margin-bottom: 20px;
 }
+
+.rate-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0;
+    user-select: none;
+}
+
+.rate-score-display {
+    position: relative;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.rate-score-huge {
+    font-size: 80px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -3px;
+    transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.3s ease;
+    will-change: transform;
+}
+
+.rate-score-huge span {
+    font-size: 24px;
+    opacity: 0.3;
+    letter-spacing: 0;
+    margin-left: 4px;
+}
+
+.rate-slider-wrap {
+    width: 100%;
+    padding: 20px 10px;
+    touch-action: none;
+    position: relative;
+}
+
+.rate-slider-track {
+    height: 8px;
+    background: var(--bg-input);
+    border-radius: 4px;
+    position: relative;
+    border: 1px solid var(--border);
+}
+
+.rate-slider-fill {
+    position: absolute;
+    left: 0;
+    top: -1px;
+    bottom: -1px;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width 0.1s linear, background 0.3s ease;
+}
+
+.rate-slider-handle {
+    position: absolute;
+    top: 50%;
+    width: 32px;
+    height: 32px;
+    background: #fff;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    border: 4px solid var(--accent);
+    cursor: grab;
+    transition: border-color 0.3s ease, transform 0.2s var(--transition-bounce);
+    z-index: 10;
+}
+
+.rate-slider-wrap:active .rate-slider-handle {
+    transform: translate(-50%, -50%) scale(1.2);
+    cursor: grabbing;
+}
+
+.rate-scale-labels {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 15px;
+    padding: 0 5px;
+}
+
+.rate-scale-labels span {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+
+.rate-pulse {
+    transform: scale(1.15);
+}
+
+/* Динамические цвета для уровней оценки */
+.score-low { --accent: #e74c3c; --accent-dim: rgba(231, 76, 60, 0.15); }
+.score-mid { --accent: #f1c40f; --accent-dim: rgba(241, 196, 15, 0.15); }
+.score-high { --accent: #2ecc71; --accent-dim: rgba(46, 204, 113, 0.15); }
