@@ -807,7 +807,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
     Show.objects.bulk_create(shows_to_create, ignore_conflicts=True)
 
     unique_show_ids = list({item['show_id'] for item in views_on_page})
-    enqueue_show_update(unique_show_ids, details=True, durations=False)
+    enqueue_show_update(unique_show_ids, details=True, durations=False, ratings=True)
 
     q_objects = Q()
     for item in views_on_page:

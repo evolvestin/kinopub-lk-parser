@@ -131,7 +131,7 @@ def parse_and_save_catalog_page(driver, mode):
     )
 
     if new_ids:
-        enqueue_show_update(new_ids, details=True, durations=True)
+        enqueue_show_update(new_ids, details=True, durations=True, ratings=True)
 
     return len(new_ids)
 

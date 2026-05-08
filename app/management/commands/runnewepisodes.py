@@ -97,6 +97,7 @@ class Command(LoggableBaseCommand):
                                 [show_id],
                                 details=not show_has_details,
                                 durations=not duration_exists,
+                                ratings=not show_has_details,
                             )
 
                             notify_new_episode_task.delay(show_id, season, episode)

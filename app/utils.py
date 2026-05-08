@@ -24,7 +24,7 @@ def update_heartbeat():
         logger.warning('Could not update heartbeat file %s: %s', heartbeat_file, e)
 
 
-def enqueue_show_update(show_ids: list[int], details: bool = True, durations: bool = True):
+def enqueue_show_update(show_ids: list[int], details: bool = True, durations: bool = True, ratings: bool = False):
     if not show_ids:
         return
 
@@ -34,6 +34,8 @@ def enqueue_show_update(show_ids: list[int], details: bool = True, durations: bo
             r.sadd('queue:update_details', *show_ids)
         if durations:
             r.sadd('queue:update_durations', *show_ids)
+        if ratings:
+            r.sadd('queue:priority_ratings_sync', *show_ids)
     except Exception as e:
         logger.error(f'Failed to enqueue shows {show_ids} for update: {e}')
 

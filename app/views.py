@@ -8,6 +8,8 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+
+from django.db import transaction
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
@@ -2361,3 +2363,36 @@ def webapp_delete_rating(request):
     except Exception as e:
         logging.error(f'WebApp Delete Rating Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@csrf_exempt
+@staff_member_required
+@require_http_methods(['POST'])
+def merge_persons_api(request):
+    try:
+        data = json.loads(request.body)
+        master_id = data.get('master_id')
+        alias_ids = data.get('alias_ids', [])
+
+        if not master_id or not alias_ids:
+            return JsonResponse({'error': 'Master ID and Aliases are required'}, status=400)
+
+        with transaction.atomic():
+            master = Person.objects.get(id=master_id)
+            
+            if master.master_person:
+                master.master_person = None
+                master.save(update_fields=['master_person'])
+
+            aliases = Person.objects.filter(id__in=alias_ids).exclude(id=master_id)
+            count = aliases.update(master_person=master)
+
+            for aid in alias_ids:
+                cache.delete(f'user_stats:person:{aid}')
+            cache.delete(f'user_stats:person:{master_id}')
+
+        return JsonResponse({'status': 'ok', 'merged_count': count, 'master_name': master.name})
+    except Person.DoesNotExist:
+        return JsonResponse({'error': 'Master person not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

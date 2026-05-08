@@ -19,6 +19,7 @@ urlpatterns = [
     ),
     path('api/metrics/details/<str:key>/', views.get_metric_details, name='get_metric_details'),
     path('api/metrics/queue_update/', views.queue_update_details, name='queue_update_details'),
+    path('api/metrics/merge_persons/', views.merge_persons_api, name='merge_persons_api'),
     # WebApp Endpoints
     path('webapp/', views.webapp_index, name='webapp_index'),
     path(

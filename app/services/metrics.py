@@ -564,16 +564,19 @@ def get_duplicate_photo_urls_list(source_type: str):
 
     grouped_persons = defaultdict(list)
     for p in persons_qs:
-        grouped_persons[p[field]].append(p['name'])
+        grouped_persons[p[field]].append({
+            'id': p['id'],
+            'name': p['name']
+        })
 
     results = []
     for url in urls:
-        names = sorted(grouped_persons[url])
+        persons_list = sorted(grouped_persons[url], key=lambda x: x['id'])
         results.append(
             {
                 'id': 0,
                 'title': f'Группа дубликатов ({url_counts[url]})',
-                'persons': names,
+                'persons': persons_list,
                 'tmdb_photo_url': url if field == 'tmdb_photo_url' else None,
                 'kp_photo_url': url if field == 'kp_photo_url' else None,
                 'admin_url': f'/admin/app/person/?q={url}',
