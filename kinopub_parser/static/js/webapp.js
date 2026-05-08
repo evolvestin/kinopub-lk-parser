@@ -24,6 +24,15 @@ window.handleKpPlaceholder = function (img, name) {
     }
 };
 
+const shareModalEl = document.getElementById('share-modal');
+if (shareModalEl) {
+    shareModalEl.addEventListener('click', (e) => {
+        if (e.target.id === 'share-modal') {
+            closeShareModal();
+        }
+    });
+}
+
 window.AppData = {
     cache: new Map(),
     isPreloading: false,
@@ -2090,15 +2099,27 @@ window.init = async function() {
 
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.IS_ADMIN_DASHBOARD) return;
-    
-    if (typeof init === 'function') {
-        init();
-    } else {
-        // Фоллбэк на случай критической ошибки
-        const loader = document.getElementById('loader');
-        if (loader) loader.classList.add('hidden');
-    }
+    if (typeof switchPeriod === 'function') switchPeriod('now');
+
+    const modalCloseMap = {
+        'details-modal': () => (typeof closeModal === 'function') && closeModal(),
+        'wl-item-delete-modal': () => window.App.closeItemDeleteModal(),
+        'add-view-modal': () => window.App.closeAddViewModal(),
+        'wl-modal': () => window.App.closeFolderModal(),
+        'wl-edit-modal': () => window.App.closeFolderEditModal(),
+        'wl-limit-modal': () => window.App.closeLimitModal(),
+        'casino-modal': () => window.App.closeCasino(),
+        'rate-show-modal': () => window.App.closeRateModal()
+    };
+
+    Object.keys(modalCloseMap).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('click', (e) => {
+                if (e.target.id === id) modalCloseMap[id]();
+            });
+        }
+    });
 });
 
 const originalRenderHistoryBatchLayer = window.renderHistoryBatchLayer;
