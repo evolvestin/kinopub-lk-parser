@@ -360,8 +360,14 @@ function renderSearchResults(data) {
     if (!data.shows?.length && !data.persons?.length) {
         html = `<div class="empty"><div class="icon">${Icons.dash}</div>Ничего не найдено</div>`;
     }
+
+    const resultsContainer = document.getElementById('search-results');
+    resultsContainer.innerHTML = html;
     
     document.getElementById('search-results').innerHTML = html;
+    requestAnimationFrame(() => {
+        window.App.fitAll('.grid-below-title', resultsContainer);
+    });
 }
 
 async function loadShared(statId) {
@@ -1269,6 +1275,12 @@ function renderHistoryBatchLayer() {
     requestAnimationFrame(() => {
         isRenderingBatch = false;
         
+        const container = topLayer.el.querySelector('#layer-hist-container');
+        if (container) {
+            window.App.fitAll('.grid-below-title', container);
+            window.App.fitAll('.hist-title', container);
+        }
+
         if (grouping !== 'none') {
             topLayer.el.dispatchEvent(new Event('scroll'));
         }
@@ -1780,22 +1792,33 @@ window.App = {
     fitText: function(el) {
         if (!el) return;
         
-        // Сбрасываем стили для чистого расчета
+        const styles = window.getComputedStyle(el);
+        const maxHeight = parseFloat(styles.maxHeight) || parseFloat(styles.height);
+        const clientWidth = el.clientWidth;
+        
+        if (!maxHeight || maxHeight <= 0) return;
+
         el.style.fontSize = "";
-        el.style.display = "block"; // Временно переключаем в block для точного замера scrollHeight
+        let size = parseFloat(window.getComputedStyle(el).fontSize);
         
-        let size = parseInt(window.getComputedStyle(el).fontSize);
-        const maxHeight = el.clientHeight;
-        
-        // Уменьшаем шрифт, пока высота контента (scrollHeight) не влезет в высоту блока
-        // size > 6 — минимальный порог, чтобы текст не превратился в точку
-        while (el.scrollHeight > maxHeight && size > 6) {
-            size--;
+        const hasOverflow = () => {
+            if (styles.whiteSpace === 'nowrap') {
+                return el.scrollWidth > clientWidth + 1;
+            }
+            // Проверяем, не превышает ли реальная высота контента 
+            // заданный лимит (2.3em или фиксированную высоту)
+            return el.scrollHeight > maxHeight + 2;
+        };
+
+        // Уменьшаем шаг для более плавного подбора
+        while (hasOverflow() && size > 9) {
+            size -= 0.5;
             el.style.fontSize = size + "px";
         }
-        
-        // Возвращаем flex для центрирования
-        el.style.display = "flex";
+    },
+    fitAll: function(selector, container = document) {
+        const elements = container.querySelectorAll(selector);
+        elements.forEach(el => this.fitText(el));
     },
     toggleHistoryEditMode: function() {
         isHistoryEditMode = !isHistoryEditMode;
@@ -2032,3 +2055,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (loader) loader.classList.add('hidden');
     }
 });
+
+const originalRenderHistoryBatchLayer = window.renderHistoryBatchLayer;
+window.renderHistoryBatchLayer = function() {
+    if (isRenderingBatch || currentHistoryOffset >= curHistData.length) return;
+    
+    // Вызываем оригинальную функцию
+    originalRenderHistoryBatchLayer();
+    
+    // После отрисовки батча подгоняем размеры (ждем кадра для точности clientHeight)
+    requestAnimationFrame(() => {
+        const container = document.getElementById('layer-hist-container');
+        if (container) {
+            window.App.fitAll('.grid-below-title', container);
+            window.App.fitAll('.hist-title', container);
+        }
+    });
+};
