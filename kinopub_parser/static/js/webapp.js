@@ -1411,6 +1411,7 @@ window.openShowLayer = async function(showId) {
         }
 
         const safeTitle = show.title.replace(/'/g, "\\'");
+        const rateVal = show.personal_rating ? show.personal_rating : 'null';
         
         let countriesMetaHtml = '';
         if (show.countries && show.countries.length > 0) {
@@ -1439,6 +1440,9 @@ window.openShowLayer = async function(showId) {
                     <button class="wishlist-add-btn detail-wishlist-btn anim-item" style="animation-delay: 0.6s;" onclick="window.App.showFolderModal(${show.id}, '${safeTitle}')">${Icons.bookmark_plus}</button>
                     <button class="detail-add-view-btn anim-item" style="animation-delay: 0.7s;" onclick="window.App.openAddViewModal(${show.id}, '${safeTitle}', '${show.type}')">
                         ${Icons.eye}
+                    </button>
+                    <button class="detail-add-view-btn detail-rate-btn anim-item" style="animation-delay: 0.8s;" onclick="window.App.openRateModal(${show.id}, '${safeTitle}', ${rateVal}, '${show.type}')">
+                        ${Icons.star}
                     </button>
                 </div>
             </div>
@@ -1470,7 +1474,14 @@ window.openShowLayer = async function(showId) {
             ${crewHtml}
         `;
 
-        pushLayer(html, { type: 'show' });
+        const currentTop = viewStack[viewStack.length - 1];
+        const isRefresh = currentTop && currentTop.context.type === 'show' && currentTop.context.showId == showId;
+
+        pushLayer(html, { 
+            type: 'show', 
+            showId: showId, 
+            replace: isRefresh 
+        });
     } catch (e) {
         showToast('Не удалось загрузить данные шоу');
     } finally {
@@ -1557,6 +1568,14 @@ window.openCollectionLayer = async function(type, id, titleFallback) {
 let viewStack =[]; 
 
 function pushLayer(htmlContent, contextData = {}) {
+    if (contextData.replace && viewStack.length > 0) {
+        const top = viewStack[viewStack.length - 1];
+        top.el.innerHTML = htmlContent;
+        top.context = contextData;
+        top.el.scrollTop = 0;
+        return;
+    }
+
     const layer = document.createElement('div');
     layer.className = 'layer';
     layer.innerHTML = htmlContent;
@@ -2021,7 +2040,7 @@ window.App = {
             btn.innerHTML = origHtml;
             btn.disabled = false;
         }
-    }
+    },
 };
 
 window.init = async function() {

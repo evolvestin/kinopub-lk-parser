@@ -8,6 +8,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from django.core.cache import cache
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
@@ -1179,7 +1180,6 @@ def webapp_get_show_full(request, show_id):
             'countries', 'genres', 'showcrew_set__person__master_person'
         ).get(id=show_id)
 
-        # Идентификация пользователя
         view_user = None
         init_data = request.GET.get('init_data')
         if init_data:
@@ -1189,9 +1189,11 @@ def webapp_get_show_full(request, show_id):
 
         internal_rating, _ = show.get_internal_rating_data()
 
-        # Настройка видимости
         visible_ids = set()
         is_guest = True
+        personal_rating = None
+        personal_episodes_count = 0
+
         if view_user:
             is_guest = (view_user.role == UserRole.GUEST)
             visible_ids.add(view_user.id)
@@ -1199,16 +1201,25 @@ def webapp_get_show_full(request, show_id):
                 mate_ids = ViewUser.objects.filter(groups__users=view_user).values_list('id', flat=True)
                 visible_ids.update(mate_ids)
 
+            # Получаем конкретно общую оценку проекта пользователем
+            rating_obj = UserRating.objects.filter(
+                user=view_user, show=show, season_number__isnull=True
+            ).first()
+            if rating_obj:
+                personal_rating = rating_obj.rating
+
+            personal_episodes_count = UserRating.objects.filter(
+                user=view_user, show=show, season_number__isnull=False
+            ).count()
+
         last_view = None
         user_show_history = []
         if view_user:
-            # Получаем всю историю шоу, чтобы отфильтровать видимых
             history_qs = ViewHistory.objects.filter(show=show).prefetch_related('users').order_by(
                 F('view_date').desc(nulls_last=True), '-id'
             )
             
             for h in history_qs:
-                # В списке пользователей истории оставляем только тех, кого можно видеть
                 allowed_users = [u for u in h.users.all() if u.id in visible_ids]
                 if not allowed_users:
                     continue
@@ -1224,14 +1235,12 @@ def webapp_get_show_full(request, show_id):
                     'episode_number': h.episode_number,
                     'poster_url': get_poster_url(show.id),
                     'user_names': [u.name or u.username or str(u.telegram_id) for u in allowed_users],
-                    # Если гость — аватарки не шлем вообще
                     'user_photos': [] if is_guest else [u.photo_url for u in allowed_users],
                     'user_ids': [u.id for u in allowed_users]
                 }
                 user_show_history.append(item)
             
             if user_show_history:
-                # Ищем самую свежую запись именно текущего пользователя для пометки "Просмотрено"
                 my_last = next((x for x in user_show_history if view_user.id in x['user_ids']), None)
                 if my_last:
                     se_suffix = f" ({format_se(my_last['season_number'], my_last['episode_number'])})" if my_last['season_number'] > 0 else ""
@@ -1306,6 +1315,8 @@ def webapp_get_show_full(request, show_id):
             'kinopoisk_rating': show.kinopoisk_rating,
             'imdb_rating': show.imdb_rating,
             'internal_rating': internal_rating,
+            'personal_rating': personal_rating,
+            'personal_episodes_count': personal_episodes_count,
             'last_view': last_view,
             'view_history': user_show_history,
             'countries': [
@@ -2185,3 +2196,151 @@ def webapp_remove_view(request):
     except Exception as e:
         logging.error(f'WebApp Remove View Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Internal server error'}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_get_episodes(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+        show_id = body.get('show_id')
+        
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
+        if not view_user:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        durations = ShowDuration.objects.filter(
+            show_id=show_id,
+            season_number__isnull=False,
+            episode_number__isnull=False
+        ).order_by('season_number', 'episode_number')
+
+        ratings = UserRating.objects.filter(
+            user=view_user,
+            show_id=show_id,
+            season_number__isnull=False
+        ).values('season_number', 'episode_number', 'rating')
+
+        ratings_map = {(r['season_number'], r['episode_number']): r['rating'] for r in ratings}
+
+        seasons_dict = defaultdict(list)
+        for d in durations:
+            seasons_dict[d.season_number].append({
+                'episode_number': d.episode_number,
+                'rating': ratings_map.get((d.season_number, d.episode_number))
+            })
+
+        result = [
+            {'season_number': s, 'episodes': episodes}
+            for s, episodes in sorted(seasons_dict.items())
+        ]
+
+        return JsonResponse({'seasons': result})
+    except Exception as e:
+        logging.error(f'WebApp Get Episodes Error: {e}', exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_rate_show(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        show_id = body.get('show_id')
+        rating = float(body.get('rating'))
+        season = body.get('season')  # Может быть None
+        episode = body.get('episode') # Может быть None
+        
+        show = Show.objects.get(id=show_id)
+
+        UserRating.objects.update_or_create(
+            user=view_user,
+            show=show,
+            season_number=season,
+            episode_number=episode,
+            defaults={'rating': rating},
+        )
+
+        history_qs = ViewHistory.objects.filter(
+            show=show,
+            users=view_user,
+            telegram_message_id__isnull=False,
+        )
+        
+        if season is not None and episode is not None:
+            history_qs = history_qs.filter(season_number=season, episode_number=episode)
+        else:
+            history_qs = history_qs.filter(season_number=0)
+
+        sender = TelegramSender()
+        for history_item in history_qs:
+            sender.update_history_message(history_item)
+
+        for y in [timezone.now().year, 'all']:
+            cache.delete(f'user_stats_v6:{view_user.id}:{y}')
+            cache.delete(f'group_stats_v6:{view_user.id}:{y}')
+
+        return JsonResponse({'status': 'ok'})
+
+    except Exception as e:
+        logging.error(f'WebApp Rate Show Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_delete_rating(request):
+    try:
+        body = json.loads(request.body)
+        init_data = body.get('init_data')
+        tg_user = validate_telegram_init_data(init_data)
+        if not tg_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        show_id = body.get('show_id')
+        season = body.get('season')
+        episode = body.get('episode')
+
+        UserRating.objects.filter(
+            user=view_user,
+            show_id=show_id,
+            season_number=season,
+            episode_number=episode,
+        ).delete()
+
+        history_qs = ViewHistory.objects.filter(
+            show_id=show_id,
+            users=view_user,
+            telegram_message_id__isnull=False,
+        )
+        
+        if season is not None and episode is not None:
+            history_qs = history_qs.filter(season_number=season, episode_number=episode)
+        else:
+            history_qs = history_qs.filter(season_number=0)
+
+        sender = TelegramSender()
+        for history_item in history_qs:
+            sender.update_history_message(history_item)
+
+        for y in [timezone.now().year, 'all']:
+            cache.delete(f'user_stats_v6:{view_user.id}:{y}')
+            cache.delete(f'group_stats_v6:{view_user.id}:{y}')
+
+        return JsonResponse({'status': 'ok'})
+
+    except Exception as e:
+        logging.error(f'WebApp Delete Rating Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)
