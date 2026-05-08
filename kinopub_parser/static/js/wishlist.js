@@ -133,7 +133,6 @@ function renderWishlistFolders() {
         </div>
     `).join('');
 
-    // Подгоняем названия папок
     requestAnimationFrame(() => {
         window.App.fitAll('.wl-folder-name', grid);
     });
@@ -201,6 +200,9 @@ function renderActiveWlFolder() {
         } else {
             mainHeader.textContent = 'Мои списки';
         }
+        
+        mainHeader.style.fontSize = "";
+        requestAnimationFrame(() => window.App.fitText(mainHeader));
     }
 
     if (titleEl) {
@@ -297,7 +299,9 @@ function renderActiveWlFolder() {
         
         requestAnimationFrame(() => {
             window.App.fitAll('.grid-below-title', container);
+            window.App.fitAll('.grid-below-orig', container);
             window.App.fitAll('.hist-title', container);
+            window.App.fitAll('.hist-orig', container);
         });
     }
 

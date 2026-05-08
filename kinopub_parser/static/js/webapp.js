@@ -1792,28 +1792,41 @@ window.App = {
     fitText: function(el) {
         if (!el) return;
         
-        const styles = window.getComputedStyle(el);
-        const maxHeight = parseFloat(styles.maxHeight) || parseFloat(styles.height);
-        const clientWidth = el.clientWidth;
-        
-        if (!maxHeight || maxHeight <= 0) return;
-
+        // Сбрасываем размер для чистого замера
         el.style.fontSize = "";
-        let size = parseFloat(window.getComputedStyle(el).fontSize);
+        const styles = window.getComputedStyle(el);
         
-        const hasOverflow = () => {
-            if (styles.whiteSpace === 'nowrap') {
-                return el.scrollWidth > clientWidth + 1;
-            }
-            // Проверяем, не превышает ли реальная высота контента 
-            // заданный лимит (2.3em или фиксированную высоту)
-            return el.scrollHeight > maxHeight + 2;
-        };
+        // Захватываем лимиты в пикселях один раз, чтобы они не менялись при изменении шрифта
+        const limitWidth = el.clientWidth;
+        const limitHeight = parseFloat(styles.maxHeight) || el.offsetHeight || 40;
+        
+        const isSingleLine = styles.whiteSpace === 'nowrap' || styles.webkitLineClamp === '1';
+        let size = parseFloat(styles.fontSize);
+        const minSize = 9;
 
-        // Уменьшаем шаг для более плавного подбора
-        while (hasOverflow() && size > 9) {
-            size -= 0.5;
-            el.style.fontSize = size + "px";
+        // Очищаем временные ограничения для замера реального контента
+        const originalMaxHeight = el.style.maxHeight;
+        const originalClamp = el.style.webkitLineClamp;
+        
+        if (isSingleLine) {
+            // Для однострочных: уменьшаем, пока контент шире контейнера
+            while (el.scrollWidth > limitWidth + 1 && size > minSize) {
+                size -= 0.5;
+                el.style.fontSize = size + "px";
+            }
+        } else {
+            // Для многострочных: временно убираем обрезку, чтобы scrollHeight показал реальный объем
+            el.style.webkitLineClamp = "none";
+            el.style.maxHeight = "none";
+            
+            while (el.scrollHeight > limitHeight + 1 && size > minSize) {
+                size -= 0.5;
+                el.style.fontSize = size + "px";
+            }
+            
+            // Возвращаем CSS ограничения
+            el.style.webkitLineClamp = originalClamp;
+            el.style.maxHeight = originalMaxHeight;
         }
     },
     fitAll: function(selector, container = document) {
