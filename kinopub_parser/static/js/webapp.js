@@ -499,7 +499,12 @@ window.switchPersonTab = function(category, mode, btn) {
 function render() {
     if (!D?.meta) return;
     const n = D.meta.name || 'Пользователь';
-    document.getElementById('user-name').textContent = n;
+    const nameEl = document.getElementById('user-name');
+    if (nameEl) {
+        nameEl.textContent = n;
+        // Подгоняем размер после вставки текста
+        requestAnimationFrame(() => window.App.fitText(nameEl));
+    }
     
     const avEl = document.getElementById('avatar');
     if (D.meta.is_anonymous) {
@@ -1772,6 +1777,26 @@ window.App = {
     openCasino: window.openCasino,
     closeCasino: window.closeCasino,
     resetCasino: window.resetCasino,
+    fitText: function(el) {
+        if (!el) return;
+        
+        // Сбрасываем стили для чистого расчета
+        el.style.fontSize = "";
+        el.style.display = "block"; // Временно переключаем в block для точного замера scrollHeight
+        
+        let size = parseInt(window.getComputedStyle(el).fontSize);
+        const maxHeight = el.clientHeight;
+        
+        // Уменьшаем шрифт, пока высота контента (scrollHeight) не влезет в высоту блока
+        // size > 6 — минимальный порог, чтобы текст не превратился в точку
+        while (el.scrollHeight > maxHeight && size > 6) {
+            size--;
+            el.style.fontSize = size + "px";
+        }
+        
+        // Возвращаем flex для центрирования
+        el.style.display = "flex";
+    },
     toggleHistoryEditMode: function() {
         isHistoryEditMode = !isHistoryEditMode;
         const btn = document.getElementById('hist-del-toggle');

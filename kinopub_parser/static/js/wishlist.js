@@ -196,11 +196,17 @@ function renderActiveWlFolder() {
         } else {
             mainHeader.textContent = 'Мои списки';
         }
+        // Запускаем подбор шрифта
+        requestAnimationFrame(() => window.App.fitText(mainHeader));
     }
 
     if (titleEl) {
-        titleEl.innerHTML = `<span style="color:${folder.color}">${Icons[folder.icon] || Icons.folder}</span> ${folder.name}`;
+        titleEl.innerHTML = `<span style="color:${folder.color}; margin-right: 8px; display: inline-flex; vertical-align: middle;">${Icons[folder.icon] || Icons.folder}</span>${folder.name}`;
         titleEl.style.display = folders.length > 1 ? 'flex' : 'none';
+        // Запускаем подбор шрифта для подзаголовка в панели
+        if (folders.length > 1) {
+            requestAnimationFrame(() => window.App.fitText(titleEl));
+        }
     }
 
     document.getElementById('wl-vt-grid')?.classList.toggle('active', wlViewMode === 'grid');

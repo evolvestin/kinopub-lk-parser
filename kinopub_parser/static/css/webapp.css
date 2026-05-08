@@ -141,10 +141,16 @@ body {
     font-weight: 800;
     color: var(--text-primary);
     letter-spacing: -0.5px;
-    line-height: 1.2;
-    white-space: nowrap;
+    line-height: 1.1;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    /* Фиксированная высота как у кнопок в хедере */
+    height: clamp(36px, 10vw, 44px);
+    /* Центрируем содержимое вертикально */
+    display: flex;
+    align-items: center;
     overflow: hidden;
-    text-overflow: ellipsis;
     min-width: 0;
     flex: 1;
 }
