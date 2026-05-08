@@ -65,6 +65,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'app.middleware.NoIndexMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -345,7 +346,11 @@ CELERY_BEAT_SCHEDULE = {
     },
     'update_site_metrics': {
         'task': 'app.tasks.update_site_metrics_task',
-        'schedule': crontab(minute=0, hour=0),
+        'schedule': crontab(minute=0, hour=0),  # every 24 hours
+    },
+    'auto_enqueue_missing_metadata': {
+        'task': 'app.tasks.auto_enqueue_missing_metadata_task',
+        'schedule': crontab(minute=0, hour=9),  # every 24 hours
     },
 }
 

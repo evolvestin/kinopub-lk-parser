@@ -7,6 +7,7 @@ from app import views
 from app.admin_site import admin_site
 
 urlpatterns = [
+    path('robots.txt', views.robots_txt, name='robots_txt'),
     path('', views.index, name='index'),
     path('admin/', admin_site.urls),
     path(

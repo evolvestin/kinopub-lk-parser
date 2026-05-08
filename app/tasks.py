@@ -14,6 +14,7 @@ from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.management import call_command
+from django.db.models import Q
 from django.utils import timezone
 from redis import Redis
 
@@ -26,6 +27,8 @@ from app.services.metrics import (
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
+from app.utils import enqueue_show_update
+from shared.constants import SERIES_TYPES
 from shared.formatters import format_se
 
 
@@ -559,3 +562,36 @@ def notify_new_episode_task(show_id, season, episode):
     for user in users:
         if user.telegram_id:
             sender.send_new_episode_notification(user, show, season, episode)
+
+
+@shared_task
+@safe_execution
+def auto_enqueue_missing_metadata_task():
+    logging.info('Starting auto-enqueue task for shows with missing metadata.')
+
+    detail_ids = list(
+        Show.objects.filter(
+            Q(year__isnull=True)
+            | Q(plot__isnull=True)
+            | Q(plot='')
+            | Q(genres__isnull=True)
+            | Q(countries__isnull=True)
+            | (Q(type__in=SERIES_TYPES) & (Q(status__isnull=True) | Q(status='')))
+        )
+        .values_list('id', flat=True)
+        .distinct()
+    )
+
+    duration_ids = list(
+        Show.objects.filter(showduration__isnull=True).values_list('id', flat=True).distinct()
+    )
+
+    if detail_ids:
+        logging.info(f'Enqueuing {len(detail_ids)} shows for details update.')
+        enqueue_show_update(detail_ids, details=True, durations=False)
+
+    if duration_ids:
+        logging.info(f'Enqueuing {len(duration_ids)} shows for durations update.')
+        enqueue_show_update(duration_ids, details=False, durations=True)
+
+    logging.info('Auto-enqueue task completed.')

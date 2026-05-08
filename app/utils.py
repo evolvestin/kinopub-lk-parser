@@ -24,7 +24,9 @@ def update_heartbeat():
         logger.warning('Could not update heartbeat file %s: %s', heartbeat_file, e)
 
 
-def enqueue_show_update(show_ids: list[int], details: bool = True, durations: bool = True, ratings: bool = False):
+def enqueue_show_update(
+    show_ids: list[int], details: bool = True, durations: bool = True, ratings: bool = False
+):
     if not show_ids:
         return
 

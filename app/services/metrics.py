@@ -564,10 +564,7 @@ def get_duplicate_photo_urls_list(source_type: str):
 
     grouped_persons = defaultdict(list)
     for p in persons_qs:
-        grouped_persons[p[field]].append({
-            'id': p['id'],
-            'name': p['name']
-        })
+        grouped_persons[p[field]].append({'id': p['id'], 'name': p['name']})
 
     results = []
     for url in urls:

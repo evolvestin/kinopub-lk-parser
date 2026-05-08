@@ -8,15 +8,14 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-
-from django.db import transaction
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models import Avg, F, Max, Prefetch, Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
@@ -74,6 +73,14 @@ from shared.constants import (
 )
 from shared.formatters import format_precision_date, format_se
 from shared.media import get_poster_url
+
+
+def robots_txt(request):
+    lines = [
+        'User-agent: *',
+        'Disallow: /',
+    ]
+    return HttpResponse('\n'.join(lines), content_type='text/plain')
 
 
 def _toggle_user_in_view(user, view_id):
@@ -2379,7 +2386,7 @@ def merge_persons_api(request):
 
         with transaction.atomic():
             master = Person.objects.get(id=master_id)
-            
+
             if master.master_person:
                 master.master_person = None
                 master.save(update_fields=['master_person'])

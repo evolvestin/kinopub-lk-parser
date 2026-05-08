@@ -1,5 +1,10 @@
 {% extends "admin/base.html" %}
 
+{% block extrahead %}
+{{ block.super }}
+<meta name="robots" content="noindex, nofollow, noarchive">
+{% endblock %}
+
 {% block title %}KinoPub Observer Admin{% endblock %}
 
 {% block branding %}
