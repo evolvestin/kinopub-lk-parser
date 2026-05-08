@@ -151,6 +151,7 @@ class TelegramSender:
 
     def _build_message_payload(self, view_history_obj, for_user=None, is_channel=False):
         UserRating = apps.get_model('app', 'UserRating')
+        ViewUser = apps.get_model('app', 'ViewUser')
 
         lines = []
         season = view_history_obj.season_number
@@ -192,20 +193,41 @@ class TelegramSender:
             ]
         )
 
+        # Логика видимости участников
+        all_viewers = view_history_obj.users.all()
+        visible_names = []
+
         if is_channel:
+            # Для канала: показываем только тех, кто является Viewer или Admin.
+            # Гости не отображаются в общем канале для приватности.
+            visible_names = [
+                f'@{u.username}' if u.username else str(u.name)
+                for u in all_viewers if u.role != UserRole.GUEST
+            ]
+            
             if view_history_obj.is_checked:
                 lines.append(f'✅ {italic("Учитывается в статистике")}')
             else:
                 lines.append(f'❌ {italic("Не учитывается в статистике")}')
 
-            names = [f'@{user.username}' or str(user.name) for user in view_history_obj.users.all()]
+        elif for_user:
+            # Для приватного сообщения: показываем себя и сокомандников.
+            allowed_ids = {for_user.id}
+            if for_user.role != UserRole.GUEST:
+                mate_ids = ViewUser.objects.filter(groups__users=for_user).values_list('id', flat=True)
+                allowed_ids.update(mate_ids)
+            
+            visible_names = [
+                f'@{u.username}' if u.username else str(u.name)
+                for u in all_viewers if u.id in allowed_ids
+            ]
 
-            if len(names) == 1:
-                lines.append(f'👀 Смотрит: {names[0]}')
-            elif len(names) > 0:
-                lines.append('👀 Смотрят:')
-                for i, name in enumerate(names, start=1):
-                    lines.append(f'{i}. {name}')
+        if len(visible_names) == 1:
+            lines.append(f'👀 Смотрит: {visible_names[0]}')
+        elif len(visible_names) > 0:
+            lines.append('👀 Смотрят:')
+            for i, name in enumerate(visible_names, start=1):
+                lines.append(f'{i}. {name}')
 
         personal_rating = None
         episodes_count = 0

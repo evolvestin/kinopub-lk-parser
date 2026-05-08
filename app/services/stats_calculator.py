@@ -27,7 +27,7 @@ from django.db.models.functions import (
 )
 from django.utils import timezone
 
-from app.models import Person, ShowDuration, UserRating, ViewHistory, ViewUserGroup, WishlistItem
+from app.models import Person, ShowDuration, UserRating, ViewHistory, ViewUserGroup, WishlistItem, ViewUser
 from shared.constants import (
     ACTOR_ROLES,
     DIRECTOR_ROLES,
@@ -36,6 +36,7 @@ from shared.constants import (
     RAW_TO_NORMALIZED_GENRE,
     SERIES_TYPES,
     WRITER_ROLES,
+    UserRole
 )
 from shared.formatters import format_duration, format_precision_date
 from shared.media import get_poster_url
@@ -512,6 +513,13 @@ def generate_user_stats(user, year=None):
         return cached
 
     current_yr = timezone.now().year
+    is_guest = (user.role == UserRole.GUEST)
+
+    # Предварительно получаем ID всех сокомандников для фильтрации имен в истории
+    visible_user_ids = {user.id}
+    if not is_guest:
+        mate_ids = ViewUser.objects.filter(groups__users=user).values_list('id', flat=True)
+        visible_user_ids.update(mate_ids)
 
     history_years = (
         ViewHistory.objects.filter(users=user)
@@ -699,9 +707,11 @@ def generate_user_stats(user, year=None):
         .annotate(user_rating=Subquery(user_movie_rating))
         .order_by(F('view_date').desc(nulls_last=True), '-id')
     ):
+        # Ограничиваем список участников только видимыми
+        allowed_users = [u for u in h.users.all() if u.id in visible_user_ids]
         movies_history.append(
             {
-                'id': h.id,  # Добавлено
+                'id': h.id,
                 'show_id': h.show_id,
                 'show__title': h.show.title,
                 'show__original_title': h.show.original_title,
@@ -711,9 +721,9 @@ def generate_user_stats(user, year=None):
                 'date_precision': h.date_precision,
                 'user_rating': h.user_rating,
                 'poster_url': get_poster_url(h.show_id),
-                'user_ids': list(h.users.values_list('id', flat=True)),
-                'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
-                'user_photos': [u.photo_url for u in h.users.all()],
+                'user_ids': [u.id for u in allowed_users],
+                'user_names': [u.name or u.username or str(u.telegram_id) for u in allowed_users],
+                'user_photos': [] if is_guest else [u.photo_url for u in allowed_users],
             }
         )
 
@@ -734,9 +744,10 @@ def generate_user_stats(user, year=None):
         .annotate(user_rating=Subquery(user_ep_rating), user_show_rating=Subquery(user_show_rating))
         .order_by(F('view_date').desc(nulls_last=True), '-id')
     ):
+        allowed_users = [u for u in h.users.all() if u.id in visible_user_ids]
         episodes_history.append(
             {
-                'id': h.id,  # Добавлено
+                'id': h.id,
                 'show_id': h.show_id,
                 'show__title': h.show.title,
                 'show__original_title': h.show.original_title,
@@ -749,9 +760,9 @@ def generate_user_stats(user, year=None):
                 'user_rating': h.user_rating,
                 'user_show_rating': h.user_show_rating,
                 'poster_url': get_poster_url(h.show_id),
-                'user_ids': list(h.users.values_list('id', flat=True)),
-                'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
-                'user_photos': [u.photo_url for u in h.users.all()],
+                'user_ids': [u.id for u in allowed_users],
+                'user_names': [u.name or u.username or str(u.telegram_id) for u in allowed_users],
+                'user_photos': [] if is_guest else [u.photo_url for u in allowed_users],
             }
         )
 
@@ -800,6 +811,7 @@ def generate_group_stats(user, year=None):
 
     group = groups.first()
     group_users = list(group.users.all())
+    group_user_ids = set(u.id for u in group_users)
 
     history_filter = Q(users__in=group_users, is_checked=True)
     if year:
@@ -865,17 +877,20 @@ def generate_group_stats(user, year=None):
     history_episodes = []
 
     for h in base_qs.order_by(F('view_date').desc(nulls_last=True), '-id'):
+        # В групповой статистике показываем только тех, кто в ЭТОЙ группе
+        allowed_users = [u for u in h.users.all() if u.id in group_user_ids]
+        
         entry = {
-            'id': h.id,  # Добавлено
+            'id': h.id,
             'show_id': h.show_id,
             'show__title': h.show.title,
             'show__original_title': h.show.original_title,
             'show__year': h.show.year,
             'view_date': format_precision_date(h.view_date, h.date_precision),
             'poster_url': get_poster_url(h.show_id),
-            'user_ids': list(h.users.values_list('id', flat=True)),
-            'user_names': [u.name or u.username or str(u.telegram_id) for u in h.users.all()],
-            'user_photos': [u.photo_url for u in h.users.all()],
+            'user_ids': [u.id for u in allowed_users],
+            'user_names': [u.name or u.username or str(u.telegram_id) for u in allowed_users],
+            'user_photos': [u.photo_url for u in allowed_users],
         }
         if h.season_number > 0:
             entry.update(

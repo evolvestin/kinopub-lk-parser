@@ -107,7 +107,15 @@ def _serialize_show_details(show, user=None):
     personal_rating = None
     personal_episodes_count = 0
 
+    # Определяем ID пользователей, которых текущий пользователь имеет право видеть
+    visible_ids = set()
     if user:
+        visible_ids.add(user.id)
+        if user.role != UserRole.GUEST:
+            # Получаем ID всех сокомандников (участников тех же групп)
+            mate_ids = ViewUser.objects.filter(groups__users=user).values_list('id', flat=True)
+            visible_ids.update(mate_ids)
+
         personal_rating = UserRating.objects.filter(user=user, show=show).aggregate(
             avg=Avg('rating')
         )['avg']
@@ -132,6 +140,16 @@ def _serialize_show_details(show, user=None):
         if not last_message_id and h.telegram_message_id:
             last_message_id = h.telegram_message_id
 
+        # Фильтруем пользователей в записи истории согласно области видимости
+        # Если запрашивает аноним (нет user), он не видит никого (или можно оставить базовую логику)
+        if user:
+            h_users = [u for u in h.users.all() if u.id in visible_ids]
+        else:
+            h_users = []
+
+        if not h_users:
+            continue
+
         view_history_list.append(
             {
                 'id': h.id,
@@ -140,7 +158,7 @@ def _serialize_show_details(show, user=None):
                 'episode': h.episode_number,
                 'users': [
                     f'@{u.username}' if u.username else u.name or str(u.telegram_id)
-                    for u in h.users.all()
+                    for u in h_users
                 ],
                 'message_id': h.telegram_message_id,
                 'is_viewer': user in h.users.all() if user else False,
@@ -1171,16 +1189,30 @@ def webapp_get_show_full(request, show_id):
 
         internal_rating, _ = show.get_internal_rating_data()
 
-        # Данные о последнем просмотре и история для WebApp
+        # Настройка видимости
+        visible_ids = set()
+        is_guest = True
+        if view_user:
+            is_guest = (view_user.role == UserRole.GUEST)
+            visible_ids.add(view_user.id)
+            if not is_guest:
+                mate_ids = ViewUser.objects.filter(groups__users=view_user).values_list('id', flat=True)
+                visible_ids.update(mate_ids)
+
         last_view = None
         user_show_history = []
         if view_user:
-            history_qs = ViewHistory.objects.filter(show=show, users=view_user).order_by(
+            # Получаем всю историю шоу, чтобы отфильтровать видимых
+            history_qs = ViewHistory.objects.filter(show=show).prefetch_related('users').order_by(
                 F('view_date').desc(nulls_last=True), '-id'
             )
             
             for h in history_qs:
-                se_text = format_se(h.season_number, h.episode_number)
+                # В списке пользователей истории оставляем только тех, кого можно видеть
+                allowed_users = [u for u in h.users.all() if u.id in visible_ids]
+                if not allowed_users:
+                    continue
+
                 item = {
                     'id': h.id,
                     'show_id': show.id,
@@ -1191,18 +1223,21 @@ def webapp_get_show_full(request, show_id):
                     'season_number': h.season_number,
                     'episode_number': h.episode_number,
                     'poster_url': get_poster_url(show.id),
-                    'user_names': [view_user.name or view_user.username or str(view_user.telegram_id)],
-                    'user_photos': [view_user.photo_url],
-                    'user_ids': [view_user.id]
+                    'user_names': [u.name or u.username or str(u.telegram_id) for u in allowed_users],
+                    # Если гость — аватарки не шлем вообще
+                    'user_photos': [] if is_guest else [u.photo_url for u in allowed_users],
+                    'user_ids': [u.id for u in allowed_users]
                 }
                 user_show_history.append(item)
             
             if user_show_history:
-                first = user_show_history[0]
-                se_suffix = f" ({format_se(first['season_number'], first['episode_number'])})" if first['season_number'] > 0 else ""
-                last_view = {
-                    'display': f"{first['view_date']}{se_suffix}"
-                }
+                # Ищем самую свежую запись именно текущего пользователя для пометки "Просмотрено"
+                my_last = next((x for x in user_show_history if view_user.id in x['user_ids']), None)
+                if my_last:
+                    se_suffix = f" ({format_se(my_last['season_number'], my_last['episode_number'])})" if my_last['season_number'] > 0 else ""
+                    last_view = {
+                        'display': f"{my_last['view_date']}{se_suffix}"
+                    }
 
         crew_grouped = defaultdict(list)
         seen_canonical_by_prof = defaultdict(set)
