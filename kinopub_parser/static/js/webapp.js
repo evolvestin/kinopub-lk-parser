@@ -2099,7 +2099,14 @@ window.init = async function() {
 
 
 document.addEventListener('DOMContentLoaded', () => {
-    window.init();
+    if (window.IS_ADMIN_DASHBOARD) return;
+
+    if (typeof window.init === 'function') {
+        window.init();
+    } else {
+        const loader = document.getElementById('loader');
+        if (loader) loader.classList.add('hidden');
+    }
 
     if (typeof switchPeriod === 'function') switchPeriod('now');
 
