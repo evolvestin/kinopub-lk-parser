@@ -1069,18 +1069,18 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
 
     const headerHtml = `
     <div class="layer-header" id="layer-header-node">
-        <div>
+        <div style="flex-shrink: 0;">
             <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 12px; flex-shrink:0;">
                 <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:4px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
             </button>
         </div>
-        <div class="layer-header-center">
+        <div class="layer-header-center" style="flex: 1; min-width: 0; max-width: 60%;">
             <div class="layer-title-main">${title}</div>
             <div class="layer-group-label" id="sticky-group-text"></div>
         </div>
-        <div style="justify-content:flex-end; gap:8px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; justify-content: flex-end;">
             ${deleteToggleBtn}
-            <div class="view-toggle" style="margin:0; padding:2px;">
+            <div class="view-toggle" style="margin:0; padding:2px; flex-shrink: 0;">
                 <button class="vt-btn ${viewMode === 'grid' ? 'active' : ''}" onclick="window.App.setViewModeLayer('grid')">${Icons.grid}</button>
                 <button class="vt-btn ${viewMode === 'list' ? 'active' : ''}" onclick="window.App.setViewModeLayer('list')">${Icons.list}</button>
             </div>
@@ -1103,6 +1103,14 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
     currentHistoryOffset = 0;
     
     const topLayer = viewStack[viewStack.length - 1];
+    
+    const mainTitleEl = topLayer.el.querySelector('.layer-title-main');
+    if (mainTitleEl) {
+        setTimeout(() => {
+            window.App.fitText(mainTitleEl);
+        }, 50);
+    }
+
     if (historyObserver) historyObserver.disconnect();
     historyObserver = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting) renderHistoryBatchLayer();
@@ -1318,6 +1326,7 @@ function initStickyGroupObserver() {
             const groupText = activeDivider.dataset.label;
             if (label.textContent !== groupText) {
                 label.textContent = groupText;
+                window.App.fitText(label);
             }
 
             const isDividerUnderHeader = activeDivider.offsetTop <= scrollTop + (headerHeight / 2);
@@ -1328,7 +1337,6 @@ function initStickyGroupObserver() {
     };
 
     container.addEventListener('scroll', updateStickyHeader, { passive: true });
-    
     updateStickyHeader();
 }
 
@@ -1602,10 +1610,15 @@ window.closeHistory = popLayer;
 function getLayerHeader(title) {
     return `
     <div class="layer-header">
-        <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 16px; margin-right: 12px;">
-            <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
-        </button>
-        <span style="font-weight:800; color:var(--text-primary); font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex: 1;">${title}</span>
+        <div>
+            <button onclick="popLayer()" class="tab clickable" style="background:var(--bg-input); color:var(--text-primary); margin:0; display:inline-flex; border:none; padding:8px 16px; margin-right: 12px;">
+                <svg viewBox="0 0 24 24" width="18" height="18" style="margin-right:6px;"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Назад
+            </button>
+        </div>
+        <div class="layer-header-center">
+            <div class="layer-title-main">${title}</div>
+        </div>
+        <div></div>
     </div>`;
 }
 

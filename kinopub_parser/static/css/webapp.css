@@ -602,18 +602,28 @@ body.has-banner #app {
     top: 0;
     z-index: 500;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
     padding: 12px 16px;
     background: none;
     min-height: 64px;
+    gap: 8px;
 }
 
 .layer-header > div:first-child,
 .layer-header > div:last-child {
-    flex: 1;
+    flex: 1 1 0;
     display: flex;
+    align-items: center;
     min-width: 0;
+}
+
+.layer-header > div:first-child {
+    justify-content: flex-start;
+}
+
+.layer-header > div:last-child {
+    justify-content: flex-end;
 }
 
 .layer-header::before {
@@ -1450,6 +1460,7 @@ body.has-banner #app {
     color: var(--text-primary);
     cursor: pointer;
     transition: all 0.2s;
+    flex-shrink: 0;
 }
 
 #hist-del-toggle svg {
@@ -1487,9 +1498,12 @@ body.has-banner #app {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 0 12px;
+    padding: 0 4px;
     text-align: center;
-    max-width: 50%;
+    min-width: 0;
+    max-width: 45%;
+    position: relative;
+    justify-content: center;
 }
 
 .layer-title-main {
@@ -1501,8 +1515,8 @@ body.has-banner #app {
     width: 100%;
     text-align: center;
     transition: opacity 0.2s, transform 0.2s;
-    /* Высота для хедера слоя */
     height: 1.2em;
+    line-height: 1.2;
 }
 
 .layer-group-label {
