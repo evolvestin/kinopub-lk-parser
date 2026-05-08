@@ -19,7 +19,7 @@ from redis import Redis
 
 from app import history_parser
 from app.gdrive_backup import BackupManager
-from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser
+from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser, WishlistItem
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
     generate_global_metrics_snapshot,
@@ -534,3 +534,28 @@ def send_view_confirmation_task(telegram_id, show_title, season=None, episode=No
 
     message = f'✅ Вы отметили просмотр: {show_title}{se_text}'
     sender.send_message_to_user(telegram_id, message)
+
+
+@shared_task
+@safe_execution
+def notify_new_episode_task(show_id, season, episode):
+    try:
+        show = Show.objects.get(id=show_id)
+    except Show.DoesNotExist:
+        return
+
+    # Находим всех пользователей, у которых это шоу в активном вишлисте
+    user_ids = WishlistItem.objects.filter(
+        show=show, 
+        is_active=True
+    ).values_list('user_id', flat=True).distinct()
+
+    if not user_ids:
+        return
+
+    users = ViewUser.objects.filter(id__in=user_ids, is_bot_active=True)
+    sender = TelegramSender()
+
+    for user in users:
+        if user.telegram_id:
+            sender.send_new_episode_notification(user, show, season, episode)

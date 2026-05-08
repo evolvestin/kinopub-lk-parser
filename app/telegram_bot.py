@@ -4,6 +4,7 @@ import requests
 from django.apps import apps
 from django.conf import settings
 
+from shared.formatters import format_se
 from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
 from app.services.error_aggregator import ErrorAggregator
 from shared.card_formatter import get_show_card_text
@@ -370,3 +371,49 @@ class TelegramSender:
     def send_message_to_user(self, telegram_id: int, text: str):
         payload = {'chat_id': telegram_id, 'text': text, 'parse_mode': 'HTML'}
         return self._request('send_message', payload)
+    
+    def send_new_episode_notification(self, view_user, show, season, episode):
+        
+
+        se_text = format_se(season, episode)
+        show_title = show.title or show.original_title
+        
+        text = (
+            f'🆕 {bold("Вышла новая серия!")}\n\n'
+            f'📺 {bold(html_secure(show_title))}\n'
+            f'🎞 Серия: {code(se_text)}\n'
+        )
+
+        # Собираем клавиатуру (используем стандартную логику кнопок)
+        # Так как это просто уведомление, передаем только основные параметры
+        keyboard = get_history_notification_keyboard(
+            view_history_obj=None, # Мы не создаем запись в истории, просто уведомляем
+            bot_username=self.bot_username,
+            user_rating=None,
+            is_channel=False
+        )
+        
+        # Переопределяем клавиатуру на более простую для уведомления
+        base_url = (
+            getattr(settings, 'WEBAPP_PUBLIC_URL', None) or 
+            getattr(settings, 'BACKEND_URL', None) or 
+            'http://localhost:8000'
+        ).rstrip('/')
+        
+        webapp_url = f'{base_url}/webapp/?show_id={show.id}'
+
+        # Мы работаем внутри сервиса, который делает запросы к Bot API, 
+        # поэтому формируем JSON структуру клавиатуры
+        kb_data = [
+            [{'text': '📱 Открыть в приложении', 'web_app': {'url': webapp_url}}]
+        ]
+
+        payload = {
+            'chat_id': view_user.telegram_id,
+            'text': text,
+            'parse_mode': 'HTML',
+            'reply_markup': {'inline_keyboard': kb_data},
+        }
+        
+        self._request('send_message', payload)
+        logger.info(f'New episode notification sent to {view_user.telegram_id} for show {show.id}')

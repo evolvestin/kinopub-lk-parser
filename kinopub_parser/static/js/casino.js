@@ -415,7 +415,7 @@ function runMysteryPhase(winner) {
 }
 
 function runReveal(winner) {
-    const expires = Date.now() + 10 * 60 * 1000;
+    const expires = Date.now() + 24 * 60 * 60 * 1000;
     localStorage.setItem('kp_casino_res', JSON.stringify({ item: winner, expires }));
 
     window.renderCasinoResult(winner, expires, true);

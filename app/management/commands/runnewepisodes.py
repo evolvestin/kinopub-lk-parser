@@ -13,7 +13,7 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import Show, ShowDuration
-from app.utils import enqueue_show_update
+from app.tasks import enqueue_show_update, notify_new_episode_task
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 
 
@@ -98,6 +98,9 @@ class Command(LoggableBaseCommand):
                                 details=not show_has_details,
                                 durations=not duration_exists,
                             )
+
+                            notify_new_episode_task.delay(show_id, season, episode)
+                            
                             new_items_on_page += 1
                             total_processed_count += 1
 

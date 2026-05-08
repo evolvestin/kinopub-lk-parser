@@ -1161,7 +1161,48 @@ def webapp_get_show_full(request, show_id):
             'countries', 'genres', 'showcrew_set__person__master_person'
         ).get(id=show_id)
 
+        # Идентификация пользователя
+        view_user = None
+        init_data = request.GET.get('init_data')
+        if init_data:
+            tg_user = validate_telegram_init_data(init_data)
+            if tg_user:
+                view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
+
         internal_rating, _ = show.get_internal_rating_data()
+
+        # Данные о последнем просмотре и история для WebApp
+        last_view = None
+        user_show_history = []
+        if view_user:
+            history_qs = ViewHistory.objects.filter(show=show, users=view_user).order_by(
+                F('view_date').desc(nulls_last=True), '-id'
+            )
+            
+            for h in history_qs:
+                se_text = format_se(h.season_number, h.episode_number)
+                item = {
+                    'id': h.id,
+                    'show_id': show.id,
+                    'show__title': show.title,
+                    'show__original_title': show.original_title,
+                    'show__year': show.year,
+                    'view_date': format_precision_date(h.view_date, h.date_precision),
+                    'season_number': h.season_number,
+                    'episode_number': h.episode_number,
+                    'poster_url': get_poster_url(show.id),
+                    'user_names': [view_user.name or view_user.username or str(view_user.telegram_id)],
+                    'user_photos': [view_user.photo_url],
+                    'user_ids': [view_user.id]
+                }
+                user_show_history.append(item)
+            
+            if user_show_history:
+                first = user_show_history[0]
+                se_suffix = f" ({format_se(first['season_number'], first['episode_number'])})" if first['season_number'] > 0 else ""
+                last_view = {
+                    'display': f"{first['view_date']}{se_suffix}"
+                }
 
         crew_grouped = defaultdict(list)
         seen_canonical_by_prof = defaultdict(set)
@@ -1230,6 +1271,8 @@ def webapp_get_show_full(request, show_id):
             'kinopoisk_rating': show.kinopoisk_rating,
             'imdb_rating': show.imdb_rating,
             'internal_rating': internal_rating,
+            'last_view': last_view,
+            'view_history': user_show_history,
             'countries': [
                 {'id': c.id, 'name': c.name, 'emoji': c.emoji_flag} for c in show.countries.all()
             ],

@@ -389,15 +389,15 @@ async function loadShared(statId) {
 
 async function load(year, isBackground = false) {
     if (year === undefined || year === null) year = curYear;
-    curYear = year;
 
     const cachedData = window.AppData.getFromCache(year);
     if (cachedData) {
-        D = cachedData;
-        render();
         if (!isBackground) {
+            curYear = year;
+            D = cachedData;
+            render();
             hideLoader();
-            return; 
+            return;
         }
     }
 
@@ -426,15 +426,21 @@ async function load(year, isBackground = false) {
         const j = await r.json();
         if (j.error) throw new Error(j.error);
         
-        D = j;
         window.AppData.saveToCache(year, j);
         
-        if (!availableYears.length && D.meta?.years) {
-            availableYears = [...D.meta.years];
+        if (!availableYears.length && j.meta?.years) {
+            availableYears = [...j.meta.years];
             preloadAllPeriods();
         }
-        
-        render();
+
+        if (!isBackground) {
+            curYear = year;
+            D = j;
+            render();
+        } else if (year === curYear) {
+            D = j;
+            render();
+        }
     } catch (e) { 
         console.error('Load error:', e); 
         if (!isBackground) {
@@ -453,15 +459,10 @@ async function preloadAllPeriods() {
     
     for (const year of yearsToLoad) {
         if (!window.AppData.getFromCache(year)) {
-            // Небольшая задержка, чтобы не спамить сервер одновременно
-            await new Promise(res => setTimeout(res, 1000));
+            await new Promise(res => setTimeout(res, 1200));
             await load(year, true);
         }
     }
-    
-    // Возвращаем curYear в исходное состояние, так как load его меняет
-    curYear = document.querySelector('#years .yr.on')?.textContent.trim() || 'all';
-    if (curYear === 'Всё время') curYear = 'all';
 }
 
 function hideLoader() {
@@ -984,6 +985,9 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
     else if (type === 'wishlist_watched') {
         curHistData = D.wishlist_watched_items || [];
     }
+    else if (type === 'show_history') {
+        curHistData = extraKey; 
+    }
     else if (type === 'filter') { 
         const sourcePool = extraKey.startsWith('group') ? [...D.group.history_movies, ...D.group.history_episodes] : [...D.history_movies, ...D.history_episodes]; 
         const allowedIds = D[extraKey][extraIndex].show_ids || []; 
@@ -1015,7 +1019,7 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
     else if (len >= 50) grouping = 'year';
 
     let headerSectionHtml = '';
-    const isPersonCategory = extraKey && (extraKey.startsWith('actors') || extraKey.startsWith('directors') || extraKey.startsWith('writers'));
+    const isPersonCategory = extraKey && typeof extraKey === 'string' && (extraKey.startsWith('actors') || extraKey.startsWith('directors') || extraKey.startsWith('writers'));
     
     if (type === 'filter' && isPersonCategory) {
         const p = D[extraKey][extraIndex];
@@ -1031,7 +1035,7 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
         else if (extraKey.startsWith('writers')) profLabel = 'Сценарист';
         
         headerSectionHtml = `
-            <div class="card anim-item clickable" onclick="window.App.openShowLayer(${p.id})" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm); position:relative;">
+            <div class="card anim-item clickable" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm); position:relative;">
                 ${imgHtml}
                 <div style="min-width:0; flex:1;">
                     <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">${p.name}</div>
@@ -1125,19 +1129,17 @@ function getHistoryItemHtml(item, idx, type, mode) {
     const animClass = 'anim-item';
     const style = `style="animation-delay: ${delay}s"`;
 
-    // Нормализация данных из разных источников (История vs Рейтинги)
     const title = item.show__title || item.title;
     const originalTitle = item.show__original_title || item.original_title;
     const itemYear = item.show__year || item.year;
     const displayDate = item.view_date || item.date;
     const rating = item.user_rating || item.rating;
     
-    // Номер сезона и эпизода
     const sNum = item.season_number || item.season;
     const eNum = item.episode_number || item.episode;
 
     let deleteBtn = '';
-    if (!isSharedMode && type !== 'ratings' && type !== 'wishlist_watched') {
+    if (!isSharedMode && type !== 'ratings' && type !== 'wishlist_watched' && type !== 'casino') {
         const itemData = JSON.stringify({ view_history_id: item.id }).replace(/"/g, '&quot;');
         deleteBtn = `<div class="wl-delete-badge" style="background:var(--danger);" 
             onclick="event.stopPropagation(); window.App.removeHistoryItem(this, ${itemData})">${Icons.minus}</div>`;
@@ -1318,15 +1320,17 @@ window.openShowLayer = async function(showId) {
     document.getElementById('loader').style.opacity = '1';
 
     try {
-        const r = await fetch(`/api/webapp/show/${showId}/`);
+        const r = await fetch(`/api/webapp/show/${showId}/?init_data=${encodeURIComponent(tg?.initData || '')}`);
         if (!r.ok) throw new Error('Not found');
         const show = await r.json();
+
+        window.App._activeShowHistory = show.view_history || [];
 
         let crewHtml = '';
         if (show.crew && show.crew.length > 0) {
             show.crew.forEach((group, index) => {
                 crewHtml += `
-                <div class="label" style="${index === 0 ? '' : 'padding-top:0'}"><div class="icon" style="color:#d29922">${Icons.users}</div>${group.profession}</div>
+                <div class="label" style="${index === 0 ? '' : 'padding-top:0'}"><div class="icon" id="ic-users" style="color:#d29922"></div>${group.profession}</div>
                 <div class="h-scroll-container" style="padding-bottom:16px;">
                     ${group.persons.map(p => {
                         const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
@@ -1350,7 +1354,7 @@ window.openShowLayer = async function(showId) {
         let genresHtml = '';
         if (show.genres && show.genres.length > 0) {
             genresHtml = `
-            <div class="label" style="padding-top:0"><div class="icon" style="color:var(--info)">${Icons.star}</div>Жанры</div>
+            <div class="label" style="padding-top:0"><div class="icon" id="it-star-internal" style="color:var(--info)"></div>Жанры</div>
             <div class="h-scroll-container" style="padding-bottom:30px;">
                 ${show.genres.map(g => `<div class="genre-pill" onclick="window.App.openCollectionLayer('genre', ${g.id}, '${g.name}')">${g.name}</div>`).join('')}
             </div>`;
@@ -1383,7 +1387,6 @@ window.openShowLayer = async function(showId) {
 
         const safeTitle = show.title.replace(/'/g, "\\'");
         
-        // Формируем теги стран
         let countriesMetaHtml = '';
         if (show.countries && show.countries.length > 0) {
             countriesMetaHtml = `<div class="show-meta-tags" style="animation-delay: 0.3s">` + 
@@ -1391,6 +1394,14 @@ window.openShowLayer = async function(showId) {
                     const safeCountryName = c.name.replace(/'/g, "\\'");
                     return `<div class="sm-tag clickable" onclick="window.App.openCollectionLayer('country', ${c.id}, '${safeCountryName}')">${c.emoji ? c.emoji + ' ' : ''}${c.name}</div>`;
                 }).join('') + `</div>`;
+        }
+
+        let lastViewHtml = '';
+        if (show.last_view) {
+            lastViewHtml = `<div class="sm-tag clickable" style="background:var(--accent-dim); color:var(--accent); border-color:var(--accent);" 
+                onclick="window.App.openHistoryLayer('show_history', '${safeTitle}', null, null, window.App._activeShowHistory)">
+                ${Icons.eye} Просмотр: ${show.last_view.display}
+            </div>`;
         }
 
         const html = `
@@ -1425,7 +1436,7 @@ window.openShowLayer = async function(showId) {
                     ${show.internal_rating ? `<div class="sm-tag" style="background:var(--accent-dim); color:var(--accent); border:none">★ ${show.internal_rating.toFixed(1)}</div>` : ''}
                 </div>
 
-
+                ${lastViewHtml ? `<div class="show-meta-tags" style="animation-delay: 0.45s">${lastViewHtml}</div>` : ''}
             </div>
 
             ${show.plot ? `<div class="plot-box">${show.plot}</div>` : ''}
@@ -1556,7 +1567,8 @@ function popLayer() {
         prev.el.style.display = 'block';
         prev.el.scrollTop = prev.scrollPos;
     } else {
-        document.getElementById('view-' + activeMainView).style.display = 'block';
+        switchMainView(activeMainView);
+        
         if (!isSharedMode) document.getElementById('bottom-nav').style.display = 'flex';
         
         getScrollContainer().scrollTop = lastScrollPos;
