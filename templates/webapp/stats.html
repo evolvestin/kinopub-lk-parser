@@ -268,26 +268,25 @@
             </button>
         </div>
         <div class="modal-overlay" id="rate-show-modal">
-            <div class="modal-content" style="padding: 24px; min-height: 480px;">
+            <div class="modal-content" style="padding: 24px; min-height: 520px; display: flex; flex-direction: column;">
                 <div id="rate-nav-bar">
                     <button id="rate-back-btn" class="vt-btn" style="padding: 4px 8px; display: none;" onclick="window.App.rateGoBack()">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><path d="M15 18l-6-6 6-6"/></svg>
                     </button>
-                    <div id="rate-breadcrumb"></div>
+                    <div id="rate-breadcrumb">Общая оценка</div>
                 </div>
 
-                <div id="rate-show-title" style="font-size: 20px; font-weight: 900; color: var(--text-primary); margin-bottom: 10px; text-align: center;"></div>
+                <div id="rate-show-title" style="font-size: 20px; font-weight: 900; color: var(--text-primary); margin-bottom: 12px; text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"></div>
                 
-                <div class="view-toggle" id="rate-mode-toggle" style="margin-bottom: 20px;">
+                <div class="view-toggle" id="rate-mode-toggle" style="margin-bottom: 20px; flex-shrink: 0;">
                     <button class="vt-btn active" id="rate-mode-main" style="flex: 1;" onclick="window.App.setRateLevel('show')">Весь сериал</button>
                     <button class="vt-btn" id="rate-mode-ep" style="flex: 1;" onclick="window.App.setRateLevel('seasons')">По сериям</button>
                 </div>
 
-                <div id="rate-content-area" style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
-                    <!-- Новый интерактивный слайдер -->
+                <div id="rate-content-area" style="flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0;">
                     <div id="rate-slider-container" class="rate-container">
                         <div class="rate-score-display">
-                            <div class="rate-score-huge" id="rate-huge-val">5.0<span>/ 10</span></div>
+                            <div class="rate-score-huge" id="rate-huge-val">7<span>/ 10</span></div>
                         </div>
                         
                         <div class="rate-slider-wrap" id="rate-slider-hit">
@@ -304,9 +303,9 @@
                     <div id="rate-episodes-nav" style="display: none;"></div>
                 </div>
 
-                <div style="display: flex; gap: 12px; margin-top: 30px;">
-                    <button class="btn-primary" id="btn-delete-rating" style="margin: 0; background: var(--bg-input); color: var(--danger); flex: 1; display: none;" onclick="window.App.deleteRating()">Удалить</button>
-                    <button class="btn-primary" id="btn-submit-rating" style="margin: 0; flex: 2;" onclick="window.App.submitRatingFromSlider()">Поставить оценку</button>
+                <div style="display: flex; gap: 12px; margin-top: 20px; flex-shrink: 0;">
+                    <button class="btn-primary" id="btn-delete-rating" style="margin: 0; background: var(--bg-input); color: var(--danger); flex: 1; display: none; box-shadow: none;" onclick="window.App.deleteRating()">Удалить</button>
+                    <button class="btn-primary" id="btn-submit-rating" style="margin: 0; flex: 2;" onclick="window.App.submitRatingFromSlider()">Сохранить</button>
                 </div>
             </div>
         </div>

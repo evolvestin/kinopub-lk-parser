@@ -8,10 +8,10 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from django.core.cache import cache
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Avg, F, Max, Prefetch, Q
 from django.http import JsonResponse
@@ -61,6 +61,7 @@ from app.services.metrics import (
 )
 from app.services.stats_calculator import generate_group_stats, generate_user_stats
 from app.services.telegram_auth import validate_telegram_init_data
+from app.tasks import send_view_confirmation_task
 from app.telegram_bot import TelegramSender
 from shared.constants import (
     GENRES_MAPPING,
@@ -1195,10 +1196,12 @@ def webapp_get_show_full(request, show_id):
         personal_episodes_count = 0
 
         if view_user:
-            is_guest = (view_user.role == UserRole.GUEST)
+            is_guest = view_user.role == UserRole.GUEST
             visible_ids.add(view_user.id)
             if not is_guest:
-                mate_ids = ViewUser.objects.filter(groups__users=view_user).values_list('id', flat=True)
+                mate_ids = ViewUser.objects.filter(groups__users=view_user).values_list(
+                    'id', flat=True
+                )
                 visible_ids.update(mate_ids)
 
             # Получаем конкретно общую оценку проекта пользователем
@@ -1215,10 +1218,12 @@ def webapp_get_show_full(request, show_id):
         last_view = None
         user_show_history = []
         if view_user:
-            history_qs = ViewHistory.objects.filter(show=show).prefetch_related('users').order_by(
-                F('view_date').desc(nulls_last=True), '-id'
+            history_qs = (
+                ViewHistory.objects.filter(show=show)
+                .prefetch_related('users')
+                .order_by(F('view_date').desc(nulls_last=True), '-id')
             )
-            
+
             for h in history_qs:
                 allowed_users = [u for u in h.users.all() if u.id in visible_ids]
                 if not allowed_users:
@@ -1234,19 +1239,25 @@ def webapp_get_show_full(request, show_id):
                     'season_number': h.season_number,
                     'episode_number': h.episode_number,
                     'poster_url': get_poster_url(show.id),
-                    'user_names': [u.name or u.username or str(u.telegram_id) for u in allowed_users],
+                    'user_names': [
+                        u.name or u.username or str(u.telegram_id) for u in allowed_users
+                    ],
                     'user_photos': [] if is_guest else [u.photo_url for u in allowed_users],
-                    'user_ids': [u.id for u in allowed_users]
+                    'user_ids': [u.id for u in allowed_users],
                 }
                 user_show_history.append(item)
-            
+
             if user_show_history:
-                my_last = next((x for x in user_show_history if view_user.id in x['user_ids']), None)
+                my_last = next(
+                    (x for x in user_show_history if view_user.id in x['user_ids']), None
+                )
                 if my_last:
-                    se_suffix = f" ({format_se(my_last['season_number'], my_last['episode_number'])})" if my_last['season_number'] > 0 else ""
-                    last_view = {
-                        'display': f"{my_last['view_date']}{se_suffix}"
-                    }
+                    se_suffix = (
+                        f' ({format_se(my_last["season_number"], my_last["episode_number"])})'
+                        if my_last['season_number'] > 0
+                        else ''
+                    )
+                    last_view = {'display': f'{my_last["view_date"]}{se_suffix}'}
 
         crew_grouped = defaultdict(list)
         seen_canonical_by_prof = defaultdict(set)
@@ -2020,8 +2031,6 @@ def webapp_casino(request):
         return JsonResponse({'error': 'Invalid action'}, status=400)
 
     except Exception as e:
-        import logging
-
         logging.error(f'Casino API Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
 
@@ -2125,8 +2134,6 @@ def webapp_add_view(request):
         if not vh.users.filter(id=view_user.id).exists():
             vh.users.add(view_user)
 
-        from app.tasks import send_view_confirmation_task
-
         show_title = vh.show.title or vh.show.original_title
         send_view_confirmation_task.delay(
             view_user.telegram_id,
@@ -2205,7 +2212,7 @@ def webapp_get_episodes(request):
         body = json.loads(request.body)
         init_data = body.get('init_data')
         show_id = body.get('show_id')
-        
+
         tg_user = validate_telegram_init_data(init_data)
         if not tg_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
@@ -2215,25 +2222,23 @@ def webapp_get_episodes(request):
             return JsonResponse({'error': 'User not found'}, status=404)
 
         durations = ShowDuration.objects.filter(
-            show_id=show_id,
-            season_number__isnull=False,
-            episode_number__isnull=False
+            show_id=show_id, season_number__isnull=False, episode_number__isnull=False
         ).order_by('season_number', 'episode_number')
 
         ratings = UserRating.objects.filter(
-            user=view_user,
-            show_id=show_id,
-            season_number__isnull=False
+            user=view_user, show_id=show_id, season_number__isnull=False
         ).values('season_number', 'episode_number', 'rating')
 
         ratings_map = {(r['season_number'], r['episode_number']): r['rating'] for r in ratings}
 
         seasons_dict = defaultdict(list)
         for d in durations:
-            seasons_dict[d.season_number].append({
-                'episode_number': d.episode_number,
-                'rating': ratings_map.get((d.season_number, d.episode_number))
-            })
+            seasons_dict[d.season_number].append(
+                {
+                    'episode_number': d.episode_number,
+                    'rating': ratings_map.get((d.season_number, d.episode_number)),
+                }
+            )
 
         result = [
             {'season_number': s, 'episodes': episodes}
@@ -2259,15 +2264,15 @@ def webapp_rate_show(request):
         view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
         show_id = body.get('show_id')
         rating = float(body.get('rating'))
-        
+
         season = body.get('season')
         episode = body.get('episode')
-        
+
         if season == 0 or season == '0':
             season = None
         if episode == 0 or episode == '0':
             episode = None
-        
+
         show = Show.objects.get(id=show_id)
 
         UserRating.objects.update_or_create(
@@ -2283,7 +2288,7 @@ def webapp_rate_show(request):
             users=view_user,
             telegram_message_id__isnull=False,
         )
-        
+
         if season is not None and episode is not None:
             history_qs = history_qs.filter(season_number=season, episode_number=episode)
         else:
@@ -2303,6 +2308,7 @@ def webapp_rate_show(request):
         logging.error(f'WebApp Rate Show Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
 
+
 @csrf_exempt
 @require_http_methods(['POST'])
 def webapp_delete_rating(request):
@@ -2315,7 +2321,7 @@ def webapp_delete_rating(request):
 
         view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
         show_id = body.get('show_id')
-        
+
         season = body.get('season')
         episode = body.get('episode')
 
@@ -2336,7 +2342,7 @@ def webapp_delete_rating(request):
             users=view_user,
             telegram_message_id__isnull=False,
         )
-        
+
         if season is not None and episode is not None:
             history_qs = history_qs.filter(season_number=season, episode_number=episode)
         else:

@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import timedelta
-from shared.constants import SHOW_TYPE_DISPLAY_RU
+
 from django.conf import settings
 from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import Coalesce, Lower, StrIndex
@@ -27,6 +27,7 @@ from shared.constants import (
     RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
     SERIES_TYPES,
+    SHOW_TYPE_DISPLAY_RU,
 )
 
 

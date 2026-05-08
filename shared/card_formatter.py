@@ -1,7 +1,7 @@
-from shared.constants import SERIES_TYPES
+from shared.constants import SERIES_TYPES, SHOW_STATUS_DISPLAY_RU, SHOW_TYPE_DISPLAY_RU
 from shared.formatters import format_se
 from shared.html_helper import bold, html_link, html_secure, italic
-from shared.constants import SHOW_TYPE_DISPLAY_RU, SHOW_STATUS_DISPLAY_RU, SERIES_TYPES
+
 RATINGS_TRUNCATE_COUNT = 6
 
 

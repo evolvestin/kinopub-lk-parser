@@ -100,7 +100,7 @@ class Command(LoggableBaseCommand):
                             )
 
                             notify_new_episode_task.delay(show_id, season, episode)
-                            
+
                             new_items_on_page += 1
                             total_processed_count += 1
 

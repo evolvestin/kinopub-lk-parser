@@ -2,6 +2,7 @@ import logging
 import re
 import sys
 import time
+import winreg
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
@@ -23,8 +24,6 @@ from shared.constants import SHOW_TYPE_MAPPING
 
 
 def _get_windows_chrome_version():
-    import winreg
-
     try:
         key_path = r'Software\Google\Chrome\BLBeacon'
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:

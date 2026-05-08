@@ -1,4 +1,5 @@
 import functools
+import logging
 import os
 
 import client
@@ -37,7 +38,6 @@ def safe_callback(func):
             await func(callback, bot, *args, **kwargs)
         except Exception as e:
             # Логируем полный трейсбек ошибки, он уйдет в базу данных через RemoteLogHandler
-            import logging
 
             logging.error(f'Error in callback {callback.data}: {e}', exc_info=True)
             try:

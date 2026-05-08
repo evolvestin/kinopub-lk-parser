@@ -21,7 +21,7 @@ window.App.openRateModal = function(showId, title, currentRating, type = null) {
         showId: showId,
         showType: type || 'Movie',
         title: title,
-        currentVal: hasExisting ? parseFloat(currentRating) : 1.0,
+        currentVal: hasExisting ? parseFloat(currentRating) : 5.0,
         hasExistingRating: hasExisting,
         needsRefresh: false,
         season: null,
@@ -37,7 +37,6 @@ window.App.openRateModal = function(showId, title, currentRating, type = null) {
     document.getElementById('rate-show-modal').classList.add('show');
 };
 
-
 window.App.initSlider = function() {
     const hitArea = document.getElementById('rate-slider-hit');
     if (!hitArea) return;
@@ -50,14 +49,21 @@ window.App.initSlider = function() {
         let x = clientX - rect.left;
         let percent = Math.max(0, Math.min(1, x / rect.width));
         
-        // Маппинг на шкалу 1-10 с шагом 0.5
         let val = 1 + (percent * 9);
         val = Math.round(val * 2) / 2;
         
         if (val !== this.rateData.currentVal) {
+            const oldVal = this.rateData.currentVal;
             this.rateData.currentVal = val;
             this.updateSliderUI(true);
-            if (window.navigator.vibrate) window.navigator.vibrate(5);
+            
+            if (window.navigator.vibrate) {
+                if (Math.floor(val) !== Math.floor(oldVal)) {
+                    window.navigator.vibrate(10);
+                } else {
+                    window.navigator.vibrate(3);
+                }
+            }
         }
     };
 
@@ -83,26 +89,28 @@ window.App.updateSliderUI = function(withPulse = false) {
     const fill = document.getElementById('rate-slider-fill');
     const handle = document.getElementById('rate-slider-handle');
     const huge = document.getElementById('rate-huge-val');
-    const container = document.getElementById('rate-slider-container');
+    const modalContent = document.querySelector('#rate-show-modal .modal-content');
     const delBtn = document.getElementById('btn-delete-rating');
 
-    fill.style.width = `${percent}%`;
-    handle.style.left = `${percent}%`;
-    huge.innerHTML = `${val.toFixed(1 === val % 1 ? 0 : 1)}<span>/ 10</span>`;
+    if (fill) fill.style.width = `${percent}%`;
+    if (handle) handle.style.left = `${percent}%`;
+    if (huge) huge.innerHTML = `${val.toFixed(1 === val % 1 ? 0 : 1)}<span>/ 10</span>`;
 
-    if (withPulse) {
+    if (withPulse && huge) {
         huge.classList.remove('rate-pulse');
         void huge.offsetWidth;
         huge.classList.add('rate-pulse');
     }
 
-    container.classList.remove('score-low', 'score-mid', 'score-high');
-    if (val < 5) container.classList.add('score-low');
-    else if (val < 8) container.classList.add('score-mid');
-    else container.classList.add('score-high');
+    if (modalContent && (this.rateData.level === 'show' || this.rateData.level === 'score')) {
+        modalContent.classList.remove('score-low', 'score-mid', 'score-high');
+        if (val < 5) modalContent.classList.add('score-low');
+        else if (val < 8) modalContent.classList.add('score-mid');
+        else modalContent.classList.add('score-high');
+    }
 
     const isInputView = (this.rateData.level === 'show' || this.rateData.level === 'score');
-    delBtn.style.display = (isInputView && this.rateData.hasExistingRating) ? 'block' : 'none';
+    if (delBtn) delBtn.style.display = (isInputView && this.rateData.hasExistingRating) ? 'block' : 'none';
 };
 
 window.App.setRateLevel = function(level, params = {}) {
@@ -114,38 +122,47 @@ window.App.setRateLevel = function(level, params = {}) {
     const modeToggle = document.getElementById('rate-mode-toggle');
     const submitBtn = document.getElementById('btn-submit-rating');
     const delBtn = document.getElementById('btn-delete-rating');
+    const modalContent = document.querySelector('#rate-show-modal .modal-content');
 
-    slider.style.display = 'none';
-    epNav.style.display = 'none';
-    submitBtn.style.display = 'none';
-    delBtn.style.display = 'none';
+    if (slider) slider.style.display = 'none';
+    if (epNav) epNav.style.display = 'none';
+    if (submitBtn) submitBtn.style.display = 'none';
+    if (delBtn) delBtn.style.display = 'none';
     
-    backBtn.style.display = (level !== 'show') ? 'block' : 'none';
+    if (backBtn) backBtn.style.display = (level !== 'show' && level !== 'seasons') ? 'block' : 'none';
+
+    if (modalContent && (level === 'seasons' || level === 'episodes')) {
+        modalContent.classList.remove('score-low', 'score-mid', 'score-high');
+    }
 
     if (level === 'show') {
         this.rateData.season = null;
         this.rateData.episode = null;
-        breadcrumb.textContent = 'Общая оценка';
-        slider.style.display = 'flex';
-        submitBtn.style.display = 'block';
-        modeToggle.querySelector('#rate-mode-main').classList.add('active');
-        modeToggle.querySelector('#rate-mode-ep').classList.remove('active');
+        if (breadcrumb) breadcrumb.textContent = 'Общая оценка';
+        if (slider) slider.style.display = 'flex';
+        if (submitBtn) submitBtn.style.display = 'block';
+        if (modeToggle) {
+            modeToggle.querySelector('#rate-mode-main').classList.add('active');
+            modeToggle.querySelector('#rate-mode-ep').classList.remove('active');
+        }
         this.updateSliderUI();
     } 
     else if (level === 'seasons') {
         this.rateData.season = null;
         this.rateData.episode = null;
-        breadcrumb.textContent = 'Выбор сезона';
-        epNav.style.display = 'block';
-        modeToggle.querySelector('#rate-mode-main').classList.remove('active');
-        modeToggle.querySelector('#rate-mode-ep').classList.add('active');
+        if (breadcrumb) breadcrumb.textContent = 'Выбор сезона';
+        if (epNav) epNav.style.display = 'block';
+        if (modeToggle) {
+            modeToggle.querySelector('#rate-mode-main').classList.remove('active');
+            modeToggle.querySelector('#rate-mode-ep').classList.add('active');
+        }
         this.loadAndRenderSeasons();
     }
     else if (level === 'episodes') {
         this.rateData.season = params.season;
         this.rateData.episode = null;
-        breadcrumb.textContent = `Сезон ${params.season}`;
-        epNav.style.display = 'block';
+        if (breadcrumb) breadcrumb.textContent = `Сезон ${params.season}`;
+        if (epNav) epNav.style.display = 'block';
         this.renderEpisodes(params.season);
     }
     else if (level === 'score') {
@@ -154,17 +171,18 @@ window.App.setRateLevel = function(level, params = {}) {
         
         const hasExisting = (params.rating && params.rating !== 'null' && params.rating !== null);
         this.rateData.hasExistingRating = hasExisting;
-        this.rateData.currentVal = hasExisting ? parseFloat(params.rating) : 1.0;
+        this.rateData.currentVal = hasExisting ? parseFloat(params.rating) : 5.0;
         
-        breadcrumb.textContent = `S${params.season} E${params.episode}`;
-        slider.style.display = 'flex';
-        submitBtn.style.display = 'block';
+        if (breadcrumb) breadcrumb.textContent = `S${params.season} E${params.episode}`;
+        if (slider) slider.style.display = 'flex';
+        if (submitBtn) submitBtn.style.display = 'block';
         this.updateSliderUI();
     }
 };
 
 window.App.loadAndRenderSeasons = async function() {
     const epNav = document.getElementById('rate-episodes-nav');
+    if (!epNav) return;
     epNav.innerHTML = '<div class="loader-inline"><div class="spinner"></div></div>';
     try {
         const r = await fetch('/api/webapp/get_episodes/', {
@@ -181,11 +199,11 @@ window.App.loadAndRenderSeasons = async function() {
 
         this.rateData.episodesData = data.seasons;
 
-        let html = '<div class="rating-grid-wa" style="grid-template-columns: repeat(3, 1fr);">';
+        let html = '<div class="rating-grid-wa">';
         data.seasons.forEach(s => {
             const rated = s.episodes.filter(e => e.rating).length;
             const badge = rated ? `<span style="color:var(--accent);font-size:10px;display:block;">★ ${rated}/${s.episodes.length}</span>` : `<span style="opacity:0.5;font-size:10px;display:block;">0/${s.episodes.length}</span>`;
-            html += `<button class="rating-grid-btn" style="height:auto;" onclick="window.App.setRateLevel('episodes', {season: ${s.season_number}})">
+            html += `<button class="rating-grid-btn" onclick="window.App.setRateLevel('episodes', {season: ${s.season_number}})">
                 Сезон ${s.season_number}${badge}
             </button>`;
         });
@@ -197,10 +215,17 @@ window.App.loadAndRenderSeasons = async function() {
 
 window.App.renderEpisodes = function(seasonNum) {
     const epNav = document.getElementById('rate-episodes-nav');
+    if (!epNav) return;
     const season = this.rateData.episodesData.find(s => s.season_number === seasonNum);
     let html = '<div class="rating-grid-wa" style="grid-template-columns: repeat(4, 1fr);">';
     season.episodes.forEach(e => {
-        const isActive = e.rating ? 'active' : '';
+        let colorClass = '';
+        if (e.rating) {
+            if (e.rating < 5) colorClass = 'score-low';
+            else if (e.rating < 8) colorClass = 'score-mid';
+            else colorClass = 'score-high';
+        }
+        const isActive = e.rating ? 'active ' + colorClass : '';
         const label = e.rating ? `<span style="font-weight:900;">★ ${e.rating}</span>` : `E${e.episode_number}`;
         html += `<button class="rating-grid-btn ${isActive}" onclick="window.App.setRateLevel('score', {season: ${seasonNum}, episode: ${e.episode_number}, rating: ${e.rating}})">${label}</button>`;
     });
@@ -269,7 +294,6 @@ window.App.deleteRating = async function() {
 window.App.rateGoBack = function() {
     if (this.rateData.level === 'score') this.setRateLevel('episodes', {season: this.rateData.season});
     else if (this.rateData.level === 'episodes') this.setRateLevel('seasons');
-    else if (this.rateData.level === 'seasons') this.setRateLevel('show');
 };
 
 window.App.closeRateModal = function() {

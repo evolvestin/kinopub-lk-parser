@@ -26,6 +26,7 @@ from app.services.metrics import (
 )
 from app.services.stats_calculator import generate_user_stats
 from app.telegram_bot import TelegramSender
+from shared.formatters import format_se
 
 
 @contextmanager
@@ -528,8 +529,6 @@ def send_view_confirmation_task(telegram_id, show_title, season=None, episode=No
 
     se_text = ''
     if season and episode:
-        from shared.formatters import format_se
-
         se_text = f' ({format_se(season, episode)})'
 
     message = f'✅ Вы отметили просмотр: {show_title}{se_text}'
@@ -545,10 +544,11 @@ def notify_new_episode_task(show_id, season, episode):
         return
 
     # Находим всех пользователей, у которых это шоу в активном вишлисте
-    user_ids = WishlistItem.objects.filter(
-        show=show, 
-        is_active=True
-    ).values_list('user_id', flat=True).distinct()
+    user_ids = (
+        WishlistItem.objects.filter(show=show, is_active=True)
+        .values_list('user_id', flat=True)
+        .distinct()
+    )
 
     if not user_ids:
         return

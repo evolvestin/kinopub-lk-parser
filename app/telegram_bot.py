@@ -4,7 +4,6 @@ import requests
 from django.apps import apps
 from django.conf import settings
 
-from shared.formatters import format_se
 from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
 from app.services.error_aggregator import ErrorAggregator
 from shared.card_formatter import get_show_card_text
@@ -202,9 +201,10 @@ class TelegramSender:
             # Гости не отображаются в общем канале для приватности.
             visible_names = [
                 f'@{u.username}' if u.username else str(u.name)
-                for u in all_viewers if u.role != UserRole.GUEST
+                for u in all_viewers
+                if u.role != UserRole.GUEST
             ]
-            
+
             if view_history_obj.is_checked:
                 lines.append(f'✅ {italic("Учитывается в статистике")}')
             else:
@@ -214,12 +214,15 @@ class TelegramSender:
             # Для приватного сообщения: показываем себя и сокомандников.
             allowed_ids = {for_user.id}
             if for_user.role != UserRole.GUEST:
-                mate_ids = ViewUser.objects.filter(groups__users=for_user).values_list('id', flat=True)
+                mate_ids = ViewUser.objects.filter(groups__users=for_user).values_list(
+                    'id', flat=True
+                )
                 allowed_ids.update(mate_ids)
-            
+
             visible_names = [
                 f'@{u.username}' if u.username else str(u.name)
-                for u in all_viewers if u.id in allowed_ids
+                for u in all_viewers
+                if u.id in allowed_ids
             ]
 
         if len(visible_names) == 1:
@@ -393,42 +396,28 @@ class TelegramSender:
     def send_message_to_user(self, telegram_id: int, text: str):
         payload = {'chat_id': telegram_id, 'text': text, 'parse_mode': 'HTML'}
         return self._request('send_message', payload)
-    
-    def send_new_episode_notification(self, view_user, show, season, episode):
-        
 
+    def send_new_episode_notification(self, view_user, show, season, episode):
         se_text = format_se(season, episode)
         show_title = show.title or show.original_title
-        
+
         text = (
             f'🆕 {bold("Вышла новая серия!")}\n\n'
             f'📺 {bold(html_secure(show_title))}\n'
             f'🎞 Серия: {code(se_text)}\n'
         )
 
-        # Собираем клавиатуру (используем стандартную логику кнопок)
-        # Так как это просто уведомление, передаем только основные параметры
-        keyboard = get_history_notification_keyboard(
-            view_history_obj=None, # Мы не создаем запись в истории, просто уведомляем
-            bot_username=self.bot_username,
-            user_rating=None,
-            is_channel=False
-        )
-        
-        # Переопределяем клавиатуру на более простую для уведомления
         base_url = (
-            getattr(settings, 'WEBAPP_PUBLIC_URL', None) or 
-            getattr(settings, 'BACKEND_URL', None) or 
-            'http://localhost:8000'
+            getattr(settings, 'WEBAPP_PUBLIC_URL', None)
+            or getattr(settings, 'BACKEND_URL', None)
+            or 'http://localhost:8000'
         ).rstrip('/')
-        
+
         webapp_url = f'{base_url}/webapp/?show_id={show.id}'
 
-        # Мы работаем внутри сервиса, который делает запросы к Bot API, 
+        # Мы работаем внутри сервиса, который делает запросы к Bot API,
         # поэтому формируем JSON структуру клавиатуры
-        kb_data = [
-            [{'text': '📱 Открыть в приложении', 'web_app': {'url': webapp_url}}]
-        ]
+        kb_data = [[{'text': '📱 Открыть в приложении', 'web_app': {'url': webapp_url}}]]
 
         payload = {
             'chat_id': view_user.telegram_id,
@@ -436,6 +425,6 @@ class TelegramSender:
             'parse_mode': 'HTML',
             'reply_markup': {'inline_keyboard': kb_data},
         }
-        
+
         self._request('send_message', payload)
         logger.info(f'New episode notification sent to {view_user.telegram_id} for show {show.id}')

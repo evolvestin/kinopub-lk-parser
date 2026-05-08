@@ -27,7 +27,15 @@ from django.db.models.functions import (
 )
 from django.utils import timezone
 
-from app.models import Person, ShowDuration, UserRating, ViewHistory, ViewUserGroup, WishlistItem, ViewUser
+from app.models import (
+    Person,
+    ShowDuration,
+    UserRating,
+    ViewHistory,
+    ViewUser,
+    ViewUserGroup,
+    WishlistItem,
+)
 from shared.constants import (
     ACTOR_ROLES,
     DIRECTOR_ROLES,
@@ -36,7 +44,7 @@ from shared.constants import (
     RAW_TO_NORMALIZED_GENRE,
     SERIES_TYPES,
     WRITER_ROLES,
-    UserRole
+    UserRole,
 )
 from shared.formatters import format_duration, format_precision_date
 from shared.media import get_poster_url
@@ -513,7 +521,7 @@ def generate_user_stats(user, year=None):
         return cached
 
     current_yr = timezone.now().year
-    is_guest = (user.role == UserRole.GUEST)
+    is_guest = user.role == UserRole.GUEST
 
     # Предварительно получаем ID всех сокомандников для фильтрации имен в истории
     visible_user_ids = {user.id}
@@ -879,7 +887,7 @@ def generate_group_stats(user, year=None):
     for h in base_qs.order_by(F('view_date').desc(nulls_last=True), '-id'):
         # В групповой статистике показываем только тех, кто в ЭТОЙ группе
         allowed_users = [u for u in h.users.all() if u.id in group_user_ids]
-        
+
         entry = {
             'id': h.id,
             'show_id': h.show_id,

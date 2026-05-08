@@ -20,7 +20,6 @@ from django.db.models import (
     Value,
     When,
 )
-from shared.constants import SHOW_TYPE_DISPLAY_RU, SHOW_STATUS_DISPLAY_RU
 from django.db.models.functions import Coalesce
 from django.http import HttpResponseRedirect
 from django.template.loader import render_to_string
@@ -62,6 +61,8 @@ from shared.constants import (
     PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_EN,
     RAW_TO_NORMALIZED_RU,
+    SHOW_STATUS_DISPLAY_RU,
+    SHOW_TYPE_DISPLAY_RU,
     UserRole,
 )
 
@@ -351,7 +352,13 @@ class ShowAdmin(admin.ModelAdmin):
         'updated_at',
     )
     list_editable = ('ignore_collision',)
-    list_filter = (ShowTypeFilter, ShowStatusFilter, AverageRatingFilter, 'year', 'ignore_collision')
+    list_filter = (
+        ShowTypeFilter,
+        ShowStatusFilter,
+        AverageRatingFilter,
+        'year',
+        'ignore_collision',
+    )
     search_fields = ('title', 'original_title', 'plot')
     inlines = [
         ExternalRatingInline,

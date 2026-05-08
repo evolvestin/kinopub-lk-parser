@@ -16,8 +16,7 @@ from app.models import TaskRun
 from app.tasks import run_admin_command
 from app.utils import get_scheduled_tasks_info
 from kinopub_parser import celery_app
-from shared.constants import SHOW_TYPE_DISPLAY_RU
-from shared.constants import DATETIME_FORMAT, SHOW_TYPE_MAPPING
+from shared.constants import DATETIME_FORMAT, SHOW_TYPE_DISPLAY_RU, SHOW_TYPE_MAPPING
 
 
 class CustomAdminSite(admin.AdminSite):
