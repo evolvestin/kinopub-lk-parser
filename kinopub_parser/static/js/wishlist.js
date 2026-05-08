@@ -713,10 +713,13 @@ window.App = {
             return;
         }
 
-        document.getElementById('wl-modal-title').textContent = title;
+        const modalTitle = document.getElementById('wl-modal-title');
         const grid = document.getElementById('wl-modal-folders');
-        grid.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div>';
-        document.getElementById('wl-modal').classList.add('show');
+        const modal = document.getElementById('wl-modal');
+
+        modalTitle.textContent = title;
+        grid.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:24px;height:24px;border-width:3px;"></div></div>';
+        modal.classList.add('show');
 
         try {
             const data = await sendWishlistAction('get');
@@ -730,21 +733,27 @@ window.App = {
                     return;
                 }
 
-                grid.innerHTML = data.folders.map(f => `
-                    <div class="wl-folder-card" style="margin-bottom:8px;" onclick="window.App.addToFolder(${f.id})">
-                        <div class="wl-folder-icon" style="background: ${f.color}20; color: ${f.color};">
-                            ${Icons[f.icon] || Icons.folder}
+                grid.innerHTML = data.folders.map(f => {
+                    const countText = `${f.items.length} ${plural(f.items.length, ['элемент', 'элемента', 'элементов'])}`;
+                    return `
+                        <div class="wl-folder-card" onclick="window.App.addToFolder(${f.id})">
+                            <div class="wl-folder-icon" style="color: ${f.color};">
+                                ${Icons[f.icon] || Icons.folder}
+                            </div>
+                            <div class="wl-folder-info">
+                                <div class="wl-folder-name">${f.name}</div>
+                                <div class="wl-folder-count">${countText}</div>
+                            </div>
                         </div>
-                        <div class="wl-folder-info">
-                            <div class="wl-folder-name">${f.name}</div>
-                            <div class="wl-folder-count">${f.items.length} элементов</div>
-                        </div>
-                    </div>
-                `).join('');
-                if (!data.folders.length) grid.innerHTML = '<div class="empty">Нет папок. Создайте их в Избранном.</div>';
+                    `;
+                }).join('');
+
+                if (!data.folders.length) {
+                    grid.innerHTML = '<div class="empty">У вас пока нет папок</div>';
+                }
             }
         } catch (e) {
-            grid.innerHTML = '<div class="empty">Ошибка</div>';
+            grid.innerHTML = '<div class="empty">Ошибка загрузки списков</div>';
         }
     },
     closeFolderModal: function () {
