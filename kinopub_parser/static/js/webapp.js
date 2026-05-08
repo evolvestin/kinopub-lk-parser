@@ -2099,6 +2099,8 @@ window.init = async function() {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+    window.init();
+
     if (typeof switchPeriod === 'function') switchPeriod('now');
 
     const modalCloseMap = {

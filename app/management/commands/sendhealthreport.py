@@ -188,7 +188,7 @@ class Command(BaseCommand):
                     age = time.time() - os.path.getmtime(hb_file)
                     service_name = hb_file.name.replace('heartbeat_', '')
 
-                    if age > 86400:
+                    if age > 3600:
                         try:
                             hb_file.unlink(missing_ok=True)
                             deleted_count += 1
@@ -211,7 +211,7 @@ class Command(BaseCommand):
                 else:
                     msg = f'✅ Heartbeat: <b>OK</b> ({active_count} services active)'
                     if deleted_count > 0:
-                        msg += f' <small>(cleaned {deleted_count} old)</small>'
+                        msg += f' <small>(cleaned {deleted_count} ghost files)</small>'
                     components_lines.append(msg)
         except Exception as e:
             components_lines.append(f'⚠️ Heartbeat: <b>Error scanning dir</b> ({str(e)[:20]})')
