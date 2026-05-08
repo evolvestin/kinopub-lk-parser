@@ -107,6 +107,124 @@
         .status-info { display: flex; flex-direction: column; min-width: 0; }
         .status-label { font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .status-val { font-size: 14px; color: var(--text-primary); font-weight: 800; font-variant-numeric: tabular-nums; }
+        .merge-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .merge-card.merged-success {
+            opacity: 0.3;
+            filter: grayscale(1);
+            pointer-events: none;
+            transform: scale(0.98);
+        }
+
+        .merge-header {
+            padding: 10px 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .merge-content {
+            display: flex;
+            padding: 12px;
+            gap: 16px;
+        }
+
+        .merge-poster-area {
+            flex-shrink: 0;
+            width: 100px;
+        }
+
+        .merge-poster-area img {
+            width: 100px;
+            height: 100px;
+            border-radius: 12px;
+            object-fit: cover;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .merge-list {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .merge-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            user-select: none;
+        }
+
+        .merge-row:hover {
+            background: var(--bg-input);
+        }
+
+        .merge-row.is-master {
+            background: var(--accent-dim);
+            border-color: var(--accent);
+        }
+
+        .merge-row input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .merge-row .person-name {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .merge-row .edit-link {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            opacity: 0.5;
+            text-decoration: none;
+        }
+
+        .merge-row .edit-link:hover {
+            opacity: 1;
+            color: var(--link-fg);
+        }
+
+        .btn-merge-action {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-merge-action:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body>
@@ -766,53 +884,52 @@
                 }
                 return `<div class="modal-item" style="min-height: 60px;"><div class="modal-item-content">${contentHtml}</div></div>`;
             }
+
             if (data.is_person) {
                 const fallbackIcon = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%239ca3af"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
-                const poster = item.poster_url ? item.poster_url : fallbackIcon;
-                const objectFit = item.poster_url ? 'cover' : 'none';
                 
-                let contentHtml = '';
                 if (item.is_duplicate_group && item.persons) {
-                    const groupKey = item.tmdb_photo_url || item.kp_photo_url;
-                    const radioGroupName = `master_for_${btoa(groupKey).substring(0, 10)}`;
+                    const groupId = item.persons[0].id;
+                    const radioName = `master_group_${groupId}`;
                     
-                    const rowsList = item.persons.map((p, idx) => `
-                        <div style="display:flex; align-items:center; gap:10px; padding: 8px 12px; background: var(--bg-main); border-radius: 10px; margin-bottom: 6px; border: 1px solid var(--border);">
-                            <input type="radio" name="${radioGroupName}" value="${p.id}" id="p-${p.id}" ${idx === 0 ? 'checked' : ''} data-group-key="${groupKey}" style="width:18px; height:18px; accent-color: var(--accent);">
-                            <label for="p-${p.id}" style="flex:1; font-size:14px; font-weight:700; color:var(--text-primary); cursor:pointer;">${p.name}</label>
-                            <a href="/admin/app/person/${p.id}/change/" target="_blank" class="admin-link-btn" style="color:var(--link-fg); font-size:11px; font-weight:800; text-transform:uppercase; padding: 4px 8px;">Edit</a>
-                        </div>
+                    const rowsHtml = item.persons.map((p, idx) => `
+                        <label class="merge-row ${idx === 0 ? 'is-master' : ''}" onclick="selectMergeMaster(this)">
+                            <input type="radio" name="${radioName}" value="${p.id}" ${idx === 0 ? 'checked' : ''}>
+                            <span class="person-name">${p.name}</span>
+                            <a href="/admin/app/person/${p.id}/change/" target="_blank" class="edit-link" onclick="event.stopPropagation()">Edit</a>
+                        </label>
                     `).join('');
 
-                    contentHtml = `
-                        <div class="modal-item-info" style="padding: 15px;">
-                            <div style="color: var(--accent); font-weight: 800; font-size: 11px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px; display:flex; justify-content:space-between; align-items:center;">
-                                <a href="${item.admin_url}" target="_blank" style="color: var(--accent); text-decoration: none; display: flex; align-items: center; gap: 4px;">
-                                    <span>Открыть группу в админке</span>
-                                    <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="3" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>
-                                </a>
-                                <button onclick="saveMergeGroup('${radioGroupName}')" class="nav-btn active" style="padding: 4px 10px; font-size: 10px; background:var(--accent);">Объединить группу</button>
+                    return `
+                        <div class="modal-item merge-card" id="merge-group-${groupId}">
+                            <div class="merge-header">
+                                <span style="font-size: 11px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">Группа дубликатов</span>
+                                <button class="btn-merge-action" onclick="executeMerge(${groupId}, '${radioName}')">Объединить</button>
                             </div>
-                            <div class="persons-merge-list">${rowsList}</div>
-                        </div>
-                    `;
-                } else {
-                    contentHtml = `
+                            <div class="merge-content">
+                                <div class="merge-poster-area">
+                                    <img src="${item.tmdb_photo_url || item.kp_photo_url || fallbackIcon}" alt="avatar">
+                                </div>
+                                <div class="merge-list">
+                                    ${rowsHtml}
+                                </div>
+                            </div>
+                        </div>`;
+                }
+
+                // Стандартное отображение (не дубликат)
+                const poster = item.poster_url || fallbackIcon;
+                return `
+                <div class="modal-item" style="min-height: 80px;">
+                    <img src="${poster}" class="modal-item-poster" alt="avatar" style="width: 80px; object-fit: cover;">
+                    <div class="modal-item-content">
                         <div class="modal-item-info" style="flex-direction:row; justify-content:space-between; align-items:center; padding: 15px 20px;">
                             <div style="min-width: 0; padding-right: 15px;">
-                                <div class="modal-item-title" style="margin:0; font-size: 15px;">${item.title}</div>
-                                <div class="modal-item-orig" style="margin-top: 4px;">${item.original_title || ''}</div>
+                                <div class="modal-item-title" style="margin:0; font-size: 15px;">${item.name}</div>
+                                <div class="modal-item-orig" style="margin-top: 4px;">${item.en_name || ''}</div>
                             </div>
                             <a href="${item.admin_url}" target="_blank" class="nav-btn" style="padding:8px 16px; font-size:13px; height:auto; background: var(--bg-card); flex-shrink: 0;">Правка</a>
                         </div>
-                    `;
-                }
-
-                return `
-                <div class="modal-item" style="min-height: 80px;" id="group-box-${btoa(item.poster_url).substring(0, 10)}">
-                    <img src="${poster}" class="modal-item-poster" alt="avatar" loading="lazy" style="width: 100px; object-fit: ${objectFit}; background: var(--bg-card);">
-                    <div class="modal-item-content">
-                        ${contentHtml}
                     </div>
                 </div>`;
             }
@@ -833,14 +950,7 @@
             }
 
             const qDisabled = item.in_queue ? 'disabled' : '';
-            let btnText = 'Обновить детали';
-            if (item.in_queue) {
-                btnText = 'В очереди';
-            } else if (currentTargetTask === 'priority_sync') {
-                btnText = 'Синхронизировать';
-            } else if (currentTargetTask === 'durations') {
-                btnText = 'Обновить время';
-            }
+            let btnText = item.in_queue ? 'В очереди' : (currentTargetTask === 'priority_sync' ? 'Синхронизировать' : (currentTargetTask === 'durations' ? 'Обновить время' : 'Обновить детали'));
             
             return `
             <div class="modal-item" id="mi-${item.id}">
@@ -854,12 +964,8 @@
                         <button class="queue-btn" id="qb-${item.id}" onclick="addToQueue([${item.id}], this)" ${qDisabled}>
                             <span>${btnText}</span>
                         </button>
-                        <a href="${item.kinopub_url}" target="_blank" class="admin-link-btn" style="color: var(--accent); border-right: 1px solid var(--border);" title="Открыть на Кинопабе">
-                            На Кинопабе
-                        </a>
-                        <a href="${item.admin_url}" target="_blank" class="admin-link-btn" title="Открыть в админке">
-                            В админке
-                        </a>
+                        <a href="${item.kinopub_url}" target="_blank" class="admin-link-btn" style="color: var(--accent); border-right: 1px solid var(--border);" title="Открыть на Кинопабе">На Кинопабе</a>
+                        <a href="${item.admin_url}" target="_blank" class="admin-link-btn" title="Открыть в админке">В админке</a>
                     </div>
                 </div>
             </div>`;
@@ -1134,6 +1240,67 @@
                 if (currentTargetTask === 'priority_sync') actionText = 'на синхронизацию';
                 else if (currentTargetTask === 'durations') actionText = 'длительности';
                 btn.innerHTML = `В очередь ${actionText} (${pendingIds.length})`;
+            }
+        }
+
+        function selectMergeMaster(rowEl) {
+            const container = rowEl.closest('.merge-list');
+            const radio = rowEl.querySelector('input[type="radio"]');
+            
+            if (radio) {
+                radio.checked = true;
+                container.querySelectorAll('.merge-row').forEach(row => row.classList.remove('is-master'));
+                rowEl.classList.add('is-master');
+            }
+        }
+
+        async function executeMerge(groupId, radioName) {
+            const card = document.getElementById(`merge-group-${groupId}`);
+            const radios = document.getElementsByName(radioName);
+            const selectedRadio = Array.from(radios).find(r => r.checked);
+            
+            if (!selectedRadio) return;
+            
+            const masterId = selectedRadio.value;
+            const allIds = Array.from(radios).map(r => r.value);
+            const aliasIds = allIds.filter(id => id !== masterId);
+            
+            if (aliasIds.length === 0) {
+                alert('Необходимо выбрать хотя бы один алиас для объединения.');
+                return;
+            }
+
+            const btn = event.currentTarget;
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:14px; height:14px; border-width:2px; border-top-color:#fff; margin:0;"></div>';
+
+            try {
+                const response = await fetch('/api/metrics/merge_persons/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        master_id: masterId,
+                        alias_ids: aliasIds
+                    })
+                });
+
+                if (!response.ok) throw new Error('Ошибка API');
+                
+                const data = await response.json();
+                showToast(`Объединено в: ${data.master_name}`);
+                
+                if (card) {
+                    card.classList.add('merged-done');
+                    // Дополнительный визуальный эффект успеха
+                    card.style.opacity = '0.3';
+                    card.style.filter = 'grayscale(1)';
+                    card.style.pointerEvents = 'none';
+                }
+            } catch (e) {
+                alert('Ошибка: ' + e.message);
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
             }
         }
 
