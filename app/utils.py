@@ -1,16 +1,13 @@
 import logging
 import os
 from datetime import timedelta
-
 from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 from redis import Redis
-
 from shared.constants import DATETIME_FORMAT
 
 logger = logging.getLogger(__name__)
-
 
 def update_heartbeat():
     if getattr(settings, 'LOCAL_RUN', False):
@@ -21,7 +18,7 @@ def update_heartbeat():
         with open(heartbeat_file, 'a'):
             os.utime(heartbeat_file, None)
     except Exception as e:
-        logger.warning('Could not update heartbeat file %s: %s', heartbeat_file, e)
+        logger.warning('Could not update heartbeat file %s: %s', settings.HEARTBEAT_FILE, e)
 
 
 def enqueue_show_update(

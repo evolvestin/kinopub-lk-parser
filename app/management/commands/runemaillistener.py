@@ -3,14 +3,14 @@ import os
 import signal
 import threading
 import time
-
 import imaplib2
-from django.conf import settings
 
+from django.conf import settings
 from app import email_processor
 from app.management.base import LoggableBaseCommand
 from app.utils import update_heartbeat
 
+# Глобальный флаг для завершения
 shutdown_flag = threading.Event()
 
 

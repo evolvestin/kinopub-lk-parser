@@ -16,6 +16,7 @@
     <script>
         window.IS_DEBUG = {{ is_debug|yesno:"true,false" }};
     </script>
+    <script src="{% static 'js/state_manager.js' %}?v={{ APP_VERSION }}"></script>
 </head>
 <body class="is-webapp">
     <div class="loader" id="loader"><div class="spinner"></div></div>
@@ -35,7 +36,7 @@
                 </div>
                 <!-- Контейнер поиска теперь стабильно прижат к низу вьюхи через flex -->
                 <div class="search-container" style="display: flex; gap: 12px; align-items: center;">
-                    <input type="text" id="search-input" class="search-input" style="flex: 1;" placeholder="Фильмы, сериалы, актеры..." oninput="window.App.doSearch(this.value)">
+                    <input type="text" id="search-input" data-state-bind="forms.search.query" class="search-input" style="flex: 1;" placeholder="Фильмы, сериалы, актеры..." oninput="window.App.doSearch(this.value)">
                     <button class="theme-btn js-theme-toggle" onclick="window.App.toggleTheme()"></button>
                 </div>
             </div>
@@ -442,11 +443,11 @@
             <div id="add-view-se-container" style="display:none; gap:12px; margin-bottom:20px;">
                 <div style="flex:1;">
                     <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:6px; text-transform:uppercase;">Сезон</div>
-                    <input type="number" id="add-view-season" class="search-input" placeholder="1" min="1">
+                    <input type="number" id="add-view-season" data-state-bind="forms.addView.season" class="search-input" placeholder="1" min="1">
                 </div>
                 <div style="flex:1;">
                     <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:6px; text-transform:uppercase;">Эпизод</div>
-                    <input type="number" id="add-view-episode" class="search-input" placeholder="1" min="1">
+                    <input type="number" id="add-view-episode" data-state-bind="forms.addView.episode" class="search-input" placeholder="1" min="1">
                 </div>
             </div>
 
@@ -459,9 +460,9 @@
             </div>
 
             <div id="add-view-date-inputs" style="margin-bottom: 24px;">
-                <input type="date" id="add-view-exact" class="search-input" style="width:100%;">
-                <input type="month" id="add-view-month" class="search-input" style="width:100%; display:none;">
-                <input type="number" id="add-view-year" class="search-input" placeholder="YYYY" style="width:100%; display:none;" min="1900" max="2100">
+                <input type="date" id="add-view-exact" data-state-bind="forms.addView.exact" class="search-input" style="width:100%;">
+                <input type="month" id="add-view-month" data-state-bind="forms.addView.month" class="search-input" style="width:100%; display:none;">
+                <input type="number" id="add-view-year" data-state-bind="forms.addView.year" class="search-input" placeholder="YYYY" style="width:100%; display:none;" min="1900" max="2100">
                 <div id="add-view-unknown-text" style="display:none; font-size:13px; color:var(--text-secondary); text-align:center; padding: 10px; background: var(--bg-input); border-radius: 12px; border: 1px dashed var(--border);">Просмотр будет учтен в статистике "Всё время" и закреплен в самом низу истории.</div>
             </div>
 

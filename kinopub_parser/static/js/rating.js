@@ -16,8 +16,7 @@ window.App.rateData = {
 window.App.openRateModal = function(showId, title, currentRating, type = null) {
     const hasExisting = (currentRating && currentRating !== 'null' && currentRating !== null);
     
-    this.rateData = {
-        ...this.rateData,
+    const context = {
         showId: showId,
         showType: type || 'Movie',
         title: title,
@@ -25,24 +24,28 @@ window.App.openRateModal = function(showId, title, currentRating, type = null) {
         hasExistingRating: hasExisting,
         needsRefresh: false,
         season: null,
-        episode: null
+        episode: null,
+        episodesData: []
     };
 
+    window.App.State.setState('modals.rateShow', { isOpen: true, context: context });
+
     document.getElementById('rate-show-title').textContent = title;
-    const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(this.rateData.showType);
+    const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(context.showType);
     document.getElementById('rate-mode-toggle').style.display = isSeries ? 'flex' : 'none';
     
     this.initSlider();
     this.setRateLevel('show');
-    document.getElementById('rate-show-modal').classList.add('show');
 };
 
 window.App.initSlider = function() {
     const hitArea = document.getElementById('rate-slider-hit');
     if (!hitArea) return;
 
+    let isDragging = false;
+
     const handleMove = (e) => {
-        if (!this.rateData.isDragging && e.type === 'pointermove') return;
+        if (!isDragging && e.type === 'pointermove') return;
         
         const rect = hitArea.querySelector('.rate-slider-track').getBoundingClientRect();
         const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
@@ -52,9 +55,11 @@ window.App.initSlider = function() {
         let val = 1 + (percent * 9);
         val = Math.round(val * 2) / 2;
         
-        if (val !== this.rateData.currentVal) {
-            const oldVal = this.rateData.currentVal;
-            this.rateData.currentVal = val;
+        const ctx = window.App.State.getState('modals.rateShow.context');
+        if (val !== ctx.currentVal) {
+            const oldVal = ctx.currentVal;
+            ctx.currentVal = val;
+            window.App.State.setState('modals.rateShow.context', ctx);
             this.updateSliderUI(true);
             
             if (window.navigator.vibrate) {
@@ -68,7 +73,7 @@ window.App.initSlider = function() {
     };
 
     hitArea.onpointerdown = (e) => {
-        this.rateData.isDragging = true;
+        isDragging = true;
         hitArea.setPointerCapture(e.pointerId);
         handleMove(e);
     };
@@ -76,14 +81,15 @@ window.App.initSlider = function() {
     hitArea.onpointermove = handleMove;
 
     hitArea.onpointerup = () => {
-        this.rateData.isDragging = false;
+        isDragging = false;
     };
 
     this.updateSliderUI();
 };
 
 window.App.updateSliderUI = function(withPulse = false) {
-    const val = this.rateData.currentVal;
+    const ctx = window.App.State.getState('modals.rateShow.context');
+    const val = ctx.currentVal;
     const percent = ((val - 1) / 9) * 100;
     
     const fill = document.getElementById('rate-slider-fill');
@@ -102,19 +108,21 @@ window.App.updateSliderUI = function(withPulse = false) {
         huge.classList.add('rate-pulse');
     }
 
-    if (modalContent && (this.rateData.level === 'show' || this.rateData.level === 'score')) {
+    if (modalContent && (ctx.level === 'show' || ctx.level === 'score')) {
         modalContent.classList.remove('score-low', 'score-mid', 'score-high');
         if (val < 5) modalContent.classList.add('score-low');
         else if (val < 8) modalContent.classList.add('score-mid');
         else modalContent.classList.add('score-high');
     }
 
-    const isInputView = (this.rateData.level === 'show' || this.rateData.level === 'score');
-    if (delBtn) delBtn.style.display = (isInputView && this.rateData.hasExistingRating) ? 'block' : 'none';
+    const isInputView = (ctx.level === 'show' || ctx.level === 'score');
+    if (delBtn) delBtn.style.display = (isInputView && ctx.hasExistingRating) ? 'block' : 'none';
 };
 
 window.App.setRateLevel = function(level, params = {}) {
-    this.rateData.level = level;
+    const ctx = window.App.State.getState('modals.rateShow.context');
+    ctx.level = level;
+    
     const slider = document.getElementById('rate-slider-container');
     const epNav = document.getElementById('rate-episodes-nav');
     const backBtn = document.getElementById('rate-back-btn');
@@ -136,8 +144,8 @@ window.App.setRateLevel = function(level, params = {}) {
     }
 
     if (level === 'show') {
-        this.rateData.season = null;
-        this.rateData.episode = null;
+        ctx.season = null;
+        ctx.episode = null;
         if (breadcrumb) breadcrumb.textContent = 'Общая оценка';
         if (slider) slider.style.display = 'flex';
         if (submitBtn) submitBtn.style.display = 'block';
@@ -145,37 +153,41 @@ window.App.setRateLevel = function(level, params = {}) {
             modeToggle.querySelector('#rate-mode-main').classList.add('active');
             modeToggle.querySelector('#rate-mode-ep').classList.remove('active');
         }
+        window.App.State.setState('modals.rateShow.context', ctx);
         this.updateSliderUI();
     } 
     else if (level === 'seasons') {
-        this.rateData.season = null;
-        this.rateData.episode = null;
+        ctx.season = null;
+        ctx.episode = null;
         if (breadcrumb) breadcrumb.textContent = 'Выбор сезона';
         if (epNav) epNav.style.display = 'block';
         if (modeToggle) {
             modeToggle.querySelector('#rate-mode-main').classList.remove('active');
             modeToggle.querySelector('#rate-mode-ep').classList.add('active');
         }
+        window.App.State.setState('modals.rateShow.context', ctx);
         this.loadAndRenderSeasons();
     }
     else if (level === 'episodes') {
-        this.rateData.season = params.season;
-        this.rateData.episode = null;
+        ctx.season = params.season;
+        ctx.episode = null;
         if (breadcrumb) breadcrumb.textContent = `Сезон ${params.season}`;
         if (epNav) epNav.style.display = 'block';
+        window.App.State.setState('modals.rateShow.context', ctx);
         this.renderEpisodes(params.season);
     }
     else if (level === 'score') {
-        this.rateData.season = params.season;
-        this.rateData.episode = params.episode;
+        ctx.season = params.season;
+        ctx.episode = params.episode;
         
         const hasExisting = (params.rating && params.rating !== 'null' && params.rating !== null);
-        this.rateData.hasExistingRating = hasExisting;
-        this.rateData.currentVal = hasExisting ? parseFloat(params.rating) : 5.0;
+        ctx.hasExistingRating = hasExisting;
+        ctx.currentVal = hasExisting ? parseFloat(params.rating) : 5.0;
         
         if (breadcrumb) breadcrumb.textContent = `S${params.season} E${params.episode}`;
         if (slider) slider.style.display = 'flex';
         if (submitBtn) submitBtn.style.display = 'block';
+        window.App.State.setState('modals.rateShow.context', ctx);
         this.updateSliderUI();
     }
 };
@@ -185,10 +197,11 @@ window.App.loadAndRenderSeasons = async function() {
     if (!epNav) return;
     epNav.innerHTML = '<div class="loader-inline"><div class="spinner"></div></div>';
     try {
+        const ctx = window.App.State.getState('modals.rateShow.context');
         const r = await fetch('/api/webapp/get_episodes/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ show_id: this.rateData.showId, init_data: tg?.initData || '' })
+            body: JSON.stringify({ show_id: ctx.showId, init_data: tg?.initData || '' })
         });
         const data = await r.json();
         
@@ -197,7 +210,8 @@ window.App.loadAndRenderSeasons = async function() {
             return;
         }
 
-        this.rateData.episodesData = data.seasons;
+        ctx.episodesData = data.seasons;
+        window.App.State.setState('modals.rateShow.context', ctx);
 
         let html = '<div class="rating-grid-wa">';
         data.seasons.forEach(s => {
@@ -216,7 +230,8 @@ window.App.loadAndRenderSeasons = async function() {
 window.App.renderEpisodes = function(seasonNum) {
     const epNav = document.getElementById('rate-episodes-nav');
     if (!epNav) return;
-    const season = this.rateData.episodesData.find(s => s.season_number === seasonNum);
+    const ctx = window.App.State.getState('modals.rateShow.context');
+    const season = ctx.episodesData.find(s => s.season_number === seasonNum);
     let html = '<div class="rating-grid-wa" style="grid-template-columns: repeat(4, 1fr);">';
     season.episodes.forEach(e => {
         let colorClass = '';
@@ -233,7 +248,8 @@ window.App.renderEpisodes = function(seasonNum) {
 };
 
 window.App.submitRatingFromSlider = function() {
-    this.submitRating(this.rateData.currentVal);
+    const ctx = window.App.State.getState('modals.rateShow.context');
+    this.submitRating(ctx.currentVal);
 };
 
 window.App.submitRating = async function(rating) {
@@ -242,24 +258,27 @@ window.App.submitRating = async function(rating) {
     btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:#fff;margin:0;"></div>';
     btn.disabled = true;
     
+    const ctx = window.App.State.getState('modals.rateShow.context');
+    
     try {
         await fetch('/api/webapp/rate/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 init_data: tg?.initData || '',
-                show_id: this.rateData.showId,
+                show_id: ctx.showId,
                 rating: rating,
-                season: this.rateData.season,
-                episode: this.rateData.episode
+                season: ctx.season,
+                episode: ctx.episode
             })
         });
         
         showToast('Оценка сохранена');
         window.AppData.cache.clear();
-        this.rateData.needsRefresh = true;
+        ctx.needsRefresh = true;
+        window.App.State.setState('modals.rateShow.context', ctx);
         
-        if (this.rateData.episode) {
+        if (ctx.episode) {
             this.setRateLevel('seasons');
         } else {
             this.closeRateModal();
@@ -272,34 +291,38 @@ window.App.submitRating = async function(rating) {
 
 window.App.deleteRating = async function() {
     if (!confirm('Удалить оценку?')) return;
+    const ctx = window.App.State.getState('modals.rateShow.context');
     try {
         await fetch('/api/webapp/delete_rating/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 init_data: tg?.initData || '',
-                show_id: this.rateData.showId,
-                season: this.rateData.season,
-                episode: this.rateData.episode
+                show_id: ctx.showId,
+                season: ctx.season,
+                episode: ctx.episode
             })
         });
         showToast('Оценка удалена');
         window.AppData.cache.clear();
-        this.rateData.needsRefresh = true;
-        if (this.rateData.episode) this.setRateLevel('seasons');
+        ctx.needsRefresh = true;
+        window.App.State.setState('modals.rateShow.context', ctx);
+        if (ctx.episode) this.setRateLevel('seasons');
         else this.closeRateModal();
     } catch(e) {}
 };
 
 window.App.rateGoBack = function() {
-    if (this.rateData.level === 'score') this.setRateLevel('episodes', {season: this.rateData.season});
-    else if (this.rateData.level === 'episodes') this.setRateLevel('seasons');
+    const ctx = window.App.State.getState('modals.rateShow.context');
+    if (ctx.level === 'score') this.setRateLevel('episodes', {season: ctx.season});
+    else if (ctx.level === 'episodes') this.setRateLevel('seasons');
 };
 
 window.App.closeRateModal = function() {
-    document.getElementById('rate-show-modal').classList.remove('show');
-    if (this.rateData.needsRefresh) {
-        if (activeMainView === 'stats') load(curYear);
-        window.App.openShowLayer(this.rateData.showId);
+    const ctx = window.App.State.getState('modals.rateShow.context');
+    window.App.State.setState('modals.rateShow.isOpen', false);
+    if (ctx.needsRefresh) {
+        if (window.App.State.getState('nav.activeMainView') === 'stats') load(curYear);
+        window.App.openShowLayer(ctx.showId);
     }
 };

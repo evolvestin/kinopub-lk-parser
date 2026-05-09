@@ -28,7 +28,7 @@ window.App.Router = {
     },
 
     serialize() {
-        let path = activeMainView;
+        let path = window.App.State.getState('nav.activeMainView') || 'search';
         
         viewStack.forEach(layer => {
             const ctx = layer.context;
@@ -42,11 +42,12 @@ window.App.Router = {
         });
 
         const query = new URLSearchParams();
-        if (curYear && curYear !== 'all') query.set('y', curYear);
+        const y = window.App.State.getState('nav.query.y');
+        if (y && y !== 'all') query.set('y', y);
         
-        const sInput = document.getElementById('search-input');
-        if (activeMainView === 'search' && sInput && sInput.value) {
-            query.set('q', sInput.value);
+        const q = window.App.State.getState('forms.search.query');
+        if (path.startsWith('search') && q) {
+            query.set('q', q);
         }
         
         const qStr = query.toString();
@@ -54,7 +55,7 @@ window.App.Router = {
     },
 
     updateUrl() {
-        if (window.App.isSyncingHash) return;
+        if (window.App.State.getState('flags.isSyncingHash')) return;
         const newHash = this.serialize();
         if (window.location.hash !== newHash) {
             history.pushState(null, "", newHash);
@@ -62,15 +63,13 @@ window.App.Router = {
     },
 
     async sync() {
-        if (window.App.isSyncingHash) return;
-        window.App.isSyncingHash = true;
+        if (window.App.State.getState('flags.isSyncingHash')) return;
+        window.App.State.setState('flags.isSyncingHash', true);
 
         const { segments, params } = this.parse();
         
-        // 1. Синхронизация основного вида
         const targetMainView = segments[0] || 'search';
-        if (activeMainView !== targetMainView) {
-            // При смене базового вида закрываем все слои
+        if (window.App.State.getState('nav.activeMainView') !== targetMainView) {
             while (viewStack.length > 0) {
                 const top = viewStack.pop();
                 top.el.remove();
@@ -78,27 +77,25 @@ window.App.Router = {
             switchMainView(targetMainView, true);
         }
 
-        // 2. Синхронизация фильтров (год, поиск)
         const year = params.get('y') || 'all';
         if (curYear !== year) {
             curYear = year;
+            window.App.State.setState('nav.query.y', year);
             markYear();
             await load(year, false);
         }
 
         const query = params.get('q');
-        const sInput = document.getElementById('search-input');
-        if (query && sInput && sInput.value !== query) {
-            sInput.value = query;
+        if (query && window.App.State.getState('forms.search.query') !== query) {
+            window.App.State.setState('forms.search.query', query);
+            const sInput = document.getElementById('search-input');
+            if (sInput) sInput.value = query;
             doSearch(query);
         }
 
-        // 3. Синхронизация стека слоев
         const layerSegments = segments.slice(1);
-        // Каждый слой представлен парой (тип, id) или (тип, субтип)
         const targetDepth = Math.floor(layerSegments.length / 2);
 
-        // Убираем лишние слои
         while (viewStack.length > targetDepth) {
             const top = viewStack.pop();
             top.el.remove();
@@ -107,7 +104,6 @@ window.App.Router = {
             }
         }
 
-        // Достраиваем недостающие слои
         for (let i = viewStack.length; i < targetDepth; i++) {
             const type = layerSegments[i * 2];
             const id = layerSegments[i * 2 + 1];
@@ -119,14 +115,24 @@ window.App.Router = {
             }
         }
 
-        // Если слоев нет, показываем навигацию
         if (viewStack.length === 0) {
             if (!isSharedMode) document.getElementById('bottom-nav').style.display = 'flex';
         } else {
             if (tg?.BackButton) tg.BackButton.show();
         }
 
-        window.App.isSyncingHash = false;
+        requestAnimationFrame(() => {
+            const scrollPos = window.App.State.getState(`ui.scrollPositions.${targetMainView}`) || 0;
+            if (viewStack.length === 0) {
+                document.getElementById('views-container').scrollTop = scrollPos;
+            } else {
+                const topLayer = viewStack[viewStack.length - 1];
+                const layerScrollPos = window.App.State.getState(`ui.scrollPositions.layer_${targetDepth}`) || 0;
+                topLayer.el.scrollTop = layerScrollPos;
+            }
+        });
+
+        window.App.State.setState('flags.isSyncingHash', false);
     }
 };
 
@@ -395,6 +401,8 @@ function getScrollContainer() {
 
 function switchMainView(view, fromRouter = false) {
     activeMainView = view;
+    window.App.State.setState('nav.activeMainView', view);
+    
     document.getElementById('view-search').style.display = view === 'search' ? 'flex' : 'none';
     document.getElementById('view-stats').style.display = view === 'stats' ? 'block' : 'none';
     document.getElementById('view-wishlist').style.display = view === 'wishlist' ? 'block' : 'none';
@@ -403,7 +411,8 @@ function switchMainView(view, fromRouter = false) {
     document.getElementById('bn-stats').classList.toggle('active', view === 'stats');
     document.getElementById('bn-wishlist').classList.toggle('active', view === 'wishlist');
     
-    getScrollContainer().scrollTop = 0;
+    const savedScroll = window.App.State.getState(`ui.scrollPositions.${view}`) || 0;
+    getScrollContainer().scrollTop = savedScroll;
 
     if (view === 'wishlist' && window.App.loadWishlist && !isSharedMode) {
         window.App.loadWishlist();
@@ -1931,9 +1940,12 @@ let addViewData = {
 
 window.App = {
     ...window.App,
-    toggleTheme: toggleTheme,
-    openShareModal: openShareModal,
-    closeShareModal: closeShareModal,
+    toggleTheme: () => {
+        const cur = window.App.State.getState('ui.theme');
+        window.App.State.setState('ui.theme', cur === 'dark' ? 'light' : 'dark');
+    },
+    openShareModal: () => window.App.State.setState('modals.share.isOpen', true),
+    closeShareModal: () => window.App.State.setState('modals.share.isOpen', false),
     toggleGroupOpts: toggleGroupOpts,
     submitShare: submitShare,
     mainTab: mainTab,
@@ -1952,40 +1964,28 @@ window.App = {
     resetCasino: window.resetCasino,
     fitText: function(el) {
         if (!el) return;
-        
-        // Сбрасываем размер для чистого замера
         el.style.fontSize = "";
         const styles = window.getComputedStyle(el);
-        
-        // Захватываем лимиты в пикселях один раз, чтобы они не менялись при изменении шрифта
         const limitWidth = el.clientWidth;
         const limitHeight = parseFloat(styles.maxHeight) || el.offsetHeight || 40;
-        
         const isSingleLine = styles.whiteSpace === 'nowrap' || styles.webkitLineClamp === '1';
         let size = parseFloat(styles.fontSize);
         const minSize = 9;
-
-        // Очищаем временные ограничения для замера реального контента
         const originalMaxHeight = el.style.maxHeight;
         const originalClamp = el.style.webkitLineClamp;
         
         if (isSingleLine) {
-            // Для однострочных: уменьшаем, пока контент шире контейнера
             while (el.scrollWidth > limitWidth + 1 && size > minSize) {
                 size -= 0.5;
                 el.style.fontSize = size + "px";
             }
         } else {
-            // Для многострочных: временно убираем обрезку, чтобы scrollHeight показал реальный объем
             el.style.webkitLineClamp = "none";
             el.style.maxHeight = "none";
-            
             while (el.scrollHeight > limitHeight + 1 && size > minSize) {
                 size -= 0.5;
                 el.style.fontSize = size + "px";
             }
-            
-            // Возвращаем CSS ограничения
             el.style.webkitLineClamp = originalClamp;
             el.style.maxHeight = originalMaxHeight;
         }
@@ -1995,15 +1995,15 @@ window.App = {
         elements.forEach(el => this.fitText(el));
     },
     toggleHistoryEditMode: function() {
-        isHistoryEditMode = !isHistoryEditMode;
+        const cur = window.App.State.getState('flags.isHistoryEditMode');
+        window.App.State.setState('flags.isHistoryEditMode', !cur);
+        isHistoryEditMode = !cur;
         const btn = document.getElementById('hist-del-toggle');
         const container = document.getElementById('layer-hist-container');
-        
         if (btn) {
             btn.style.background = isHistoryEditMode ? 'var(--accent)' : 'var(--bg-input)';
             btn.style.color = isHistoryEditMode ? '#fff' : 'var(--text-primary)';
         }
-        
         if (container) {
             container.classList.toggle('history-edit-mode', isHistoryEditMode);
         }
@@ -2011,7 +2011,6 @@ window.App = {
     removeRatingItem: function(btn, payload) {
         const msg = "Удалить эту оценку?";
         const element = btn.closest('.grid-item-wrap') || btn.closest('.hist-item');
-        
         const performDelete = async () => {
             if (element) {
                 element.style.transition = 'all 0.3s ease';
@@ -2019,22 +2018,15 @@ window.App = {
                 element.style.transform = 'scale(0.8)';
                 setTimeout(() => element.remove(), 300);
             }
-            
             try {
                 const r = await fetch('/api/webapp/delete_rating/', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        init_data: tg?.initData || '',
-                        ...payload
-                    })
+                    body: JSON.stringify({ init_data: tg?.initData || '', ...payload })
                 });
                 if (!r.ok) throw new Error('Ошибка API');
-                
                 window.AppData.cache.clear();
                 showToast('Оценка удалена');
-                
-                // Перезагружаем статистику на фоне
                 if (activeMainView === 'stats') load(curYear, true);
             } catch(e) {
                 showToast('Не удалось удалить');
@@ -2044,11 +2036,8 @@ window.App = {
                 }
             }
         };
-
         if (window.Telegram?.WebApp?.showConfirm) {
-            window.Telegram.WebApp.showConfirm(msg, (confirmed) => {
-                if (confirmed) performDelete();
-            });
+            window.Telegram.WebApp.showConfirm(msg, (confirmed) => { if (confirmed) performDelete(); });
         } else {
             if (confirm(msg)) performDelete();
         }
@@ -2057,7 +2046,6 @@ window.App = {
     removeHistoryItem: function(btn, payload) {
         const msg = "Удалить этот просмотр из вашей истории?";
         const element = btn.closest('.grid-item-wrap') || btn.closest('.hist-item');
-        
         const performDelete = async () => {
             if (element) {
                 element.style.transition = 'all 0.3s ease';
@@ -2065,18 +2053,13 @@ window.App = {
                 element.style.transform = 'scale(0.8)';
                 setTimeout(() => element.remove(), 300);
             }
-            
             try {
                 const r = await fetch('/api/webapp/remove_view/', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        init_data: tg?.initData || '',
-                        ...payload
-                    })
+                    body: JSON.stringify({ init_data: tg?.initData || '', ...payload })
                 });
                 if (!r.ok) throw new Error('Ошибка API');
-                
                 window.AppData.cache.clear();
                 showToast('Просмотр удален');
             } catch(e) {
@@ -2087,74 +2070,68 @@ window.App = {
                 }
             }
         };
-
         if (window.Telegram?.WebApp?.showConfirm) {
-            window.Telegram.WebApp.showConfirm(msg, (confirmed) => {
-                if (confirmed) performDelete();
-            });
+            window.Telegram.WebApp.showConfirm(msg, (confirmed) => { if (confirmed) performDelete(); });
         } else {
             if (confirm(msg)) performDelete();
         }
     },
     showStatsHelp: function(e) {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
+        if (e) { e.preventDefault(); e.stopPropagation(); }
         const informer = document.getElementById('wl-stats-informer');
         if (!informer) return;
-
         if (informer.classList.contains('show')) {
             informer.classList.remove('show');
             return;
         }
-
         informer.classList.add('show');
-
-        const closeHandler = () => {
-            informer.classList.remove('show');
-            document.removeEventListener('click', closeHandler);
-        };
-
+        const closeHandler = () => { informer.classList.remove('show'); document.removeEventListener('click', closeHandler); };
         setTimeout(() => document.addEventListener('click', closeHandler), 10);
     },
     closeItemDeleteModal: function() {
-        document.getElementById('wl-item-delete-modal').classList.remove('show');
-        const informer = document.getElementById('wl-stats-informer');
-        if (informer) informer.classList.remove('show');
+        window.App.State.setState('modals.wlDelete.isOpen', false);
         itemToDeleteId = null;
         itemToDeleteElement = null;
     },
     openAddViewModal: function(showId, title, type) {
-        addViewData.showId = showId;
-        addViewData.type = type;
+        const draft = window.App.State.getState('forms.addView');
+        window.App.State.setState('modals.addView', { isOpen: true, context: { showId, type }});
         
         document.getElementById('add-view-title').textContent = title;
-
         const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(type);
         document.getElementById('add-view-se-container').style.display = isSeries ? 'flex' : 'none';
-        document.getElementById('add-view-season').value = '';
-        document.getElementById('add-view-episode').value = '';
-
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
         
-        document.getElementById('add-view-exact').value = `${year}-${month}-${day}`;
-        document.getElementById('add-view-month').value = `${year}-${month}`;
-        document.getElementById('add-view-year').value = year;
+        document.getElementById('add-view-season').value = draft.season || '';
+        document.getElementById('add-view-episode').value = draft.episode || '';
 
-        window.App.setAddViewMode('exact');
+        if (!draft.exact) {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            window.App.State.setState('forms.addView.exact', `${year}-${month}-${day}`);
+            window.App.State.setState('forms.addView.month', `${year}-${month}`);
+            window.App.State.setState('forms.addView.year', year);
+            document.getElementById('add-view-exact').value = `${year}-${month}-${day}`;
+            document.getElementById('add-view-month').value = `${year}-${month}`;
+            document.getElementById('add-view-year').value = year;
+        } else {
+            document.getElementById('add-view-exact').value = draft.exact;
+            document.getElementById('add-view-month').value = draft.month;
+            document.getElementById('add-view-year').value = draft.year;
+        }
 
-        document.getElementById('add-view-modal').classList.add('show');
+        window.App.setAddViewMode(draft.dateMode || 'exact');
     },
     setAddViewMode: function(mode, btn) {
-        addViewData.mode = mode;
+        window.App.State.setState('forms.addView.dateMode', mode);
         const btns = document.querySelectorAll('#add-view-modal .vt-btn');
         btns.forEach(b => b.classList.remove('active'));
         if (btn) btn.classList.add('active');
-        else if (btns.length > 0) btns[0].classList.add('active');
+        else {
+            const modeMap = {'exact': 0, 'month': 1, 'year': 2, 'unknown': 3};
+            if (btns.length > 0 && modeMap[mode] !== undefined) btns[modeMap[mode]].classList.add('active');
+        }
 
         document.getElementById('add-view-exact').style.display = mode === 'exact' ? 'block' : 'none';
         document.getElementById('add-view-month').style.display = mode === 'month' ? 'block' : 'none';
@@ -2162,17 +2139,19 @@ window.App = {
         document.getElementById('add-view-unknown-text').style.display = mode === 'unknown' ? 'block' : 'none';
     },
     closeAddViewModal: function() {
-        document.getElementById('add-view-modal').classList.remove('show');
+        window.App.State.setState('modals.addView.isOpen', false);
     },
     submitAddView: async function() {
         const btn = document.getElementById('btn-add-view-submit');
         const origHtml = btn.innerHTML;
+        const ctx = window.App.State.getState('modals.addView.context');
+        const draft = window.App.State.getState('forms.addView');
 
-        const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(addViewData.type);
+        const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(ctx.type);
         let season = 0, episode = 0;
         if (isSeries) {
-            season = parseInt(document.getElementById('add-view-season').value);
-            episode = parseInt(document.getElementById('add-view-episode').value);
+            season = parseInt(draft.season);
+            episode = parseInt(draft.episode);
             if (!season || !episode) {
                 showToast('Укажите сезон и эпизод');
                 return;
@@ -2180,9 +2159,9 @@ window.App = {
         }
 
         let dateVal = null;
-        if (addViewData.mode === 'exact') dateVal = document.getElementById('add-view-exact').value;
-        if (addViewData.mode === 'month') dateVal = document.getElementById('add-view-month').value;
-        if (addViewData.mode === 'year') dateVal = document.getElementById('add-view-year').value;
+        if (draft.dateMode === 'exact') dateVal = draft.exact;
+        if (draft.dateMode === 'month') dateVal = draft.month;
+        if (draft.dateMode === 'year') dateVal = draft.year;
 
         btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0;"></div>';
         btn.disabled = true;
@@ -2193,10 +2172,10 @@ window.App = {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     init_data: tg?.initData || '',
-                    show_id: addViewData.showId,
+                    show_id: ctx.showId,
                     season: season,
                     episode: episode,
-                    date_mode: addViewData.mode,
+                    date_mode: draft.dateMode,
                     date_val: dateVal
                 })
             });
@@ -2205,7 +2184,6 @@ window.App = {
 
             showToast('Просмотр добавлен!');
             window.App.closeAddViewModal();
-            
             window.AppData.cache.clear();
             load(curYear);
         } catch(e) {
@@ -2220,16 +2198,56 @@ window.App = {
 window.init = async function() {
     if (window.IS_ADMIN_DASHBOARD) return;
 
-    document.querySelectorAll('.theme-btn').forEach(btn => {
-        btn.innerHTML = isDark ? Icons.moon : Icons.sun;
+    window.App.State.subscribe('ui.theme', (theme) => {
+        isDark = theme === 'dark';
+        document.body.classList.toggle('light', !isDark);
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.innerHTML = isDark ? Icons.moon : Icons.sun;
+        });
+        if (D) renderCharts();
     });
+
+    const modalMap = {
+        'addView': 'add-view-modal',
+        'rateShow': 'rate-show-modal',
+        'share': 'share-modal',
+        'wlFolder': 'wl-modal',
+        'wlEdit': 'wl-edit-modal',
+        'wlLimit': 'wl-limit-modal',
+        'wlDelete': 'wl-item-delete-modal',
+        'casino': 'casino-modal',
+        'details': 'details-modal'
+    };
+
+    Object.entries(modalMap).forEach(([stateKey, elId]) => {
+        window.App.State.subscribe(`modals.${stateKey}.isOpen`, (isOpen) => {
+            const el = document.getElementById(elId);
+            if (el) el.classList.toggle('show', isOpen);
+            if (!isOpen) {
+                if (stateKey === 'addView' || stateKey === 'rateShow' || stateKey === 'wlEdit') {
+                    window.App.State.setState(`forms.${stateKey}`, window.App.State.defaultState.forms[stateKey]);
+                }
+            }
+        });
+    });
+
+    const scrollHandler = window.App.State._debounce((e) => {
+        const target = e.target;
+        if (target.id === 'views-container') {
+            window.App.State.setState(`ui.scrollPositions.${activeMainView}`, target.scrollTop);
+        } else if (target.classList.contains('layer')) {
+            window.App.State.setState(`ui.scrollPositions.layer_${viewStack.length}`, target.scrollTop);
+        }
+    }, 150);
+
+    document.getElementById('views-container').addEventListener('scroll', scrollHandler);
+    document.getElementById('dynamic-layers').addEventListener('scroll', scrollHandler, true);
 
     initIcons();
 
     const startParam = tg?.initDataUnsafe?.start_param || '';
     const hasHash = window.location.hash.length > 2;
 
-    // Deep Linking: если хеша нет, но есть start_param, формируем начальный хеш
     if (!hasHash && startParam) {
         if (startParam.startsWith('stat_')) {
             window.location.hash = `#/stats?shared_id=${startParam.replace('stat_', '')}`;
@@ -2237,8 +2255,14 @@ window.init = async function() {
             window.location.hash = `#/search/show/${startParam.replace('show_', '')}`;
         }
     } else if (!hasHash) {
-        // Дефолтное состояние
         window.location.hash = `#/search`;
+    }
+
+    const query = window.App.State.getState('forms.search.query');
+    if (query) {
+        const sInput = document.getElementById('search-input');
+        if (sInput) sInput.value = query;
+        doSearch(query);
     }
 
     await load(undefined, true);
@@ -2248,14 +2272,6 @@ window.init = async function() {
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.IS_ADMIN_DASHBOARD) return;
-
-    if (typeof window.init === 'function') {
-        window.init();
-    } else {
-        const loader = document.getElementById('loader');
-        if (loader) loader.classList.add('hidden');
-    }
-
     if (typeof switchPeriod === 'function') switchPeriod('now');
 
     const modalCloseMap = {

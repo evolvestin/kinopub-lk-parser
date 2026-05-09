@@ -462,7 +462,9 @@ window.App = {
         renderActiveWlFolder();
     },
     toggleReorderMode: function () {
-        isReorderMode = !isReorderMode;
+        const cur = window.App.State.getState('flags.isReorderMode');
+        window.App.State.setState('flags.isReorderMode', !cur);
+        isReorderMode = !cur;
         const btn = document.getElementById('wl-reorder-btn');
         const viewWrap = document.getElementById('view-wishlist');
 
@@ -480,7 +482,9 @@ window.App = {
         renderWishlistFolders();
     },
     toggleItemsReorderMode: function () {
-        isItemsReorderMode = !isItemsReorderMode;
+        const cur = window.App.State.getState('flags.isItemsReorderMode');
+        window.App.State.setState('flags.isItemsReorderMode', !cur);
+        isItemsReorderMode = !cur;
         const btn = document.getElementById('wl-items-reorder-btn');
         const container = document.getElementById('wl-items-container');
 
@@ -508,7 +512,7 @@ window.App = {
         }
 
         document.getElementById('wl-del-keep-stats').checked = true;
-        document.getElementById('wl-item-delete-modal').classList.add('show');
+        window.App.State.setState('modals.wlDelete.isOpen', true);
     },
     removeWlItem: function (id, element) {
         itemToDeleteId = id;
@@ -617,7 +621,7 @@ window.App = {
     },
     openFolderEditModal: function (isEdit = false, folderId = null) {
         if (!isEdit && wishlistFolders.length >= 12) {
-            document.getElementById('wl-limit-modal').classList.add('show');
+            window.App.State.setState('modals.wlLimit.isOpen', true);
             if (window.navigator.vibrate) window.navigator.vibrate([40, 100, 40]);
             return;
         }
@@ -642,9 +646,9 @@ window.App = {
         } else {
             titleEl.textContent = 'Новая папка';
             delBtn.style.display = 'none';
-            nameInp.value = '';
         }
 
+        window.App.State.setState('forms.wlEdit', { name: curName, color: curColor, icon: curIcon });
         nameInp.value = curName;
         document.getElementById('wl-color-picker').dataset.color = curColor;
         document.getElementById('wl-icon-picker').dataset.icon = curIcon;
@@ -652,13 +656,13 @@ window.App = {
         renderColorPicker(curColor);
         renderIconPicker(curIcon);
 
-        document.getElementById('wl-edit-modal').classList.add('show');
+        window.App.State.setState('modals.wlEdit.isOpen', true);
     },
     closeFolderEditModal: function () {
-        document.getElementById('wl-edit-modal').classList.remove('show');
+        window.App.State.setState('modals.wlEdit.isOpen', false);
     },
     closeLimitModal: function () {
-        document.getElementById('wl-limit-modal').classList.remove('show');
+        window.App.State.setState('modals.wlLimit.isOpen', false);
     },
     selectFolderColor: function (color) {
         document.querySelectorAll('.wl-color-btn').forEach(b => b.classList.remove('active'));
@@ -750,11 +754,11 @@ window.App = {
 
         const modalTitle = document.getElementById('wl-modal-title');
         const grid = document.getElementById('wl-modal-folders');
-        const modal = document.getElementById('wl-modal');
+        
+        window.App.State.setState('modals.wlFolder.isOpen', true);
 
         modalTitle.textContent = title;
         grid.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:24px;height:24px;border-width:3px;"></div></div>';
-        modal.classList.add('show');
 
         try {
             const data = await sendWishlistAction('get');
@@ -792,8 +796,7 @@ window.App = {
         }
     },
     closeFolderModal: function () {
-        const modal = document.getElementById('wl-modal');
-        if (modal) modal.classList.remove('show');
+        window.App.State.setState('modals.wlFolder.isOpen', false);
     },
     addToFolder: async function (folderId) {
         if (!activeShowForWishlist) return;
