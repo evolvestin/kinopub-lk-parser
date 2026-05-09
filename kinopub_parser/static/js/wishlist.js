@@ -174,6 +174,15 @@ function renderWishlistFolders() {
             onEnd: function (evt) {
                 document.body.classList.remove('sorting-active');
                 const order = Array.from(grid.children).map(el => parseInt(el.dataset.id));
+                
+                // Синхронизируем локальное состояние с новым порядком DOM
+                const newFolders = [];
+                order.forEach(id => {
+                    const f = wishlistFolders.find(x => x.id === id);
+                    if (f) newFolders.push(f);
+                });
+                wishlistFolders = newFolders;
+
                 sendWishlistAction('reorder_folders', { order });
             }
         });
@@ -335,6 +344,18 @@ function renderActiveWlFolder() {
                     document.body.classList.remove('sorting-active');
                     if (evt.to === targetContainer) {
                         const order = Array.from(targetContainer.children).map(el => parseInt(el.dataset.id));
+                        
+                        // Синхронизируем локальное состояние элементов внутри папки
+                        const folder = wishlistFolders.find(f => f.id === activeId);
+                        if (folder) {
+                            const newItems = [];
+                            order.forEach(id => {
+                                const it = folder.items.find(x => x.id === id);
+                                if (it) newItems.push(it);
+                            });
+                            folder.items = newItems;
+                        }
+
                         sendWishlistAction('reorder_items', { folder_id: activeId, order });
                     }
                 }
