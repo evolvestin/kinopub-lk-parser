@@ -518,8 +518,15 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
                 updateExpiredUI();
                 return; 
             }
-            const m = Math.floor(left / 60), s = (left % 60).toString().padStart(2, '0');
-            if (countdownEl) countdownEl.textContent = `${m}:${s}`;
+            const h = Math.floor(left / 3600);
+            const m = Math.floor((left % 3600) / 60);
+            const s = (left % 60).toString().padStart(2, '0');
+            
+            if (h > 0) {
+                countdownEl.textContent = `${h}:${m.toString().padStart(2, '0')}:${s}`;
+            } else {
+                countdownEl.textContent = `${m}:${s}`;
+            }
         };
         tick();
         engine.clockInterval = setInterval(tick, 1000);

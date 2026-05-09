@@ -170,7 +170,7 @@ def cleanup_old_data_task():
     try:
         heartbeat_dir = settings.HEARTBEAT_DIR
         for hb_file in heartbeat_dir.glob('heartbeat_*'):
-            if time.time() - os.getmtime(hb_file) > 3600:
+            if time.time() - os.path.getmtime(hb_file) > 3600:
                 hb_file.unlink(missing_ok=True)
                 deleted_hb_files += 1
     except Exception as e:

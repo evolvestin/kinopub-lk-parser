@@ -1737,7 +1737,7 @@ def webapp_wishlist_data(request):
         if action == 'get':
             if not WishlistFolder.objects.filter(user=view_user, is_deleted=False).exists():
                 WishlistFolder.objects.create(
-                    user=view_user, name='Избранное', icon='star', color='#f1c40f', sort_order=1
+                    user=view_user, name='Избранное', icon='bookmark', color='#f1c40f', sort_order=1
                 )
 
             active_items_qs = WishlistItem.objects.filter(is_active=True).select_related('show')
@@ -1808,7 +1808,7 @@ def webapp_wishlist_data(request):
 
             if not WishlistFolder.objects.filter(user=view_user, is_deleted=False).exists():
                 WishlistFolder.objects.create(
-                    user=view_user, name='Избранное', icon='star', color='#f1c40f', sort_order=1
+                    user=view_user, name='Избранное', icon='bookmark', color='#f1c40f', sort_order=1
                 )
 
             return JsonResponse({'status': 'ok'})
@@ -1932,10 +1932,10 @@ def webapp_casino(request):
             latest_spin = CasinoSpin.objects.filter(user=view_user).order_by('-created_at').first()
             if latest_spin:
                 time_passed = (timezone.now() - latest_spin.created_at).total_seconds()
-                if time_passed < 600:
+                if time_passed < 86400:
                     show = latest_spin.show
                     expires_ms = int(
-                        (latest_spin.created_at + timedelta(minutes=10)).timestamp() * 1000
+                        (latest_spin.created_at + timedelta(hours=24)).timestamp() * 1000
                     )
 
                     user_rating = UserRating.objects.filter(
@@ -1964,7 +1964,7 @@ def webapp_casino(request):
             latest_spin = CasinoSpin.objects.filter(user=view_user).order_by('-created_at').first()
             if latest_spin:
                 time_passed = (timezone.now() - latest_spin.created_at).total_seconds()
-                if time_passed < 600:
+                if time_passed < 86400:
                     return JsonResponse({'error': 'Cooldown active'}, status=400)
 
             folder_id = body.get('folder_id')
@@ -1982,7 +1982,7 @@ def webapp_casino(request):
             winner_show = winner_item.show
 
             new_spin = CasinoSpin.objects.create(user=view_user, show=winner_show)
-            expires_ms = int((new_spin.created_at + timedelta(minutes=10)).timestamp() * 1000)
+            expires_ms = int((new_spin.created_at + timedelta(hours=24)).timestamp() * 1000)
 
             user_rating = UserRating.objects.filter(
                 user=view_user, show=winner_show, season_number__isnull=True
@@ -2028,10 +2028,10 @@ def webapp_casino(request):
 
         elif action == 'reset':
             now = timezone.now()
-            ten_minutes_ago = now - timedelta(minutes=10)
-            target_time = now - timedelta(minutes=11)
+            day_ago = now - timedelta(hours=24)
+            target_time = now - timedelta(hours=25)
 
-            CasinoSpin.objects.filter(user=view_user, created_at__gte=ten_minutes_ago).update(
+            CasinoSpin.objects.filter(user=view_user, created_at__gte=day_ago).update(
                 created_at=target_time
             )
 

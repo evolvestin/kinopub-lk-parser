@@ -248,6 +248,7 @@ body {
     color: var(--text-secondary); padding: clamp(12px, 3vw, 16px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px);
     background: none;
     border-radius: 0;
+    flex-shrink: 0;
 }
 .card .label { padding: 0; font-size: clamp(14px, 4vw, 16px); color: var(--text-primary); }
 .card .label.more-pad { padding: 0 0 clamp(4px, 4vw, 8px) 0; }
@@ -735,7 +736,16 @@ body.has-banner #app {
 
 .plot-box { font-size: 15px; color: var(--text-secondary); line-height: 1.6; text-align: left; padding: 0 20px; margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.4s both; }
 
-.h-scroll-container { display: flex; overflow-x: auto; gap: 12px; padding: 0 20px 20px; scrollbar-width: none; -webkit-overflow-scrolling: touch; animation: slideInRight 0.5s ease-out 0.5s both; }
+.h-scroll-container { 
+    display: flex; 
+    overflow-x: auto; 
+    gap: 12px; 
+    padding: 0 20px 20px; 
+    scrollbar-width: none; 
+    -webkit-overflow-scrolling: touch; 
+    animation: slideInRight 0.5s ease-out 0.5s both; 
+    flex-shrink: 0;
+}
 .h-scroll-container::-webkit-scrollbar { display: none; }
 
 .person-pill { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 70px; flex-shrink: 0; cursor: pointer; transition: transform var(--transition-bounce); }
@@ -969,13 +979,48 @@ body.has-banner #app {
 
 .wl-folder-count { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
 
-.wl-color-picker { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
-.wl-color-btn { width: 36px; height: 36px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s; display: flex; align-items: center; justify-content: center; }
+.wl-color-picker { 
+    display: flex; 
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px; 
+    width: 100%;
+}
+.wl-color-btn { 
+    width: clamp(26px, 7.5vw, 44px); 
+    height: clamp(26px, 7.5vw, 44px); 
+    border-radius: 50%; 
+    border: 2px solid transparent; 
+    cursor: pointer; 
+    transition: transform 0.2s; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    flex-shrink: 1;
+}
 .wl-color-btn.active { transform: scale(1.15); border-color: var(--text-primary); }
 .wl-color-btn::after { content: ''; width: 100%; height: 100%; border-radius: 50%; background: inherit; }
 
-.wl-icon-picker { display: flex; gap: 12px; flex-wrap: wrap; }
-.wl-icon-btn { width: 44px; height: 44px; border-radius: 12px; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+.wl-icon-picker { 
+    display: grid;
+    grid-template-columns: repeat(7, 1fr); 
+    gap: 8px;
+    width: 100%;
+}
+.wl-icon-btn { 
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 12px; 
+    background: var(--bg-input); 
+    border: 1px solid var(--border); 
+    color: var(--text-muted); 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    cursor: pointer; 
+    transition: all 0.2s; 
+    font-size: clamp(16px, 5vw, 22px);
+}
 .wl-icon-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); transform: scale(1.1); }
 
 @media (max-width: 350px) {

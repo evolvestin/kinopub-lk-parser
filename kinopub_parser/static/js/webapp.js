@@ -1171,6 +1171,14 @@ function getHistoryItemHtml(item, idx, type, mode) {
         const itemData = JSON.stringify({ view_history_id: item.id }).replace(/"/g, '&quot;');
         deleteBtn = `<div class="wl-delete-badge" style="background:var(--danger);" 
             onclick="event.stopPropagation(); window.App.removeHistoryItem(this, ${itemData})">${Icons.minus}</div>`;
+    } else if (!isSharedMode && type === 'ratings') {
+        const rateData = JSON.stringify({ 
+            show_id: sid, 
+            season: sNum, 
+            episode: eNum 
+        }).replace(/"/g, '&quot;');
+        deleteBtn = `<div class="wl-delete-badge" style="background:var(--danger);" 
+            onclick="event.stopPropagation(); window.App.removeRatingItem(this, ${rateData})">${Icons.minus}</div>`;
     } else if (type === 'wishlist_watched') {
         deleteBtn = `<div class="wl-delete-badge" style="background:var(--danger);" 
             onclick="event.stopPropagation(); window.App.removeWlStatItem(${item.wl_item_id}, this.closest('.grid-item-wrap') || this.closest('.hist-item'))">${Icons.minus}</div>`;
@@ -1886,6 +1894,51 @@ window.App = {
         
         if (container) {
             container.classList.toggle('history-edit-mode', isHistoryEditMode);
+        }
+    },
+    removeRatingItem: function(btn, payload) {
+        const msg = "Удалить эту оценку?";
+        const element = btn.closest('.grid-item-wrap') || btn.closest('.hist-item');
+        
+        const performDelete = async () => {
+            if (element) {
+                element.style.transition = 'all 0.3s ease';
+                element.style.opacity = '0';
+                element.style.transform = 'scale(0.8)';
+                setTimeout(() => element.remove(), 300);
+            }
+            
+            try {
+                const r = await fetch('/api/webapp/delete_rating/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        init_data: tg?.initData || '',
+                        ...payload
+                    })
+                });
+                if (!r.ok) throw new Error('Ошибка API');
+                
+                window.AppData.cache.clear();
+                showToast('Оценка удалена');
+                
+                // Перезагружаем статистику на фоне
+                if (activeMainView === 'stats') load(curYear, true);
+            } catch(e) {
+                showToast('Не удалось удалить');
+                if (element) {
+                    element.style.opacity = '1';
+                    element.style.transform = 'scale(1)';
+                }
+            }
+        };
+
+        if (window.Telegram?.WebApp?.showConfirm) {
+            window.Telegram.WebApp.showConfirm(msg, (confirmed) => {
+                if (confirmed) performDelete();
+            });
+        } else {
+            if (confirm(msg)) performDelete();
         }
     },
     startCasinoSpin: window.startCasinoSpin,

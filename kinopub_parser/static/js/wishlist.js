@@ -17,11 +17,20 @@ let itemToDeleteElement = null;
 
 const FOLDER_COLORS = ['#388bfd', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#95a5a6', '#fd79a8'];
 const FOLDER_ICONS = [
-    'folder', 'bookmark', 'star', 'heart',
-    'film', 'tv', 'video', 'ticket',
-    'award', 'zap', 'rocket',
-    'ghost',
-    'coffee', 'list'
+    // Ряд 1: Базовые и системные (папки, избранное, поиск)
+    'bookmark', 'folder', 'heart', 'star', 'bookmark_plus', 'check', 'search',
+
+    // Ряд 2: Кино и просмотр (основная тематика сервиса)
+    'film', 'video', 'play_circle', 'tv', 'monitor', 'ticket', 'award',
+
+    // Ряд 3: Персонажи и настроение (социальное и эмоции)
+    'user', 'users', 'smile', 'frown', 'music', 'coffee', 'globe',
+
+    // Ряд 4: Экшен, триллер, вайб (динамика и жанровость)
+    'zap', 'flame', 'rocket', 'eye', 'ghost', 'skull', 'trash',
+
+    // Ряд 5: Планирование и статистика (время и списки)
+    'clock', 'cal', 'days', 'list', 'target', 'chart', 'help'
 ];
 
 let editFolderMode = 'create';
