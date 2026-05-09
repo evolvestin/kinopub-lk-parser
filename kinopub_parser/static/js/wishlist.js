@@ -445,6 +445,11 @@ window.App = {
         activeWlFolderId = id;
         renderWishlistFolders();
         renderActiveWlFolder();
+        
+        // Синхронизируем URL при смене папки
+        if (window.App.Router) {
+            window.App.Router.updateUrl();
+        }
     },
     setWlViewMode: function (mode) {
         wlViewMode = mode;

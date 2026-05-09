@@ -16,6 +16,123 @@ const RU_MONTHS = [
     "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
 ];
 
+window.App.isSyncingHash = false;
+
+window.App.Router = {
+    parse() {
+        const hash = window.location.hash.startsWith('#/') ? window.location.hash.slice(2) : '';
+        const [pathStr, queryStr] = hash.split('?');
+        const segments = pathStr ? pathStr.split('/') : [];
+        const params = new URLSearchParams(queryStr || '');
+        return { segments, params };
+    },
+
+    serialize() {
+        let path = activeMainView;
+        
+        viewStack.forEach(layer => {
+            const ctx = layer.context;
+            if (ctx.type === 'show') {
+                path += `/show/${ctx.showId}`;
+            } else if (ctx.type === 'collection') {
+                path += `/${ctx.ctype}/${ctx.itemId}`;
+            } else if (ctx.type === 'history') {
+                path += `/history/${ctx.htype || 'all'}`;
+            }
+        });
+
+        const query = new URLSearchParams();
+        if (curYear && curYear !== 'all') query.set('y', curYear);
+        
+        const sInput = document.getElementById('search-input');
+        if (activeMainView === 'search' && sInput && sInput.value) {
+            query.set('q', sInput.value);
+        }
+        
+        const qStr = query.toString();
+        return '#/' + path + (qStr ? '?' + qStr : '');
+    },
+
+    updateUrl() {
+        if (window.App.isSyncingHash) return;
+        const newHash = this.serialize();
+        if (window.location.hash !== newHash) {
+            history.pushState(null, "", newHash);
+        }
+    },
+
+    async sync() {
+        if (window.App.isSyncingHash) return;
+        window.App.isSyncingHash = true;
+
+        const { segments, params } = this.parse();
+        
+        // 1. Синхронизация основного вида
+        const targetMainView = segments[0] || 'search';
+        if (activeMainView !== targetMainView) {
+            // При смене базового вида закрываем все слои
+            while (viewStack.length > 0) {
+                const top = viewStack.pop();
+                top.el.remove();
+            }
+            switchMainView(targetMainView, true);
+        }
+
+        // 2. Синхронизация фильтров (год, поиск)
+        const year = params.get('y') || 'all';
+        if (curYear !== year) {
+            curYear = year;
+            markYear();
+            await load(year, false);
+        }
+
+        const query = params.get('q');
+        const sInput = document.getElementById('search-input');
+        if (query && sInput && sInput.value !== query) {
+            sInput.value = query;
+            doSearch(query);
+        }
+
+        // 3. Синхронизация стека слоев
+        const layerSegments = segments.slice(1);
+        // Каждый слой представлен парой (тип, id) или (тип, субтип)
+        const targetDepth = Math.floor(layerSegments.length / 2);
+
+        // Убираем лишние слои
+        while (viewStack.length > targetDepth) {
+            const top = viewStack.pop();
+            top.el.remove();
+            if (viewStack.length > 0) {
+                viewStack[viewStack.length - 1].el.style.display = 'block';
+            }
+        }
+
+        // Достраиваем недостающие слои
+        for (let i = viewStack.length; i < targetDepth; i++) {
+            const type = layerSegments[i * 2];
+            const id = layerSegments[i * 2 + 1];
+            
+            if (type === 'show') {
+                await window.App.openShowLayer(id, true);
+            } else if (['person', 'genre', 'country'].includes(type)) {
+                await window.App.openCollectionLayer(type, id, '', true);
+            }
+        }
+
+        // Если слоев нет, показываем навигацию
+        if (viewStack.length === 0) {
+            if (!isSharedMode) document.getElementById('bottom-nav').style.display = 'flex';
+        } else {
+            if (tg?.BackButton) tg.BackButton.show();
+        }
+
+        window.App.isSyncingHash = false;
+    }
+};
+
+// Слушатель системной кнопки Назад
+window.addEventListener('popstate', () => window.App.Router.sync());
+
 window.handleKpPlaceholder = function (img, name) {
     // Проверка на специфические размеры заглушки Кинопоиска (no-poster.gif)
     // Эти размеры определены в ходе исследования: 208x304
@@ -276,7 +393,7 @@ function getScrollContainer() {
     return document.getElementById('views-container');
 }
 
-function switchMainView(view) {
+function switchMainView(view, fromRouter = false) {
     activeMainView = view;
     document.getElementById('view-search').style.display = view === 'search' ? 'flex' : 'none';
     document.getElementById('view-stats').style.display = view === 'stats' ? 'block' : 'none';
@@ -288,10 +405,12 @@ function switchMainView(view) {
     
     getScrollContainer().scrollTop = 0;
 
-    if (view === 'wishlist' && window.App.loadWishlist) {
-        const container = document.getElementById('wl-items-container');
-        if (container) container.innerHTML = '';
+    if (view === 'wishlist' && window.App.loadWishlist && !isSharedMode) {
         window.App.loadWishlist();
+    }
+
+    if (!fromRouter) {
+        window.App.Router.updateUrl();
     }
 }
 
@@ -1357,7 +1476,7 @@ function initStickyGroupObserver() {
     updateStickyHeader();
 }
 
-window.openShowLayer = async function(showId) {
+window.openShowLayer = async function(showId, fromRouter = false) {
     document.getElementById('loader').classList.remove('hidden');
     document.getElementById('loader').style.opacity = '1';
 
@@ -1497,16 +1616,19 @@ window.openShowLayer = async function(showId) {
         pushLayer(html, { 
             type: 'show', 
             showId: showId, 
-            replace: isRefresh 
+            replace: isRefresh,
+            fromRouter: fromRouter
         });
+        return true;
     } catch (e) {
         showToast('Не удалось загрузить данные шоу');
+        return false;
     } finally {
         hideLoader();
     }
 };
 
-window.openCollectionLayer = async function(type, id, titleFallback) {
+window.openCollectionLayer = async function(type, id, titleFallback, fromRouter = false) {
     document.getElementById('loader').classList.remove('hidden');
     document.getElementById('loader').style.opacity = '1';
 
@@ -1574,9 +1696,16 @@ window.openCollectionLayer = async function(type, id, titleFallback) {
             </div>
         `;
 
-        pushLayer(html, { type: 'collection' });
+        pushLayer(html, { 
+            type: 'collection', 
+            ctype: type, 
+            itemId: id,
+            fromRouter: fromRouter 
+        });
+        return true;
     } catch (e) {
         showToast('Не удалось загрузить данные коллекции');
+        return false;
     } finally {
         hideLoader();
     }
@@ -1585,6 +1714,8 @@ window.openCollectionLayer = async function(type, id, titleFallback) {
 let viewStack =[]; 
 
 function pushLayer(htmlContent, contextData = {}) {
+    const isSync = contextData.fromRouter || false;
+
     if (contextData.replace && viewStack.length > 0) {
         const top = viewStack[viewStack.length - 1];
         top.el.innerHTML = htmlContent;
@@ -1596,48 +1727,29 @@ function pushLayer(htmlContent, contextData = {}) {
     const layer = document.createElement('div');
     layer.className = 'layer';
     layer.innerHTML = htmlContent;
-    
     document.getElementById('dynamic-layers').appendChild(layer);
     
-    const container = getScrollContainer();
-    const prevScroll = container.scrollTop;
-    
     if (viewStack.length > 0) {
-        viewStack[viewStack.length - 1].scrollPos = prevScroll;
         viewStack[viewStack.length - 1].el.style.display = 'none';
-    } else {
-        lastScrollPos = prevScroll;
     }
+    
+    document.getElementById('bottom-nav').style.display = 'none';
 
-    viewStack.push({ el: layer, context: contextData, scrollPos: 0 });
+    viewStack.push({ el: layer, context: contextData });
     
     if (tg?.BackButton) { 
         tg.BackButton.show(); 
         tg.BackButton.onClick(popLayer); 
     }
+
+    if (!isSync) {
+        window.App.Router.updateUrl();
+    }
 }
 
 function popLayer() {
-    if (viewStack.length === 0) return;
-    
-    const top = viewStack.pop();
-    top.el.remove();
-
     if (viewStack.length > 0) {
-        const prev = viewStack[viewStack.length - 1];
-        prev.el.style.display = 'block';
-        prev.el.scrollTop = prev.scrollPos;
-    } else {
-        switchMainView(activeMainView);
-        
-        if (!isSharedMode) document.getElementById('bottom-nav').style.display = 'flex';
-        
-        getScrollContainer().scrollTop = lastScrollPos;
-        
-        if (tg?.BackButton) { 
-            tg.BackButton.hide(); 
-            tg.BackButton.offClick(popLayer); 
-        }
+        history.back();
     }
 }
 
@@ -2115,39 +2227,22 @@ window.init = async function() {
     initIcons();
 
     const startParam = tg?.initDataUnsafe?.start_param || '';
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedIdFromUrl = urlParams.get('shared_id');
-    const showIdFromUrl = urlParams.get('show_id') || (startParam.startsWith('show_') ? startParam.replace('show_', '') : null);
-    const viewFromUrl = urlParams.get('view');
+    const hasHash = window.location.hash.length > 2;
 
-    if (sharedIdFromUrl || startParam.startsWith('stat_')) {
-        isSharedMode = true;
-        document.body.classList.add('has-banner');
-        document.getElementById('share-btn').classList.add('hidden');
-        document.getElementById('bottom-nav').style.display = 'none';
-        switchMainView('stats');
-        
-        const sid = sharedIdFromUrl || startParam.replace('stat_', '');
-        await loadShared(sid);
-    } else {
-        // Если есть прямая ссылка на фильм, загружаем данные пользователя "в фоне",
-        // не скрывая лоадер и не показывая основное приложение раньше времени.
-        const isDeepLink = !!showIdFromUrl;
-        await load(undefined, isDeepLink);
-
-        document.getElementById('bottom-nav').style.display = 'flex';
-        document.body.classList.add('has-nav');
-        
-        // Настраиваем фоновый вид под будущим слоем
-        switchMainView(viewFromUrl || 'search');
-
-        if (isDeepLink) {
-            // Загружаем и открываем слой с фильмом. 
-            // await гарантирует, что мы дождемся завершения отрисовки.
-            // openShowLayer сам вызовет hideLoader() в блоке finally.
-            await window.App.openShowLayer(showIdFromUrl);
+    // Deep Linking: если хеша нет, но есть start_param, формируем начальный хеш
+    if (!hasHash && startParam) {
+        if (startParam.startsWith('stat_')) {
+            window.location.hash = `#/stats?shared_id=${startParam.replace('stat_', '')}`;
+        } else if (startParam.startsWith('show_')) {
+            window.location.hash = `#/search/show/${startParam.replace('show_', '')}`;
         }
+    } else if (!hasHash) {
+        // Дефолтное состояние
+        window.location.hash = `#/search`;
     }
+
+    await load(undefined, true);
+    await window.App.Router.sync();
 };
 
 

@@ -494,7 +494,6 @@ async def handle_history_action_command(message: Message, bot: Bot):
 
 async def handle_stats_command(message: Message, bot: Bot):
     dynamic_url = URLStore().get_url()
-    # Приоритет: Динамическая ссылка -> ENV переменная -> Бэкенд
     base_url = (
         dynamic_url
         or os.getenv('WEBAPP_PUBLIC_URL')
@@ -503,7 +502,8 @@ async def handle_stats_command(message: Message, bot: Bot):
     )
 
     base_url = base_url.rstrip('/')
-    web_app_url = f'{base_url}/webapp/?view=stats'
+    # Изменяем формат ссылки: переносим view в сегмент хеша для роутера
+    web_app_url = f'{base_url}/webapp/#/stats'
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -511,9 +511,10 @@ async def handle_stats_command(message: Message, bot: Bot):
         ]
     )
 
-    debug_info = ''
     user_id = message.from_user.id
     role = await client.check_user_role(user_id)
+    
+    debug_info = ''
     if role == UserRole.ADMIN:
         debug_info = f'\n\n🔧 {italic(f"URL: {base_url}")}'
 
