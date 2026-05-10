@@ -69,6 +69,12 @@ window.App.Router = {
         const { segments, params } = this.parse();
         
         const targetMainView = segments[0] || 'search';
+        const year = params.get('y') || window.App.State.getState('nav.query.y') || 'all';
+        const query = params.get('q') || window.App.State.getState('forms.search.query');
+
+        window.App.State.setState('nav.query.y', year);
+        if (query) window.App.State.setState('forms.search.query', query);
+
         if (window.App.State.getState('nav.activeMainView') !== targetMainView) {
             while (viewStack.length > 0) {
                 const top = viewStack.pop();
@@ -77,17 +83,10 @@ window.App.Router = {
             switchMainView(targetMainView, true);
         }
 
-        const year = params.get('y') || 'all';
-        if (curYear !== year) {
-            curYear = year;
-            window.App.State.setState('nav.query.y', year);
-            markYear();
-            await load(year, false);
-        }
+        await load(year, false);
+        markYear();
 
-        const query = params.get('q');
-        if (query && window.App.State.getState('forms.search.query') !== query) {
-            window.App.State.setState('forms.search.query', query);
+        if (targetMainView === 'search' && query) {
             const sInput = document.getElementById('search-input');
             if (sInput) sInput.value = query;
             doSearch(query);
@@ -107,12 +106,8 @@ window.App.Router = {
         for (let i = viewStack.length; i < targetDepth; i++) {
             const type = layerSegments[i * 2];
             const id = layerSegments[i * 2 + 1];
-            
-            if (type === 'show') {
-                await window.App.openShowLayer(id, true);
-            } else if (['person', 'genre', 'country'].includes(type)) {
-                await window.App.openCollectionLayer(type, id, '', true);
-            }
+            if (type === 'show') await window.App.openShowLayer(id, true);
+            else if (['person', 'genre', 'country'].includes(type)) await window.App.openCollectionLayer(type, id, '', true);
         }
 
         if (viewStack.length === 0) {
@@ -127,12 +122,11 @@ window.App.Router = {
                 document.getElementById('views-container').scrollTop = scrollPos;
             } else {
                 const topLayer = viewStack[viewStack.length - 1];
-                const layerScrollPos = window.App.State.getState(`ui.scrollPositions.layer_${targetDepth}`) || 0;
+                const layerScrollPos = window.App.State.getState(`ui.scrollPositions.layer_${viewStack.length}`) || 0;
                 topLayer.el.scrollTop = layerScrollPos;
             }
+            window.App.State.setState('flags.isSyncingHash', false);
         });
-
-        window.App.State.setState('flags.isSyncingHash', false);
     }
 };
 
@@ -826,36 +820,36 @@ function renderYears() {
 }
 
 function markYear() {
+    const y = window.App.State.getState('nav.query.y');
     document.querySelectorAll('#years .yr').forEach(b => {
         const v = b.textContent.trim();
-        const isAllTime = curYear === 'all' || !curYear;
-        const targetStr = isAllTime ? 'Всё время' : String(curYear);
+        const isAllTime = y === 'all' || !y;
+        const targetStr = isAllTime ? 'Всё время' : String(y);
         b.classList.toggle('on', v === targetStr);
     });
 }
 
-window.pickYear = y => { 
-    if (curYear === y) return;
+window.pickYear = async y => { 
+    const cur = window.App.State.getState('nav.query.y');
+    if (cur === y) return;
     
-    curYear = y; 
+    window.App.State.setState('nav.query.y', y);
     markYear(); 
     
     if (isSharedMode) {
         D = SharedDataMap[y];
         render();
-        return;
-    }
-
-    // Проверяем кэш прямо здесь для мгновенного отклика
-    const cached = window.AppData.getFromCache(y);
-    if (cached) {
-        D = cached;
-        render();
-        // Прокручиваем наверх при смене года
-        getScrollContainer().scrollTop = 0;
     } else {
-        load(y); 
+        const cached = window.AppData.getFromCache(y);
+        if (cached) {
+            D = cached;
+            render();
+            getScrollContainer().scrollTop = 0;
+        } else {
+            await load(y); 
+        }
     }
+    window.App.Router.updateUrl();
 };
 
 let toastTimer = null;
@@ -2201,11 +2195,20 @@ window.init = async function() {
     window.App.State.subscribe('ui.theme', (theme) => {
         isDark = theme === 'dark';
         document.body.classList.toggle('light', !isDark);
-        document.querySelectorAll('.theme-btn').forEach(btn => {
+        document.querySelectorAll('.theme-btn, .js-theme-toggle').forEach(btn => {
             btn.innerHTML = isDark ? Icons.moon : Icons.sun;
         });
         if (D) renderCharts();
     });
+
+    const initialTheme = window.App.State.getState('ui.theme');
+    if (initialTheme) {
+        isDark = initialTheme === 'dark';
+        document.body.classList.toggle('light', !isDark);
+        document.querySelectorAll('.theme-btn, .js-theme-toggle').forEach(btn => {
+            btn.innerHTML = isDark ? Icons.moon : Icons.sun;
+        });
+    }
 
     const modalMap = {
         'addView': 'add-view-modal',
@@ -2234,7 +2237,7 @@ window.init = async function() {
     const scrollHandler = window.App.State._debounce((e) => {
         const target = e.target;
         if (target.id === 'views-container') {
-            window.App.State.setState(`ui.scrollPositions.${activeMainView}`, target.scrollTop);
+            window.App.State.setState(`ui.scrollPositions.${window.App.State.getState('nav.activeMainView')}`, target.scrollTop);
         } else if (target.classList.contains('layer')) {
             window.App.State.setState(`ui.scrollPositions.layer_${viewStack.length}`, target.scrollTop);
         }
@@ -2244,28 +2247,8 @@ window.init = async function() {
     document.getElementById('dynamic-layers').addEventListener('scroll', scrollHandler, true);
 
     initIcons();
+    window.App.State.applyStateToDOM();
 
-    const startParam = tg?.initDataUnsafe?.start_param || '';
-    const hasHash = window.location.hash.length > 2;
-
-    if (!hasHash && startParam) {
-        if (startParam.startsWith('stat_')) {
-            window.location.hash = `#/stats?shared_id=${startParam.replace('stat_', '')}`;
-        } else if (startParam.startsWith('show_')) {
-            window.location.hash = `#/search/show/${startParam.replace('show_', '')}`;
-        }
-    } else if (!hasHash) {
-        window.location.hash = `#/search`;
-    }
-
-    const query = window.App.State.getState('forms.search.query');
-    if (query) {
-        const sInput = document.getElementById('search-input');
-        if (sInput) sInput.value = query;
-        doSearch(query);
-    }
-
-    await load(undefined, true);
     await window.App.Router.sync();
 };
 

@@ -32,11 +32,12 @@ class StateManager {
             flags: {
                 isReorderMode: false,
                 isItemsReorderMode: false,
-                isHistoryEditMode: false
+                isHistoryEditMode: false,
+                isSyncingHash: false
             },
             nav: {
-                path: '',
-                query: {}
+                activeMainView: 'search',
+                query: { y: 'all', folderId: null }
             }
         };
 
@@ -63,6 +64,17 @@ class StateManager {
             this.saveSessionDebounced();
             this._checkAndSavePersistent(path, value);
         }
+    }
+
+    applyStateToDOM() {
+        document.querySelectorAll('[data-state-bind]').forEach(el => {
+            const path = el.getAttribute('data-state-bind');
+            const val = this.getState(path);
+            if (val !== undefined && val !== null) {
+                if (el.type === 'checkbox') el.checked = !!val;
+                else el.value = val;
+            }
+        });
     }
 
     subscribe(path, callback) {
@@ -93,6 +105,9 @@ class StateManager {
                 const parsed = JSON.parse(saved);
                 this.state.forms = this._mergeObjects(this.state.forms, parsed.forms || {});
                 this.state.ui.scrollPositions = parsed.ui?.scrollPositions || {};
+                if (parsed.nav) {
+                    this.state.nav.query = this._mergeObjects(this.state.nav.query, parsed.nav.query || {});
+                }
             }
         } catch (e) {}
     }
@@ -101,7 +116,8 @@ class StateManager {
         try {
             const toSave = {
                 forms: this.state.forms,
-                ui: { scrollPositions: this.state.ui.scrollPositions }
+                ui: { scrollPositions: this.state.ui.scrollPositions },
+                nav: { query: this.state.nav.query }
             };
             sessionStorage.setItem('kp_app_state', JSON.stringify(toSave));
         } catch (e) {}
@@ -130,11 +146,12 @@ class StateManager {
 
     _mergeObjects(target, source) {
         for (const key of Object.keys(source)) {
-            if (source[key] instanceof Object && key in target) {
-                Object.assign(source[key], this._mergeObjects(target[key], source[key]));
+            if (source[key] instanceof Object && key in target && !Array.isArray(source[key])) {
+                Object.assign(target[key], this._mergeObjects(target[key], source[key]));
+            } else {
+                target[key] = source[key];
             }
         }
-        Object.assign(target || {}, source);
         return target;
     }
 

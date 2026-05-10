@@ -90,15 +90,15 @@ async function loadWishlist() {
             }
         }
 
-        const folderExists = wishlistFolders.some(f => f.id === activeWlFolderId);
+        let activeId = window.App.State.getState('nav.query.folderId');
+        const folderExists = wishlistFolders.some(f => f.id === activeId);
+        
         if (!folderExists) {
-            activeWlFolderId = null;
+            activeId = wishlistFolders.length > 0 ? wishlistFolders[0].id : null;
+            window.App.State.setState('nav.query.folderId', activeId);
         }
 
-        if (wishlistFolders.length > 0 && !activeWlFolderId) {
-            activeWlFolderId = wishlistFolders[0].id;
-        }
-
+        activeWlFolderId = activeId;
         renderWishlistFolders();
         renderActiveWlFolder();
     } catch (e) {
@@ -443,10 +443,10 @@ window.App = {
     selectWlFolder: function (id) {
         if (activeWlFolderId === id) return;
         activeWlFolderId = id;
+        window.App.State.setState('nav.query.folderId', id);
         renderWishlistFolders();
         renderActiveWlFolder();
         
-        // Синхронизируем URL при смене папки
         if (window.App.Router) {
             window.App.Router.updateUrl();
         }
