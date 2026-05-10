@@ -67,15 +67,18 @@ window.App.Router = {
         window.App.State.setState('flags.isSyncingHash', true);
 
         const { segments, params } = this.parse();
-        
-        const targetMainView = segments[0] || 'search';
-        const year = params.get('y') || window.App.State.getState('nav.query.y') || 'all';
-        const query = params.get('q') || window.App.State.getState('forms.search.query');
+        if (segments.length === 0) {
+            window.App.State.setState('flags.isSyncingHash', false);
+            return;
+        }
+
+        const targetMainView = segments[0];
+        const year = params.get('y') || 'all';
 
         window.App.State.setState('nav.query.y', year);
-        if (query) window.App.State.setState('forms.search.query', query);
 
         if (window.App.State.getState('nav.activeMainView') !== targetMainView) {
+            // Закрываем все слои перед переключением корня
             while (viewStack.length > 0) {
                 const top = viewStack.pop();
                 top.el.remove();
@@ -86,47 +89,23 @@ window.App.Router = {
         await load(year, false);
         markYear();
 
-        if (targetMainView === 'search' && query) {
-            const sInput = document.getElementById('search-input');
-            if (sInput) sInput.value = query;
-            doSearch(query);
-        }
-
         const layerSegments = segments.slice(1);
         const targetDepth = Math.floor(layerSegments.length / 2);
 
+        // Синхронизируем стек слоев
         while (viewStack.length > targetDepth) {
             const top = viewStack.pop();
             top.el.remove();
-            if (viewStack.length > 0) {
-                viewStack[viewStack.length - 1].el.style.display = 'block';
-            }
         }
 
-        for (let i = viewStack.length; i < targetDepth; i++) {
-            const type = layerSegments[i * 2];
-            const id = layerSegments[i * 2 + 1];
-            if (type === 'show') await window.App.openShowLayer(id, true);
-            else if (['person', 'genre', 'country'].includes(type)) await window.App.openCollectionLayer(type, id, '', true);
-        }
-
-        if (viewStack.length === 0) {
-            if (!isSharedMode) document.getElementById('bottom-nav').style.display = 'flex';
+        if (viewStack.length > 0) {
+            viewStack[viewStack.length - 1].el.style.display = 'block';
         } else {
-            if (tg?.BackButton) tg.BackButton.show();
+            if (!isSharedMode) document.getElementById('bottom-nav').style.display = 'flex';
         }
 
-        requestAnimationFrame(() => {
-            const scrollPos = window.App.State.getState(`ui.scrollPositions.${targetMainView}`) || 0;
-            if (viewStack.length === 0) {
-                document.getElementById('views-container').scrollTop = scrollPos;
-            } else {
-                const topLayer = viewStack[viewStack.length - 1];
-                const layerScrollPos = window.App.State.getState(`ui.scrollPositions.layer_${viewStack.length}`) || 0;
-                topLayer.el.scrollTop = layerScrollPos;
-            }
-            window.App.State.setState('flags.isSyncingHash', false);
-        });
+        window.App.State.setState('flags.isSyncingHash', false);
+        this.updateUrl();
     }
 };
 
@@ -260,6 +239,12 @@ const Icons = {
 function i(id, name) { const el = document.getElementById(id); if (el) el.innerHTML = Icons[name]; }
 
 function initIcons() {
+    i('ic-search-nav', 'search'); i('ic-stats-nav', 'nav_stats');
+    i('ic-wishlist-nav', 'bookmark');
+    i('ic-bookmark', 'bookmark'); i('ic-check', 'check');
+    i('wl-vt-grid', 'grid'); i('wl-vt-list', 'list');
+    i('wl-edit-btn', 'gear');
+    
     i('ic-user', 'user'); i('ic-users', 'users'); i('ic-dash', 'dash');
     i('ic-time', 'time'); i('ic-cal', 'cal'); i('ic-tv', 'tv'); i('ic-film', 'film');
     i('ic-chart-internal', 'chart'); i('ic-flame-internal', 'flame');
@@ -267,12 +252,7 @@ function initIcons() {
     i('it-dir-internal', 'film'); i('it-wri-internal', 'list');
     i('it-cou-internal', 'globe'); i('it-bin-internal', 'bolt');
     i('it-star-internal', 'star'); i('ic-weekday-internal', 'days');
-    i('ic-search-nav', 'search'); i('ic-stats-nav', 'nav_stats');
-    i('ic-wishlist-nav', 'bookmark');
-    i('ic-bookmark', 'bookmark'); i('ic-check', 'check');
-    i('wl-vt-grid', 'grid'); i('wl-vt-list', 'list');
-    i('wl-edit-btn', 'gear');
-    
+
     i('ic-stat-history', 'chart'); i('ic-stat-parser', 'zap');
     i('ic-stat-shows', 'play_circle'); i('ic-stat-ratings', 'star');
     i('ic-stat-durations', 'time'); i('ic-stat-photos', 'user');
@@ -299,6 +279,11 @@ function initIcons() {
 
     const itemsReorderBtn = document.getElementById('wl-items-reorder-btn');
     if (itemsReorderBtn) itemsReorderBtn.innerHTML = Icons.reorder;
+
+    const currentTheme = window.App.State.getState('ui.theme') || (document.body.classList.contains('light') ? 'light' : 'dark');
+    document.querySelectorAll('.theme-btn, .js-theme-toggle').forEach(btn => {
+        btn.innerHTML = currentTheme === 'dark' ? Icons.moon : Icons.sun;
+    });
 
     document.querySelectorAll('.js-ic-help').forEach(el => {
         el.innerHTML = Icons.help;
@@ -397,13 +382,23 @@ function switchMainView(view, fromRouter = false) {
     activeMainView = view;
     window.App.State.setState('nav.activeMainView', view);
     
-    document.getElementById('view-search').style.display = view === 'search' ? 'flex' : 'none';
-    document.getElementById('view-stats').style.display = view === 'stats' ? 'block' : 'none';
-    document.getElementById('view-wishlist').style.display = view === 'wishlist' ? 'block' : 'none';
+    // Скрываем все вьюхи
+    document.querySelectorAll('.view').forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('active-view');
+    });
+
+    // Показываем нужную
+    const targetEl = document.getElementById(`view-${view}`);
+    if (targetEl) {
+        targetEl.style.display = view === 'search' ? 'flex' : 'block';
+        targetEl.classList.add('active-view');
+    }
     
-    document.getElementById('bn-search').classList.toggle('active', view === 'search');
-    document.getElementById('bn-stats').classList.toggle('active', view === 'stats');
-    document.getElementById('bn-wishlist').classList.toggle('active', view === 'wishlist');
+    // Обновляем навигацию
+    document.getElementById('bn-search')?.classList.toggle('active', view === 'search');
+    document.getElementById('bn-stats')?.classList.toggle('active', view === 'stats');
+    document.getElementById('bn-wishlist')?.classList.toggle('active', view === 'wishlist');
     
     const savedScroll = window.App.State.getState(`ui.scrollPositions.${view}`) || 0;
     getScrollContainer().scrollTop = savedScroll;
@@ -412,7 +407,7 @@ function switchMainView(view, fromRouter = false) {
         window.App.loadWishlist();
     }
 
-    if (!fromRouter) {
+    if (!fromRouter && !window.App.State.getState('flags.isSyncingHash')) {
         window.App.Router.updateUrl();
     }
 }
@@ -1096,7 +1091,7 @@ let isRenderingBatch = false;
 let viewMode = localStorage.getItem('kp_view_mode') || 'grid';
 let isHistoryEditMode = false;
 
-window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, extraIndex) {
+window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, extraIndex, fromRouter = false) {
     curHistType = type;
     isHistoryEditMode = false;
     
@@ -1227,8 +1222,15 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
 
     pushLayer(bodyHtml, { 
         type: 'history', 
+        htype: type,
+        title: title,
+        extraId: extraId,
+        extraDate: extraDate,
+        extraKey: extraKey,
+        extraIndex: extraIndex,
         grouping: grouping,
-        lastGroupKey: null 
+        lastGroupKey: null,
+        fromRouter: fromRouter
     });
     
     currentHistoryOffset = 0;
@@ -1256,6 +1258,7 @@ window.openHistoryLayer = function(type, title, extraId, extraDate, extraKey, ex
         initStickyGroupObserver();
     }
 };
+
 
 window.setViewModeLayer = function(mode) {
     viewMode = mode;
@@ -1703,6 +1706,7 @@ window.openCollectionLayer = async function(type, id, titleFallback, fromRouter 
             type: 'collection', 
             ctype: type, 
             itemId: id,
+            titleFallback: titleFallback,
             fromRouter: fromRouter 
         });
         return true;
@@ -1724,6 +1728,9 @@ function pushLayer(htmlContent, contextData = {}) {
         top.el.innerHTML = htmlContent;
         top.context = contextData;
         top.el.scrollTop = 0;
+        
+        const stackData = viewStack.map(item => item.context);
+        window.App.State.setState('nav.layerStack', stackData);
         return;
     }
 
@@ -1740,6 +1747,9 @@ function pushLayer(htmlContent, contextData = {}) {
 
     viewStack.push({ el: layer, context: contextData });
     
+    const stackData = viewStack.map(item => item.context);
+    window.App.State.setState('nav.layerStack', stackData);
+
     if (tg?.BackButton) { 
         tg.BackButton.show(); 
         tg.BackButton.onClick(popLayer); 
@@ -2089,7 +2099,7 @@ window.App = {
     },
     openAddViewModal: function(showId, title, type) {
         const draft = window.App.State.getState('forms.addView');
-        window.App.State.setState('modals.addView', { isOpen: true, context: { showId, type }});
+        window.App.State.setState('modals.addView', { isOpen: true, context: { showId, title, type }});
         
         document.getElementById('add-view-title').textContent = title;
         const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(type);
@@ -2189,6 +2199,43 @@ window.App = {
     },
 };
 
+window.App.restoreModals = function() {
+    const modals = window.App.State.getState('modals');
+    
+    const origSave = window.App.State.saveSessionDebounced;
+    window.App.State.saveSessionDebounced = () => {};
+
+    if (modals.addView?.isOpen && modals.addView.context?.showId) {
+        const ctx = modals.addView.context;
+        window.App.openAddViewModal(ctx.showId, ctx.title, ctx.type);
+    }
+    if (modals.rateShow?.isOpen && modals.rateShow.context?.showId) {
+        const ctx = modals.rateShow.context;
+        window.App.openRateModal(ctx.showId, ctx.title, ctx.currentVal, ctx.showType);
+        if (ctx.level) window.App.setRateLevel(ctx.level, ctx);
+    }
+    if (modals.wlEdit?.isOpen) {
+        const ctx = modals.wlEdit.context;
+        window.App.openFolderEditModal(ctx.isEdit, ctx.folderId);
+    }
+    if (modals.wlFolder?.isOpen && modals.wlFolder.context?.showId) {
+        const ctx = modals.wlFolder.context;
+        window.App.showFolderModal(ctx.showId, ctx.title);
+    }
+    if (modals.wlDelete?.isOpen && modals.wlDelete.context?.id) {
+        window.App.confirmDeleteWlItem(modals.wlDelete.context.id);
+    }
+    if (modals.share?.isOpen) {
+        window.App.openShareModal();
+    }
+
+    window.App.State.saveSessionDebounced = origSave;
+
+    requestAnimationFrame(() => {
+        window.App.State.applyStateToDOM();
+    });
+};
+
 window.init = async function() {
     if (window.IS_ADMIN_DASHBOARD) return;
 
@@ -2200,15 +2247,6 @@ window.init = async function() {
         });
         if (D) renderCharts();
     });
-
-    const initialTheme = window.App.State.getState('ui.theme');
-    if (initialTheme) {
-        isDark = initialTheme === 'dark';
-        document.body.classList.toggle('light', !isDark);
-        document.querySelectorAll('.theme-btn, .js-theme-toggle').forEach(btn => {
-            btn.innerHTML = isDark ? Icons.moon : Icons.sun;
-        });
-    }
 
     const modalMap = {
         'addView': 'add-view-modal',
@@ -2226,11 +2264,6 @@ window.init = async function() {
         window.App.State.subscribe(`modals.${stateKey}.isOpen`, (isOpen) => {
             const el = document.getElementById(elId);
             if (el) el.classList.toggle('show', isOpen);
-            if (!isOpen) {
-                if (stateKey === 'addView' || stateKey === 'rateShow' || stateKey === 'wlEdit') {
-                    window.App.State.setState(`forms.${stateKey}`, window.App.State.defaultState.forms[stateKey]);
-                }
-            }
         });
     });
 
@@ -2249,7 +2282,75 @@ window.init = async function() {
     initIcons();
     window.App.State.applyStateToDOM();
 
-    await window.App.Router.sync();
+    window.App.State.setState('flags.isSyncingHash', true);
+
+    const { segments } = window.App.Router.parse();
+    const sharedIdFromUrl = new URLSearchParams(window.location.search).get('shared_id');
+    const startParam = tg?.initDataUnsafe?.start_param || '';
+
+    let initialView = 'search';
+    if (sharedIdFromUrl || startParam.startsWith('stat_')) {
+        initialView = 'stats';
+        isSharedMode = true;
+    } else if (segments.length > 0) {
+        initialView = segments[0];
+    } else {
+        initialView = window.App.State.getState('nav.activeMainView') || 'search';
+    }
+
+    switchMainView(initialView, true);
+
+    if (isSharedMode) {
+        document.body.classList.add('has-banner');
+        document.getElementById('share-btn').classList.add('hidden');
+        document.getElementById('bottom-nav').style.display = 'none';
+        
+        const bannerContainer = document.getElementById('shared-banner-container');
+        bannerContainer.innerHTML = `<div class="shared-banner">Вы просматриваете чужую статистику</div>`;
+        
+        const sid = sharedIdFromUrl || startParam.replace('stat_', '');
+        await loadShared(sid);
+    } else {
+        await load(window.App.State.getState('nav.query.y') || 'all');
+        
+        const role = D?.meta?.role || 'guest';
+        document.getElementById('bottom-nav').style.display = 'flex';
+        document.body.classList.add('has-nav');
+        if (role === 'guest') document.getElementById('bn-stats').classList.add('hidden');
+
+        if (segments.length > 1) {
+            const layerSegments = segments.slice(1);
+            const historyTitles = {
+                'all': 'Вся история',
+                'movies': 'Фильмы',
+                'episodes': 'Эпизоды',
+                'wishlist_watched': 'Избранное',
+                'casino': 'История рулетки'
+            };
+
+            for (let i = 0; i < Math.floor(layerSegments.length / 2); i++) {
+                const type = layerSegments[i * 2];
+                const id = layerSegments[i * 2 + 1];
+                if (type === 'show') await window.App.openShowLayer(id, true);
+                else if (type === 'history') window.App.openHistoryLayer(id, historyTitles[id] || 'История', null, null, null, null, true);
+                else if (['person', 'genre', 'country'].includes(type)) await window.App.openCollectionLayer(type, id, '', true);
+            }
+        }
+    }
+
+    const savedSearchQuery = window.App.State.getState('forms.search.query');
+    if (savedSearchQuery && savedSearchQuery.length >= 2) {
+        window.App.doSearch(savedSearchQuery);
+    }
+
+    const currentTheme = window.App.State.getState('ui.theme');
+    document.querySelectorAll('.theme-btn, .js-theme-toggle').forEach(btn => {
+        btn.innerHTML = currentTheme === 'dark' ? Icons.moon : Icons.sun;
+    });
+
+    window.App.State.setState('flags.isSyncingHash', false);
+    window.App.Router.updateUrl();
+    window.App.restoreModals();
 };
 
 

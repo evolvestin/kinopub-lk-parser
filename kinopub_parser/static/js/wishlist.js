@@ -512,7 +512,7 @@ window.App = {
         }
 
         document.getElementById('wl-del-keep-stats').checked = true;
-        window.App.State.setState('modals.wlDelete.isOpen', true);
+        window.App.State.setState('modals.wlDelete', { isOpen: true, context: { id }});
     },
     removeWlItem: function (id, element) {
         itemToDeleteId = id;
@@ -656,7 +656,7 @@ window.App = {
         renderColorPicker(curColor);
         renderIconPicker(curIcon);
 
-        window.App.State.setState('modals.wlEdit.isOpen', true);
+        window.App.State.setState('modals.wlEdit', { isOpen: true, context: { isEdit, folderId }});
     },
     closeFolderEditModal: function () {
         window.App.State.setState('modals.wlEdit.isOpen', false);
@@ -755,7 +755,7 @@ window.App = {
         const modalTitle = document.getElementById('wl-modal-title');
         const grid = document.getElementById('wl-modal-folders');
         
-        window.App.State.setState('modals.wlFolder.isOpen', true);
+        window.App.State.setState('modals.wlFolder', { isOpen: true, context: { showId, title }});
 
         modalTitle.textContent = title;
         grid.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:24px;height:24px;border-width:3px;"></div></div>';

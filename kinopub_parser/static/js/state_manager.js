@@ -37,7 +37,8 @@ class StateManager {
             },
             nav: {
                 activeMainView: 'search',
-                query: { y: 'all', folderId: null }
+                query: { y: 'all', folderId: null },
+                layerStack: []
             }
         };
 
@@ -71,8 +72,13 @@ class StateManager {
             const path = el.getAttribute('data-state-bind');
             const val = this.getState(path);
             if (val !== undefined && val !== null) {
-                if (el.type === 'checkbox') el.checked = !!val;
-                else el.value = val;
+                if (el.type === 'checkbox') {
+                    el.checked = !!val;
+                } else if (el.type === 'radio') {
+                    if (el.value === String(val)) el.checked = true;
+                } else {
+                    el.value = val;
+                }
             }
         });
     }
@@ -103,22 +109,16 @@ class StateManager {
             const saved = sessionStorage.getItem('kp_app_state');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                this.state.forms = this._mergeObjects(this.state.forms, parsed.forms || {});
-                this.state.ui.scrollPositions = parsed.ui?.scrollPositions || {};
-                if (parsed.nav) {
-                    this.state.nav.query = this._mergeObjects(this.state.nav.query, parsed.nav.query || {});
-                }
+                delete parsed.flags;
+                this.state = this._mergeObjects(this.state, parsed);
             }
         } catch (e) {}
     }
 
     saveSessionState() {
         try {
-            const toSave = {
-                forms: this.state.forms,
-                ui: { scrollPositions: this.state.ui.scrollPositions },
-                nav: { query: this.state.nav.query }
-            };
+            const toSave = Object.assign({}, this.state);
+            delete toSave.flags;
             sessionStorage.setItem('kp_app_state', JSON.stringify(toSave));
         } catch (e) {}
     }
