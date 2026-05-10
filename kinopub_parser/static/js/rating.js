@@ -275,8 +275,8 @@ window.App.submitRating = async function(rating) {
             })
         });
         
-        showToast('Оценка сохранена');
-        window.AppData.cache.clear();
+        window.App.showToast('Оценка сохранена');
+        window.App.Data.cache.clear();
         ctx.needsRefresh = true;
         window.App.State.setState('modals.rateShow.context', ctx);
         
@@ -285,7 +285,7 @@ window.App.submitRating = async function(rating) {
         } else {
             this.closeRateModal();
         }
-    } catch(e) { showToast('Ошибка'); } finally {
+    } catch(e) { window.App.showToast('Ошибка'); } finally {
         btn.textContent = origText;
         btn.disabled = false;
     }
@@ -305,8 +305,8 @@ window.App.deleteRating = async function() {
                 episode: ctx.episode
             })
         });
-        showToast('Оценка удалена');
-        window.AppData.cache.clear();
+        window.App.showToast('Оценка удалена');
+        window.App.Data.cache.clear();
         ctx.needsRefresh = true;
         window.App.State.setState('modals.rateShow.context', ctx);
         if (ctx.episode) this.setRateLevel('seasons');
@@ -324,7 +324,7 @@ window.App.closeRateModal = function() {
     const ctx = window.App.State.getState('modals.rateShow.context');
     window.App.State.setState('modals.rateShow.isOpen', false);
     if (ctx.needsRefresh) {
-        if (window.App.State.getState('nav.activeMainView') === 'stats') load(curYear);
+        if (window.App.State.getState('nav.activeMainView') === 'stats') window.App.load(curYear);
         window.App.openShowLayer(ctx.showId);
     }
 };

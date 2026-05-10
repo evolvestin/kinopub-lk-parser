@@ -88,8 +88,8 @@ class StateManager {
         this.subscribe('ui.theme', (val) => {
             document.body.classList.toggle('light', val === 'light');
             document.querySelectorAll('.js-theme-toggle').forEach(btn => {
-                if (window.Icons) {
-                    btn.innerHTML = val === 'dark' ? Icons.moon : Icons.sun;
+                if (window.App.Icons) {
+                    btn.innerHTML = val === 'dark' ? window.App.Icons.moon : window.App.Icons.sun;
                 }
             });
         });

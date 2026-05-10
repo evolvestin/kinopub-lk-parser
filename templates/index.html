@@ -1214,7 +1214,7 @@
                 if (!response.ok) throw new Error('Ошибка API');
                 
                 const data = await response.json();
-                showToast(`Объединено: ${data.master_name}`);
+                window.App.showToast(`Объединено: ${data.master_name}`);
                 
                 const boxId = `group-box-${groupName.replace('master_for_', '')}`;
                 const box = document.getElementById(boxId);
@@ -1291,7 +1291,7 @@
                 if (!response.ok) throw new Error('Ошибка API');
                 
                 const data = await response.json();
-                showToast(`Объединено в: ${data.master_name}`);
+                window.App.showToast(`Объединено в: ${data.master_name}`);
                 
                 if (card) {
                     card.classList.add('merged-done');

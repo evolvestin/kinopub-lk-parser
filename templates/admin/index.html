@@ -96,8 +96,8 @@
                         <div class="icon" style="color: #d29922;" id="it-act-internal"></div>Актёры
                     </div>
                     <div class="view-toggle" style="margin-bottom: 0; scale: 0.8; transform-origin: right;">
-                        <button class="vt-btn active" onclick="switchPersonTab('actors', 'series', this)">Сериалы</button>
-                        <button class="vt-btn" onclick="switchPersonTab('actors', 'others', this)">Фильмы</button>
+                        <button class="vt-btn active" onclick="window.App.switchPersonTab('actors', 'series', this)">Сериалы</button>
+                        <button class="vt-btn" onclick="window.App.switchPersonTab('actors', 'others', this)">Фильмы</button>
                     </div>
                 </div>
                 <div id="actors-list"></div>
@@ -109,8 +109,8 @@
                         <div class="icon" style="color: #e74c3c;" id="it-dir-internal"></div>Режиссёры
                     </div>
                     <div class="view-toggle" style="margin-bottom: 0; scale: 0.8; transform-origin: right;">
-                        <button class="vt-btn active" onclick="switchPersonTab('directors', 'series', this)">Сериалы</button>
-                        <button class="vt-btn" onclick="switchPersonTab('directors', 'others', this)">Фильмы</button>
+                        <button class="vt-btn active" onclick="window.App.switchPersonTab('directors', 'series', this)">Сериалы</button>
+                        <button class="vt-btn" onclick="window.App.switchPersonTab('directors', 'others', this)">Фильмы</button>
                     </div>
                 </div>
                 <div id="directors-list"></div>
@@ -122,8 +122,8 @@
                         <div class="icon" style="color: #3498db;" id="it-wri-internal"></div>Сценаристы
                     </div>
                     <div class="view-toggle" style="margin-bottom: 0; scale: 0.8; transform-origin: right;">
-                        <button class="vt-btn active" onclick="switchPersonTab('writers', 'series', this)">Сериалы</button>
-                        <button class="vt-btn" onclick="switchPersonTab('writers', 'others', this)">Фильмы</button>
+                        <button class="vt-btn active" onclick="window.App.switchPersonTab('writers', 'series', this)">Сериалы</button>
+                        <button class="vt-btn" onclick="window.App.switchPersonTab('writers', 'others', this)">Фильмы</button>
                     </div>
                 </div>
                 <div id="writers-list"></div>
@@ -185,7 +185,7 @@
             el.addEventListener('mouseout', () => el.style.color = 'var(--text-primary)');
         });
 
-        initIcons();
+        window.App.initIcons();
         
         const s = D.summary || {};
         const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
@@ -215,7 +215,7 @@
 
         if (D.heatmap?.length > 0) {
             document.getElementById('card-heatmap').style.display = 'block';
-            renderHeatmap();
+            window.App.renderHeatmap();
         } else {
             document.getElementById('card-heatmap').style.display = 'none';
         }
@@ -227,16 +227,16 @@
         }
 
         const hasActors = (D.actors?.series?.length || D.actors?.others?.length);
-        if (hasActors) { document.getElementById('card-actors').style.display = 'block'; fillList('actors-list', D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series'); }
+        if (hasActors) { document.getElementById('card-actors').style.display = 'block'; window.App.fillList('actors-list', D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series'); }
         
         const hasDirectors = (D.directors?.series?.length || D.directors?.others?.length);
-        if (hasDirectors) { document.getElementById('card-directors').style.display = 'block'; fillList('directors-list', D.directors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'directors', 'series'); }
+        if (hasDirectors) { document.getElementById('card-directors').style.display = 'block'; window.App.fillList('directors-list', D.directors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'directors', 'series'); }
         
         const hasWriters = (D.writers?.series?.length || D.writers?.others?.length);
-        if (hasWriters) { document.getElementById('card-writers').style.display = 'block'; fillList('writers-list', D.writers.series, null, ['просмотр', 'просмотра', 'просмотров'], 'writers', 'series'); }
+        if (hasWriters) { document.getElementById('card-writers').style.display = 'block'; window.App.fillList('writers-list', D.writers.series, null, ['просмотр', 'просмотра', 'просмотров'], 'writers', 'series'); }
         
-        if (D.countries?.length > 0) { document.getElementById('card-countries').style.display = 'block'; fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries'); }
-        if (D.binges?.length > 0) { document.getElementById('card-binges').style.display = 'block'; fillBinges(); }
+        if (D.countries?.length > 0) { document.getElementById('card-countries').style.display = 'block'; window.App.fillList('countries-list', D.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries'); }
+        if (D.binges?.length > 0) { document.getElementById('card-binges').style.display = 'block'; window.App.fillBinges(); }
 
         if (D.ratings?.total > 0) {
             const rt = D.ratings;
@@ -256,13 +256,13 @@
             else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.background = 'rgba(210, 153, 34, 0.15)'; badge.style.color = '#d29922'; }
             else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
             
-            renderRatingsDist();
+            window.App.renderRatingsDist();
         } else {
             document.getElementById('ratings-box').style.display = 'none';
         }
 
-        window.openHistoryLayer = function() {};
-        renderCharts();
+        window.App.openHistoryLayer = function() {};
+        window.App.renderCharts();
     }
 
     document.addEventListener('DOMContentLoaded', () => {

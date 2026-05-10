@@ -181,7 +181,7 @@ window.openCasino = async function() {
             window.showCasinoMainMenu();
         }
     } catch(e) {
-        showToast('Ошибка соединения');
+        window.App.showToast('Ошибка соединения');
         window.closeCasino();
     }
 };
@@ -213,7 +213,7 @@ window.checkCasinoStatus = async function() {
             window.showCasinoFolders();
         }
     } catch(e) {
-        showToast('Ошибка соединения');
+        window.App.showToast('Ошибка соединения');
         window.closeCasino();
     }
 };
@@ -222,7 +222,7 @@ window.showCasinoFolders = function() {
     let allItemsCount = 0;
     wishlistFolders.forEach(f => allItemsCount += f.items.length);
     if (allItemsCount === 0) {
-        showToast('Ваш список избранного пуст!');
+        window.App.showToast('Ваш список избранного пуст!');
         window.closeCasino();
         return;
     }
@@ -239,7 +239,7 @@ window.showCasinoFolders = function() {
     
     validFolders.forEach(f => {
         html += `<button class="btn-primary casino-btn-choice" onclick="window.startCasinoSpin(${f.id})">
-            <span style="color:${f.color}; margin-right:10px;">${Icons[f.icon] || Icons.folder}</span>
+            <span style="color:${f.color}; margin-right:10px;">${window.App.Icons[f.icon] || window.App.Icons.folder}</span>
             <span style="flex:1; color: var(--text-primary);">${f.name}</span>
             <span style="opacity:0.6; font-size:12px; color: var(--text-muted);">${f.items.length}</span>
         </button>`;
@@ -260,7 +260,7 @@ window.startCasinoSpin = async function(folderId) {
         });
         const data = await res.json();
         if (data.error) {
-            showToast('Ошибка: ' + data.error);
+            window.App.showToast('Ошибка: ' + data.error);
             window.closeCasino();
             return;
         }
@@ -327,7 +327,7 @@ window.startCasinoSpin = async function(folderId) {
         }, 300);
 
     } catch (e) {
-        showToast('Ошибка при запуске рулетки');
+        window.App.showToast('Ошибка при запуске рулетки');
         window.closeCasino();
     }
 };
@@ -480,7 +480,7 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
             badgesContainer.className = 'grid-badges';
             windowEl.appendChild(badgesContainer);
         }
-        badgesContainer.innerHTML = `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${Icons.star}${item.user_rating}</span>`;
+        badgesContainer.innerHTML = `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${window.App.Icons.star}${item.user_rating}</span>`;
         badgesContainer.style.display = 'flex';
     } else if (badgesContainer) {
         badgesContainer.style.display = 'none';
@@ -548,11 +548,11 @@ window.loadCasinoHistory = async function() {
         if (data.error) throw new Error(data.error);
 
         D.casino_history = data.history || [];
-        window.openHistoryLayer('casino', 'История рулетки');
+        window.App.openHistoryLayer('casino', 'История рулетки');
     } catch(e) {
-        showToast('Ошибка загрузки истории');
+        window.App.showToast('Ошибка загрузки истории');
     } finally {
-        hideLoader();
+        window.App.hideLoader();
     }
 };
 

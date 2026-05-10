@@ -100,7 +100,7 @@
             
             // Ждем небольшую паузу для завершения парсинга webapp.js
             setTimeout(() => {
-                if (typeof initIcons === 'function') initIcons();
+                if (typeof initIcons === 'function') window.App.initIcons();
                 if (typeof renderActiveWlFolder === 'function') renderActiveWlFolder();
             }, 50);
             
