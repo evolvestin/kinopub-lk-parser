@@ -7,11 +7,22 @@ class StateManager {
 
         this.defaultState = {
             ui: {
-                activeTabs: {},
-                scrollPositions: {},
+                activeStatsTab: 'personal',
                 theme: 'dark',
                 viewMode: 'grid',
-                sortMode: 'default'
+                sortMode: 'default',
+                scrollPositions: {}
+            },
+            flags: {
+                isReorderMode: false,
+                isItemsReorderMode: false,
+                isHistoryEditMode: false,
+                isSyncingHash: false
+            },
+            nav: {
+                activeMainView: 'search',
+                query: { y: 'all', folderId: null },
+                layerStack: [] 
             },
             modals: {
                 addView: { isOpen: false, context: {} },
@@ -26,25 +37,62 @@ class StateManager {
             },
             forms: {
                 search: { query: '' },
-                addView: { season: '', episode: '', dateMode: 'exact', exact: '', month: '', year: '' },
+                addView: { 
+                    season: '', 
+                    episode: '', 
+                    dateMode: 'exact', 
+                    exact: '', 
+                    month: '', 
+                    year: '' 
+                },
                 wlEdit: { name: '', color: '', icon: '' }
-            },
-            flags: {
-                isReorderMode: false,
-                isItemsReorderMode: false,
-                isHistoryEditMode: false,
-                isSyncingHash: false
-            },
-            nav: {
-                activeMainView: 'search',
-                query: { y: 'all', folderId: null },
-                layerStack: []
             }
         };
 
-        this.state = this._mergeObjects({}, this.defaultState);
+        this.state = this._deepClone(this.defaultState);
         this.loadSessionState();
-        this.loadPersistentState();
+        
+        // Реактивные подписки для синхронизации состояния с DOM
+        this.initGlobalListeners();
+    }
+
+    initGlobalListeners() {
+        // Синхронизация вкладок статистики (Личная / Группа)
+        this.subscribe('ui.activeStatsTab', (val) => {
+            if (typeof window.App.mainTab === 'function') {
+                window.App.mainTab(val, true);
+            }
+        });
+
+        // Режим переупорядочивания папок
+        this.subscribe('flags.isReorderMode', (val) => {
+            const grid = document.getElementById('wl-folders-grid');
+            const view = document.getElementById('view-wishlist');
+            if (grid) grid.classList.toggle('reorder-mode', val);
+            if (view) view.classList.toggle('reorder-active-state', val);
+        });
+
+        // Режим переупорядочивания элементов внутри папки
+        this.subscribe('flags.isItemsReorderMode', (val) => {
+            const container = document.getElementById('wl-items-container');
+            if (container) container.classList.toggle('reorder-items-mode', val);
+        });
+
+        // Режим удаления истории
+        this.subscribe('flags.isHistoryEditMode', (val) => {
+            const container = document.getElementById('layer-hist-container');
+            if (container) container.classList.toggle('history-edit-mode', val);
+        });
+
+        // Синхронизация темы (Dark/Light)
+        this.subscribe('ui.theme', (val) => {
+            document.body.classList.toggle('light', val === 'light');
+            document.querySelectorAll('.js-theme-toggle').forEach(btn => {
+                if (window.Icons) {
+                    btn.innerHTML = val === 'dark' ? Icons.moon : Icons.sun;
+                }
+            });
+        });
     }
 
     getState(path) {
@@ -59,11 +107,31 @@ class StateManager {
             return acc[part];
         }, this.state);
 
-        if (target[lastKey] !== value) {
+        if (JSON.stringify(target[lastKey]) !== JSON.stringify(value)) {
             target[lastKey] = value;
             this.emit(path, value);
             this.saveSessionDebounced();
-            this._checkAndSavePersistent(path, value);
+        }
+    }
+
+    subscribe(path, callback) {
+        if (!this.listeners[path]) this.listeners[path] = [];
+        this.listeners[path].push(callback);
+    }
+
+    emit(path, value) {
+        if (this.listeners[path]) {
+            this.listeners[path].forEach(cb => cb(value));
+        }
+        
+        const parts = path.split('.');
+        let currentPath = '';
+        for (let i = 0; i < parts.length - 1; i++) {
+            currentPath += (i === 0 ? '' : '.') + parts[i];
+            const wildcardPath = `${currentPath}.*`;
+            if (this.listeners[wildcardPath]) {
+                this.listeners[wildcardPath].forEach(cb => cb(this.getState(currentPath)));
+            }
         }
     }
 
@@ -72,36 +140,25 @@ class StateManager {
             const path = el.getAttribute('data-state-bind');
             const val = this.getState(path);
             if (val !== undefined && val !== null) {
-                if (el.type === 'checkbox') {
-                    el.checked = !!val;
-                } else if (el.type === 'radio') {
-                    if (el.value === String(val)) el.checked = true;
-                } else {
-                    el.value = val;
+                if (el.type === 'checkbox') el.checked = !!val;
+                else if (el.type === 'radio') { 
+                    if (el.value === String(val)) el.checked = true; 
                 }
+                else el.value = val;
             }
         });
+        
+        // Принудительный вызов слушателей для актуализации классов
+        this.emit('ui.theme', this.getState('ui.theme'));
+        this.emit('flags.isReorderMode', this.getState('flags.isReorderMode'));
+        this.emit('flags.isItemsReorderMode', this.getState('flags.isItemsReorderMode'));
+        this.emit('ui.activeStatsTab', this.getState('ui.activeStatsTab'));
     }
 
-    subscribe(path, callback) {
-        if (!this.listeners[path]) {
-            this.listeners[path] = [];
-        }
-        this.listeners[path].push(callback);
-    }
-
-    emit(path, value) {
-        if (this.listeners[path]) {
-            this.listeners[path].forEach(cb => cb(value));
-        }
-        const parts = path.split('.');
-        let currentPath = '';
-        for (let i = 0; i < parts.length - 1; i++) {
-            currentPath += (i === 0 ? '' : '.') + parts[i];
-            if (this.listeners[`${currentPath}.*`]) {
-                this.listeners[`${currentPath}.*`].forEach(cb => cb(this.getState(currentPath)));
-            }
-        }
+    saveSessionState() {
+        try {
+            sessionStorage.setItem('kp_app_state', JSON.stringify(this.state));
+        } catch (e) {}
     }
 
     loadSessionState() {
@@ -109,45 +166,15 @@ class StateManager {
             const saved = sessionStorage.getItem('kp_app_state');
             if (saved) {
                 const parsed = JSON.parse(saved);
-                delete parsed.flags;
-                this.state = this._mergeObjects(this.state, parsed);
+                this.state = this._mergeObjects(this._deepClone(this.defaultState), parsed);
             }
         } catch (e) {}
-    }
-
-    saveSessionState() {
-        try {
-            const toSave = Object.assign({}, this.state);
-            delete toSave.flags;
-            sessionStorage.setItem('kp_app_state', JSON.stringify(toSave));
-        } catch (e) {}
-    }
-
-    loadPersistentState() {
-        const theme = localStorage.getItem('kt') === 'l' ? 'light' : 'dark';
-        this.setState('ui.theme', theme);
-
-        const viewMode = localStorage.getItem('kp_view_mode') || 'grid';
-        this.setState('ui.viewMode', viewMode);
-
-        const sortMode = localStorage.getItem('wl_sort_mode') || 'default';
-        this.setState('ui.sortMode', sortMode);
-    }
-
-    _checkAndSavePersistent(path, value) {
-        if (path === 'ui.theme') {
-            localStorage.setItem('kt', value === 'light' ? 'l' : 'd');
-        } else if (path === 'ui.viewMode') {
-            localStorage.setItem('kp_view_mode', value);
-        } else if (path === 'ui.sortMode') {
-            localStorage.setItem('wl_sort_mode', value);
-        }
     }
 
     _mergeObjects(target, source) {
         for (const key of Object.keys(source)) {
             if (source[key] instanceof Object && key in target && !Array.isArray(source[key])) {
-                Object.assign(target[key], this._mergeObjects(target[key], source[key]));
+                this._mergeObjects(target[key], source[key]);
             } else {
                 target[key] = source[key];
             }
@@ -155,15 +182,15 @@ class StateManager {
         return target;
     }
 
+    _deepClone(obj) {
+        return JSON.parse(JSON.stringify(obj));
+    }
+
     _debounce(func, wait) {
         let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
+        return (...args) => {
             clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
+            timeout = setTimeout(() => func(...args), wait);
         };
     }
 }

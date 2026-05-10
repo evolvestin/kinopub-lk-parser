@@ -311,14 +311,6 @@ let SharedDataMap = {};
 let availableYears = [];
 let activeMainView = 'search';
 
-function toggleTheme() {
-    isDark = !isDark;
-    document.body.classList.toggle('light', !isDark);
-    document.querySelectorAll('.js-theme-toggle').forEach(btn => btn.innerHTML = isDark ? Icons.moon : Icons.sun);
-    localStorage.setItem('kt', isDark ? 'd' : 'l');
-    if (D) renderCharts();
-}
-
 (function initTheme() {
     if (window.tg && tg.colorScheme === 'light') isDark = false;
     const stored = localStorage.getItem('kt');
@@ -509,7 +501,7 @@ async function loadShared(statId) {
         curYear = availableYears[0];
         D = SharedDataMap[curYear];
         
-        render();
+        window.App.render();
     } catch(e) { 
         console.error(e); 
         document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Слепок не найден или произошла ошибка:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
@@ -527,7 +519,7 @@ async function load(year, isBackground = false) {
         if (!isBackground) {
             curYear = year;
             D = cachedData;
-            render();
+            window.App.render();
             hideLoader();
             return;
         }
@@ -568,10 +560,10 @@ async function load(year, isBackground = false) {
         if (!isBackground) {
             curYear = year;
             D = j;
-            render();
+            window.App.render();
         } else if (year === curYear) {
             D = j;
-            render();
+            window.App.render();
         }
     } catch (e) { 
         console.error('Load error:', e); 
@@ -603,21 +595,7 @@ function hideLoader() {
     document.getElementById('app').classList.remove('hidden'); 
 }
 
-function plural(n, forms) {
-    let n10 = Math.abs(n) % 10;
-    let n100 = Math.abs(n) % 100;
-    if (n100 >= 11 && n100 <= 14) return forms[2];
-    if (n10 === 1) return forms[0];
-    if (n10 >= 2 && n10 <= 4) return forms[1];
-    return forms[2];
-}
-
 const UserAvatarColors = ['#3498db', '#9b59b6', '#f1c40f', '#e67e22', '#e74c3c', '#1abc9c', '#34495e', '#2ecc71'];
-
-function getUserColor(id) {
-    if (id === 0) return 'var(--bg-input)';
-    return UserAvatarColors[(id - 1) % UserAvatarColors.length];
-}
 
 window.switchPersonTab = function(category, mode, btn) {
     const container = btn.closest('.view-toggle');
@@ -627,135 +605,6 @@ window.switchPersonTab = function(category, mode, btn) {
     const data = D[category][mode];
     fillList(`${category}-list`, data, null, ['просмотр', 'просмотра', 'просмотров'], category, mode);
 };
-
-function render() {
-    if (!D?.meta) return;
-    const n = D.meta.name || 'Пользователь';
-    const nameEl = document.getElementById('user-name');
-    if (nameEl) {
-        nameEl.textContent = n;
-        // Подгоняем размер после вставки текста
-        requestAnimationFrame(() => window.App.fitText(nameEl));
-    }
-    
-    const avEl = document.getElementById('avatar');
-    if (D.meta.is_anonymous) {
-        const myId = D.meta.id || 0;
-        if (myId > 0) {
-            avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${getUserColor(myId)};color:#fff;font-weight:900;">${myId}</div>`;
-        } else {
-            avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-muted);">${Icons.user}</div>`;
-        }
-    } else if (D.meta.photo_url) {
-        avEl.innerHTML = `<img src="${D.meta.photo_url}" alt="A">`;
-    } else {
-        const u = tg?.initDataUnsafe?.user;
-        if (!isSharedMode && u && u.photo_url) avEl.innerHTML = `<img src="${u.photo_url}" alt="A">`;
-        else avEl.textContent = n.charAt(0).toUpperCase();
-    }
-
-    document.getElementById('period-label').textContent = D.summary?.period_label || '';
-    renderYears();
-
-    const s = D.summary || {};
-    const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
-    
-    const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
-
-    const hasGroup = !!D.group;
-    toggle('main-tabs', hasGroup);
-
-    toggle('label-overview', true);
-    toggle('grid-overview', true);
-
-    document.getElementById('s-time').textContent  = s.duration_display || '0м';
-    document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
-    document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
-    document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
-    document.getElementById('s-ep').textContent = vEp;
-    const epLbl = document.getElementById('s-ep').nextElementSibling;
-    if (epLbl) epLbl.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
-    const serInfo = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']);
-    document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
-    document.getElementById('s-mov').textContent = vMov;
-    const movLbl = document.getElementById('s-mov').nextElementSibling;
-    if (movLbl) movLbl.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
-    document.getElementById('s-uni').textContent = s.movies_duration || '0м';
-    
-    document.getElementById('s-wl-added').textContent = s.wishlist_added || 0;
-    document.getElementById('s-wl-watched').textContent = s.wishlist_watched || 0;
-
-    const showWelcome = vViews === 0;
-    let welcomeEl = document.getElementById('welcome-empty-state');
-    if (showWelcome) {
-        if (!welcomeEl) {
-            welcomeEl = document.createElement('div');
-            welcomeEl.id = 'welcome-empty-state';
-            welcomeEl.className = 'card anim-item';
-            welcomeEl.innerHTML = `<div class="empty"><div class="icon">${Icons.tv}</div>Здесь будет ваша статистика, когда вы начнете смотреть кино.</div>`;
-            document.getElementById('sec-personal').appendChild(welcomeEl);
-        }
-    } else if (welcomeEl) {
-        welcomeEl.remove();
-    }
-
-    const hasDynamics = D.monthly_chart?.views?.some(v => v > 0);
-    toggle('card-dynamics', hasDynamics);
-
-    const hasWeekday = D.weekday_chart?.data?.some(v => v > 0);
-    toggle('card-weekday', hasWeekday);
-
-    const hasHeatmap = D.heatmap?.length > 0;
-    toggle('card-heatmap', hasHeatmap);
-    if (hasHeatmap) renderHeatmap();
-
-    const hasGenres = D.genres?.length > 0;
-    toggle('card-genres', hasGenres);
-    
-    const hasActors = (D.actors?.series?.length || D.actors?.others?.length);
-    toggle('card-actors', hasActors);
-    if (hasActors) fillList('actors-list', D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series');
-    
-    const hasDirectors = (D.directors?.series?.length || D.directors?.others?.length);
-    toggle('card-directors', hasDirectors);
-    if (hasDirectors) fillList('directors-list', D.directors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'directors', 'series');
-
-    const hasWriters = (D.writers?.series?.length || D.writers?.others?.length);
-    toggle('card-writers', hasWriters);
-    if (hasWriters) fillList('writers-list', D.writers.series, null, ['просмотр', 'просмотра', 'просмотров'], 'writers', 'series');
-    
-    const hasCountries = D.countries?.length > 0;
-    toggle('card-countries', hasCountries);
-    if (hasCountries) fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
-    
-    const hasBinges = D.binges?.length > 0;
-    toggle('card-binges', hasBinges);
-    if (hasBinges) fillBinges();
-
-    const rt = D.ratings;
-    const hasRatings = rt && rt.total > 0;
-    toggle('ratings-box', hasRatings);
-
-    if (hasRatings) {
-        const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
-        const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
-        const scoreColor = ratingPalette[colorIdx];
-        const avgEl = document.getElementById('cr-avg');
-        avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
-        avgEl.style.color = scoreColor;
-        document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
-        const badge = document.getElementById('cr-badge');
-        if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.background = 'rgba(46, 204, 113, 0.15)'; badge.style.color = '#2ecc71'; }
-        else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.background = 'rgba(56, 139, 253, 0.15)'; badge.style.color = '#60a5fa'; }
-        else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.background = 'rgba(210, 153, 34, 0.15)'; badge.style.color = '#d29922'; }
-        else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
-        renderRatingsDist();
-    }
-
-    toggle('tab-group-btn', !!D.group);
-    renderGroup();
-    renderCharts();
-}
 
 function renderRatingsDist() {
     if (typeof Chart === 'undefined') return;
@@ -778,7 +627,7 @@ function renderRatingsDist() {
             onClick: (event, activeElements) => { if (activeElements.length > 0) window.openHistoryLayer('rating_filter', 'Оценка: ' + (activeElements[0].index + 1), null, null, null, activeElements[0].index + 1); },
             plugins: {
                 legend: { display: false },
-                tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { title: (ctx) => `Оценка: ${ctx[0].label}`, label: (ctx) => ` ${ctx.parsed.y} ${plural(ctx.parsed.y, ['оценка', 'оценки', 'оценок'])}` } }
+                tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { title: (ctx) => `Оценка: ${ctx[0].label}`, label: (ctx) => ` ${ctx.parsed.y} ${window.App.plural(ctx.parsed.y, ['оценка', 'оценки', 'оценок'])}` } }
             },
             scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { display: false, beginAtZero: true } }
         }
@@ -833,12 +682,12 @@ window.pickYear = async y => {
     
     if (isSharedMode) {
         D = SharedDataMap[y];
-        render();
+        window.App.render();
     } else {
         const cached = window.AppData.getFromCache(y);
         if (cached) {
             D = cached;
-            render();
+            window.App.render();
             getScrollContainer().scrollTop = 0;
         } else {
             await load(y); 
@@ -955,8 +804,8 @@ function fillList(id, items, ico, unit, categoryKey, mode = 'series') {
     }
     let html = '';
     items.forEach((it, i) => {
-        const cnt = it.count || it.views || 0, sub = it.sub || (it.shows ? `${it.shows} ${plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
-        const lbl = Array.isArray(unit) ? `${cnt} ${plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
+        const cnt = it.count || it.views || 0, sub = it.sub || (it.shows ? `${it.shows} ${window.App.plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
+        const lbl = Array.isArray(unit) ? `${cnt} ${window.App.plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
         const delay = (i + 1) * 0.05;
         
         const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
@@ -975,7 +824,7 @@ function fillList(id, items, ico, unit, categoryKey, mode = 'series') {
         const histKey = ['actors', 'directors', 'writers'].includes(categoryKey) ? `${categoryKey}_${mode}` : categoryKey;
         D[histKey] = items;
 
-        html += `<div class="li li-clickable anim-list-item clickable" onclick="window.openHistoryLayer('filter', '${safeName}', null, null, '${histKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
+        html += `<div class="li li-clickable anim-list-item clickable" onclick="window.App.openHistoryLayer('filter', '${safeName}', null, null, '${histKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
     });
     el.innerHTML = html;
 }
@@ -987,7 +836,7 @@ function fillBinges() {
     D.binges.forEach((b, i) => {
         const delay = (i + 1) * 0.05, safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
         const posterHtml = b.poster_url ? `<img src="${b.poster_url}" style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.1);" onerror="this.style.display='none'">` : `<div style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
-        html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="window.openHistoryLayer('binge', '${safeTitle}', ${b.show_id}, '${b.date}')"><div class="li-l">${posterHtml}<div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r" style="color:var(--info)">${b.count} ${plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span></div>`;
+        html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="window.openHistoryLayer('binge', '${safeTitle}', ${b.show_id}, '${b.date}')"><div class="li-l">${posterHtml}<div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r" style="color:var(--info)">${b.count} ${window.App.plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span></div>`;
     });
     el.innerHTML = html;
 }
@@ -1050,7 +899,7 @@ function renderWeekday() {
                 }
             },
             onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; },
-            plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { label: (context) => { const val = context.parsed.y; const pct = totalViews > 0 ? Math.round((val / totalViews) * 100) : 0; return ` ${val} ${plural(val, ['просмотр', 'просмотра', 'просмотров'])} (${pct}%)`; } } } }, 
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)', titleColor: isDark ? '#f0f6fc' : '#1f2328', bodyColor: isDark ? '#8b949e' : '#59636e', borderColor: c.b, borderWidth: 1, cornerRadius: 10, padding: 12, displayColors: false, callbacks: { label: (context) => { const val = context.parsed.y; const pct = totalViews > 0 ? Math.round((val / totalViews) * 100) : 0; return ` ${val} ${window.App.plural(val, ['просмотр', 'просмотра', 'просмотров'])} (${pct}%)`; } } } }, 
             scales: { x: { ticks: { color: c.t, font: { size: fSizeAx, weight: '600' } }, grid: { display: false } }, y: { ticks: { color: c.t, font: { size: fSizeAx }, precision: 0 }, grid: { color: c.g }, beginAtZero: true, border: { display: false } } } 
         } 
     });
@@ -1347,7 +1196,7 @@ function getHistoryItemHtml(item, idx, type, mode) {
                 const photo = item.user_photos && item.user_photos[i];
                 const userId = (item.user_ids && item.user_ids[i]);
                 if (photo) avatars += `<img src="${photo}" class="grid-user-avatar">`;
-                else avatars += `<div class="grid-user-avatar" style="background:${getUserColor(userId || 0)};">${isSharedMode && userId > 0 ? userId : name.charAt(0).toUpperCase()}</div>`;
+                else avatars += `<div class="grid-user-avatar" style="background:${window.App.getUserColor(userId || 0)};">${isSharedMode && userId > 0 ? userId : name.charAt(0).toUpperCase()}</div>`;
             }
             usersHtml = `<div class="grid-users">${avatars}</div>`;
         }
@@ -1810,7 +1659,7 @@ function renderGroup() {
     const mx = Math.max(...g.members.map(m=>m.views),1);
     const mbH = g.members.map((m, idx) => `<div class="mb anim-list-item clickable" onclick="window.openHistoryLayer('group_member', '${m.name.replace(/'/g, "\\'")}', null, null, null, ${idx})" style="animation-delay:${(idx+1)*0.05}s"><span class="mb-n">${m.name}</span><div class="mb-t"><div class="mb-f" style="width:${(m.views/mx)*100}%"></div></div><span class="mb-c">${m.views}</span></div>`).join('');
     let gGenH = g.genres?.length ? `<div class="card hoverable anim-item" style="animation-delay:0.3s"><div class="label"><div class="icon" style="font-size:clamp(16px, 4.5vw, 18px);line-height:1">${Icons.masks}</div>Жанры группы</div><div class="chart-box" style="height:380px;"><canvas id="c-group-genre"></canvas></div><div id="legend-group-genre" class="legend-grid"></div></div>` : '';
-    const membersLabel = `${g.members_count} ${plural(g.members_count, ['участник', 'участника', 'участников'])}`;
+    const membersLabel = `${g.members_count} ${window.App.plural(g.members_count, ['участник', 'участника', 'участников'])}`;
     
     el.innerHTML = `
         <div class="card hoverable anim-item">
@@ -1942,11 +1791,159 @@ let addViewData = {
     mode: 'exact'
 };
 
-window.App = {
-    ...window.App,
-    toggleTheme: () => {
-        const cur = window.App.State.getState('ui.theme');
-        window.App.State.setState('ui.theme', cur === 'dark' ? 'light' : 'dark');
+Object.assign(window.App, {
+    plural: function(n, forms) {
+        let n10 = Math.abs(n) % 10;
+        let n100 = Math.abs(n) % 100;
+        if (n100 >= 11 && n100 <= 14) return forms[2];
+        if (n10 === 1) return forms[0];
+        if (n10 >= 2 && n10 <= 4) return forms[1];
+        return forms[2];
+    },
+
+    getUserColor: function(id) {
+        if (id === 0) return 'var(--bg-input)';
+        return UserAvatarColors[(id - 1) % UserAvatarColors.length];
+    },
+
+    toggleTheme: function() {
+        isDark = !isDark;
+        document.body.classList.toggle('light', !isDark);
+        document.querySelectorAll('.js-theme-toggle').forEach(btn => {
+            btn.innerHTML = isDark ? Icons.moon : Icons.sun;
+        });
+        localStorage.setItem('kt', isDark ? 'd' : 'l');
+        
+        window.App.State.setState('ui.theme', isDark ? 'dark' : 'light');
+        
+        if (D) this.renderCharts();
+    },
+    render: function() {
+        if (!D?.meta) return;
+        const n = D.meta.name || 'Пользователь';
+        const nameEl = document.getElementById('user-name');
+        if (nameEl) {
+            nameEl.textContent = n;
+            requestAnimationFrame(() => window.App.fitText(nameEl));
+        }
+        
+        const avEl = document.getElementById('avatar');
+        if (D.meta.is_anonymous) {
+            const myId = D.meta.id || 0;
+            if (myId > 0) {
+                avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${getUserColor(myId)};color:#fff;font-weight:900;">${myId}</div>`;
+            } else {
+                avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-muted);">${Icons.user}</div>`;
+            }
+        } else if (D.meta.photo_url) {
+            avEl.innerHTML = `<img src="${D.meta.photo_url}" alt="A">`;
+        } else {
+            const u = tg?.initDataUnsafe?.user;
+            if (!isSharedMode && u && u.photo_url) avEl.innerHTML = `<img src="${u.photo_url}" alt="A">`;
+            else avEl.textContent = n.charAt(0).toUpperCase();
+        }
+
+        document.getElementById('period-label').textContent = D.summary?.period_label || '';
+        renderYears();
+
+        const s = D.summary || {};
+        const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
+        
+        const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
+
+        const hasGroup = !!D.group;
+        toggle('main-tabs', hasGroup);
+
+        toggle('label-overview', true);
+        toggle('grid-overview', true);
+
+        document.getElementById('s-time').textContent  = s.duration_display || '0м';
+        document.getElementById('s-views').textContent = vViews + ' ' + window.App.plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
+        document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
+        document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
+        document.getElementById('s-ep').textContent = vEp;
+        const epLbl = document.getElementById('s-ep').nextElementSibling;
+        if (epLbl) epLbl.textContent = window.App.plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+        const serInfo = vSer + ' ' + window.App.plural(vSer, ['сериал', 'сериала', 'сериалов']);
+        document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
+        document.getElementById('s-mov').textContent = vMov;
+        const movLbl = document.getElementById('s-mov').nextElementSibling;
+        if (movLbl) movLbl.textContent = window.App.plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
+        document.getElementById('s-uni').textContent = s.movies_duration || '0м';
+        
+        document.getElementById('s-wl-added').textContent = s.wishlist_added || 0;
+        document.getElementById('s-wl-watched').textContent = s.wishlist_watched || 0;
+
+        const showWelcome = vViews === 0;
+        let welcomeEl = document.getElementById('welcome-empty-state');
+        if (showWelcome) {
+            if (!welcomeEl) {
+                welcomeEl = document.createElement('div');
+                welcomeEl.id = 'welcome-empty-state';
+                welcomeEl.className = 'card anim-item';
+                welcomeEl.innerHTML = `<div class="empty"><div class="icon">${Icons.tv}</div>Здесь будет ваша статистика, когда вы начнете смотреть кино.</div>`;
+                document.getElementById('sec-personal').appendChild(welcomeEl);
+            }
+        } else if (welcomeEl) {
+            welcomeEl.remove();
+        }
+
+        const hasDynamics = D.monthly_chart?.views?.some(v => v > 0);
+        toggle('card-dynamics', hasDynamics);
+
+        const hasWeekday = D.weekday_chart?.data?.some(v => v > 0);
+        toggle('card-weekday', hasWeekday);
+
+        const hasHeatmap = D.heatmap?.length > 0;
+        toggle('card-heatmap', hasHeatmap);
+        if (hasHeatmap) renderHeatmap();
+
+        const hasGenres = D.genres?.length > 0;
+        toggle('card-genres', hasGenres);
+        
+        const hasActors = (D.actors?.series?.length || D.actors?.others?.length);
+        toggle('card-actors', hasActors);
+        if (hasActors) fillList('actors-list', D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series');
+        
+        const hasDirectors = (D.directors?.series?.length || D.directors?.others?.length);
+        toggle('card-directors', hasDirectors);
+        if (hasDirectors) fillList('directors-list', D.directors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'directors', 'series');
+
+        const hasWriters = (D.writers?.series?.length || D.writers?.others?.length);
+        toggle('card-writers', hasWriters);
+        if (hasWriters) fillList('writers-list', D.writers.series, null, ['просмотр', 'просмотра', 'просмотров'], 'writers', 'series');
+        
+        const hasCountries = D.countries?.length > 0;
+        toggle('card-countries', hasCountries);
+        if (hasCountries) fillList('countries-list', D.countries, Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+        
+        const hasBinges = D.binges?.length > 0;
+        toggle('card-binges', hasBinges);
+        if (hasBinges) fillBinges();
+
+        const rt = D.ratings;
+        const hasRatings = rt && rt.total > 0;
+        toggle('ratings-box', hasRatings);
+
+        if (hasRatings) {
+            const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
+            const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
+            const scoreColor = ratingPalette[colorIdx];
+            const avgEl = document.getElementById('cr-avg');
+            avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
+            avgEl.style.color = scoreColor;
+            document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${window.App.plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
+            const badge = document.getElementById('cr-badge');
+            if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.background = 'rgba(46, 204, 113, 0.15)'; badge.style.color = '#2ecc71'; }
+            else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.background = 'rgba(56, 139, 253, 0.15)'; badge.style.color = '#60a5fa'; }
+            else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.background = 'rgba(210, 153, 34, 0.15)'; badge.style.color = '#d29922'; }
+            else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
+            renderRatingsDist();
+        }
+
+        toggle('tab-group-btn', !!D.group);
+        renderGroup();
+        renderCharts();
     },
     openShareModal: () => window.App.State.setState('modals.share.isOpen', true),
     closeShareModal: () => window.App.State.setState('modals.share.isOpen', false),
@@ -2001,16 +1998,6 @@ window.App = {
     toggleHistoryEditMode: function() {
         const cur = window.App.State.getState('flags.isHistoryEditMode');
         window.App.State.setState('flags.isHistoryEditMode', !cur);
-        isHistoryEditMode = !cur;
-        const btn = document.getElementById('hist-del-toggle');
-        const container = document.getElementById('layer-hist-container');
-        if (btn) {
-            btn.style.background = isHistoryEditMode ? 'var(--accent)' : 'var(--bg-input)';
-            btn.style.color = isHistoryEditMode ? '#fff' : 'var(--text-primary)';
-        }
-        if (container) {
-            container.classList.toggle('history-edit-mode', isHistoryEditMode);
-        }
     },
     removeRatingItem: function(btn, payload) {
         const msg = "Удалить эту оценку?";
@@ -2197,7 +2184,7 @@ window.App = {
             btn.disabled = false;
         }
     },
-};
+});
 
 window.App.restoreModals = function() {
     const modals = window.App.State.getState('modals');
@@ -2318,7 +2305,14 @@ window.init = async function() {
         document.body.classList.add('has-nav');
         if (role === 'guest') document.getElementById('bn-stats').classList.add('hidden');
 
-        if (segments.length > 1) {
+        const savedStack = window.App.State.getState('nav.layerStack') || [];
+        if (savedStack.length > 0) {
+            for (const ctx of savedStack) {
+                if (ctx.type === 'show') await window.App.openShowLayer(ctx.showId, true);
+                else if (ctx.type === 'history') window.App.openHistoryLayer(ctx.htype, ctx.title, ctx.extraId, ctx.extraDate, ctx.extraKey, ctx.extraIndex, true);
+                else if (['person', 'genre', 'country'].includes(ctx.type)) await window.App.openCollectionLayer(ctx.ctype, ctx.itemId, ctx.titleFallback, true);
+            }
+        } else if (segments.length > 1) {
             const layerSegments = segments.slice(1);
             const historyTitles = {
                 'all': 'Вся история',

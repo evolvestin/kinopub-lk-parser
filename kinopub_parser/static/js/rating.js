@@ -1,42 +1,44 @@
 window.App = window.App || {};
 
-window.App.rateData = {
-    showId: null,
-    showType: null,
-    level: 'show', 
-    season: null,
-    episode: null,
-    title: '',
-    currentVal: 5.0,
-    isDragging: false,
-    episodesData: [],
-    needsRefresh: false
-};
-
-window.App.openRateModal = function(showId, title, currentRating, type = null) {
-    const hasExisting = (currentRating && currentRating !== 'null' && currentRating !== null);
-    
-    const context = {
-        showId: showId,
-        showType: type || 'Movie',
-        title: title,
-        currentVal: hasExisting ? parseFloat(currentRating) : 5.0,
-        hasExistingRating: hasExisting,
-        needsRefresh: false,
+Object.assign(window.App, {
+    rateData: {
+        showId: null,
+        showType: null,
+        level: 'show', 
         season: null,
         episode: null,
-        episodesData: []
-    };
+        title: '',
+        currentVal: 5.0,
+        isDragging: false,
+        episodesData: [],
+        needsRefresh: false
+    },
 
-    window.App.State.setState('modals.rateShow', { isOpen: true, context: context });
+    openRateModal: function(showId, title, currentRating, type = null) {
+        const hasExisting = (currentRating !== undefined && currentRating !== 'null' && currentRating !== null);
+        
+        const context = {
+            showId: showId,
+            showType: type || 'Movie',
+            title: title,
+            currentVal: hasExisting ? parseFloat(currentRating) : 5.0,
+            hasExistingRating: hasExisting,
+            needsRefresh: false,
+            season: null,
+            episode: null,
+            episodesData: []
+        };
 
-    document.getElementById('rate-show-title').textContent = title;
-    const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(context.showType);
-    document.getElementById('rate-mode-toggle').style.display = isSeries ? 'flex' : 'none';
-    
-    this.initSlider();
-    this.setRateLevel('show');
-};
+        window.App.State.setState('modals.rateShow', { isOpen: true, context: context });
+
+        document.getElementById('rate-show-title').textContent = title;
+        const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(context.showType);
+        document.getElementById('rate-mode-toggle').style.display = isSeries ? 'flex' : 'none';
+        
+        this.initSlider();
+        this.setRateLevel('show');
+    }
+});
 
 window.App.initSlider = function() {
     const hitArea = document.getElementById('rate-slider-hit');

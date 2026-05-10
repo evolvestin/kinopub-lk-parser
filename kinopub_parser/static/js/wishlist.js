@@ -136,7 +136,7 @@ function renderWishlistFolders() {
                 </div>
                 <div class="wl-folder-info">
                     <div class="wl-folder-name">${f.name}</div>
-                    <div class="wl-folder-count">${f.items.length} ${plural(f.items.length, ['шоу', 'шоу', 'шоу'])}</div>
+                    <div class="wl-folder-count">${f.items.length} ${window.App.plural(f.items.length, ['шоу', 'шоу', 'шоу'])}</div>
                 </div>
             </div>
         </div>
@@ -437,8 +437,7 @@ function renderIconPicker(activeIcon) {
     `).join('');
 }
 
-window.App = {
-    ...window.App,
+Object.assign(window.App, {
     loadWishlist: loadWishlist,
     selectWlFolder: function (id) {
         if (activeWlFolderId === id) return;
@@ -464,19 +463,9 @@ window.App = {
     toggleReorderMode: function () {
         const cur = window.App.State.getState('flags.isReorderMode');
         window.App.State.setState('flags.isReorderMode', !cur);
-        isReorderMode = !cur;
-        const btn = document.getElementById('wl-reorder-btn');
-        const viewWrap = document.getElementById('view-wishlist');
-
-        btn.innerHTML = isReorderMode ? Icons.reorder : Icons.reorder;
-        btn.style.background = isReorderMode ? 'var(--accent)' : 'var(--bg-input)';
-        btn.style.color = isReorderMode ? '#fff' : 'var(--text-primary)';
-
-        viewWrap.classList.toggle('reorder-active-state', isReorderMode);
-        document.getElementById('wl-folders-grid').classList.toggle('reorder-mode', isReorderMode);
-
+        
         if (wlFoldersSortable) {
-            wlFoldersSortable.option('disabled', !isReorderMode);
+            wlFoldersSortable.option('disabled', cur); // cur здесь это старое значение
         }
 
         renderWishlistFolders();
@@ -484,17 +473,9 @@ window.App = {
     toggleItemsReorderMode: function () {
         const cur = window.App.State.getState('flags.isItemsReorderMode');
         window.App.State.setState('flags.isItemsReorderMode', !cur);
-        isItemsReorderMode = !cur;
-        const btn = document.getElementById('wl-items-reorder-btn');
-        const container = document.getElementById('wl-items-container');
-
-        btn.style.background = isItemsReorderMode ? 'var(--accent)' : 'var(--bg-input)';
-        btn.style.color = isItemsReorderMode ? '#fff' : 'var(--text-primary)';
-
-        container.classList.toggle('reorder-items-mode', isItemsReorderMode);
 
         if (wlItemsSortable) {
-            wlItemsSortable.option('disabled', !isItemsReorderMode);
+            wlItemsSortable.option('disabled', cur);
         }
     },
     confirmDeleteWlItem: function (id) {
@@ -557,7 +538,7 @@ window.App = {
         }
     },
     closeItemDeleteModal: function () {
-        document.getElementById('wl-item-delete-modal').classList.remove('show');
+        window.App.State.setState('modals.wlDelete.isOpen', false);
         itemToDeleteId = null;
         itemToDeleteElement = null;
     },
@@ -773,7 +754,7 @@ window.App = {
                 }
 
                 grid.innerHTML = data.folders.map(f => {
-                    const countText = `${f.items.length} ${plural(f.items.length, ['элемент', 'элемента', 'элементов'])}`;
+                    const countText = `${f.items.length} ${window.App.plural(f.items.length, ['элемент', 'элемента', 'элементов'])}`;
                     return `
                         <div class="wl-folder-card" onclick="window.App.addToFolder(${f.id})">
                             <div class="wl-folder-icon" style="color: ${f.color};">
@@ -841,4 +822,4 @@ window.App = {
 
         window.App.setWlSortMode(newMode);
     }
-};
+});

@@ -191,14 +191,14 @@
         const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
         
         document.getElementById('s-time').textContent  = s.duration_display || '0м';
-        document.getElementById('s-views').textContent = vViews + ' ' + plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
+        document.getElementById('s-views').textContent = vViews + ' ' + window.App.plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
         document.getElementById('s-act').textContent   = (s.activity_percent || 0) + '%';
         document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
         document.getElementById('s-ep').textContent = vEp;
-        document.getElementById('s-ep').nextElementSibling.textContent = plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
-        document.getElementById('s-ser').textContent = vSer + ' ' + plural(vSer, ['сериал', 'сериала', 'сериалов']) + ' · ' + (s.series_duration || '0м');
+        document.getElementById('s-ep').nextElementSibling.textContent = window.App.plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+        document.getElementById('s-ser').textContent = vSer + ' ' + window.App.plural(vSer, ['сериал', 'сериала', 'сериалов']) + ' · ' + (s.series_duration || '0м');
         document.getElementById('s-mov').textContent = vMov;
-        document.getElementById('s-mov').nextElementSibling.textContent = plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
+        document.getElementById('s-mov').nextElementSibling.textContent = window.App.plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
         document.getElementById('s-uni').textContent = s.movies_duration || '0м';
         
         if (D.monthly_chart?.views?.some(v => v > 0)) {
@@ -248,7 +248,7 @@
             avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
             avgEl.style.color = ratingPalette[colorIdx];
             
-            document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
+            document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${window.App.plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
             
             const badge = document.getElementById('cr-badge');
             if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.background = 'rgba(46, 204, 113, 0.15)'; badge.style.color = '#2ecc71'; }
