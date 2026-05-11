@@ -1014,36 +1014,26 @@
         }
 
         async function openDetails(key, typeLabel) {
-            const modal = document.getElementById('details-modal');
-            const mContent = modal.querySelector('.modal-content');
+            const metricName = METRIC_CONFIG[key] || 'Детализация';
+            const context = { key, typeLabel };
+
+            if (window.App && window.App.setState) {
+                window.App.setState('modals.details', { isOpen: true, context });
+            } else {
+                document.getElementById('details-modal').classList.add('show');
+            }
+
             const list = document.getElementById('modal-list');
             const loader = document.getElementById('modal-loader');
             const title = document.getElementById('modal-title');
             const footer = document.getElementById('modal-footer');
 
-            const metricName = METRIC_CONFIG[key] || 'Детализация';
             title.innerText = `${metricName}: ${typeLabel}`;
-            
-            mContent.style.width = 'min(95vw, 400px)';
-            
             list.innerHTML = '';
             footer.classList.add('hidden');
-            modal.classList.add('show');
 
             if (!IS_AUTHENTICATED) {
-                mContent.style.width = 'min(95vw, 460px)';
-                list.innerHTML = `
-                    <div class="empty" style="grid-column: 1/-1; padding: 40px 20px;">
-                        <div class="icon" style="font-size: 48px; margin-bottom: 20px; color: var(--danger);">
-                            <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="2" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                        </div>
-                        <p style="font-size: 16px; margin-bottom: 20px; color: var(--text-primary);">
-                            Для просмотра деталей необходимо авторизоваться
-                        </p>
-                        <a href="/admin/login/?next=/" class="nav-btn active" style="padding: 12px 24px;">
-                            Войти в панель управления
-                        </a>
-                    </div>`;
+                list.innerHTML = `<div class="empty" style="grid-column: 1/-1; padding: 40px 20px;">Авторизуйтесь для просмотра</div>`;
                 return;
             }
 
@@ -1052,72 +1042,18 @@
             try {
                 const resp = await fetch(`/api/metrics/details/${key}/?type=${encodeURIComponent(typeLabel)}`);
                 const data = await resp.json();
-                
                 currentTargetTask = data.target_task || 'details';
-                
-                if (data.is_summary) {
-                    mContent.style.width = 'min(95vw, 460px)';
-                    list.innerHTML = `
-                        <div class="empty" style="grid-column: 1/-1; padding: 40px 20px;">
-                            <div class="icon" style="font-size: 48px; margin-bottom: 20px; color: var(--accent);">
-                                <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                            </div>
-                            <p style="font-size: 15px; margin-bottom: 24px; color: var(--text-secondary); text-align: center; line-height: 1.5;">
-                                Вы можете просмотреть полный список в панели управления.
-                            </p>
-                            <a href="${data.admin_url}" class="nav-btn active" style="padding: 12px 24px; display: inline-flex; align-items: center; gap: 8px;">
-                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                                Открыть в админке
-                            </a>
-                        </div>`;
-                    return;
-                }
 
                 if (data.items && data.items.length) {
                     currentModalItems = data.items;
                     currentModalDataContext = data;
                     currentModalOffset = 0;
-                    
-                    if (data.items.length > 5) {
-                        mContent.style.width = '95vw';
-                    } else {
-                        mContent.style.width = 'min(95vw, 550px)';
-                    }
-
-                    list.innerHTML = '';
-                    if (modalObserver) {
-                        modalObserver.disconnect();
-                        modalObserver = null;
-                    }
-                    
                     renderModalBatch();
-                    
-                    const adminBtnHtml = `
-                        <a href="${data.admin_url}" target="_blank" class="nav-btn active" style="margin-right:auto; background: var(--secondary); border-color: var(--border); color: var(--text-primary); padding: 12px 20px; display: inline-flex; align-items: center; gap: 8px;">
-                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                            Весь список в админке
-                        </a>
-                    `;
-
-                    footer.innerHTML = adminBtnHtml;
-                    if (key === 'duplicate_photo_urls') {
-                        // Кнопка "Объединить всё" не совсем подходит, так как в каждой группе свой мастер.
-                        // Оставляем только кнопку админки в футере, так как кнопки объединения теперь есть в каждой карточке группы.
-                    } else if (data.is_genre || key.includes('genre')) {
-                        // Для жанров кнопку очереди не добавляем
-                    } else if (!data.is_country && !data.is_person) {
-                        footer.innerHTML += `<button class="add-all-btn" id="add-all-btn" onclick="addAllToQueue()">В очередь на обновление</button>`;
-                        updateAddAllButtonState();
-                    }
                     footer.classList.remove('hidden');
                 } else {
-                    currentModalItems = [];
-                    mContent.style.width = 'min(95vw, 460px)';
                     list.innerHTML = '<div class="empty">Ничего не найдено</div>';
                 }
             } catch (e) {
-                currentModalItems = [];
-                mContent.style.width = 'min(95vw, 460px)';
                 list.innerHTML = '<div class="empty" style="color:var(--danger)">Ошибка загрузки</div>';
             } finally {
                 loader.classList.add('hidden');
@@ -1125,7 +1061,11 @@
         }
 
         function closeModal() {
-            document.getElementById('details-modal').classList.remove('show');
+            if (window.App && window.App.setState) {
+                window.App.setState('modals.details.isOpen', false);
+            } else {
+                document.getElementById('details-modal').classList.remove('show');
+            }
             if (modalObserver) {
                 modalObserver.disconnect();
                 modalObserver = null;

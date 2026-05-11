@@ -29,12 +29,7 @@ Object.assign(window.App, {
             episodesData: []
         };
 
-        window.App.State.setState('modals.rateShow', { isOpen: true, context: context });
-
-        document.getElementById('rate-show-title').textContent = title;
-        const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(context.showType);
-        document.getElementById('rate-mode-toggle').style.display = isSeries ? 'flex' : 'none';
-        
+        window.App.setState('modals.rateShow', { isOpen: true, context: context });
         window.App.initSlider();
         window.App.setRateLevel('show');
     },
@@ -325,14 +320,14 @@ Object.assign(window.App, {
 
     closeRateModal: function() {
         const ctx = window.App.State.getState('modals.rateShow.context');
+        
+        // Используем общий метод
+        window.App.closeModal('rateShow');
 
-        window.App.State.setState('modals.rateShow.isOpen', false);
-
-        if (ctx.needsRefresh) {
+        if (ctx && ctx.needsRefresh) {
             if (window.App.State.getState('nav.activeMainView') === 'stats') {
-                window.App.load(window.App.curYear);
+                window.App.load(window.App.getState('nav.query.y'));
             }
-
             window.App.openShowLayer(ctx.showId);
         }
     },

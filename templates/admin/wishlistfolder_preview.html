@@ -31,8 +31,10 @@
             </div>
 
             <div class="view-toggle" style="margin: 0; padding: 2px; background: var(--bg-input);">
-                <button type="button" class="vt-btn active" id="wl-vt-grid" onclick="if(window.App && window.App.setWlViewMode) window.App.setWlViewMode('grid')"></button>
-                <button type="button" class="vt-btn" id="wl-vt-list" onclick="if(window.App && window.App.setWlViewMode) window.App.setWlViewMode('list')"></button>
+                <button type="button" class="vt-btn active" id="wl-vt-grid" 
+                    onclick="if(window.App) window.App.setState('ui.wlViewMode', 'grid')"></button>
+                <button type="button" class="vt-btn" id="wl-vt-list" 
+                    onclick="if(window.App) window.App.setState('ui.wlViewMode', 'list')"></button>
             </div>
         </div>
     </div>

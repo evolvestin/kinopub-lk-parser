@@ -537,9 +537,8 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
 };
 
 window.loadCasinoHistory = async function() {
-    window.closeCasino();
-    document.getElementById('loader').classList.remove('hidden');
-    document.getElementById('loader').style.opacity = '1';
+    window.App.closeCasino();
+    window.App.showLoader();
 
     try {
         const res = await fetch('/api/webapp/casino/', {

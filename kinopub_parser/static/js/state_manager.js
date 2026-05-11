@@ -211,11 +211,9 @@ const stateInstance = new StateManager(DEFAULT_APP_STATE);
  * Здесь описываем, как DOM реагирует на изменения в State
  */
 function initUIEffects(App) {
-    // Эффект лоадера и видимости приложения
     App.subscribe('ui.isLoading', (loading) => {
         const loader = document.getElementById('loader');
         const app = document.getElementById('app');
-
         if (loading) {
             if (loader) {
                 loader.classList.remove('hidden');
@@ -225,19 +223,13 @@ function initUIEffects(App) {
             if (loader) {
                 loader.style.opacity = '0';
                 setTimeout(() => {
-                    if (!App.getState('ui.isLoading')) {
-                        loader.classList.add('hidden');
-                    }
+                    if (!App.getState('ui.isLoading')) loader.classList.add('hidden');
                 }, 400);
             }
-            // Главное исправление: показываем приложение, когда загрузка завершена
-            if (app) {
-                app.classList.remove('hidden');
-            }
+            if (app) app.classList.remove('hidden');
         }
     });
 
-    // Тема
     App.subscribe('ui.theme', (val) => {
         document.body.classList.toggle('light', val === 'light');
         document.querySelectorAll('.js-theme-toggle').forEach(btn => {
@@ -247,7 +239,61 @@ function initUIEffects(App) {
         });
     });
 
-    // Режимы редактирования
+    const MODAL_MAP = {
+        'addView': 'add-view-modal',
+        'rateShow': 'rate-show-modal',
+        'share': 'share-modal',
+        'wlFolder': 'wl-modal',
+        'wlEdit': 'wl-edit-modal',
+        'wlLimit': 'wl-limit-modal',
+        'wlDelete': 'wl-item-delete-modal',
+        'casino': 'casino-modal',
+        'details': 'details-modal'
+    };
+
+    Object.entries(MODAL_MAP).forEach(([stateKey, elId]) => {
+        App.subscribe(`modals.${stateKey}.isOpen`, (isOpen) => {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            
+            if (isOpen) {
+                el.classList.add('show');
+                document.body.style.overflow = 'hidden';
+            } else {
+                el.classList.remove('show');
+                const anyOpen = Object.keys(MODAL_MAP).some(key => App.getState(`modals.${key}.isOpen`));
+                if (!anyOpen) document.body.style.overflow = '';
+            }
+        });
+    });
+
+    App.subscribe('ui.activeStatsTab', val => {
+        if (typeof window.App.mainTab === 'function') {
+            window.App.mainTab(val, true);
+        }
+    });
+
+    const syncInput = (path) => {
+        document.querySelectorAll(`[data-state-bind="${path}"]`).forEach(el => {
+            stateInstance._updateElementValue(el, stateInstance.getState(path));
+        });
+    };
+
+    ['forms.search.query', 'ui.theme', 'flags.isReorderMode'].forEach(path => {
+        App.subscribe(path, () => syncInput(path));
+    });
+
+    App.subscribe('modals.addView.context', (ctx) => {
+        if (!ctx) return;
+        const titleEl = document.getElementById('add-view-title');
+        if (titleEl) titleEl.textContent = ctx.title || '';
+        const seContainer = document.getElementById('add-view-se-container');
+        if (seContainer) {
+            const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(ctx.type);
+            seContainer.style.display = isSeries ? 'flex' : 'none';
+        }
+    });
+
     App.subscribe('flags.isReorderMode', val => {
         const grid = document.getElementById('wl-folders-grid');
         if (grid) grid.classList.toggle('reorder-mode', val);
@@ -256,27 +302,6 @@ function initUIEffects(App) {
     App.subscribe('flags.isItemsReorderMode', val => {
         const container = document.getElementById('wl-items-container');
         if (container) container.classList.toggle('reorder-items-mode', val);
-    });
-
-    // Вкладки статистики
-    App.subscribe('ui.activeStatsTab', val => {
-        if (typeof window.App.mainTab === 'function') {
-            window.App.mainTab(val, true);
-        }
-    });
-
-    // Автоматическая синхронизация всех data-state-bind элементов (входящая)
-    // Мы подписываемся на "изменение чего угодно", чтобы обновить инпуты
-    // В продакшене лучше подписаться на конкретные ветки для перфоманса
-    const syncInput = (path) => {
-        document.querySelectorAll(`[data-state-bind="${path}"]`).forEach(el => {
-            stateInstance._updateElementValue(el, stateInstance.getState(path));
-        });
-    };
-
-    // Регистрируем базовые пути для авто-синхронизации инпутов
-    ['forms.search.query', 'ui.theme', 'flags.isReorderMode'].forEach(path => {
-        App.subscribe(path, () => syncInput(path));
     });
 }
 

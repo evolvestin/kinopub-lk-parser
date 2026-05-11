@@ -492,24 +492,24 @@
                 }
             }
 
-            // 3. Обработка закрытия модальных окон при клике на фон (Overlay)
-            const modalCloseMap = {
-                'details-modal': () => (typeof closeModal === 'function') && closeModal(),
-                'wl-item-delete-modal': () => window.App.closeItemDeleteModal(),
-                'add-view-modal': () => window.App.closeAddViewModal(),
-                'wl-modal': () => window.App.closeFolderModal(),
-                'wl-edit-modal': () => window.App.closeFolderEditModal(),
-                'wl-limit-modal': () => window.App.closeLimitModal(),
-                'casino-modal': () => window.App.closeCasino(),
-                'rate-show-modal': () => window.App.closeRateModal()
+            const modalToStateKey = {
+                'wl-item-delete-modal': 'wlDelete',
+                'add-view-modal': 'addView',
+                'wl-modal': 'wlFolder',
+                'wl-edit-modal': 'wlEdit',
+                'wl-limit-modal': 'wlLimit',
+                'casino-modal': 'casino',
+                'rate-show-modal': 'rateShow',
+                'share-modal': 'share',
+                'details-modal': 'details'
             };
 
-            Object.keys(modalCloseMap).forEach(id => {
-                const el = document.getElementById(id);
+            Object.entries(modalToStateKey).forEach(([elId, stateKey]) => {
+                const el = document.getElementById(elId);
                 if (el) {
                     el.addEventListener('click', (e) => {
-                        if (e.target.id === id) {
-                            modalCloseMap[id]();
+                        if (e.target.id === elId) {
+                            window.App.setState(`modals.${stateKey}.isOpen`, false);
                         }
                     });
                 }

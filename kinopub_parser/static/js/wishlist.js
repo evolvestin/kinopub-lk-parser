@@ -105,7 +105,10 @@ Object.assign(window.App, {
 
     renderWishlistFolders: function() {
         const grid = document.getElementById('wl-folders-grid');
+        if (!grid) return;
+        
         const wrapper = document.getElementById('wl-folders-wrapper');
+        const activeId = window.App.getState('data.activeWlFolderId');
 
         if (wrapper) {
             wrapper.style.display = window.App.wishlistFolders.length > 1 ? 'block' : 'none';
@@ -113,21 +116,19 @@ Object.assign(window.App, {
 
         if (!window.App.wishlistFolders.length) {
             grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Нет папок</div>';
-            if (window.App.wlFoldersSortable) { window.App.wlFoldersSortable.destroy(); window.App.wlFoldersSortable = null; }
             return;
         }
 
         grid.innerHTML = window.App.wishlistFolders.map(f => `
-            <div class="wl-folder-card ${f.id === window.App.activeWlFolderId && !window.App.isReorderMode ? 'active' : ''}" 
+            <div class="wl-folder-card ${f.id === activeId ? 'active' : ''}" 
                 data-id="${f.id}" 
                 onpointerdown="window.App.handleFolderPointerDown(${f.id})"
                 onpointerup="window.App.handleFolderPointerUp()"
-                onpointerleave="window.App.handleFolderPointerUp()"
-                onclick="if(!window.App.isFolderLongPress && !window.App.isReorderMode) window.App.selectWlFolder(${f.id})">
+                onclick="if(!window.App.isFolderLongPress && !window.App.getState('flags.isReorderMode')) window.App.selectWlFolder(${f.id})">
                 <div class="wl-delete-badge" onclick="event.stopPropagation(); window.App.deleteWlFolder(${f.id}, this.parentElement)">
                     ${window.App.Icons.minus}
                 </div>
-                <div class="wl-folder-inner ${window.App.isReorderMode ? 'wiggle' : ''}">
+                <div class="wl-folder-inner">
                     <div class="wl-folder-icon" style="background: ${f.color}20; color: ${f.color};">
                         ${window.App.Icons[f.icon] || window.App.Icons.folder}
                     </div>
@@ -139,51 +140,7 @@ Object.assign(window.App, {
             </div>
         `).join('');
 
-        requestAnimationFrame(() => {
-            window.App.fitAll('.wl-folder-name', grid);
-        });
-
-        if (typeof Sortable !== 'undefined' && !window.App.wlFoldersSortable) {
-            window.App.wlFoldersSortable = new Sortable(grid, {
-                animation: 350,
-                easing: "cubic-bezier(0.25, 1, 0.5, 1)",
-                disabled: true,
-                forceFallback: true,
-                fallbackOnBody: true,
-                fallbackClass: 'sortable-fallback',
-                ghostClass: 'sortable-ghost',
-                onStart: function (evt) {
-                    document.body.classList.add('sorting-active');
-                    if (window.navigator.vibrate) window.navigator.vibrate(10);
-
-                    requestAnimationFrame(() => {
-                        const fallback = document.querySelector('.sortable-fallback');
-                        if (fallback) {
-                            fallback.style.width = evt.item.offsetWidth + 'px';
-                            fallback.style.height = evt.item.offsetHeight + 'px';
-                            const animatedChildren = fallback.querySelectorAll('.wiggle, .wl-folder-inner');
-                            animatedChildren.forEach(el => { el.style.animation = 'none'; });
-                            const badge = fallback.querySelector('.wl-delete-badge');
-                            if (badge) badge.style.display = 'none';
-                        }
-                    });
-                },
-                onEnd: function (evt) {
-                    document.body.classList.remove('sorting-active');
-                    const order = Array.from(grid.children).map(el => parseInt(el.dataset.id));
-                    
-                    // Синхронизируем локальное состояние с новым порядком DOM
-                    const newFolders = [];
-                    order.forEach(id => {
-                        const f = window.App.wishlistFolders.find(x => x.id === id);
-                        if (f) newFolders.push(f);
-                    });
-                    window.App.wishlistFolders = newFolders;
-
-                    window.App.sendWishlistAction('reorder_folders', { order });
-                }
-            });
-        }
+        requestAnimationFrame(() => window.App.fitAll('.wl-folder-name', grid));
     },
 
     renderActiveWlFolder: function() {
@@ -448,10 +405,8 @@ Object.assign(window.App, {
         }
     },
     selectWlFolder: function (id) {
-        if (window.App.getState('data.activeWlFolderId') === id) return;
         window.App.setState('data.activeWlFolderId', id);
         window.App.setState('nav.query.folderId', id);
-        window.App.Router.updateUrl();
     },
 
     initWishlistReactivity: function() {
@@ -520,21 +475,14 @@ Object.assign(window.App, {
     },
 
     confirmDeleteWlItem: function (id) {
-        const el = document.querySelector(`.hist-item[data-id="${id}"], .grid-item-wrap[data-id="${id}"]`);
-        window.App.itemToDeleteId = id;
-        window.App.itemToDeleteElement = el;
-
         const item = window.App.wishlistFolders.flatMap(f => f.items).find(i => i.id === id);
         if (item) {
-            const ruType = window.App.SHOW_TYPE_RU[item.type] || 'шоу';
             const textEl = document.getElementById('wl-delete-confirm-text');
             if (textEl) {
-                textEl.innerHTML = `Вы уверены, что хотите удалить ${ruType} <b style="color:var(--text-primary)">«${item.title}»</b> из списка?`;
+                textEl.innerHTML = `Вы уверены, что хотите удалить <b style="color:var(--text-primary)">«${item.title}»</b>?`;
             }
         }
-
-        document.getElementById('wl-del-keep-stats').checked = true;
-        window.App.State.setState('modals.wlDelete', { isOpen: true, context: { id }});
+        window.App.setState('modals.wlDelete', { isOpen: true, context: { id }});
     },
     removeWlItem: function (id, element) {
         window.App.itemToDeleteId = id;
@@ -643,48 +591,34 @@ Object.assign(window.App, {
     },
     openFolderEditModal: function (isEdit = false, folderId = null) {
         if (!isEdit && window.App.wishlistFolders.length >= 12) {
-            window.App.State.setState('modals.wlLimit.isOpen', true);
+            window.App.setState('modals.wlLimit.isOpen', true);
             if (window.navigator.vibrate) window.navigator.vibrate([40, 100, 40]);
             return;
         }
 
         window.App.editFolderMode = isEdit ? 'edit' : 'create';
-        const titleEl = document.getElementById('wl-edit-title');
-        const nameInp = document.getElementById('wl-folder-name');
-        const delBtn = document.getElementById('wl-delete-folder-btn');
+        const folder = isEdit ? window.App.wishlistFolders.find(f => f.id === (folderId || window.App.activeWlFolderId)) : null;
 
-        let curName = '', curColor = FOLDER_COLORS[0], curIcon = FOLDER_ICONS[0];
+        const initialData = {
+            name: folder ? folder.name : '',
+            color: folder ? folder.color : window.App.FOLDER_COLORS[0],
+            icon: folder ? folder.icon : window.App.FOLDER_ICONS[0]
+        };
 
-        if (isEdit) {
-            if (folderId) window.App.activeWlFolderId = folderId;
-            const folder = window.App.wishlistFolders.find(f => f.id === window.App.activeWlFolderId);
-            if (!folder) return;
+        window.App.setState('forms.wlEdit', initialData);
+        window.App.setState('modals.wlEdit', { 
+            isOpen: true, 
+            context: { isEdit, folderId }
+        });
 
-            curName = folder.name;
-            curColor = folder.color;
-            curIcon = folder.icon;
-            titleEl.textContent = 'Настройки папки';
-            delBtn.style.display = 'block';
-        } else {
-            titleEl.textContent = 'Новая папка';
-            delBtn.style.display = 'none';
-        }
-
-        window.App.State.setState('forms.wlEdit', { name: curName, color: curColor, icon: curIcon });
-        nameInp.value = curName;
-        document.getElementById('wl-color-picker').dataset.color = curColor;
-        document.getElementById('wl-icon-picker').dataset.icon = curIcon;
-
-        window.App.renderColorPicker(curColor);
-        window.App.renderIconPicker(curIcon);
-
-        window.App.State.setState('modals.wlEdit', { isOpen: true, context: { isEdit, folderId }});
+        window.App.renderColorPicker(initialData.color);
+        window.App.renderIconPicker(initialData.icon);
     },
     closeFolderEditModal: function () {
         window.App.State.setState('modals.wlEdit.isOpen', false);
     },
     closeLimitModal: function () {
-        window.App.State.setState('modals.wlLimit.isOpen', false);
+        window.App.setState('modals.wlLimit.isOpen', false);
     },
     selectFolderColor: function (color) {
         document.querySelectorAll('.wl-color-btn').forEach(b => b.classList.remove('active'));
@@ -768,54 +702,38 @@ Object.assign(window.App, {
             try {
                 await window.App.sendWishlistAction('add_item', { folder_id: window.App.wishlistFolders[0].id, show_id: showId });
                 window.App.showToast('Успешно добавлено');
-            } catch (e) {
-                window.App.showToast('Ошибка при добавлении');
-            }
+            } catch (e) { window.App.showToast('Ошибка при добавлении'); }
             return;
         }
 
-        const modalTitle = document.getElementById('wl-modal-title');
-        const grid = document.getElementById('wl-modal-folders');
+        window.App.setState('modals.wlFolder', { isOpen: true, context: { showId, title } });
         
-        window.App.State.setState('modals.wlFolder', { isOpen: true, context: { showId, title }});
-
-        modalTitle.textContent = title;
-        grid.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:24px;height:24px;border-width:3px;"></div></div>';
+        const grid = document.getElementById('wl-modal-folders');
+        if (grid) grid.innerHTML = '<div class="loader-inline"><div class="spinner"></div></div>';
 
         try {
             const data = await window.App.sendWishlistAction('get');
             if (data.folders) {
                 window.App.wishlistFolders = data.folders;
-
-                if (window.App.wishlistFolders.length === 1) {
-                    window.App.closeFolderModal();
-                    await window.App.sendWishlistAction('add_item', { folder_id: window.App.wishlistFolders[0].id, show_id: showId });
+                if (data.folders.length === 1) {
+                    window.App.setState('modals.wlFolder.isOpen', false);
+                    await window.App.sendWishlistAction('add_item', { folder_id: data.folders[0].id, show_id: showId });
                     window.App.showToast('Успешно добавлено');
                     return;
                 }
-
-                grid.innerHTML = data.folders.map(f => {
-                    const countText = `${f.items.length} ${window.App.plural(f.items.length, ['элемент', 'элемента', 'элементов'])}`;
-                    return `
+                if (grid) {
+                    grid.innerHTML = data.folders.map(f => `
                         <div class="wl-folder-card" onclick="window.App.addToFolder(${f.id})">
-                            <div class="wl-folder-icon" style="color: ${f.color};">
-                                ${window.App.Icons[f.icon] || window.App.Icons.folder}
-                            </div>
+                            <div class="wl-folder-icon" style="color: ${f.color};">${window.App.Icons[f.icon] || window.App.Icons.folder}</div>
                             <div class="wl-folder-info">
                                 <div class="wl-folder-name">${f.name}</div>
-                                <div class="wl-folder-count">${countText}</div>
+                                <div class="wl-folder-count">${f.items.length} элементов</div>
                             </div>
                         </div>
-                    `;
-                }).join('');
-
-                if (!data.folders.length) {
-                    grid.innerHTML = '<div class="empty">У вас пока нет папок</div>';
+                    `).join('');
                 }
             }
-        } catch (e) {
-            grid.innerHTML = '<div class="empty">Ошибка загрузки списков</div>';
-        }
+        } catch (e) { if (grid) grid.innerHTML = '<div class="empty">Ошибка загрузки</div>'; }
     },
     closeFolderModal: function () {
         window.App.State.setState('modals.wlFolder.isOpen', false);

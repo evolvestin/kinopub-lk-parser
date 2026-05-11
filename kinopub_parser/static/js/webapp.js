@@ -283,9 +283,7 @@ Object.assign(window.App, {
         window.App.setState('ui.activeStatsTab', t);
     },
     pickYear: function(y) {
-        if (window.App.getState('nav.query.y') === y) return;
         window.App.setState('nav.query.y', y);
-        window.App.Router.updateUrl();
     },
     openShowLayer: async function(showId, fromRouter = false) {
         if (!showId) return false;
@@ -801,26 +799,23 @@ Object.assign(window.App, {
         window.App.itemToDeleteElement = null;
     },
     openAddViewModal: function(showId, title, type) {
-        // Вместо прямого изменения DOM, просто обновляем стейт. 
-        // data-state-bind сам обновит значения в инпутах.
+        const today = new Date().toISOString().split('T')[0];
+        const draft = {
+            season: '',
+            episode: '',
+            dateMode: 'exact',
+            exact: today,
+            month: today.substring(0, 7),
+            year: today.substring(0, 4)
+        };
+        
+        window.App.setState('forms.addView', draft);
         window.App.setState('modals.addView', { 
             isOpen: true, 
             context: { showId, title, type }
         });
         
-        document.getElementById('add-view-title').textContent = title;
-        const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(type);
-        document.getElementById('add-view-se-container').style.display = isSeries ? 'flex' : 'none';
-
-        const draft = window.App.getState('forms.addView');
-        if (!draft.exact) {
-            const today = new Date().toISOString().split('T')[0];
-            window.App.setState('forms.addView.exact', today);
-            window.App.setState('forms.addView.month', today.substring(0, 7));
-            window.App.setState('forms.addView.year', today.substring(0, 4));
-        }
-
-        window.App.setAddViewMode(draft.dateMode || 'exact');
+        window.App.setAddViewMode('exact');
     },
     setAddViewMode: function(mode, btn) {
         window.App.State.setState('forms.addView.dateMode', mode);
@@ -837,9 +832,12 @@ Object.assign(window.App, {
         document.getElementById('add-view-year').style.display = mode === 'year' ? 'block' : 'none';
         document.getElementById('add-view-unknown-text').style.display = mode === 'unknown' ? 'block' : 'none';
     },
-    closeAddViewModal: function() {
-        window.App.State.setState('modals.addView.isOpen', false);
-    },
+    closeAddViewModal: () => window.App.closeModal('addView'),
+    closeFolderModal: () => window.App.closeModal('wlFolder'),
+    closeFolderEditModal: () => window.App.closeModal('wlEdit'),
+    closeLimitModal: () => window.App.closeModal('wlLimit'),
+    closeItemDeleteModal: () => window.App.closeModal('wlDelete'),
+    closeRateModal: () => window.App.closeModal('rateShow'),
     submitAddView: async function() {
         const btn = document.getElementById('btn-add-view-submit');
         const origHtml = btn.innerHTML;
@@ -1069,13 +1067,25 @@ Object.assign(window.App, {
             }
         });
 
-        window.App.State.subscribe('nav.query.y', (year) => {
-            document.querySelectorAll('#years .yr').forEach(btn => {
-                const btnText = btn.textContent.trim();
-                const isAll = (year === 'all' || !year);
-                const targetLabel = isAll ? 'Всё время' : String(year);
-                btn.classList.toggle('on', btnText === targetLabel);
-            });
+        window.App.State.subscribe('nav.query.y', async (year) => {
+            window.App.markYear();
+
+            if (window.App.isSharedMode) {
+                if (window.App.SharedDataMap[year]) {
+                    window.App.D = window.App.SharedDataMap[year];
+                    window.App.render();
+                }
+            } else {
+                const cached = window.App.Data.getFromCache(year);
+                if (cached) {
+                    window.App.D = cached;
+                    window.App.render();
+                } else if (window.App.D) {
+                    await window.App.load(year);
+                }
+            }
+            // После смены года обновляем URL
+            window.App.Router.updateUrl();
         });
 
         window.App.State.subscribe('ui.theme', (theme) => {
@@ -1085,6 +1095,12 @@ Object.assign(window.App, {
                 btn.innerHTML = window.App.isDark ? window.App.Icons.moon : window.App.Icons.sun;
             });
             if (window.App.D) window.App.renderCharts();
+        });
+
+        window.App.subscribe('data.activeWlFolderId', (val) => {
+            window.App.activeWlFolderId = val;
+            window.App.renderWishlistFolders(); 
+            window.App.renderActiveWlFolder();
         });
 
         const modalMap = {
@@ -1100,10 +1116,9 @@ Object.assign(window.App, {
         };
 
         Object.entries(modalMap).forEach(([stateKey, elId]) => {
-            window.App.State.subscribe(`modals.${stateKey}`, (modalState) => {
+            window.App.State.subscribe(`modals.${stateKey}.isOpen`, (isOpen) => {
                 const el = document.getElementById(elId);
-                const isOpen = modalState && modalState.isOpen ? true : false;
-                if (el) el.classList.toggle('show', isOpen);
+                if (el) el.classList.toggle('show', !!isOpen);
             });
         });
 
@@ -1379,27 +1394,11 @@ Object.assign(window.App, {
     },
 
     showLoader: function() {
-        if (window.App.State) {
-            window.App.setState('ui.isLoading', true);
-        } else {
-            const l = document.getElementById('loader');
-            if (l) {
-                l.classList.remove('hidden');
-                l.style.opacity = '1';
-            }
-        }
+        window.App.setState('ui.isLoading', true);
     },
 
     hideLoader: function() {
-        if (window.App.State) {
-            window.App.setState('ui.isLoading', false);
-        } else {
-            const l = document.getElementById('loader');
-            if (l) {
-                l.style.opacity = '0';
-                setTimeout(() => l.classList.add('hidden'), 400);
-            }
-        }
+        window.App.setState('ui.isLoading', false);
     },
 
     switchPersonTab: function(category, mode) {
@@ -1453,10 +1452,19 @@ Object.assign(window.App, {
             h += `<button class="yr clickable" onclick="window.App.pickYear('${y}')">${y}</button>`; 
         });
         c.innerHTML = h;
+
+        window.App.markYear();
+    },
+
+    closeModal: function(key) {
+        const path = `modals.${key}.isOpen`;
+        if (window.App.getState(path) !== undefined) {
+            window.App.setState(path, false);
+        }
     },
 
     markYear: function() {
-        const y = window.App.State.getState('nav.query.y');
+        const y = window.App.getState('nav.query.y') || 'all';
         document.querySelectorAll('#years .yr').forEach(b => {
             const v = b.textContent.trim();
             const isAllTime = y === 'all' || !y;
@@ -2292,38 +2300,39 @@ Object.assign(window.App, {
             ${gGenH}`;
     },
     openShareModal: function() {
-        window.App.State.setState('modals.share.isOpen', true)
+        const hasGroup = !!window.App.D.group;
+        const config = {
+            anon_user: false,
+            inc_group: hasGroup,
+            anon_group: false
+        };
 
-        const grid = document.getElementById('share-years-grid');
-        grid.innerHTML = `<label><input type="checkbox" class="yr-chk-input" value="all" checked><div class="yr-chk-btn">Всё время</div></label>`;
-        
-        window.App.availableYears.filter(y => y !== 'all').forEach(y => {
-            grid.innerHTML += `<label><input type="checkbox" class="yr-chk-input" value="${y}"><div class="yr-chk-btn">${y}</div></label>`;
+        window.App.setState('modals.share', { 
+            isOpen: true, 
+            context: { config } 
         });
 
-        const hasGroup = !!window.App.D.group;
-        const groupWrap = document.getElementById('sh-group-wrap');
-        const anonGroupWrap = document.getElementById('sh-anon-group-wrap');
-        if (hasGroup) {
-            groupWrap.style.display = 'flex';
-            anonGroupWrap.style.display = 'flex';
-            document.getElementById('sh-inc-group').checked = true;
-        } else {
-            groupWrap.style.display = 'none';
-            anonGroupWrap.style.display = 'none';
-            document.getElementById('sh-inc-group').checked = false;
+        const grid = document.getElementById('share-years-grid');
+        if (grid) {
+            grid.innerHTML = `<label><input type="checkbox" class="yr-chk-input" value="all" checked><div class="yr-chk-btn">Всё время</div></label>`;
+            window.App.availableYears.filter(y => y !== 'all').forEach(y => {
+                grid.innerHTML += `<label><input type="checkbox" class="yr-chk-input" value="${y}"><div class="yr-chk-btn">${y}</div></label>`;
+            });
         }
 
-        document.getElementById('sh-anon-user').checked = false;
-        document.getElementById('sh-anon-group').checked = false;
+        const groupWrap = document.getElementById('sh-group-wrap');
+        const anonGroupWrap = document.getElementById('sh-anon-group-wrap');
+        if (groupWrap) groupWrap.style.display = hasGroup ? 'flex' : 'none';
+        if (anonGroupWrap) anonGroupWrap.style.display = hasGroup ? 'flex' : 'none';
+        
+        const incGroupCheck = document.getElementById('sh-inc-group');
+        if (incGroupCheck) incGroupCheck.checked = hasGroup;
 
         window.App.toggleGroupOpts();
-        document.getElementById('share-modal').classList.add('show');
     },
 
     closeShareModal: function() {
-        window.App.State.setState('modals.share.isOpen', false)
-        document.getElementById('share-modal').classList.remove('show');
+        window.App.setState('modals.share.isOpen', false);
     },
 
     toggleGroupOpts: function() {
