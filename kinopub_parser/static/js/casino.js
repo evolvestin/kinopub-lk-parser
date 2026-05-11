@@ -220,14 +220,14 @@ window.checkCasinoStatus = async function() {
 
 window.showCasinoFolders = function() {
     let allItemsCount = 0;
-    wishlistFolders.forEach(f => allItemsCount += f.items.length);
+    window.App.wishlistFolders.forEach(f => allItemsCount += f.items.length);
     if (allItemsCount === 0) {
         window.App.showToast('Ваш список избранного пуст!');
         window.closeCasino();
         return;
     }
 
-    const validFolders = wishlistFolders.filter(f => f.items.length > 0);
+    const validFolders = window.App.wishlistFolders.filter(f => f.items.length > 0);
 
     if (validFolders.length === 1) {
         window.startCasinoSpin(validFolders[0].id);
@@ -271,10 +271,10 @@ window.startCasinoSpin = async function(folderId) {
         let pool = [];
         if (folderId === 'all') {
             let map = new Map();
-            wishlistFolders.forEach(f => f.items.forEach(i => map.set(i.show_id, i)));
+            window.App.wishlistFolders.forEach(f => f.items.forEach(i => map.set(i.show_id, i)));
             pool = Array.from(map.values());
         } else {
-            const f = wishlistFolders.find(x => x.id === folderId);
+            const f = window.App.wishlistFolders.find(x => x.id === folderId);
             if (f) pool = f.items;
         }
         if (!pool.length) pool = [winner];
@@ -547,7 +547,7 @@ window.loadCasinoHistory = async function() {
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
-        D.casino_history = data.history || [];
+        window.App.D.casino_history = data.history || [];
         window.App.openHistoryLayer('casino', 'История рулетки');
     } catch(e) {
         window.App.showToast('Ошибка загрузки истории');

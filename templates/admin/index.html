@@ -187,7 +187,7 @@
 
         window.App.initIcons();
         
-        const s = D.summary || {};
+        const s = window.App.D.summary || {};
         const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
         
         document.getElementById('s-time').textContent  = s.duration_display || '0м';
@@ -201,45 +201,45 @@
         document.getElementById('s-mov').nextElementSibling.textContent = window.App.plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
         document.getElementById('s-uni').textContent = s.movies_duration || '0м';
         
-        if (D.monthly_chart?.views?.some(v => v > 0)) {
+        if (window.App.D.monthly_chart?.views?.some(v => v > 0)) {
             document.getElementById('card-dynamics').style.display = 'block';
         } else {
             document.getElementById('card-dynamics').style.display = 'none';
         }
 
-        if (D.weekday_chart?.data?.some(v => v > 0)) {
+        if (window.App.D.weekday_chart?.data?.some(v => v > 0)) {
             document.getElementById('card-weekday').style.display = 'block';
         } else {
             document.getElementById('card-weekday').style.display = 'none';
         }
 
-        if (D.heatmap?.length > 0) {
+        if (window.App.D.heatmap?.length > 0) {
             document.getElementById('card-heatmap').style.display = 'block';
             window.App.renderHeatmap();
         } else {
             document.getElementById('card-heatmap').style.display = 'none';
         }
 
-        if (D.genres?.length > 0) {
+        if (window.App.D.genres?.length > 0) {
             document.getElementById('card-genres').style.display = 'block';
         } else {
             document.getElementById('card-genres').style.display = 'none';
         }
 
-        const hasActors = (D.actors?.series?.length || D.actors?.others?.length);
-        if (hasActors) { document.getElementById('card-actors').style.display = 'block'; window.App.fillList('actors-list', D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series'); }
+        const hasActors = (window.App.D.actors?.series?.length || window.App.D.actors?.others?.length);
+        if (hasActors) { document.getElementById('card-actors').style.display = 'block'; window.App.fillList('actors-list', window.App.D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series'); }
         
-        const hasDirectors = (D.directors?.series?.length || D.directors?.others?.length);
-        if (hasDirectors) { document.getElementById('card-directors').style.display = 'block'; window.App.fillList('directors-list', D.directors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'directors', 'series'); }
+        const hasDirectors = (window.App.D.directors?.series?.length || window.App.D.directors?.others?.length);
+        if (hasDirectors) { document.getElementById('card-directors').style.display = 'block'; window.App.fillList('directors-list', window.App.D.directors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'directors', 'series'); }
         
-        const hasWriters = (D.writers?.series?.length || D.writers?.others?.length);
-        if (hasWriters) { document.getElementById('card-writers').style.display = 'block'; window.App.fillList('writers-list', D.writers.series, null, ['просмотр', 'просмотра', 'просмотров'], 'writers', 'series'); }
+        const hasWriters = (window.App.D.writers?.series?.length || window.App.D.writers?.others?.length);
+        if (hasWriters) { document.getElementById('card-writers').style.display = 'block'; window.App.fillList('writers-list', window.App.D.writers.series, null, ['просмотр', 'просмотра', 'просмотров'], 'writers', 'series'); }
         
-        if (D.countries?.length > 0) { document.getElementById('card-countries').style.display = 'block'; window.App.fillList('countries-list', D.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries'); }
-        if (D.binges?.length > 0) { document.getElementById('card-binges').style.display = 'block'; window.App.fillBinges(); }
+        if (window.App.D.countries?.length > 0) { document.getElementById('card-countries').style.display = 'block'; window.App.fillList('countries-list', window.App.D.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries'); }
+        if (window.App.D.binges?.length > 0) { document.getElementById('card-binges').style.display = 'block'; window.App.fillBinges(); }
 
-        if (D.ratings?.total > 0) {
-            const rt = D.ratings;
+        if (window.App.D.ratings?.total > 0) {
+            const rt = window.App.D.ratings;
             document.getElementById('ratings-box').style.display = 'block';
             const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
             const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));

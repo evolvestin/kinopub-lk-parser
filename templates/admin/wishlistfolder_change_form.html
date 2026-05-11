@@ -95,13 +95,13 @@
             if (!r.ok) throw new Error();
             const data = await r.json();
             
-            window.activeWlFolderId = parseInt(folderId);
-            window.wishlistFolders = [data]; 
+            window.App.activeWlFolderId = parseInt(folderId);
+            window.App.wishlistFolders = [data]; 
             
             // Ждем небольшую паузу для завершения парсинга webapp.js
             setTimeout(() => {
                 if (typeof initIcons === 'function') window.App.initIcons();
-                if (typeof renderActiveWlFolder === 'function') renderActiveWlFolder();
+                if (typeof renderActiveWlFolder === 'function') window.App.renderActiveWlFolder();
             }, 50);
             
         } catch (e) {

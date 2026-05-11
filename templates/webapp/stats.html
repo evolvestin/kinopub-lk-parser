@@ -482,7 +482,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             if (typeof switchPeriod === 'function') switchPeriod('now');
 
-            if (typeof window.init === 'function') {
+            if (typeof window.App.init === 'function') {
                 try {
                     await window.App.init();
                 } catch (e) {
