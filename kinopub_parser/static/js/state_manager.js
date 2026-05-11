@@ -70,18 +70,21 @@ class StateManager {
     // --- ПРИВАТНЫЕ МЕТОДЫ ---
 
     _emit(path, value) {
-        // Вызываем подписчиков конкретного пути
         if (this.listeners.has(path)) {
             this.listeners.get(path).forEach(cb => cb(value));
         }
 
-        // Вызываем подписчиков на родительские пути (wildcards)
-        // Если изменилось 'ui.theme', уведомляем тех, кто подписан на 'ui.*'
         const parts = path.split('.');
         if (parts.length > 1) {
-            const parentPath = parts.slice(0, -1).join('.') + '.*';
-            if (this.listeners.has(parentPath)) {
-                this.listeners.get(parentPath).forEach(cb => cb(this.getState(parts[0])));
+            // Идем вверх по дереву и уведомляем всех слушателей wildcard
+            // Пример: если изменилось 'modals.rateShow.isOpen', 
+            // уведомим 'modals.rateShow.*' и 'modals.*'
+            for (let i = 1; i < parts.length; i++) {
+                const parentPath = parts.slice(0, -i).join('.') + '.*';
+                if (this.listeners.has(parentPath)) {
+                    const subState = this.getState(parts.slice(0, -i).join('.'));
+                    this.listeners.get(parentPath).forEach(cb => cb(subState));
+                }
             }
         }
     }
@@ -142,11 +145,18 @@ class StateManager {
 
 const DEFAULT_APP_STATE = {
     ui: {
+        isLoading: true, // Добавлено состояние загрузки
         activeStatsTab: 'personal',
+        personTabs: {
+            actors: 'series',
+            directors: 'series',
+            writers: 'series'
+        },
         theme: 'dark',
-        viewMode: 'grid', // глобальный режим для истории
-        wlViewMode: 'grid', // локальный для вишлиста
+        viewMode: 'grid',
+        wlViewMode: 'grid',
         sortMode: 'default',
+        isSortMenuOpen: false,
         scrollPositions: {}
     },
     flags: {
@@ -160,7 +170,6 @@ const DEFAULT_APP_STATE = {
         query: { y: 'all', folderId: null },
         layerStack: []
     },
-    // Данные приложения
     data: {
         wishlistFolders: [],
         activeWlFolderId: null
@@ -202,6 +211,32 @@ const stateInstance = new StateManager(DEFAULT_APP_STATE);
  * Здесь описываем, как DOM реагирует на изменения в State
  */
 function initUIEffects(App) {
+    // Эффект лоадера и видимости приложения
+    App.subscribe('ui.isLoading', (loading) => {
+        const loader = document.getElementById('loader');
+        const app = document.getElementById('app');
+
+        if (loading) {
+            if (loader) {
+                loader.classList.remove('hidden');
+                loader.style.opacity = '1';
+            }
+        } else {
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => {
+                    if (!App.getState('ui.isLoading')) {
+                        loader.classList.add('hidden');
+                    }
+                }, 400);
+            }
+            // Главное исправление: показываем приложение, когда загрузка завершена
+            if (app) {
+                app.classList.remove('hidden');
+            }
+        }
+    });
+
     // Тема
     App.subscribe('ui.theme', (val) => {
         document.body.classList.toggle('light', val === 'light');

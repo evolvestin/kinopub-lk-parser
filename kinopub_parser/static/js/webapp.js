@@ -26,7 +26,6 @@ Object.assign(window.App, {
     currentHistoryOffset: 0,
     historyObserver: null,
 
-    viewMode: localStorage.getItem('kp_view_mode') || 'grid',  // есть аналогичный стейт, надо туда перенести
     viewStack: [],
 
     UserAvatarColors: [
@@ -283,29 +282,14 @@ Object.assign(window.App, {
     mainTab: function(t) { 
         window.App.setState('ui.activeStatsTab', t);
     },
-    pickYear: async function(y) {
+    pickYear: function(y) {
         if (window.App.getState('nav.query.y') === y) return;
-        
         window.App.setState('nav.query.y', y);
-        // markYear() больше не нужен, сработает подписка
-
-        if (window.App.isSharedMode) {
-            window.App.D = window.App.SharedDataMap[y];
-            window.App.render();
-        } else {
-            const cached = window.App.Data.getFromCache(y);
-            if (cached) {
-                window.App.D = cached;
-                window.App.render();
-            } else {
-                await window.App.load(y);
-            }
-        }
         window.App.Router.updateUrl();
     },
     openShowLayer: async function(showId, fromRouter = false) {
-        // ИСПРАВЛЕНИЕ: Защита от пустого ID при восстановлении стека или битых ссылках
         if (!showId) return false;
+        window.App.showLoader();
 
         document.getElementById('loader').classList.remove('hidden');
         document.getElementById('loader').style.opacity = '1';
@@ -422,7 +406,7 @@ Object.assign(window.App, {
                     <div class="show-meta-tags" style="animation-delay: 0.35s">
                         <div class="sm-tag">${show.year || '?'}</div>
                         <div class="sm-tag" style="color: var(--info); border-color: var(--info-dim); background: var(--info-dim)">${window.App.SHOW_TYPE_RU[show.type] || show.type || 'Show'}</div>
-                        ${show.status ? `<div class="sm-tag">${window.SHOW_STATUS_RU[show.status] || show.status}</div>` : ''}
+                        ${show.status ? `<div class="sm-tag">${window.App.SHOW_STATUS_RU[show.status] || show.status}</div>` : ''}
                     </div>
 
                     <div class="show-meta-tags" style="animation-delay: 0.4s">
@@ -527,6 +511,12 @@ Object.assign(window.App, {
             const y = window.App.State.getState('nav.query.y');
             if (y && y !== 'all') query.set('y', y);
             
+            // Сохраняем ID папки в URL, если мы в вишлисте
+            const folderId = window.App.State.getState('data.activeWlFolderId');
+            if (path.startsWith('wishlist') && folderId && folderId > 0) {
+                query.set('folder', folderId);
+            }
+            
             const q = window.App.State.getState('forms.search.query');
             if (path.startsWith('search') && q) {
                 query.set('q', q);
@@ -548,46 +538,73 @@ Object.assign(window.App, {
             if (window.App.State.getState('flags.isSyncingHash')) return;
             window.App.State.setState('flags.isSyncingHash', true);
 
-            const { segments, params } = window.App.Router.parse();
-            if (segments.length === 0) {
-                window.App.State.setState('flags.isSyncingHash', false);
-                return;
-            }
+            try {
+                const { segments, params } = window.App.Router.parse();
+                if (segments.length === 0) return;
 
-            const targetMainView = segments[0];
-            const year = params.get('y') || 'all';
+                const targetMainView = segments[0];
+                const year = params.get('y') || 'all';
+                const folderId = params.get('folder');
 
-            window.App.State.setState('nav.query.y', year);
+                // 1. Синхронизируем корень и базовые параметры
+                window.App.State.setState('nav.query.y', year);
+                if (folderId) window.App.State.setState('data.activeWlFolderId', parseInt(folderId));
 
-            if (window.App.State.getState('nav.activeMainView') !== targetMainView) {
-                // Закрываем все слои перед переключением корня
-                while (window.App.viewStack.length > 0) {
+                if (window.App.State.getState('nav.activeMainView') !== targetMainView) {
+                    while (window.App.viewStack.length > 0) {
+                        const top = window.App.viewStack.pop();
+                        top.el.remove();
+                    }
+                    window.App.switchMainView(targetMainView, true);
+                }
+
+                // 2. Загружаем данные если нужно
+                if (targetMainView === 'stats' || targetMainView === 'wishlist') {
+                    await window.App.load(year, false);
+                }
+
+                // 3. Дифференциальное обновление стека слоев
+                const layerSegments = segments.slice(1);
+                const targetStackDepth = Math.floor(layerSegments.length / 2);
+
+                // Удаляем лишние слои (назад)
+                while (window.App.viewStack.length > targetStackDepth) {
                     const top = window.App.viewStack.pop();
                     top.el.remove();
                 }
-                window.App.switchMainView(targetMainView, true);
+
+                // Достраиваем недостающие слои (вперед)
+                for (let i = window.App.viewStack.length; i < targetStackDepth; i++) {
+                    const type = layerSegments[i * 2];
+                    const id = layerSegments[i * 2 + 1];
+
+                    if (type === 'show') {
+                        await window.App.openShowLayer(id, true);
+                    } else if (type === 'history') {
+                        const titles = { 'all': 'Вся история', 'movies': 'Фильмы', 'episodes': 'Эпизоды' };
+                        window.App.openHistoryLayer(id, titles[id] || 'История', null, null, null, null, true);
+                    } else if (['person', 'genre', 'country'].includes(type)) {
+                        await window.App.openCollectionLayer(type, id, '', true);
+                    }
+                }
+
+                // Показываем только верхний слой или навигацию
+                if (window.App.viewStack.length > 0) {
+                    window.App.viewStack.forEach((layer, idx) => {
+                        layer.el.style.display = (idx === window.App.viewStack.length - 1) ? 'block' : 'none';
+                    });
+                    if (document.getElementById('bottom-nav')) document.getElementById('bottom-nav').style.display = 'none';
+                } else {
+                    if (!window.App.isSharedMode && document.getElementById('bottom-nav')) {
+                        document.getElementById('bottom-nav').style.display = 'flex';
+                    }
+                }
+            } finally {
+                window.App.State.setState('flags.isSyncingHash', false);
+                // Обновляем стейт стека для SessionStorage
+                const stackData = window.App.viewStack.map(item => item.context);
+                window.App.State.setState('nav.layerStack', stackData);
             }
-
-            await window.App.load(year, false);
-            window.App.markYear();
-
-            const layerSegments = segments.slice(1);
-            const targetDepth = Math.floor(layerSegments.length / 2);
-
-            // Синхронизируем стек слоев
-            while (window.App.viewStack.length > targetDepth) {
-                const top = window.App.viewStack.pop();
-                top.el.remove();
-            }
-
-            if (window.App.viewStack.length > 0) {
-                window.App.viewStack[window.App.viewStack.length - 1].el.style.display = 'block';
-            } else {
-                if (!window.App.isSharedMode) document.getElementById('bottom-nav').style.display = 'flex';
-            }
-
-            window.App.State.setState('flags.isSyncingHash', false);
-            window.App.Router.updateUrl();
         }
     },
     switchMainView: function(view, fromRouter = false) {
@@ -598,12 +615,13 @@ Object.assign(window.App, {
     },
 
     load: async function(year, isBackground = false) {
-        if (year === undefined || year === null) year = window.App.curYear;
+        if (year === undefined || year === null) {
+            year = window.App.getState('nav.query.y') || 'all';
+        }
 
         const cachedData = window.App.Data.getFromCache(year);
         if (cachedData) {
             if (!isBackground) {
-                window.App.curYear = year;
                 window.App.D = cachedData;
                 window.App.render();
                 window.App.hideLoader();
@@ -612,8 +630,7 @@ Object.assign(window.App, {
         }
 
         if (!isBackground) {
-            document.getElementById('loader').classList.remove('hidden');
-            document.getElementById('loader').style.opacity = '1';
+            window.App.showLoader();
         }
 
         try {
@@ -643,11 +660,7 @@ Object.assign(window.App, {
                 window.App.preloadAllPeriods();
             }
 
-            if (!isBackground) {
-                window.App.curYear = year;
-                window.App.D = j;
-                window.App.render();
-            } else if (year === window.App.curYear) {
+            if (year === window.App.getState('nav.query.y')) {
                 window.App.D = j;
                 window.App.render();
             }
@@ -968,12 +981,50 @@ Object.assign(window.App, {
     },
     init: async function() {
         if (window.IS_ADMIN_DASHBOARD) return;
-
         window.App.State.setState('flags.isSyncingHash', true);
+
+        const savedViewMode = localStorage.getItem('kp_view_mode') || 'grid';
+        window.App.setState('ui.viewMode', savedViewMode);
 
         if (typeof window.App.initWishlistReactivity === 'function') {
             window.App.initWishlistReactivity();
         }
+
+        ['actors', 'directors', 'writers'].forEach(cat => {
+            window.App.State.subscribe(`ui.personTabs.${cat}`, (mode) => {
+                const container = document.getElementById(`card-${cat}`);
+                if (!container || !window.App.D) return;
+
+                const btns = container.querySelectorAll('.vt-btn');
+                btns.forEach(btn => {
+                    const btnMode = btn.getAttribute('onclick').includes('series') ? 'series' : 'others';
+                    btn.classList.toggle('active', btnMode === mode);
+                });
+
+                const data = window.App.D[cat][mode];
+                window.App.fillList(`${cat}-list`, data, null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
+            });
+        });
+
+        window.App.subscribe('ui.viewMode', (mode) => {
+            localStorage.setItem('kp_view_mode', mode);
+            
+            const top = window.App.viewStack[window.App.viewStack.length - 1];
+            if (top && top.context.type === 'history') {
+                const btns = top.el.querySelectorAll('.layer-header .vt-btn');
+                if (btns.length >= 2) {
+                    btns[0].classList.toggle('active', mode === 'grid');
+                    btns[1].classList.toggle('active', mode === 'list');
+                }
+
+                window.App.currentHistoryOffset = 0;
+                const container = top.el.querySelector('#layer-hist-container');
+                if (container) container.innerHTML = '';
+                
+                if (window.App.historyObserver) window.App.historyObserver.disconnect();
+                window.App.renderHistoryBatchLayer();
+            }
+        });
 
         window.App.State.subscribe('nav.activeMainView', (view) => {
             const views = ['search', 'wishlist', 'stats'];
@@ -1048,7 +1099,6 @@ Object.assign(window.App, {
             'details': 'details-modal'
         };
 
-        // ИСПРАВЛЕНИЕ: Подписываемся на объект модалки целиком, а не на .isOpen
         Object.entries(modalMap).forEach(([stateKey, elId]) => {
             window.App.State.subscribe(`modals.${stateKey}`, (modalState) => {
                 const el = document.getElementById(elId);
@@ -1142,8 +1192,9 @@ Object.assign(window.App, {
                 }
             }
         } catch (e) {
-            console.error("Initialization error:", e);
+            console.error("Critical Init Error:", e);
         } finally {
+            window.App.hideLoader();
             window.App.State.setState('flags.isSyncingHash', false);
             window.App.Router.updateUrl();
             window.App.restoreModals();
@@ -1288,7 +1339,7 @@ Object.assign(window.App, {
     },
 
     loadShared: async function (statId) {
-        document.getElementById('loader').classList.remove('hidden');
+        window.App.showLoader();
         try {
             const r = await fetch(`/api/webapp/shared_stats/${statId}/`);
             if (!r.ok) throw new Error(`Ошибка HTTP сервера: ${r.status}`);
@@ -1303,8 +1354,11 @@ Object.assign(window.App, {
             window.App.render();
         } catch(e) { 
             console.error(e); 
-            document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Слепок не найден или произошла ошибка:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
-            document.getElementById('app').classList.remove('hidden');
+            const appEl = document.getElementById('app');
+            if (appEl) {
+                appEl.innerHTML = `<div style="padding: 40px; text-align:center; font-size: 16px; color: var(--text-primary);"><div style="font-size: 40px; margin-bottom: 10px;">❌</div>Слепок не найден или произошла ошибка:<br><br><span style="color:var(--danger);">${e.message}</span></div>`;
+                appEl.classList.remove('hidden');
+            }
         } finally {
             window.App.hideLoader();
         }
@@ -1324,19 +1378,32 @@ Object.assign(window.App, {
         }
     },
 
-    hideLoader: function() {
-        document.getElementById('loader').style.opacity = '0';
-        setTimeout(() => document.getElementById('loader').classList.add('hidden'), 400);
-        document.getElementById('app').classList.remove('hidden'); 
+    showLoader: function() {
+        if (window.App.State) {
+            window.App.setState('ui.isLoading', true);
+        } else {
+            const l = document.getElementById('loader');
+            if (l) {
+                l.classList.remove('hidden');
+                l.style.opacity = '1';
+            }
+        }
     },
 
-    switchPersonTab: function(category, mode, btn) {
-        const container = btn.closest('.view-toggle');
-        container.querySelectorAll('.vt-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        const data = window.App.D[category][mode];
-        window.App.fillList(`${category}-list`, data, null, ['просмотр', 'просмотра', 'просмотров'], category, mode);
+    hideLoader: function() {
+        if (window.App.State) {
+            window.App.setState('ui.isLoading', false);
+        } else {
+            const l = document.getElementById('loader');
+            if (l) {
+                l.style.opacity = '0';
+                setTimeout(() => l.classList.add('hidden'), 400);
+            }
+        }
+    },
+
+    switchPersonTab: function(category, mode) {
+        window.App.setState(`ui.personTabs.${category}`, mode);
     },
 
     renderRatingsDist: function() {
@@ -1386,7 +1453,6 @@ Object.assign(window.App, {
             h += `<button class="yr clickable" onclick="window.App.pickYear('${y}')">${y}</button>`; 
         });
         c.innerHTML = h;
-        window.App.markYear();
     },
 
     markYear: function() {
@@ -1637,7 +1703,7 @@ Object.assign(window.App, {
         window.App.isHistoryEditMode = false;
         
         if (type === 'all') { 
-            window.App.curHistData = [...D.history_movies, ...D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date)); 
+            window.App.curHistData = [...window.App.D.history_movies, ...window.App.D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date)); 
         } 
         else if (type === 'casino') {
             window.App.curHistData = window.App.D.casino_history;
@@ -1731,6 +1797,8 @@ Object.assign(window.App, {
             headerSectionHtml = `<div class="label"><div class="icon" style="color:var(--info)">${window.App.Icons.masks}</div>Жанр: ${title}</div>`;
         }
 
+        const currentViewMode = window.App.getState('ui.viewMode');
+
         const deleteBtnVisible = (!window.App.isSharedMode && type !== 'ratings');
         const deleteToggleBtn = deleteBtnVisible ? `<button class="wl-edit-btn" id="hist-del-toggle" onclick="window.App.toggleHistoryEditMode()">${window.App.Icons.trash}</button>` : '';
 
@@ -1748,8 +1816,8 @@ Object.assign(window.App, {
             <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0; justify-content: flex-end;">
                 ${deleteToggleBtn}
                 <div class="view-toggle" style="margin:0; padding:2px; flex-shrink: 0;">
-                    <button class="vt-btn ${window.App.viewMode === 'grid' ? 'active' : ''}" onclick="window.App.setViewModeLayer('grid')">${window.App.Icons.grid}</button>
-                    <button class="vt-btn ${window.App.viewMode === 'list' ? 'active' : ''}" onclick="window.App.setViewModeLayer('list')">${window.App.Icons.list}</button>
+                    <button class="vt-btn ${currentViewMode === 'grid' ? 'active' : ''}" onclick="window.App.setViewModeLayer('grid')">${window.App.Icons.grid}</button>
+                    <button class="vt-btn ${currentViewMode === 'list' ? 'active' : ''}" onclick="window.App.setViewModeLayer('list')">${window.App.Icons.list}</button>
                 </div>
             </div>
         </div>`;
@@ -1801,25 +1869,7 @@ Object.assign(window.App, {
     },
 
     setViewModeLayer: function(mode) {
-        window.App.viewMode = mode;
-        localStorage.setItem('kp_view_mode', mode);
-
-        const top = window.App.viewStack[window.App.viewStack.length - 1];
-
-        if (top && top.context.type === 'history') {
-            const btns = top.el.querySelectorAll('.vt-btn');
-
-            btns[0].classList.toggle('active', mode === 'grid');
-            btns[1].classList.toggle('active', mode === 'list');
-
-            window.App.currentHistoryOffset = 0;
-
-            top.el.querySelector('#layer-hist-container').innerHTML = '';
-
-            if (window.App.historyObserver) window.App.historyObserver.disconnect();
-
-            window.App.renderHistoryBatchLayer();
-        }
+        window.App.setState('ui.viewMode', mode);
     },
 
     getHistoryItemHtml: function(item, idx, type, mode) {
@@ -1912,7 +1962,6 @@ Object.assign(window.App, {
     },
 
     renderHistoryBatchLayer: function() {
-        // 1. Проверки на вход
         if (window.App.isRenderingBatch || window.App.currentHistoryOffset >= window.App.curHistData.length) return;
         
         const topLayer = window.App.viewStack[window.App.viewStack.length - 1];
@@ -1923,7 +1972,6 @@ Object.assign(window.App, {
 
         window.App.isRenderingBatch = true;
         
-        // 2. Подготовка данных
         const start = window.App.currentHistoryOffset;
         const end = start + historyBatchSize;
         const batch = window.App.curHistData.slice(start, end);
@@ -1935,8 +1983,8 @@ Object.assign(window.App, {
             return;
         }
 
-        // 3. Генерация HTML
         const grouping = topLayer.context.grouping;
+        const mode = window.App.getState('ui.viewMode');
         let html = '';
         
         batch.forEach((item, idx) => {
@@ -1946,7 +1994,7 @@ Object.assign(window.App, {
                     const dateObj = new Date(dateStr);
                     let groupKey = '';
                     if (grouping === 'month') {
-                        groupKey = `${RU_MONTHS[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+                        groupKey = `${window.App.RU_MONTHS[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
                     } else if (grouping === 'year') {
                         groupKey = `${dateObj.getFullYear()}`;
                     }
@@ -1960,13 +2008,13 @@ Object.assign(window.App, {
                     }
                 }
             }
-            html += window.App.getHistoryItemHtml(item, start + idx, window.App.curHistType, window.App.viewMode);
+            html += window.App.getHistoryItemHtml(item, start + idx, window.App.curHistType, mode);
         });
         
         // 4. Вставка в DOM
         if (start === 0) {
-            const wrapClass = window.App.viewMode === 'list' ? 'card' : 'hist-grid';
-            const wrapStyle = window.App.viewMode === 'list' ? 'margin:0; padding:0; border:none; background:transparent;' : '';
+            const wrapClass = mode === 'list' ? 'card' : 'hist-grid';
+            const wrapStyle = mode === 'list' ? 'margin:0; padding:0; border:none; background:transparent;' : '';
             container.innerHTML = `<div class="${wrapClass}" style="${wrapStyle}">${html}</div>`;
         } else {
             const target = container.querySelector('.card') || container.querySelector('.hist-grid');
@@ -2036,6 +2084,7 @@ Object.assign(window.App, {
     },
 
     openCollectionLayer: async function(type, id, titleFallback, fromRouter = false) {
+        window.App.showLoader();
         document.getElementById('loader').classList.remove('hidden');
         document.getElementById('loader').style.opacity = '1';
 
@@ -2151,12 +2200,20 @@ Object.assign(window.App, {
 
         if (tg?.BackButton) { 
             tg.BackButton.show(); 
-            tg.BackButton.onClick(window.App.popLayer); 
+            // Кнопка назад в TG теперь просто дергает историю браузера, 
+            // а popstate сам запустит Router.sync()
+            tg.BackButton.onClick(() => history.back()); 
         }
 
         if (!isSync) {
             window.App.Router.updateUrl();
         }
+
+        // Вызываем fitText после того как браузер отрисовал слой
+        requestAnimationFrame(() => {
+            const titleEl = layer.querySelector('.layer-title-main');
+            if (titleEl) window.App.fitText(titleEl);
+        });
     },
 
     popLayer: function() {

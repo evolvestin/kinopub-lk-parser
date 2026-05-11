@@ -152,7 +152,6 @@ let engine;
 window.openCasino = async function() {
     if (!engine) engine = new CasinoEngine();
     
-    const modal = document.getElementById('casino-modal');
     const body = document.getElementById('casino-body');
     const headerIcon = document.getElementById('casino-header-icon');
     const debugBtn = document.getElementById('casino-debug-reset');
@@ -163,9 +162,10 @@ window.openCasino = async function() {
     
     if (headerIcon) headerIcon.innerHTML = '🎰';
     body.style.opacity = '1';
-
     body.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div>';
-    modal.classList.add('show');
+
+    // Управляем через состояние
+    window.App.setState('modals.casino.isOpen', true);
 
     try {
         const res = await fetch('/api/webapp/casino/', {
@@ -453,6 +453,9 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
         window.setupCasinoLayout();
     }
 
+    // Сохраняем результат в контекст стейта для восстановления при перезагрузке
+    window.App.setState('modals.casino.context', { item, expires });
+
     const windowEl = document.getElementById('cas-window');
     const posterEl = document.getElementById('cas-poster');
     const placeholderEl = document.getElementById('cas-placeholder');
@@ -573,10 +576,10 @@ window.resetCasino = async function() {
 };
 
 window.closeCasino = function() {
-    const modal = document.getElementById('casino-modal');
+    // Управляем через состояние
+    window.App.setState('modals.casino.isOpen', false);
+
     const dimmer = document.getElementById('casino-global-dimmer');
-    
-    modal.classList.remove('show');
     if (dimmer) dimmer.classList.remove('active');
     document.body.classList.remove('app-shake-active');
 

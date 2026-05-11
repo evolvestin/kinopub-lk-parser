@@ -462,7 +462,6 @@ Object.assign(window.App, {
         });
         window.App.subscribe('flags.isReorderMode', () => window.App.renderWishlistFolders());
         
-        // ИСПРАВЛЕНИЕ: Обновляем локальную переменную перед вызовом рендера папки
         window.App.subscribe('data.activeWlFolderId', (val) => {
             window.App.activeWlFolderId = val;
             window.App.renderActiveWlFolder();
@@ -470,6 +469,25 @@ Object.assign(window.App, {
         window.App.subscribe('ui.wlViewMode', () => window.App.renderActiveWlFolder());
         window.App.subscribe('ui.sortMode', () => window.App.renderActiveWlFolder());
         window.App.subscribe('flags.isItemsReorderMode', () => window.App.renderActiveWlFolder());
+
+        window.App.subscribe('ui.isSortMenuOpen', (val) => {
+            const menu = document.getElementById('wl-sort-menu');
+            if (!menu) return;
+            
+            menu.classList.toggle('show', val);
+            
+            if (val) {
+                document.getElementById('si-reorder').innerHTML = window.App.Icons.reorder;
+                document.getElementById('si-added').innerHTML = window.App.Icons.sort_arrow;
+                document.getElementById('si-year').innerHTML = window.App.Icons.sort_arrow;
+
+                const closeHandler = () => {
+                    window.App.setState('ui.isSortMenuOpen', false);
+                    document.removeEventListener('click', closeHandler);
+                };
+                setTimeout(() => document.addEventListener('click', closeHandler), 10);
+            }
+        });
     },
 
     setWlViewMode: function (mode) {
@@ -812,37 +830,26 @@ Object.assign(window.App, {
             window.App.showToast('Ошибка при добавлении');
         }
     },
+
     toggleSortDropdown: function (e) {
         if (e) e.stopPropagation();
-        const menu = document.getElementById('wl-sort-menu');
-        const isVisible = menu.classList.contains('show');
-
-        document.querySelectorAll('.sort-dropdown-menu').forEach(m => m.classList.remove('show'));
-
-        if (!isVisible) {
-            document.getElementById('si-reorder').innerHTML = window.App.Icons.reorder;
-            document.getElementById('si-added').innerHTML = window.App.Icons.sort_arrow;
-            document.getElementById('si-year').innerHTML = window.App.Icons.sort_arrow;
-
-            menu.classList.add('show');
-            const closeHandler = () => {
-                menu.classList.remove('show');
-                document.removeEventListener('click', closeHandler);
-            };
-            setTimeout(() => document.addEventListener('click', closeHandler), 10);
-        }
+        const current = window.App.getState('ui.isSortMenuOpen');
+        window.App.setState('ui.isSortMenuOpen', !current);
     },
+
     setSortOption: function (type) {
+        const currentSortMode = window.App.getState('ui.sortMode');
         let newMode = 'default';
 
         if (type === 'added') {
-            newMode = (window.App.wlSortMode === 'added_desc') ? 'added_asc' : 'added_desc';
+            newMode = (currentSortMode === 'added_desc') ? 'added_asc' : 'added_desc';
         } else if (type === 'year') {
-            newMode = (window.App.wlSortMode === 'year_desc') ? 'year_asc' : 'year_desc';
+            newMode = (currentSortMode === 'year_desc') ? 'year_asc' : 'year_desc';
         } else {
             newMode = 'default';
         }
 
         window.App.setWlSortMode(newMode);
+        window.App.setState('ui.isSortMenuOpen', false);
     }
 });
