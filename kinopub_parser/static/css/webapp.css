@@ -325,9 +325,13 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 .hc { width: 100%; aspect-ratio: 1 / 1; border-radius: 15%; background: var(--bg-input); transition: transform var(--transition-bounce), background var(--transition-smooth); cursor: crosshair; position: relative; min-width: 0; }
 .hc-label { display: flex; align-items: center; font-size: 1.8cqw; line-height: 1; font-weight: 800; color: var(--text-muted); user-select: none; padding-right: 5px; }
 @media (max-width: 480px) { .hc-label { font-size: 7px; } }
-.h1 { background: rgba(35, 134, 54, 0.3); } .h2 { background: rgba(35, 134, 54, 0.6); } .h3 { background: rgba(35, 134, 54, 0.85); } .h4 { background: #39d353; box-shadow: 0 0 6px rgba(57, 211, 83, 0.3); }
+.hm-l1 { background: rgba(35, 134, 54, 0.3); } 
+.hm-l2 { background: rgba(35, 134, 54, 0.6); } 
+.hm-l3 { background: rgba(35, 134, 54, 0.85); } 
+.hm-l4 { background: #39d353; box-shadow: 0 0 6px rgba(57, 211, 83, 0.3); }
 .hm-leg { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 12px; font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; }
 .hm-leg .hc { width: 10px; height: 10px; border-radius: 15%; cursor: default; }
+.hm-leg .hm-l1, .hm-leg .hm-l2, .hm-leg .hm-l3, .hm-leg .hm-l4 { width: 10px; height: 10px; }
 .hm-wrapper { width: 100%; container-type: inline-size; overflow: hidden; }
 #heatmaps-wrapper { width: 100%; position: relative; }
 #hm-zoom-content { transform-origin: 0 0; transition: transform 0.1s ease-out; width: 100%; display: block; will-change: transform; }

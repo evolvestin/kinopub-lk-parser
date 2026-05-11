@@ -149,14 +149,11 @@ Object.assign(window.App, {
     },
 
     toggleTheme: function() {
-        window.App.isDark = !window.App.isDark;
-        document.body.classList.toggle('light', !window.App.isDark);
-        document.querySelectorAll('.js-theme-toggle').forEach(btn => {
-            btn.innerHTML = window.App.isDark ? window.App.Icons.moon : window.App.Icons.sun;
+        window.App.setState('ui.theme', (prev) => {
+            const next = prev === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('kt', next === 'dark' ? 'd' : 'l');
+            return next;
         });
-        localStorage.setItem('kt', window.App.isDark ? 'd' : 'l');
-        window.App.State.setState('ui.theme', window.App.isDark ? 'dark' : 'light');
-        if (window.App.D) window.App.renderCharts();
     },
 
     render: function() {
@@ -201,11 +198,14 @@ Object.assign(window.App, {
         document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
         document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
         document.getElementById('s-ep').textContent = vEp;
+        
         const epLbl = document.getElementById('s-ep').nextElementSibling;
         if (epLbl) epLbl.textContent = window.App.plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+        
         const serInfo = vSer + ' ' + window.App.plural(vSer, ['сериал', 'сериала', 'сериалов']);
         document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
         document.getElementById('s-mov').textContent = vMov;
+        
         const movLbl = document.getElementById('s-mov').nextElementSibling;
         if (movLbl) movLbl.textContent = window.App.plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
         document.getElementById('s-uni').textContent = s.movies_duration || '0м';
@@ -230,9 +230,16 @@ Object.assign(window.App, {
         toggle('card-weekday', hasWeekday);
         const hasHeatmap = window.App.D.heatmap?.length > 0;
         toggle('card-heatmap', hasHeatmap);
+        if (hasHeatmap) {
+            const hmContainer = document.getElementById('heatmaps-wrapper');
+            if (hmContainer) hmContainer.innerHTML = '';
+            window.App.renderHeatmap();
+        }
+        toggle('card-heatmap', hasHeatmap);
         if (hasHeatmap) window.App.renderHeatmap();
 
         toggle('card-genres', window.App.D.genres?.length > 0);
+        
         const hasActors = (window.App.D.actors?.series?.length || window.App.D.actors?.others?.length);
         toggle('card-actors', hasActors);
         if (hasActors) window.App.fillList('actors-list', window.App.D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series');
@@ -272,15 +279,15 @@ Object.assign(window.App, {
         window.App.renderGroup();
         window.App.renderCharts();
     },
+
     mainTab: function(t) { 
-        document.querySelectorAll('#main-tabs .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===t)); 
-        document.getElementById('sec-personal').classList.toggle('hidden', t!=='personal'); 
-        document.getElementById('sec-group').classList.toggle('hidden', t!=='group'); 
+        window.App.setState('ui.activeStatsTab', t);
     },
     pickYear: async function(y) {
-        if (window.App.State.getState('nav.query.y') === y) return;
-        window.App.State.setState('nav.query.y', y);
-        window.App.markYear();
+        if (window.App.getState('nav.query.y') === y) return;
+        
+        window.App.setState('nav.query.y', y);
+        // markYear() больше не нужен, сработает подписка
 
         if (window.App.isSharedMode) {
             window.App.D = window.App.SharedDataMap[y];
@@ -290,12 +297,16 @@ Object.assign(window.App, {
             if (cached) {
                 window.App.D = cached;
                 window.App.render();
-                window.App.getScrollContainer().scrollTop = 0;
-            } else await window.App.load(y);
+            } else {
+                await window.App.load(y);
+            }
         }
         window.App.Router.updateUrl();
     },
     openShowLayer: async function(showId, fromRouter = false) {
+        // ИСПРАВЛЕНИЕ: Защита от пустого ID при восстановлении стека или битых ссылках
+        if (!showId) return false;
+
         document.getElementById('loader').classList.remove('hidden');
         document.getElementById('loader').style.opacity = '1';
 
@@ -314,7 +325,7 @@ Object.assign(window.App, {
                     <div class="h-scroll-container" style="padding-bottom:16px;">
                         ${group.persons.map(p => {
                             const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
-                            const safeName = p.name.replace(/'/g, "\\'");
+                            const safeName = p.name ? p.name.replace(/'/g, "\\'") : '';
                             const imgHtml = p.photo_url 
                                 ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" 
                                     onerror="window.App.handleImgErr(this, ${fb}, '${safeName}')"
@@ -365,14 +376,14 @@ Object.assign(window.App, {
                 ]);
             }
 
-            const safeTitle = show.title.replace(/'/g, "\\'");
+            const safeTitle = show.title ? show.title.replace(/'/g, "\\'") : '';
             const rateVal = show.personal_rating ? show.personal_rating : 'null';
             
             let countriesMetaHtml = '';
             if (show.countries && show.countries.length > 0) {
                 countriesMetaHtml = `<div class="show-meta-tags" style="animation-delay: 0.3s">` + 
                     show.countries.map(c => {
-                        const safeCountryName = c.name.replace(/'/g, "\\'");
+                        const safeCountryName = c.name ? c.name.replace(/'/g, "\\'") : '';
                         return `<div class="sm-tag clickable" onclick="window.App.openCollectionLayer('country', ${c.id}, '${safeCountryName}')">${c.emoji ? c.emoji + ' ' : ''}${c.name}</div>`;
                     }).join('') + `</div>`;
             }
@@ -410,7 +421,7 @@ Object.assign(window.App, {
 
                     <div class="show-meta-tags" style="animation-delay: 0.35s">
                         <div class="sm-tag">${show.year || '?'}</div>
-                        <div class="sm-tag" style="color: var(--info); border-color: var(--info-dim); background: var(--info-dim)">${window.SHOW_TYPE_RU[show.type] || show.type || 'Show'}</div>
+                        <div class="sm-tag" style="color: var(--info); border-color: var(--info-dim); background: var(--info-dim)">${window.App.SHOW_TYPE_RU[show.type] || show.type || 'Show'}</div>
                         ${show.status ? `<div class="sm-tag">${window.SHOW_STATUS_RU[show.status] || show.status}</div>` : ''}
                     </div>
 
@@ -440,6 +451,7 @@ Object.assign(window.App, {
             });
             return true;
         } catch (e) {
+            console.error("openShowLayer error:", e);
             window.App.showToast('Не удалось загрузить данные шоу');
             return false;
         } finally {
@@ -579,30 +591,12 @@ Object.assign(window.App, {
         }
     },
     switchMainView: function(view, fromRouter = false) {
-        window.App.State.setState('nav.activeMainView', view);
-        
-        document.querySelectorAll('.view').forEach(el => {
-            el.style.display = 'none';
-            el.classList.remove('active-view');
-        });
-
-        const targetEl = document.getElementById(`view-${view}`);
-        if (targetEl) {
-            targetEl.style.display = view === 'search' ? 'flex' : 'block';
-            targetEl.classList.add('active-view');
-        }
-        
-        const savedScroll = window.App.State.getState(`ui.scrollPositions.${view}`) || 0;
-        window.App.getScrollContainer().scrollTop = savedScroll;
-
-        if (view === 'wishlist' && window.App.loadWishlist && !window.App.isSharedMode) {
-            window.App.loadWishlist();
-        }
-
-        if (!fromRouter && !window.App.State.getState('flags.isSyncingHash')) {
+        window.App.setState('nav.activeMainView', view);
+        if (!fromRouter && !window.App.getState('flags.isSyncingHash')) {
             window.App.Router.updateUrl();
         }
     },
+
     load: async function(year, isBackground = false) {
         if (year === undefined || year === null) year = window.App.curYear;
 
@@ -794,31 +788,23 @@ Object.assign(window.App, {
         window.App.itemToDeleteElement = null;
     },
     openAddViewModal: function(showId, title, type) {
-        const draft = window.App.State.getState('forms.addView');
-        window.App.State.setState('modals.addView', { isOpen: true, context: { showId, title, type }});
+        // Вместо прямого изменения DOM, просто обновляем стейт. 
+        // data-state-bind сам обновит значения в инпутах.
+        window.App.setState('modals.addView', { 
+            isOpen: true, 
+            context: { showId, title, type }
+        });
         
         document.getElementById('add-view-title').textContent = title;
         const isSeries = ['Series', 'Documentary Series', 'TV Show'].includes(type);
         document.getElementById('add-view-se-container').style.display = isSeries ? 'flex' : 'none';
-        
-        document.getElementById('add-view-season').value = draft.season || '';
-        document.getElementById('add-view-episode').value = draft.episode || '';
 
+        const draft = window.App.getState('forms.addView');
         if (!draft.exact) {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            window.App.State.setState('forms.addView.exact', `${year}-${month}-${day}`);
-            window.App.State.setState('forms.addView.month', `${year}-${month}`);
-            window.App.State.setState('forms.addView.year', year);
-            document.getElementById('add-view-exact').value = `${year}-${month}-${day}`;
-            document.getElementById('add-view-month').value = `${year}-${month}`;
-            document.getElementById('add-view-year').value = year;
-        } else {
-            document.getElementById('add-view-exact').value = draft.exact;
-            document.getElementById('add-view-month').value = draft.month;
-            document.getElementById('add-view-year').value = draft.year;
+            const today = new Date().toISOString().split('T')[0];
+            window.App.setState('forms.addView.exact', today);
+            window.App.setState('forms.addView.month', today.substring(0, 7));
+            window.App.setState('forms.addView.year', today.substring(0, 4));
         }
 
         window.App.setAddViewMode(draft.dateMode || 'exact');
@@ -926,7 +912,7 @@ Object.assign(window.App, {
         window.App.State.saveSessionDebounced = origSave;
 
         requestAnimationFrame(() => {
-            window.App.State.applyStateToDOM();
+            window.App.State.syncAllBindings();
         });
     },
     initIcons: function() {
@@ -983,8 +969,66 @@ Object.assign(window.App, {
     init: async function() {
         if (window.IS_ADMIN_DASHBOARD) return;
 
+        window.App.State.setState('flags.isSyncingHash', true);
+
+        if (typeof window.App.initWishlistReactivity === 'function') {
+            window.App.initWishlistReactivity();
+        }
+
+        window.App.State.subscribe('nav.activeMainView', (view) => {
+            const views = ['search', 'wishlist', 'stats'];
+            views.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) {
+                    el.style.display = (v === view) ? 'flex' : 'none';
+                    el.classList.toggle('active-view', (v === view));
+                }
+                const navBtn = document.getElementById(`bn-${v}`);
+                if (navBtn) navBtn.classList.toggle('active', v === view);
+            });
+
+            const bn = document.getElementById('bottom-nav');
+            if (bn && !window.App.isSharedMode) {
+                bn.style.display = (window.App.viewStack.length === 0) ? 'flex' : 'none';
+            }
+        });
+
+        window.App.State.subscribe('forms.search.query', (q) => {
+            if (!q || q.length < 2) {
+                const resEl = document.getElementById('search-results');
+                if (resEl) {
+                    resEl.innerHTML = `<div class="empty"><div class="icon" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px;">${window.App.Icons.search}</div>Введите название для поиска</div>`;
+                }
+                return;
+            }
+            window.App.doSearch(q);
+        });
+
+        window.App.State.subscribe('ui.activeStatsTab', (tab) => {
+            document.querySelectorAll('#main-tabs .tab').forEach(btn => {
+                btn.classList.toggle('on', btn.dataset.tab === tab);
+            });
+            const pSec = document.getElementById('sec-personal');
+            const gSec = document.getElementById('sec-group');
+            if (pSec) pSec.classList.toggle('hidden', tab !== 'personal');
+            if (gSec) gSec.classList.toggle('hidden', tab !== 'group');
+            
+            if (tab === 'group' && window.App.D && !window.App.D.group) {
+                window.App.renderGroup();
+            }
+        });
+
+        window.App.State.subscribe('nav.query.y', (year) => {
+            document.querySelectorAll('#years .yr').forEach(btn => {
+                const btnText = btn.textContent.trim();
+                const isAll = (year === 'all' || !year);
+                const targetLabel = isAll ? 'Всё время' : String(year);
+                btn.classList.toggle('on', btnText === targetLabel);
+            });
+        });
+
         window.App.State.subscribe('ui.theme', (theme) => {
-            window.App.isDark = theme === 'dark';
+            window.App.isDark = (theme === 'dark');
             document.body.classList.toggle('light', !window.App.isDark);
             document.querySelectorAll('.theme-btn, .js-theme-toggle').forEach(btn => {
                 btn.innerHTML = window.App.isDark ? window.App.Icons.moon : window.App.Icons.sun;
@@ -1004,9 +1048,11 @@ Object.assign(window.App, {
             'details': 'details-modal'
         };
 
+        // ИСПРАВЛЕНИЕ: Подписываемся на объект модалки целиком, а не на .isOpen
         Object.entries(modalMap).forEach(([stateKey, elId]) => {
-            window.App.State.subscribe(`modals.${stateKey}.isOpen`, (isOpen) => {
+            window.App.State.subscribe(`modals.${stateKey}`, (modalState) => {
                 const el = document.getElementById(elId);
+                const isOpen = modalState && modalState.isOpen ? true : false;
                 if (el) el.classList.toggle('show', isOpen);
             });
         });
@@ -1014,94 +1060,99 @@ Object.assign(window.App, {
         const scrollHandler = window.App.State._debounce((e) => {
             const target = e.target;
             if (target.id === 'views-container') {
-                window.App.State.setState(`ui.scrollPositions.${window.App.State.getState('nav.activeMainView')}`, target.scrollTop);
+                const currentView = window.App.State.getState('nav.activeMainView');
+                window.App.State.setState(`ui.scrollPositions.${currentView}`, target.scrollTop);
             } else if (target.classList.contains('layer')) {
-                window.App.State.setState(`ui.scrollPositions.layer_${window.App.viewStack.length}`, target.scrollTop);
+                const depth = window.App.viewStack.length;
+                window.App.State.setState(`ui.scrollPositions.layer_${depth}`, target.scrollTop);
             }
         }, 150);
 
-        document.getElementById('views-container').addEventListener('scroll', scrollHandler);
-        document.getElementById('dynamic-layers').addEventListener('scroll', scrollHandler, true);
+        const vContainer = document.getElementById('views-container');
+        const dLayers = document.getElementById('dynamic-layers');
+        if (vContainer) vContainer.addEventListener('scroll', scrollHandler);
+        if (dLayers) dLayers.addEventListener('scroll', scrollHandler, true);
 
         window.App.initIcons();
-        window.App.State.applyStateToDOM();
+        window.App.State.syncAllBindings();
 
-        window.App.State.setState('flags.isSyncingHash', true);
+        try {
+            const { segments } = window.App.Router.parse();
+            const sharedIdFromUrl = new URLSearchParams(window.location.search).get('shared_id');
+            const startParam = tg?.initDataUnsafe?.start_param || '';
 
-        const { segments } = window.App.Router.parse();
-        const sharedIdFromUrl = new URLSearchParams(window.location.search).get('shared_id');
-        const startParam = tg?.initDataUnsafe?.start_param || '';
+            let initialView = 'search';
+            if (sharedIdFromUrl || startParam.startsWith('stat_')) {
+                initialView = 'stats';
+                window.App.isSharedMode = true;
+            } else if (segments.length > 0) {
+                initialView = segments[0];
+            } else {
+                initialView = window.App.State.getState('nav.activeMainView') || 'search';
+            }
 
-        let initialView = 'search';
-        if (sharedIdFromUrl || startParam.startsWith('stat_')) {
-            initialView = 'stats';
-            window.App.isSharedMode = true;
-        } else if (segments.length > 0) {
-            initialView = segments[0];
-        } else {
-            initialView = window.App.State.getState('nav.activeMainView') || 'search';
-        }
+            window.App.setState('nav.activeMainView', initialView);
 
-        window.App.switchMainView(initialView, true);
-
-        if (window.App.isSharedMode) {
-            document.body.classList.add('has-banner');
-            document.getElementById('share-btn').classList.add('hidden');
-            document.getElementById('bottom-nav').style.display = 'none';
-            
-            const bannerContainer = document.getElementById('shared-banner-container');
-            bannerContainer.innerHTML = `<div class="shared-banner">Вы просматриваете чужую статистику</div>`;
-            
-            const sid = sharedIdFromUrl || startParam.replace('stat_', '');
-            await window.App.loadShared(sid);
-        } else {
-            await window.App.load(window.App.State.getState('nav.query.y') || 'all');
-            
-            const role = window.App.D?.meta?.role || 'guest';
-            document.getElementById('bottom-nav').style.display = 'flex';
-            document.body.classList.add('has-nav');
-            if (role === 'guest') document.getElementById('bn-stats').classList.add('hidden');
-
-            const savedStack = window.App.State.getState('nav.layerStack') || [];
-            if (savedStack.length > 0) {
-                for (const ctx of savedStack) {
-                    if (ctx.type === 'show') await window.App.openShowLayer(ctx.showId, true);
-                    else if (ctx.type === 'history') window.App.openHistoryLayer(ctx.htype, ctx.title, ctx.extraId, ctx.extraDate, ctx.extraKey, ctx.extraIndex, true);
-                    else if (['person', 'genre', 'country'].includes(ctx.type)) await window.App.openCollectionLayer(ctx.ctype, ctx.itemId, ctx.titleFallback, true);
+            if (window.App.isSharedMode) {
+                document.body.classList.add('has-banner');
+                const shareBtn = document.getElementById('share-btn');
+                if (shareBtn) shareBtn.classList.add('hidden');
+                
+                const bannerContainer = document.getElementById('shared-banner-container');
+                if (bannerContainer) {
+                    bannerContainer.innerHTML = `<div class="shared-banner">Вы просматриваете чужую статистику</div>`;
                 }
-            } else if (segments.length > 1) {
-                const layerSegments = segments.slice(1);
-                const historyTitles = {
-                    'all': 'Вся история',
-                    'movies': 'Фильмы',
-                    'episodes': 'Эпизоды',
-                    'wishlist_watched': 'Избранное',
-                    'casino': 'История рулетки'
-                };
+                
+                const sid = sharedIdFromUrl || startParam.replace('stat_', '');
+                await window.App.loadShared(sid);
+            } else {
+                const initialYear = window.App.State.getState('nav.query.y') || 'all';
+                await window.App.load(initialYear);
 
-                for (let i = 0; i < Math.floor(layerSegments.length / 2); i++) {
-                    const type = layerSegments[i * 2];
-                    const id = layerSegments[i * 2 + 1];
-                    if (type === 'show') await window.App.openShowLayer(id, true);
-                    else if (type === 'history') window.App.openHistoryLayer(id, historyTitles[id] || 'История', null, null, null, null, true);
-                    else if (['person', 'genre', 'country'].includes(type)) await window.App.openCollectionLayer(type, id, '', true);
+                if (typeof window.App.loadWishlist === 'function') {
+                    await window.App.loadWishlist();
+                }
+                
+                const role = window.App.D?.meta?.role || 'guest';
+                document.body.classList.add('has-nav');
+                const bnStats = document.getElementById('bn-stats');
+                if (role === 'guest' && bnStats) bnStats.classList.add('hidden');
+
+                const savedStack = window.App.State.getState('nav.layerStack') || [];
+                if (savedStack.length > 0) {
+                    for (const ctx of savedStack) {
+                        if (ctx.type === 'show') await window.App.openShowLayer(ctx.showId, true);
+                        else if (ctx.type === 'history') window.App.openHistoryLayer(ctx.htype, ctx.title, ctx.extraId, ctx.extraDate, ctx.extraKey, ctx.extraIndex, true);
+                        else if (['person', 'genre', 'country'].includes(ctx.type)) await window.App.openCollectionLayer(ctx.ctype, ctx.itemId, ctx.titleFallback, true);
+                    }
+                } else if (segments.length > 1) {
+                    const layerSegments = segments.slice(1);
+                    const historyTitles = {
+                        'all': 'Вся история', 'movies': 'Фильмы', 'episodes': 'Эпизоды',
+                        'wishlist_watched': 'Избранное', 'casino': 'История рулетки'
+                    };
+
+                    for (let i = 0; i < Math.floor(layerSegments.length / 2); i++) {
+                        const type = layerSegments[i * 2];
+                        const id = layerSegments[i * 2 + 1];
+                        if (type === 'show') await window.App.openShowLayer(id, true);
+                        else if (type === 'history') window.App.openHistoryLayer(id, historyTitles[id] || 'История', null, null, null, null, true);
+                        else if (['person', 'genre', 'country'].includes(type)) await window.App.openCollectionLayer(type, id, '', true);
+                    }
                 }
             }
+        } catch (e) {
+            console.error("Initialization error:", e);
+        } finally {
+            window.App.State.setState('flags.isSyncingHash', false);
+            window.App.Router.updateUrl();
+            window.App.restoreModals();
+
+            if (tg) {
+                tg.expand();
+                if (tg.ready) tg.ready();
+            }
         }
-
-        const savedSearchQuery = window.App.State.getState('forms.search.query');
-        if (savedSearchQuery && savedSearchQuery.length >= 2) {
-            window.App.doSearch(savedSearchQuery);
-        }
-
-        const currentTheme = window.App.State.getState('ui.theme');
-        document.querySelectorAll('.theme-btn, .js-theme-toggle').forEach(btn => {
-            btn.innerHTML = currentTheme === 'dark' ? window.App.Icons.moon : window.App.Icons.sun;
-        });
-
-        window.App.State.setState('flags.isSyncingHash', false);
-        window.App.Router.updateUrl();
-        window.App.restoreModals();
     },
 
     renderSearchResults: function(data) {
@@ -1437,7 +1488,7 @@ Object.assign(window.App, {
                 const d = document.createElement('div'); 
                 const y = curr.getFullYear(), m = String(curr.getMonth() + 1).padStart(2, '0'), day = String(curr.getDate()).padStart(2, '0');
                 const currStr = `${y}-${m}-${day}`, displayDate = `${day}.${m}.${y}`;
-                d.className = 'hc clickable' + (v ? ' h' + v : ''); 
+                d.className = 'hc clickable' + (v ? ' hm-l' + v : ''); 
                 if (v > 0) { d.setAttribute('onclick', `window.App.openHistoryLayer('day', '${displayDate}', null, '${currStr}')`); } else { d.setAttribute('onclick', `window.App.showToast('${displayDate}: просмотров нет')`); }
                 hm.appendChild(d); curr.setDate(curr.getDate() + 1);
             });

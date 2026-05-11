@@ -3,13 +3,8 @@ window.App = window.App || {};
 Object.assign(window.App, {
     folderLongPressTimer: null,
     isFolderLongPress: false,
-    isItemsReorderMode: false,  // ПОЧЕМУ ПЕРЕМЕННАЯ
-    isReorderMode: false,    // ПОЧЕМУ ПЕРЕМЕННАЯ
 
     activeWlFolderId: null,
-    wlViewMode: localStorage.getItem('wl_view_mode') || 'grid',  // ПОЧЕМУ ПЕРЕМЕННАЯ и локальное, а не через стейт?
-    wlSortMode: localStorage.getItem('wl_sort_mode') || 'default',  // ПОЧЕМУ ПЕРЕМЕННАЯ и локальное, а не через стейт?
-
     wlFoldersSortable: null,
     wlItemsSortable: null,
 
@@ -50,18 +45,13 @@ Object.assign(window.App, {
     ],
 
     handleFolderPointerDown: function(id) {
-        if (window.App.isReorderMode) return;
+        if (window.App.getState('flags.isReorderMode')) return;
 
         window.App.isFolderLongPress = false;
-
         window.App.folderLongPressTimer = setTimeout(() => {
             window.App.isFolderLongPress = true;
-
             window.App.openFolderEditModal(true, id);
-
-            if (window.navigator.vibrate) {
-                window.navigator.vibrate(50);
-            }
+            if (window.navigator.vibrate) window.navigator.vibrate(50);
         }, 600);
     },
 
@@ -203,8 +193,13 @@ Object.assign(window.App, {
         const mainHeader = document.getElementById('wl-main-header');
         const globalToggle = document.getElementById('wl-global-view-toggle');
 
-        const folders = window.App.wishlistFolders || window.App.wishlistFolders;
-        const activeId = window.App.activeWlFolderId || window.App.activeWlFolderId;
+        const folders = window.App.wishlistFolders || [];
+        const activeId = window.App.activeWlFolderId;
+
+        // Получаем значения из StateManager
+        const wlSortMode = window.App.getState('ui.sortMode') || 'default';
+        const wlViewMode = window.App.getState('ui.wlViewMode') || 'grid';
+        const isItemsReorderMode = window.App.getState('flags.isItemsReorderMode') || false;
 
         if (!activeId) {
             if (mainHeader) mainHeader.textContent = 'Избранное';
@@ -240,8 +235,8 @@ Object.assign(window.App, {
             if (titleEl && folders.length > 1) window.App.fitText(titleEl);
         });
 
-        document.getElementById('wl-vt-grid')?.classList.toggle('active', window.App.wlViewMode === 'grid');
-        document.getElementById('wl-vt-list')?.classList.toggle('active', window.App.wlViewMode === 'list');
+        document.getElementById('wl-vt-grid')?.classList.toggle('active', wlViewMode === 'grid');
+        document.getElementById('wl-vt-list')?.classList.toggle('active', wlViewMode === 'list');
 
         const triggerBtn = document.getElementById('wl-sort-trigger');
         if (triggerBtn) {
@@ -249,14 +244,14 @@ Object.assign(window.App, {
             let triggerIcon = window.App.Icons.reorder;
             let arrowClass = '';
 
-            if (window.App.wlSortMode.startsWith('added')) {
+            if (wlSortMode.startsWith('added')) {
                 triggerText = 'По дате';
                 triggerIcon = window.App.Icons.sort_arrow;
-                arrowClass = window.App.wlSortMode.endsWith('asc') ? 'rotate-180' : '';
-            } else if (window.App.wlSortMode.startsWith('year')) {
+                arrowClass = wlSortMode.endsWith('asc') ? 'rotate-180' : '';
+            } else if (wlSortMode.startsWith('year')) {
                 triggerText = 'По году';
                 triggerIcon = window.App.Icons.sort_arrow;
-                arrowClass = window.App.wlSortMode.endsWith('asc') ? 'rotate-180' : '';
+                arrowClass = wlSortMode.endsWith('asc') ? 'rotate-180' : '';
             } else {
                 triggerText = 'Порядок';
                 triggerIcon = window.App.Icons.reorder;
@@ -272,29 +267,29 @@ Object.assign(window.App, {
         document.querySelectorAll('.sort-item').forEach(item => {
             const opt = item.dataset.sort;
             let isActive = false;
-            if (opt === 'default' && window.App.wlSortMode === 'default') isActive = true;
-            if (opt === 'added' && window.App.wlSortMode.startsWith('added')) isActive = true;
-            if (opt === 'year' && window.App.wlSortMode.startsWith('year')) isActive = true;
+            if (opt === 'default' && wlSortMode === 'default') isActive = true;
+            if (opt === 'added' && wlSortMode.startsWith('added')) isActive = true;
+            if (opt === 'year' && wlSortMode.startsWith('year')) isActive = true;
 
             item.classList.toggle('active', isActive);
 
             const arrow = item.querySelector('.sort-arrow-icon');
             if (arrow && isActive) {
-                arrow.classList.toggle('rotate-180', window.App.wlSortMode.endsWith('asc'));
+                arrow.classList.toggle('rotate-180', wlSortMode.endsWith('asc'));
             }
         });
 
         const reorderBtn = document.getElementById('wl-items-reorder-btn');
         if (reorderBtn) {
-            reorderBtn.style.display = (folder.items.length > 1 && window.App.wlSortMode === 'default') ? 'flex' : 'none';
-            if (window.App.isItemsReorderMode && (folder.items.length <= 1 || window.App.wlSortMode !== 'default')) {
+            reorderBtn.style.display = (folder.items.length > 1 && wlSortMode === 'default') ? 'flex' : 'none';
+            if (isItemsReorderMode && (folder.items.length <= 1 || wlSortMode !== 'default')) {
                 window.App.toggleItemsReorderMode();
             }
-            reorderBtn.style.background = window.App.isItemsReorderMode ? 'var(--accent)' : 'var(--bg-input)';
-            reorderBtn.style.color = window.App.isItemsReorderMode ? '#fff' : 'var(--text-primary)';
+            reorderBtn.style.background = isItemsReorderMode ? 'var(--accent)' : 'var(--bg-input)';
+            reorderBtn.style.color = isItemsReorderMode ? '#fff' : 'var(--text-primary)';
         }
         
-        container?.classList.toggle('reorder-items-mode', window.App.isItemsReorderMode);
+        container?.classList.toggle('reorder-items-mode', isItemsReorderMode);
 
         if (!folder.items.length) {
             if (container) container.innerHTML = `<div class="empty"><div class="icon">${window.App.Icons.film}</div>Папка пуста</div>`;
@@ -303,20 +298,20 @@ Object.assign(window.App, {
         }
 
         let renderItems = [...folder.items];
-        if (window.App.wlSortMode === 'added_desc') {
+        if (wlSortMode === 'added_desc') {
             renderItems.sort((a, b) => new Date(b.added_at) - new Date(a.added_at) || b.id - a.id);
-        } else if (window.App.wlSortMode === 'added_asc') {
+        } else if (wlSortMode === 'added_asc') {
             renderItems.sort((a, b) => new Date(a.added_at) - new Date(b.added_at) || a.id - b.id);
-        } else if (window.App.wlSortMode === 'year_desc') {
+        } else if (wlSortMode === 'year_desc') {
             renderItems.sort((a, b) => (b.year || 0) - (a.year || 0) || b.id - a.id);
-        } else if (window.App.wlSortMode === 'year_asc') {
+        } else if (wlSortMode === 'year_asc') {
             renderItems.sort((a, b) => (a.year || 0) - (b.year || 0) || a.id - b.id);
         }
 
-        let itemsHtml = renderItems.map((item, idx) => window.App.getWlItemHtml(item, window.App.wlViewMode, idx)).join('');
+        let itemsHtml = renderItems.map((item, idx) => window.App.getWlItemHtml(item, wlViewMode, idx)).join('');
 
         if (container) {
-            if (window.App.wlViewMode === 'list') {
+            if (wlViewMode === 'list') {
                 container.innerHTML = `<div class="card" style="margin:0; padding:0; overflow:hidden; border:none; background:transparent;">${itemsHtml}</div>`;
             } else {
                 container.innerHTML = `<div class="hist-grid">${itemsHtml}</div>`;
@@ -338,7 +333,7 @@ Object.assign(window.App, {
                     group: 'wl-items',
                     animation: 350,
                     easing: "cubic-bezier(0.25, 1, 0.5, 1)",
-                    disabled: !window.App.isItemsReorderMode,
+                    disabled: !isItemsReorderMode,
                     forceFallback: true,
                     fallbackOnBody: true,
                     fallbackClass: 'sortable-fallback',
@@ -351,8 +346,6 @@ Object.assign(window.App, {
                         document.body.classList.remove('sorting-active');
                         if (evt.to === targetContainer) {
                             const order = Array.from(targetContainer.children).map(el => parseInt(el.dataset.id));
-                            
-                            // Синхронизируем локальное состояние элементов внутри папки
                             const folder = window.App.wishlistFolders.find(f => f.id === activeId);
                             if (folder) {
                                 const newItems = [];
@@ -362,7 +355,6 @@ Object.assign(window.App, {
                                 });
                                 folder.items = newItems;
                             }
-
                             window.App.sendWishlistAction('reorder_items', { folder_id: activeId, order });
                         }
                     }
@@ -397,7 +389,7 @@ Object.assign(window.App, {
                     ${item.original_title && item.original_title !== item.title ? `<div class="hist-orig">${item.original_title}</div>` : ''}
                     <div class="hist-meta">
                         ${item.year ? `<span>${item.year}</span>` : ''}
-                        ${item.type ? `<span>· ${window.SHOW_TYPE_RU[item.type] || item.type}</span>` : ''}
+                        ${item.type ? `<span>· ${window.App.SHOW_TYPE_RU[item.type] || item.type}</span>` : ''}
                         ${ratingHtml}
                         <span style="opacity: 0.6;">· ${addedDate}</span>
                     </div>
@@ -432,74 +424,83 @@ Object.assign(window.App, {
 
     loadWishlist: async function() {
         const grid = document.getElementById('wl-folders-grid');
-        const reorderBtn = document.getElementById('wl-reorder-btn');
-        if (!window.App.wishlistFolders.length) grid.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
+        if (!window.App.getState('data.wishlistFolders').length) {
+            grid.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
+        }
 
         try {
             const data = await window.App.sendWishlistAction('get');
-            window.App.wishlistFolders = data.folders || [];
-
-            if (reorderBtn) {
-                reorderBtn.style.display = window.App.wishlistFolders.length > 1 ? 'flex' : 'none';
-                if (window.App.isReorderMode && window.App.wishlistFolders.length <= 1) {
-                    window.App.toggleReorderMode();
-                }
-            }
-
-            let activeId = window.App.State.getState('nav.query.folderId');
-            const folderExists = window.App.wishlistFolders.some(f => f.id === activeId);
+            const folders = data.folders || [];
             
-            if (!folderExists) {
-                activeId = window.App.wishlistFolders.length > 0 ? window.App.wishlistFolders[0].id : null;
-                window.App.State.setState('nav.query.folderId', activeId);
-            }
+            window.App.setState('data.wishlistFolders', folders);
 
-            window.App.activeWlFolderId = activeId;
-            window.App.renderWishlistFolders();
-            window.App.renderActiveWlFolder();
+            let activeId = window.App.getState('nav.query.folderId');
+            const folderExists = folders.some(f => f.id === activeId);
+            
+            if (!folderExists && folders.length > 0) {
+                activeId = folders[0].id;
+                window.App.setState('nav.query.folderId', activeId);
+            }
+            
+            window.App.setState('data.activeWlFolderId', activeId);
         } catch (e) {
             grid.innerHTML = '<div class="empty">Ошибка загрузки</div>';
         }
     },
     selectWlFolder: function (id) {
-        if (window.App.activeWlFolderId === id) return;
-        window.App.activeWlFolderId = id;
-        window.App.State.setState('nav.query.folderId', id);
-        window.App.renderWishlistFolders();
-        window.App.renderActiveWlFolder();
+        if (window.App.getState('data.activeWlFolderId') === id) return;
+        window.App.setState('data.activeWlFolderId', id);
+        window.App.setState('nav.query.folderId', id);
+        window.App.Router.updateUrl();
+    },
+
+    initWishlistReactivity: function() {
+        window.App.subscribe('data.wishlistFolders', (val) => {
+            window.App.wishlistFolders = val || [];
+            window.App.renderWishlistFolders();
+            window.App.renderActiveWlFolder();
+        });
+        window.App.subscribe('flags.isReorderMode', () => window.App.renderWishlistFolders());
         
-        if (window.App.Router) {
-            window.App.outer.updateUrl();
-        }
+        // ИСПРАВЛЕНИЕ: Обновляем локальную переменную перед вызовом рендера папки
+        window.App.subscribe('data.activeWlFolderId', (val) => {
+            window.App.activeWlFolderId = val;
+            window.App.renderActiveWlFolder();
+        });
+        window.App.subscribe('ui.wlViewMode', () => window.App.renderActiveWlFolder());
+        window.App.subscribe('ui.sortMode', () => window.App.renderActiveWlFolder());
+        window.App.subscribe('flags.isItemsReorderMode', () => window.App.renderActiveWlFolder());
     },
+
     setWlViewMode: function (mode) {
-        window.App.wlViewMode = mode;
-        localStorage.setItem('wl_view_mode', mode);
+        window.App.setState('ui.wlViewMode', mode);
         window.App.renderActiveWlFolder();
     },
+
     setWlSortMode: function (mode) {
-        window.App.wlSortMode = mode;
-        localStorage.setItem('wl_sort_mode', mode);
+        window.App.setState('ui.sortMode', mode);
         window.App.renderActiveWlFolder();
     },
+
     toggleReorderMode: function () {
-        const cur = window.App.State.getState('flags.isReorderMode');
-        window.App.State.setState('flags.isReorderMode', !cur);
+        const cur = window.App.getState('flags.isReorderMode');
+        window.App.setState('flags.isReorderMode', !cur);
         
         if (window.App.wlFoldersSortable) {
             window.App.wlFoldersSortable.option('disabled', cur); 
         }
-
         window.App.renderWishlistFolders();
     },
+
     toggleItemsReorderMode: function () {
-        const cur = window.App.State.getState('flags.isItemsReorderMode');
-        window.App.State.setState('flags.isItemsReorderMode', !cur);
+        const cur = window.App.getState('flags.isItemsReorderMode');
+        window.App.setState('flags.isItemsReorderMode', !cur);
 
         if (window.App.wlItemsSortable) {
-            window.App.wlItemsSortable.option('disabled', cur);
+            window.App.wlItemsSortable.option('disabled', !window.App.getState('flags.isItemsReorderMode'));
         }
     },
+
     confirmDeleteWlItem: function (id) {
         const el = document.querySelector(`.hist-item[data-id="${id}"], .grid-item-wrap[data-id="${id}"]`);
         window.App.itemToDeleteId = id;
@@ -507,7 +508,7 @@ Object.assign(window.App, {
 
         const item = window.App.wishlistFolders.flatMap(f => f.items).find(i => i.id === id);
         if (item) {
-            const ruType = window.SHOW_TYPE_RU[item.type] || 'шоу';
+            const ruType = window.App.SHOW_TYPE_RU[item.type] || 'шоу';
             const textEl = document.getElementById('wl-delete-confirm-text');
             if (textEl) {
                 textEl.innerHTML = `Вы уверены, что хотите удалить ${ruType} <b style="color:var(--text-primary)">«${item.title}»</b> из списка?`;

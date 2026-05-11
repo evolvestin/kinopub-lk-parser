@@ -487,7 +487,7 @@ window.renderCasinoResult = function(item, expires, withAnimation = false) {
     }
     
     titleEl.textContent = item.title;
-    metaEl.textContent = `${item.year || ''} ${item.type ? '· ' + (window.SHOW_TYPE_RU[item.type] || item.type) : ''}`;
+    metaEl.textContent = `${item.year || ''} ${item.type ? '· ' + (window.App.SHOW_TYPE_RU[item.type] || item.type) : ''}`;
 
     btnWatch.onclick = () => { 
         window.closeCasino(); 
