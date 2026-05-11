@@ -45,37 +45,26 @@ Object.assign(window.App, {
     ],
 
     handleFolderPointerDown: function(id) {
-        if (window.App.getState('flags.isReorderMode')) return;
-
-        window.App.isFolderLongPress = false;
-        window.App.folderLongPressTimer = setTimeout(() => {
-            window.App.isFolderLongPress = true;
-            window.App.openFolderEditModal(true, id);
+        if (this.getState('flags.isReorderMode')) return;
+        this.isFolderLongPress = false;
+        this.folderLongPressTimer = setTimeout(() => {
+            this.isFolderLongPress = true;
+            this.openFolderEditModal(true, id);
             if (window.navigator.vibrate) window.navigator.vibrate(50);
         }, 600);
     },
 
     handleFolderPointerUp: function() {
-        clearTimeout(window.App.folderLongPressTimer);
+        clearTimeout(this.folderLongPressTimer);
     },
 
     sendWishlistAction: async function(action, payload = {}) {
         const r = await fetch('/api/webapp/wishlist/', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                action,
-                ...payload,
-                init_data: tg?.initData || '',
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, ...payload, init_data: tg?.initData || '' })
         });
-
-        if (!r.ok) {
-            throw new Error('Network response error');
-        }
-
+        if (!r.ok) throw new Error('Network error');
         return r.json();
     },
 
@@ -107,40 +96,41 @@ Object.assign(window.App, {
         const grid = document.getElementById('wl-folders-grid');
         if (!grid) return;
         
-        const wrapper = document.getElementById('wl-folders-wrapper');
-        const activeId = window.App.getState('data.activeWlFolderId');
+        const activeId = this.getState('data.activeWlFolderId');
+        const isReorder = this.getState('flags.isReorderMode');
 
-        if (wrapper) {
-            wrapper.style.display = window.App.wishlistFolders.length > 1 ? 'block' : 'none';
-        }
-
-        if (!window.App.wishlistFolders.length) {
-            grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Нет папок</div>';
-            return;
-        }
-
-        grid.innerHTML = window.App.wishlistFolders.map(f => `
-            <div class="wl-folder-card ${f.id === activeId ? 'active' : ''}" 
-                data-id="${f.id}" 
-                onpointerdown="window.App.handleFolderPointerDown(${f.id})"
-                onpointerup="window.App.handleFolderPointerUp()"
-                onclick="if(!window.App.isFolderLongPress && !window.App.getState('flags.isReorderMode')) window.App.selectWlFolder(${f.id})">
+        grid.innerHTML = this.wishlistFolders.map(f => `
+            <div class="wl-folder-card ${f.id === activeId && !isReorder ? 'active' : ''}" 
+                 data-id="${f.id}" 
+                 onpointerdown="window.App.handleFolderPointerDown(${f.id})"
+                 onpointerup="window.App.handleFolderPointerUp()"
+                 onclick="if(!window.App.isFolderLongPress && !window.App.getState('flags.isReorderMode')) window.App.selectWlFolder(${f.id})">
                 <div class="wl-delete-badge" onclick="event.stopPropagation(); window.App.deleteWlFolder(${f.id}, this.parentElement)">
-                    ${window.App.Icons.minus}
+                    ${this.Icons.minus}
                 </div>
                 <div class="wl-folder-inner">
                     <div class="wl-folder-icon" style="background: ${f.color}20; color: ${f.color};">
-                        ${window.App.Icons[f.icon] || window.App.Icons.folder}
+                        ${this.Icons[f.icon] || this.Icons.folder}
                     </div>
                     <div class="wl-folder-info">
                         <div class="wl-folder-name">${f.name}</div>
-                        <div class="wl-folder-count">${f.items.length} ${window.App.plural(f.items.length, ['шоу', 'шоу', 'шоу'])}</div>
+                        <div class="wl-folder-count">${f.items.length} ${this.plural(f.items.length, ['шоу', 'шоу', 'шоу'])}</div>
                     </div>
                 </div>
             </div>
         `).join('');
 
-        requestAnimationFrame(() => window.App.fitAll('.wl-folder-name', grid));
+        if (typeof Sortable !== 'undefined' && !this.wlFoldersSortable) {
+            this.wlFoldersSortable = new Sortable(grid, {
+                animation: 350,
+                disabled: !isReorder,
+                forceFallback: true,
+                onEnd: (evt) => {
+                    const order = Array.from(grid.children).map(el => parseInt(el.dataset.id));
+                    this.sendWishlistAction('reorder_folders', { order });
+                }
+            });
+        }
     },
 
     renderActiveWlFolder: function() {
@@ -382,54 +372,50 @@ Object.assign(window.App, {
     },
 
     loadWishlist: async function() {
-        const grid = document.getElementById('wl-folders-grid');
-        if (!window.App.getState('data.wishlistFolders').length) {
-            grid.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
-        }
-
         try {
-            const data = await window.App.sendWishlistAction('get');
+            const data = await this.sendWishlistAction('get');
             const folders = data.folders || [];
-            
-            window.App.setState('data.wishlistFolders', folders);
+            this.setState('data.wishlistFolders', folders);
 
-            let activeId = window.App.getState('nav.query.folderId');
-            const folderExists = folders.some(f => f.id === activeId);
-            
-            if (!folderExists && folders.length > 0) {
+            let activeId = this.getState('data.activeWlFolderId');
+            if (!activeId && folders.length > 0) {
                 activeId = folders[0].id;
-                window.App.setState('nav.query.folderId', activeId);
+                this.setState('data.activeWlFolderId', activeId);
             }
-            
-            window.App.setState('data.activeWlFolderId', activeId);
         } catch (e) {
-            grid.innerHTML = '<div class="empty">Ошибка загрузки</div>';
+            console.error('Wishlist load failed', e);
         }
     },
+
     selectWlFolder: function(id) {
-        window.App.setState('data.activeWlFolderId', id);
-        window.App.setState('nav.query.folderId', id);
-        // Больше никакого ручного вызова рендеринга!
-        window.App.Router.updateUrl();
+        this.setState('data.activeWlFolderId', id);
+        this.Router.updateUrl();
     },
 
     initWishlistReactivity: function() {
-        window.App.subscribe('data.wishlistFolders', (val) => {
-            window.App.wishlistFolders = val || [];
-            window.App.renderWishlistFolders();
+        this.subscribe('data.wishlistFolders', (val) => {
+            this.wishlistFolders = val || [];
+            this.renderWishlistFolders();
         });
         
-        window.App.subscribe('data.activeWlFolderId', () => window.App.renderActiveWlFolder());
-        window.App.subscribe('ui.wlViewMode', () => window.App.renderActiveWlFolder());
-        window.App.subscribe('ui.sortMode', () => window.App.renderActiveWlFolder());
-        window.App.subscribe('flags.isItemsReorderMode', (active) => {
-            document.getElementById('wl-items-container')?.classList.toggle('reorder-items-mode', active);
-            if (window.App.wlItemsSortable) window.App.wlItemsSortable.option('disabled', !active);
+        this.subscribe('data.activeWlFolderId', (id) => {
+            this.activeWlFolderId = id;
+            this.renderActiveWlFolder();
         });
 
-        window.App.subscribe('ui.isSortMenuOpen', (val) => {
-            const menu = document.getElementById('wl-sort-menu');
-            if (menu) menu.classList.toggle('show', val);
+        this.subscribe('ui.wlViewMode', () => this.renderActiveWlFolder());
+        this.subscribe('ui.sortMode', () => this.renderActiveWlFolder());
+        
+        this.subscribe('flags.isReorderMode', (active) => {
+            const grid = document.getElementById('wl-folders-grid');
+            if (grid) grid.classList.toggle('reorder-mode', active);
+            if (this.wlFoldersSortable) this.wlFoldersSortable.option('disabled', !active);
+        });
+
+        this.subscribe('flags.isItemsReorderMode', (active) => {
+            const container = document.getElementById('wl-items-container');
+            if (container) container.classList.toggle('reorder-items-mode', active);
+            if (this.wlItemsSortable) this.wlItemsSortable.option('disabled', !active);
         });
     },
 

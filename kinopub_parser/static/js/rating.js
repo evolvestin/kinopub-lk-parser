@@ -26,61 +26,63 @@ Object.assign(window.App, {
             needsRefresh: false,
             season: null,
             episode: null,
+            level: 'show',
             episodesData: []
         };
 
-        window.App.setState('modals.rateShow', { isOpen: true, context: context });
-        window.App.initSlider();
-        window.App.setRateLevel('show');
+        // Сначала устанавливаем контекст, потом открываем
+        this.setState('modals.rateShow.context', context);
+        this.setState('modals.rateShow.isOpen', true);
+
+        document.getElementById('rate-show-title').textContent = title;
+        
+        // Инициализация UI компонентов
+        requestAnimationFrame(() => {
+            this.initSlider();
+            this.setRateLevel('show');
+        });
     },
 
     initSlider: function() {
         const hitArea = document.getElementById('rate-slider-hit');
         if (!hitArea) return;
 
-        let isDragging = false;
-
         const handleMove = (e) => {
-            if (!isDragging && e.type === 'pointermove') return;
+            const ctx = this.getState('modals.rateShow.context');
+            if (!ctx.isDragging && e.type === 'pointermove') return;
             
             const rect = hitArea.querySelector('.rate-slider-track').getBoundingClientRect();
             const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-            let x = clientX - rect.left;
-            let percent = Math.max(0, Math.min(1, x / rect.width));
+            let percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
             
-            let val = 1 + (percent * 9);
-            val = Math.round(val * 2) / 2;
+            let val = Math.round((1 + (percent * 9)) * 2) / 2;
             
-            const ctx = window.App.State.getState('modals.rateShow.context');
             if (val !== ctx.currentVal) {
                 const oldVal = ctx.currentVal;
                 ctx.currentVal = val;
-                window.App.State.setState('modals.rateShow.context', ctx);
-                window.App.updateSliderUI(true);
+                this.setState('modals.rateShow.context', ctx);
+                this.updateSliderUI(true);
                 
                 if (window.navigator.vibrate) {
-                    if (Math.floor(val) !== Math.floor(oldVal)) {
-                        window.navigator.vibrate(10);
-                    } else {
-                        window.navigator.vibrate(3);
-                    }
+                    window.navigator.vibrate(Math.floor(val) !== Math.floor(oldVal) ? 10 : 3);
                 }
             }
         };
 
         hitArea.onpointerdown = (e) => {
-            isDragging = true;
+            const ctx = this.getState('modals.rateShow.context');
+            ctx.isDragging = true;
+            this.setState('modals.rateShow.context', ctx);
             hitArea.setPointerCapture(e.pointerId);
             handleMove(e);
         };
-
         hitArea.onpointermove = handleMove;
-
         hitArea.onpointerup = () => {
-            isDragging = false;
+            const ctx = this.getState('modals.rateShow.context');
+            ctx.isDragging = false;
+            this.setState('modals.rateShow.context', ctx);
         };
-
-        window.App.updateSliderUI();
+        this.updateSliderUI();
     },
 
     updateSliderUI: function(withPulse = false) {

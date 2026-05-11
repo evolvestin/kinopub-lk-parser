@@ -116,21 +116,16 @@ const DEFAULT_APP_STATE = {
         isLoading: true,
         isAppReady: false,
         activeStatsTab: 'personal',
-        personTabs: {
-            actors: 'series',
-            directors: 'series',
-            writers: 'series'
-        },
-        theme: 'dark',
-        viewMode: 'grid',
-        wlViewMode: 'grid',
-        sortMode: 'default',
+        personTabs: { actors: 'series', directors: 'series', writers: 'series' },
+        theme: localStorage.getItem('kt') === 'l' ? 'light' : 'dark',
+        viewMode: localStorage.getItem('kp_view_mode') || 'grid',
+        wlViewMode: localStorage.getItem('kp_wl_view_mode') || 'grid',
+        sortMode: localStorage.getItem('kp_sort_mode') || 'default',
         isSortMenuOpen: false,
-        scrollPositions: {},
-        toast: { text: '', type: 'info', visible: false },
-        helpPopoverVisible: false, // Новый флаг для подсказки в вишлисте
-        bottomNavVisible: true,    // Управление видимостью меню
-        shareBtnVisible: true      // Управление видимостью кнопки шаринга
+        helpPopoverVisible: false,
+        bottomNavVisible: true,
+        shareBtnVisible: true,
+        toast: { text: '', visible: false }
     },
     flags: {
         isReorderMode: false,
@@ -141,43 +136,29 @@ const DEFAULT_APP_STATE = {
     },
     nav: {
         activeMainView: 'search',
-        query: { y: 'all', folderId: null },
+        query: { y: 'all', folderId: null, q: '' },
         layerStack: []
     },
     data: {
-        stats: null, 
-        availableYears: [],
+        stats: null,
         wishlistFolders: [],
         activeWlFolderId: null,
-        search: {
-            results: null
-        },
-        history: {
-            list: [],
-            type: '',
-            title: '',
-            offset: 0,
-            batchSize: 80,
-            grouping: 'none',
-            lastGroupKey: null,
-            isRendering: false
+        search: { results: null },
+        history: { 
+            list: [], 
+            type: '', 
+            title: '', 
+            offset: 0, 
+            batchSize: 80, 
+            grouping: 'none', 
+            lastGroupKey: null, 
+            isRendering: false 
         }
     },
     forms: {
         search: { query: '' },
-        addView: { 
-            season: '', 
-            episode: '', 
-            dateMode: 'exact',
-            exact: '',
-            month: '',
-            year: ''
-        },
-        wlEdit: {
-            name: '',
-            color: '#388bfd',
-            icon: 'folder'
-        }
+        addView: { season: '', episode: '', dateMode: 'exact', exact: '', month: '', year: '' },
+        wlEdit: { name: '', color: '#388bfd', icon: 'folder' }
     },
     modals: {
         addView: { isOpen: false, context: {} },
@@ -200,6 +181,12 @@ const stateInstance = new StateManager(DEFAULT_APP_STATE);
  * Здесь описываем, как DOM реагирует на изменения в State
  */
 function initUIEffects(App) {
+    App.subscribe('data.search.results', (data) => {
+        if (data && typeof window.App.renderSearchResults === 'function') {
+            window.App.renderSearchResults(data);
+        }
+    });
+
     App.subscribe('ui.isLoading', (loading) => {
         const loader = document.getElementById('loader');
         if (!loader) return;
@@ -214,7 +201,6 @@ function initUIEffects(App) {
         }
     });
 
-    // Новое: управление видимостью всего приложения
     App.subscribe('ui.isAppReady', (ready) => {
         const appEl = document.getElementById('app');
         if (appEl && ready) {
@@ -331,30 +317,23 @@ function initUIEffects(App) {
         if (btn) btn.classList.toggle('hidden', !visible);
     });
 
-    // Реакция на изменение стека слоев для управления Bottom Nav
     App.subscribe('nav.layerStack', (stack) => {
         const isShared = App.getState('flags.isSharedMode');
-        // Если слоев нет и мы не в режиме шаринга — показываем навигацию
         App.setState('ui.bottomNavVisible', stack.length === 0 && !isShared);
     });
 
-    // Реакция на режим шаринга для кнопки Share
     App.subscribe('flags.isSharedMode', (isShared) => {
         App.setState('ui.shareBtnVisible', !isShared);
-        // Также обновляем навигацию, если флаг изменился внезапно
         const stack = App.getState('nav.layerStack');
         App.setState('ui.bottomNavVisible', stack.length === 0 && !isShared);
     });
 
     App.subscribe('data.stats', (d) => {
         if (!d) return;
-        
-        // 1. Мета-данные и Счетчики
         if (typeof window.App.updateUserMeta === 'function') window.App.updateUserMeta(d.meta);
         if (typeof window.App.updateOverview === 'function') window.App.updateOverview(d.summary);
         if (typeof window.App.updateRatingsSection === 'function') window.App.updateRatingsSection(d.ratings);
         
-        // 2. Списки (Actors, Directors, Writers, Countries, Binges)
         const categories = ['actors', 'directors', 'writers'];
         categories.forEach(cat => {
             const mode = App.getState(`ui.personTabs.${cat}`) || 'series';
@@ -366,17 +345,12 @@ function initUIEffects(App) {
 
         if (d.countries) window.App.fillList('countries-list', d.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
         if (d.binges) window.App.fillBinges(d.binges);
-
-        // 3. Графики
         if (typeof window.App.renderCharts === 'function') window.App.renderCharts(d);
-        
-        // 4. Групповая статистика
         if (App.getState('ui.activeStatsTab') === 'group' && typeof window.App.renderGroup === 'function') {
             window.App.renderGroup(d);
         }
     });
 
-    // Подписка на переключение табов людей (сериалы/фильмы)
     ['actors', 'directors', 'writers'].forEach(cat => {
         App.subscribe(`ui.personTabs.${cat}`, (mode) => {
             const d = App.getState('data.stats');
@@ -386,7 +360,6 @@ function initUIEffects(App) {
         });
     });
 
-    // Подписка на активную вкладку статистики (Личная/Группа)
     App.subscribe('ui.activeStatsTab', (tab) => {
         document.querySelectorAll('.tab[data-tab]').forEach(el => {
             el.classList.toggle('on', el.dataset.tab === tab);
@@ -398,7 +371,6 @@ function initUIEffects(App) {
         if (tab === 'group' && d) window.App.renderGroup(d);
     });
 
-    // Подписка на режим отображения истории (Сетка/Список)
     App.subscribe('ui.viewMode', (mode) => {
         const top = window.App.viewStack[window.App.viewStack.length - 1];
         if (top && top.context.type === 'history') {
@@ -409,6 +381,30 @@ function initUIEffects(App) {
             window.App.renderHistoryBatchLayer();
         }
         localStorage.setItem('kp_view_mode', mode);
+    });
+
+    App.subscribe('nav.activeMainView', (viewId) => {
+        document.querySelectorAll('.view').forEach(el => {
+            el.style.display = 'none';
+            el.classList.remove('active-view');
+        });
+        
+        const target = document.getElementById(`view-${viewId}`);
+        if (target) {
+            target.style.display = 'flex';
+            target.classList.add('active-view');
+        }
+
+        document.querySelectorAll('.bn-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.id === `bn-${viewId}`);
+        });
+
+        if (viewId === 'stats' && !App.getState('data.stats')) {
+            window.App.load();
+        }
+        if (viewId === 'wishlist' && App.getState('data.wishlistFolders').length === 0) {
+            window.App.loadWishlist();
+        }
     });
 }
 
@@ -429,25 +425,4 @@ Object.assign(window.App, {
 document.addEventListener('DOMContentLoaded', () => {
     initUIEffects(window.App);
     stateInstance.syncAllBindings();
-
-    // Слушаем изменения во всех инпутах с привязкой
-    document.addEventListener('input', (e) => {
-        const path = e.target.getAttribute('data-state-bind');
-        if (!path) return;
-
-        let value;
-        if (e.target.type === 'checkbox') value = e.target.checked;
-        else if (e.target.type === 'number') value = parseFloat(e.target.value);
-        else value = e.target.value;
-
-        window.App.setState(path, value);
-    });
-
-    // Специальная обработка для селектов/дат
-    document.addEventListener('change', (e) => {
-        const path = e.target.getAttribute('data-state-bind');
-        if (path && (e.target.tagName === 'SELECT' || e.target.type === 'date')) {
-            window.App.setState(path, e.target.value);
-        }
-    });
 });

@@ -11,9 +11,18 @@ Object.assign(window.App, {
 
     chR: null, chM: null, chW: null, chG: {},
     SharedDataMap: {},
+    availableYears: [],
     searchTimer: null,
     historyObserver: null,
     viewStack: [],
+
+    Templates: {
+        poster: function(url, size = 'small') {
+            const cls = size === 'big' ? 'hero-poster' : (size === 'medium' ? 'grid-poster' : 'hist-poster');
+            if (!url) return `<div class="${cls}"></div>`;
+            return `<img src="${url}" class="${cls}" loading="lazy" onerror="this.style.display='none'">`;
+        }
+    },
 
     UserAvatarColors: [
         '#3498db', '#9b59b6', '#f1c40f', '#e67e22', '#e74c3c', '#1abc9c', '#34495e', '#2ecc71',
@@ -258,186 +267,6 @@ Object.assign(window.App, {
     mainTab: (t) => window.App.setState('ui.activeStatsTab', t),
     pickYear: (y) => window.App.setState('nav.query.y', y),
 
-    openShowLayer: async function(showId, fromRouter = false) {
-        if (!showId) return false;
-        window.App.showLoader();
-
-        document.getElementById('loader').classList.remove('hidden');
-        document.getElementById('loader').style.opacity = '1';
-
-        try {
-            const r = await fetch(`/api/webapp/show/${showId}/?init_data=${encodeURIComponent(tg?.initData || '')}`);
-            if (!r.ok) throw new Error('Not found');
-            const show = await r.json();
-
-            window.App._activeShowHistory = show.view_history || [];
-
-            let crewHtml = '';
-            if (show.crew && show.crew.length > 0) {
-                show.crew.forEach((group, index) => {
-                    crewHtml += `
-                    <div class="label" style="${index === 0 ? '' : 'padding-top:0'}"><div class="icon" id="ic-users" style="color:#d29922"></div>${group.profession}</div>
-                    <div class="h-scroll-container" style="padding-bottom:16px;">
-                        ${group.persons.map(p => {
-                            const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
-                            const safeName = p.name ? p.name.replace(/'/g, "\\'") : '';
-                            const imgHtml = p.photo_url 
-                                ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" 
-                                    onerror="window.App.handleImgErr(this, ${fb}, '${safeName}')"
-                                    onload="window.App.handleKpPlaceholder(this, '${safeName}')">` 
-                                : `<div class="person-avatar">${window.App.Icons.person_placeholder}</div>`;
-                            return `
-                            <div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')">
-                                ${imgHtml}
-                                <div class="person-name">${p.name}</div>
-                            </div>`;
-                        }).join('')}
-                    </div>`;
-                });
-                crewHtml += '<div style="height: 12px;"></div>';
-            }
-
-            let genresHtml = '';
-            if (show.genres && show.genres.length > 0) {
-                genresHtml = `
-                <div class="label" style="padding-top:0"><div class="icon" id="it-star-internal" style="color:var(--info)"></div>Жанры</div>
-                <div class="h-scroll-container" style="padding-bottom:30px;">
-                    ${show.genres.map(g => `<div class="genre-pill" onclick="window.App.openCollectionLayer('genre', ${g.id}, '${g.name}')">${g.name}</div>`).join('')}
-                </div>`;
-            }
-
-            const fallbackUrl = show.poster_medium || '';
-            const posterUrl = show.poster_large || fallbackUrl;
-            const bgUrl = posterUrl || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-
-            const preloadUrls = [];
-            if (posterUrl) preloadUrls.push(posterUrl);
-            if (show.crew && show.crew.length > 0) {
-                const firstGroup = show.crew[0];
-                firstGroup.persons.slice(0, 6).forEach(p => {
-                    if (p.photo_url) preloadUrls.push(p.photo_url);
-                });
-            }
-
-            if (preloadUrls.length > 0) {
-                await Promise.race([
-                    Promise.all(preloadUrls.map(url => new Promise(res => {
-                        const img = new Image();
-                        img.onload = res;
-                        img.onerror = res;
-                        img.src = url;
-                    }))),
-                    new Promise(res => setTimeout(res, 1500))
-                ]);
-            }
-
-            const safeTitle = show.title ? show.title.replace(/'/g, "\\'") : '';
-            const rateVal = show.personal_rating ? show.personal_rating : 'null';
-            
-            let countriesMetaHtml = '';
-            if (show.countries && show.countries.length > 0) {
-                countriesMetaHtml = `<div class="show-meta-tags" style="animation-delay: 0.3s">` + 
-                    show.countries.map(c => {
-                        const safeCountryName = c.name ? c.name.replace(/'/g, "\\'") : '';
-                        return `<div class="sm-tag clickable" onclick="window.App.openCollectionLayer('country', ${c.id}, '${safeCountryName}')">${c.emoji ? c.emoji + ' ' : ''}${c.name}</div>`;
-                    }).join('') + `</div>`;
-            }
-
-            let lastViewHtml = '';
-            if (show.last_view) {
-                lastViewHtml = `<div class="sm-tag clickable" style="background:var(--accent-dim); color:var(--accent); border-color:var(--accent);" 
-                    onclick="window.App.openHistoryLayer('show_history', '${safeTitle}', null, null, window.App._activeShowHistory)">
-                    ${window.App.Icons.eye} Просмотр: ${show.last_view.display}
-                </div>`;
-            }
-
-            const html = `
-                ${window.App.getLayerHeader('О шоу')}
-                <div class="hero-container">
-                    <div class="hero-bg" style="background-image: url('${bgUrl}')"></div>
-                    <div class="hero-gradient"></div>
-                    <div style="position: relative; z-index: 3; height: 85%; max-width: 65%; display: flex; align-items: flex-end;">
-                        ${posterUrl ? `<img src="${posterUrl}" class="hero-poster" style="max-width: 100%; height: 100%; margin: 0; box-shadow: none;" alt="poster">` : ''}
-                        <button class="wishlist-add-btn detail-wishlist-btn anim-item" style="animation-delay: 0.6s;" onclick="window.App.showFolderModal(${show.id}, '${safeTitle}')">${window.App.Icons.bookmark_plus}</button>
-                        <button class="detail-add-view-btn anim-item" style="animation-delay: 0.7s;" onclick="window.App.openAddViewModal(${show.id}, '${safeTitle}', '${show.type}')">
-                            ${window.App.Icons.eye}
-                        </button>
-                        <button class="detail-add-view-btn detail-rate-btn anim-item" style="animation-delay: 0.8s;" onclick="window.App.openRateModal(${show.id}, '${safeTitle}', ${rateVal}, '${show.type}')">
-                            ${window.App.Icons.star}
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="show-info">
-                    <div class="show-title">${show.title}</div>
-                    ${show.original_title && show.original_title !== show.title ? `<div class="show-orig">${show.original_title}</div>` : ''}
-                    
-                    ${countriesMetaHtml}
-
-                    <div class="show-meta-tags" style="animation-delay: 0.35s">
-                        <div class="sm-tag">${show.year || '?'}</div>
-                        <div class="sm-tag" style="color: var(--info); border-color: var(--info-dim); background: var(--info-dim)">${window.App.SHOW_TYPE_RU[show.type] || show.type || 'Show'}</div>
-                        ${show.status ? `<div class="sm-tag">${window.App.SHOW_STATUS_RU[show.status] || show.status}</div>` : ''}
-                    </div>
-
-                    <div class="show-meta-tags" style="animation-delay: 0.4s">
-                        ${show.kinopoisk_rating ? `<div class="sm-tag" style="background:rgba(241, 90, 36, 0.15); color:#f15a24; border:none">KP ${show.kinopoisk_rating}</div>` : ''}
-                        ${show.imdb_rating ? `<div class="sm-tag" style="background:rgba(245, 197, 24, 0.15); color:#f5c518; border:none">IMDb ${show.imdb_rating}</div>` : ''}
-                        ${show.internal_rating ? `<div class="sm-tag" style="background:var(--accent-dim); color:var(--accent); border:none">★ ${show.internal_rating.toFixed(1)}</div>` : ''}
-                    </div>
-
-                    ${lastViewHtml ? `<div class="show-meta-tags" style="animation-delay: 0.45s">${lastViewHtml}</div>` : ''}
-                </div>
-
-                ${show.plot ? `<div class="plot-box">${show.plot}</div>` : ''}
-
-                ${genresHtml}
-                ${crewHtml}
-            `;
-
-            const currentTop = window.App.viewStack[window.App.viewStack.length - 1];
-            const isRefresh = currentTop && currentTop.context.type === 'show' && currentTop.context.showId == showId;
-
-            window.App.pushLayer(html, { 
-                type: 'show', 
-                showId: showId, 
-                replace: isRefresh,
-                fromRouter: fromRouter
-            });
-            return true;
-        } catch (e) {
-            console.error("openShowLayer error:", e);
-            window.App.showToast('Не удалось загрузить данные шоу');
-            return false;
-        } finally {
-            window.App.hideLoader();
-        }
-    },
-    doSearch: async function (q) {
-        clearTimeout(window.App.searchTimer);
-        const resEl = document.getElementById('search-results');
-        if (q.length < 2) { 
-            resEl.innerHTML = `<div class="empty"><div class="icon" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px;">${window.App.Icons.search}</div>Введите название для поиска</div>`;
-            return; 
-        }
-        
-        resEl.innerHTML = '<div class="loader-inline"><div class="spinner" style="width:32px;height:32px;border-width:3px;"></div></div>';
-        
-        window.App.searchTimer = setTimeout(async () => {
-            try {
-                const r = await fetch('/api/webapp/search/', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ query: q, init_data: tg?.initData || '' })
-                });
-                const data = await r.json();
-                window.App.setState('data.search.results', data);
-            } catch(e) {
-                resEl.innerHTML = '<div class="empty">Ошибка при поиске</div>';
-            }
-        }, 500);
-    },
-
     renderCharts: function(data) { 
         const d = data || window.App.D;
         if (typeof Chart === 'undefined' || !d) return;
@@ -466,119 +295,100 @@ Object.assign(window.App, {
         },
 
         serialize() {
-            let path = window.App.State.getState('nav.activeMainView') || 'search';
+            let path = window.App.getState('nav.activeMainView') || 'search';
+            const stack = window.App.getState('nav.layerStack') || [];
             
-            window.App.viewStack.forEach(layer => {
-                const ctx = layer.context;
-                if (ctx.type === 'show') {
-                    path += `/show/${ctx.showId}`;
-                } else if (ctx.type === 'collection') {
-                    path += `/${ctx.ctype}/${ctx.itemId}`;
-                } else if (ctx.type === 'history') {
-                    path += `/history/${ctx.htype || 'all'}`;
-                }
+            stack.forEach(ctx => {
+                if (ctx.type === 'show') path += `/show/${ctx.showId}`;
+                else if (ctx.type === 'collection') path += `/${ctx.ctype}/${ctx.itemId}`;
+                else if (ctx.type === 'history') path += `/history/${ctx.htype || 'all'}`;
             });
 
             const query = new URLSearchParams();
-            const y = window.App.State.getState('nav.query.y');
+            const y = window.App.getState('nav.query.y');
             if (y && y !== 'all') query.set('y', y);
             
-            // Сохраняем ID папки в URL, если мы в вишлисте
-            const folderId = window.App.State.getState('data.activeWlFolderId');
-            if (path.startsWith('wishlist') && folderId && folderId > 0) {
-                query.set('folder', folderId);
-            }
+            const q = window.App.getState('forms.search.query');
+            if (path.startsWith('search') && q) query.set('q', q);
             
-            const q = window.App.State.getState('forms.search.query');
-            if (path.startsWith('search') && q) {
-                query.set('q', q);
-            }
-            
+            const folderId = window.App.getState('data.activeWlFolderId');
+            if (path.startsWith('wishlist') && folderId) query.set('folder', folderId);
+
             const qStr = query.toString();
             return '#/' + path + (qStr ? '?' + qStr : '');
         },
 
         updateUrl() {
-            if (window.App.State.getState('flags.isSyncingHash')) return;
-            const newHash = window.App.Router.serialize();
-            if (window.location.hash !== newHash) {
-                history.pushState(null, "", newHash);
-            }
+            if (window.App.getState('flags.isSyncingHash')) return;
+            const newHash = this.serialize();
+            if (window.location.hash !== newHash) history.pushState(null, "", newHash);
         },
 
         async sync() {
-            if (window.App.State.getState('flags.isSyncingHash')) return;
-            window.App.State.setState('flags.isSyncingHash', true);
+            if (window.App.getState('flags.isSyncingHash')) return;
+            window.App.setState('flags.isSyncingHash', true);
 
             try {
-                const { segments, params } = window.App.Router.parse();
-                if (segments.length === 0) return;
+                const { segments, params } = this.parse();
+                const targetMainView = segments[0] || 'search';
+                
+                // Синхронизация основного вида
+                if (window.App.getState('nav.activeMainView') !== targetMainView) {
+                    window.App.clearLayers();
+                    window.App.setState('nav.activeMainView', targetMainView);
+                }
 
-                const targetMainView = segments[0];
+                // Синхронизация фильтров
                 const year = params.get('y') || 'all';
-                const folderId = params.get('folder');
+                window.App.setState('nav.query.y', year);
 
-                // 1. Синхронизируем корень и базовые параметры
-                window.App.State.setState('nav.query.y', year);
-                if (folderId) window.App.State.setState('data.activeWlFolderId', parseInt(folderId));
+                const q = params.get('q') || '';
+                window.App.setState('forms.search.query', q);
 
-                if (window.App.State.getState('nav.activeMainView') !== targetMainView) {
-                    while (window.App.viewStack.length > 0) {
-                        const top = window.App.viewStack.pop();
-                        top.el.remove();
-                    }
-                    window.App.switchMainView(targetMainView, true);
-                }
+                const fId = params.get('folder');
+                if (fId) window.App.setState('data.activeWlFolderId', parseInt(fId));
 
-                // 2. Загружаем данные если нужно
-                if (targetMainView === 'stats' || targetMainView === 'wishlist') {
-                    await window.App.load(year, false);
-                }
-
-                // 3. Дифференциальное обновление стека слоев
+                // Синхронизация стека слоев
                 const layerSegments = segments.slice(1);
                 const targetStackDepth = Math.floor(layerSegments.length / 2);
-
-                // Удаляем лишние слои (назад)
+                
+                // Удаляем лишние слои из DOM и массива
                 while (window.App.viewStack.length > targetStackDepth) {
                     const top = window.App.viewStack.pop();
-                    top.el.remove();
+                    if (top) top.el.remove();
                 }
 
-                // Достраиваем недостающие слои (вперед)
+                // Достраиваем недостающие слои
                 for (let i = window.App.viewStack.length; i < targetStackDepth; i++) {
                     const type = layerSegments[i * 2];
                     const id = layerSegments[i * 2 + 1];
-
-                    if (type === 'show') {
-                        await window.App.openShowLayer(id, true);
-                    } else if (type === 'history') {
-                        const titles = { 'all': 'Вся история', 'movies': 'Фильмы', 'episodes': 'Эпизоды' };
-                        window.App.openHistoryLayer(id, titles[id] || 'История', null, null, null, null, true);
-                    } else if (['person', 'genre', 'country'].includes(type)) {
-                        await window.App.openCollectionLayer(type, id, '', true);
-                    }
+                    if (type === 'show') await window.App.openShowLayer(id, true);
+                    else if (type === 'history') window.App.openHistoryLayer(id, 'История', null, null, null, null, true);
+                    else if (['person', 'genre', 'country'].includes(type)) await window.App.openCollectionLayer(type, id, '', true);
                 }
 
-                // Показываем только верхний слой или навигацию
-                if (window.App.viewStack.length > 0) {
-                    window.App.viewStack.forEach((layer, idx) => {
-                        layer.el.style.display = (idx === window.App.viewStack.length - 1) ? 'block' : 'none';
-                    });
-                    if (document.getElementById('bottom-nav')) document.getElementById('bottom-nav').style.display = 'none';
-                } else {
-                    if (!window.App.isSharedMode && document.getElementById('bottom-nav')) {
-                        document.getElementById('bottom-nav').style.display = 'flex';
-                    }
-                }
-            } finally {
-                window.App.State.setState('flags.isSyncingHash', false);
-                // Обновляем стейт стека для SessionStorage
+                // Управление видимостью слоев
+                window.App.viewStack.forEach((layer, idx) => {
+                    layer.el.style.display = (idx === window.App.viewStack.length - 1) ? 'block' : 'none';
+                });
+
                 const stackData = window.App.viewStack.map(item => item.context);
-                window.App.State.setState('nav.layerStack', stackData);
+                window.App.setState('nav.layerStack', stackData);
+
+            } finally {
+                window.App.setState('flags.isSyncingHash', false);
             }
         }
     },
+
+    clearLayers: function() {
+        while (this.viewStack.length > 0) {
+            const top = this.viewStack.pop();
+            if (top) top.el.remove();
+        }
+        this.setState('nav.layerStack', []);
+    },
+
     switchMainView: function(view, fromRouter = false) {
         window.App.setState('nav.activeMainView', view);
         if (!fromRouter && !window.App.getState('flags.isSyncingHash')) {
@@ -636,7 +446,8 @@ Object.assign(window.App, {
         el.style.fontSize = "";
         const styles = window.getComputedStyle(el);
         const limitWidth = el.clientWidth;
-        if (limitWidth <= 0) return; 
+        
+        if (limitWidth <= 0 || styles.display === 'none') return; 
 
         const limitHeight = parseFloat(styles.maxHeight) || el.offsetHeight || 40;
         const isSingleLine = styles.whiteSpace === 'nowrap' || styles.webkitLineClamp === '1';
@@ -668,6 +479,146 @@ Object.assign(window.App, {
     fitAll: function(selector, container = document) {
         const elements = container.querySelectorAll(selector);
         elements.forEach(el => window.App.fitText(el));
+    },
+
+    init: async function() {
+        if (window.IS_ADMIN_DASHBOARD) return;
+        window.App.setState('flags.isSyncingHash', true);
+
+        const savedViewMode = localStorage.getItem('kp_view_mode') || 'grid';
+        window.App.setState('ui.viewMode', savedViewMode);
+
+        if (typeof window.App.initWishlistReactivity === 'function') {
+            window.App.initWishlistReactivity();
+        }
+
+        window.App.initIcons();
+
+        // Единый консолидированный подписчик на статистику
+        window.App.subscribe('data.stats', (d) => {
+            if (!d || !d.meta) return;
+            
+            // 1. Мета пользователя
+            const nameEl = document.getElementById('user-name');
+            if (nameEl) {
+                nameEl.textContent = d.meta.name || 'Пользователь';
+                requestAnimationFrame(() => window.App.fitText(nameEl));
+            }
+            const avEl = document.getElementById('avatar');
+            if (avEl) {
+                if (d.meta.photo_url) avEl.innerHTML = `<img src="${d.meta.photo_url}" alt="A">`;
+                else avEl.textContent = (d.meta.name || 'P').charAt(0).toUpperCase();
+            }
+
+            // 2. Обзор (Overview)
+            if (typeof window.App.updateOverview === 'function') {
+                window.App.updateOverview(d.summary);
+            }
+
+            // 3. Рейтинги
+            if (typeof window.App.updateRatingsSection === 'function') {
+                window.App.updateRatingsSection(d.ratings);
+            } else if (d.ratings && d.ratings.total > 0) {
+                // Фоллбэк если функция не определена
+                const box = document.getElementById('ratings-box');
+                if (box) {
+                    box.classList.remove('hidden');
+                    window.App.renderRatingsDist();
+                }
+            }
+
+            // 4. Управление карточками
+            const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
+            
+            toggle('main-tabs', !!d.group);
+            toggle('tab-group-btn', !!d.group);
+            toggle('card-dynamics', d.monthly_chart?.views?.some(v => v > 0));
+            toggle('card-weekday', d.weekday_chart?.data?.some(v => v > 0));
+            toggle('card-heatmap', !(d.heatmap && d.heatmap.length > 0));
+            
+            if (d.heatmap?.length) window.App.renderHeatmap(d.heatmap);
+
+            toggle('card-genres', d.genres && d.genres.length > 0);
+            toggle('card-countries', d.countries && d.countries.length > 0);
+            toggle('card-binges', d.binges && d.binges.length > 0);
+
+            if (window.App.getState('ui.activeStatsTab') === 'group') window.App.renderGroup(d);
+            window.App.renderCharts(d);
+
+            ['actors', 'directors', 'writers'].forEach(cat => {
+                const mode = window.App.getState(`ui.personTabs.${cat}`) || 'series';
+                const hasData = d[cat] && (d[cat].series?.length || d[cat].others?.length);
+                toggle(`card-${cat}`, !hasData);
+                if (hasData) {
+                    window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
+                }
+            });
+            
+            if (d.binges?.length) window.App.fillBinges(d.binges);
+            if (d.countries?.length) {
+                window.App.fillList('countries-list', d.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+            }
+        });
+
+        // Подписки на табы персон
+        ['actors', 'directors', 'writers'].forEach(cat => {
+            window.App.subscribe(`ui.personTabs.${cat}`, (mode) => {
+                const d = window.App.D;
+                if (!d || !d[cat]) return;
+                window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
+            });
+        });
+
+        window.App.subscribe('data.search.results', (val) => val && window.App.renderSearchResults(val));
+        window.App.subscribe('forms.search.query', (q) => window.App.doSearch(q || ''));
+        
+        window.App.subscribe('nav.activeMainView', (view) => {
+            ['search', 'wishlist', 'stats'].forEach(v => {
+                const el = document.getElementById(`view-${v}`), navBtn = document.getElementById(`bn-${v}`);
+                if (el) el.style.display = (v === view) ? 'flex' : 'none';
+                if (navBtn) navBtn.classList.toggle('active', v === view);
+            });
+        });
+
+        // Синхронизация роутера
+        try {
+            const { segments, params } = window.App.Router.parse();
+            const sId = params.get('shared_id') || (tg?.initDataUnsafe?.start_param || '').replace('stat_', '');
+            let initialView = sId ? 'stats' : (segments[0] || window.App.getState('nav.activeMainView') || 'search');
+            
+            if (sId) window.App.isSharedMode = true;
+            window.App.setState('nav.activeMainView', initialView);
+
+            if (window.App.isSharedMode) {
+                document.body.classList.add('has-banner');
+                const banner = document.getElementById('shared-banner-container');
+                if (banner) banner.innerHTML = `<div class="shared-banner">Вы просматриваете чужую статистику</div>`;
+                await window.App.loadShared(sId);
+            } else {
+                if (typeof window.App.loadWishlist === 'function') await window.App.loadWishlist();
+                
+                // Если мы на вкладке поиска и есть запрос в URL - запускаем поиск
+                const q = params.get('q');
+                if (initialView === 'search' && q) {
+                    window.App.setState('forms.search.query', q);
+                    window.App.doSearch(q);
+                }
+
+                document.body.classList.add('has-nav');
+                const savedStack = window.App.getState('nav.layerStack') || [];
+                for (const ctx of savedStack) {
+                    if (ctx.type === 'show') await window.App.openShowLayer(ctx.showId, true);
+                    else if (ctx.type === 'history') window.App.openHistoryLayer(ctx.htype, ctx.title, ctx.extraId, ctx.extraDate, ctx.extraKey, ctx.extraIndex, true);
+                    else if (['person', 'genre', 'country'].includes(ctx.type)) await window.App.openCollectionLayer(ctx.ctype, ctx.itemId, ctx.titleFallback, true);
+                }
+            }
+        } finally {
+            window.App.hideLoader();
+            window.App.setState('flags.isSyncingHash', false);
+            window.App.setState('ui.isAppReady', true);
+            window.App.Router.updateUrl();
+            window.App.restoreModals();
+        }
     },
 
     toggleHistoryEditMode: function() {
@@ -708,6 +659,37 @@ Object.assign(window.App, {
         } else {
             if (confirm(msg)) performDelete();
         }
+    },
+    updateRatingsSection: function(rt) {
+        const box = document.getElementById('ratings-box');
+        if (!rt || rt.total === 0) {
+            box?.classList.add('hidden');
+            return;
+        }
+        box?.classList.remove('hidden');
+        
+        const palette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
+        const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
+        
+        const avgEl = document.getElementById('cr-avg');
+        if (avgEl) {
+            avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
+            avgEl.style.color = palette[colorIdx];
+        }
+
+        const totalEl = document.getElementById('cr-total');
+        if (totalEl) {
+            totalEl.innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${window.App.plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
+        }
+
+        const badge = document.getElementById('cr-badge');
+        if (badge) {
+            if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.color = '#2ecc71'; }
+            else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.color = '#60a5fa'; }
+            else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.color = '#d29922'; }
+            else { badge.textContent = 'Суровый критик'; badge.style.color = '#e74c3c'; }
+        }
+        window.App.renderRatingsDist();
     },
     startCasinoSpin: window.startCasinoSpin,
     removeHistoryItem: function(btn, payload) {
@@ -944,12 +926,18 @@ Object.assign(window.App, {
         window.App.showLoader();
         try {
             const r = await fetch(`/api/webapp/show/${showId}/?init_data=${encodeURIComponent(tg?.initData || '')}`);
+            if (!r.ok) throw new Error('Show not found');
             const show = await r.json();
-            const safeTitle = show.title.replace(/'/g, "\\'");
+            
+            if (!show || !show.title) throw new Error('Invalid data');
+
+            const safeTitle = show.title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            const posterUrl = show.poster_large || show.poster_medium;
+            
             const html = `
                 ${window.App.getLayerHeader('О шоу')}
                 <div class="hero-container">
-                    <div class="hero-bg" style="background-image: url('${show.poster_large || show.poster_medium}')"></div>
+                    <div class="hero-bg" style="background-image: url('${posterUrl}')"></div>
                     <div class="hero-gradient"></div>
                     <div style="position: relative; z-index: 3; height: 85%; max-width: 65%; display: flex; align-items: flex-end;">
                         ${window.App.Templates.poster(show.poster_large, 'big')}
@@ -971,55 +959,11 @@ Object.assign(window.App, {
                 <div class="plot-box">${show.plot || ''}</div>
             `;
             window.App.pushLayer(html, { type: 'show', showId, fromRouter });
-        } catch (e) { window.App.showToast('Ошибка загрузки'); } finally { window.App.hideLoader(); }
-    },
-
-    renderSearchResults: function(data) {
-        let html = '';
-        if (data.persons?.length) {
-            html += `<div class="label"><div class="icon" style="color:#d29922">${window.App.Icons.users}</div>Люди</div>`;
-            html += '<div class="h-scroll-container" style="padding-bottom:16px;">';
-            data.persons.forEach(p => {
-                const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
-                const safeName = p.name.replace(/'/g, "\\'");
-                const img = p.photo_url 
-                    ? `<img src="${p.photo_url}" class="person-avatar" style="object-fit:cover;" 
-                        onerror="window.App.handleImgErr(this, ${fb}, '${safeName}')" 
-                        onload="window.App.handleKpPlaceholder(this, '${safeName}')">` 
-                    : `<div class="person-avatar">${window.App.Icons.person_placeholder}</div>`;
-                html += `<div class="person-pill" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')">${img}<div class="person-name">${p.name}</div></div>`;
-            });
-            html += '</div>';
-        }
-        
-        if (data.shows?.length) {
-            html += `<div class="label"><div class="icon" style="color:var(--info)">${window.App.Icons.film}</div>Контент</div>`;
-            html += '<div class="hist-grid" style="padding:0 16px;">';
-            data.shows.forEach(s => {
-                const poster = s.poster_url ? `<img src="${s.poster_url}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
-                const safeTitle = s.title.replace(/'/g, "\\'");
-                let badgesHtml = s.user_rating ? `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${window.App.Icons.star}${s.user_rating}</span>` : '';
-
-                html += `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${s.id})">
-                    <div class="grid-item">
-                        ${poster}<div class="grid-badges">${badgesHtml}</div>
-                        ${s.year ? `<div class="grid-year">${s.year}</div>` : ''}
-                        <button class="wishlist-add-btn" onclick="event.stopPropagation(); window.App.showFolderModal(${s.id}, '${safeTitle}')">${window.App.Icons.bookmark_plus}</button>
-                    </div>
-                    <div class="grid-below-title">${s.title}</div>
-                </div>`;
-            });
-            html += '</div>';
-        }
-        
-        if (!data.shows?.length && !data.persons?.length) {
-            html = `<div class="empty"><div class="icon">${window.App.Icons.dash}</div>Ничего не найдено</div>`;
-        }
-
-        const resEl = document.getElementById('search-results');
-        if (resEl) {
-            resEl.innerHTML = html;
-            requestAnimationFrame(() => window.App.fitAll('.grid-below-title', resEl));
+        } catch (e) { 
+            console.error('OpenShowLayer Error:', e);
+            window.App.showToast('Ошибка загрузки шоу'); 
+        } finally { 
+            window.App.hideLoader(); 
         }
     },
 
@@ -1036,14 +980,6 @@ Object.assign(window.App, {
         const g = window.App.isDark ? 'rgba(255, 255, 255, .05)' : 'rgba(0, 0, 0, .05)';
         const b = window.App.isDark ? '#2d333b' : '#d0d7de';
         return { t, g, b, a: '#2ecc71', ab: window.App.isDark ? 'rgba(46, 204, 113, .2)' : 'rgba(46, 204, 113, .15)', i: '#60a5fa', ib: window.App.isDark ? 'rgba(96, 165, 250, .2)' : 'rgba(96, 165, 250, .15)' };
-    },
-
-    handleKpPlaceholder: function(img, name) {
-        // Проверка на специфические размеры заглушки Кинопоиска (no-poster.gif)
-        // Эти размеры определены в ходе исследования: 208x304
-        if (img.naturalWidth === 208 && img.naturalHeight === 304) {
-            window.App.handleImgErr(img, null, name);
-        }
     },
 
     Data: {
@@ -1082,19 +1018,6 @@ Object.assign(window.App, {
                 }
             }
             return null;
-        }
-    },
-
-    handleImgErr: function(img, fallbackUrl, name) {
-        if (fallbackUrl && !img.dataset.fallbackTried) {
-            img.dataset.fallbackTried = 'true';
-            img.src = fallbackUrl;
-        } else {
-            const wrapper = document.createElement('div');
-            wrapper.className = (img.className || '') + ' is-placeholder';
-            wrapper.style.cssText = img.style.cssText;
-            wrapper.innerHTML = window.App.Icons.person_placeholder;
-            img.replaceWith(wrapper);
         }
     },
 
@@ -1992,55 +1915,42 @@ Object.assign(window.App, {
 
     pushLayer: function(htmlContent, contextData = {}) {
         const isSync = contextData.fromRouter || false;
-
-        if (contextData.replace && window.App.viewStack.length > 0) {
-            const top = window.App.viewStack[window.App.viewStack.length - 1];
+        
+        if (contextData.replace && this.viewStack.length > 0) {
+            const top = this.viewStack[this.viewStack.length - 1];
             top.el.innerHTML = htmlContent;
             top.context = contextData;
             top.el.scrollTop = 0;
+        } else {
+            const layer = document.createElement('div');
+            layer.className = 'layer';
+            layer.innerHTML = htmlContent;
+            document.getElementById('dynamic-layers').appendChild(layer);
             
-            const stackData = window.App.viewStack.map(item => item.context);
-            window.App.State.setState('nav.layerStack', stackData);
-            return;
+            if (this.viewStack.length > 0) {
+                this.viewStack[this.viewStack.length - 1].el.style.display = 'none';
+            }
+            this.viewStack.push({ el: layer, context: contextData });
         }
 
-        const layer = document.createElement('div');
-        layer.className = 'layer';
-        layer.innerHTML = htmlContent;
-        document.getElementById('dynamic-layers').appendChild(layer);
+        const stackData = this.viewStack.map(item => item.context);
+        this.setState('nav.layerStack', stackData);
+
+        if (tg?.BackButton) {
+            tg.BackButton.show();
+            tg.BackButton.onClick(() => history.back());
+        }
+
+        if (!isSync) this.Router.updateUrl();
         
-        if (window.App.viewStack.length > 0) {
-            window.App.viewStack[window.App.viewStack.length - 1].el.style.display = 'none';
-        }
-        
-
-        window.App.viewStack.push({ el: layer, context: contextData });
-        
-        const stackData = window.App.viewStack.map(item => item.context);
-        window.App.State.setState('nav.layerStack', stackData);
-
-        if (tg?.BackButton) { 
-            tg.BackButton.show(); 
-            // Кнопка назад в TG теперь просто дергает историю браузера, 
-            // а popstate сам запустит Router.sync()
-            tg.BackButton.onClick(() => history.back()); 
-        }
-
-        if (!isSync) {
-            window.App.Router.updateUrl();
-        }
-
-        // Вызываем fitText после того как браузер отрисовал слой
         requestAnimationFrame(() => {
-            const titleEl = layer.querySelector('.layer-title-main');
-            if (titleEl) window.App.fitText(titleEl);
+            const titleEl = this.viewStack[this.viewStack.length-1].el.querySelector('.layer-title-main');
+            if (titleEl) this.fitText(titleEl);
         });
     },
 
     popLayer: function() {
-        if (window.App.viewStack.length > 0) {
-            history.back();
-        }
+        if (this.viewStack.length > 0) history.back();
     },
 
     getLayerHeader: function(title) {

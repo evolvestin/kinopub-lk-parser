@@ -219,16 +219,17 @@ window.checkCasinoStatus = async function() {
 };
 
 window.showCasinoFolders = function() {
+    const folders = window.App.getState('data.wishlistFolders') || [];
     let allItemsCount = 0;
-    window.App.wishlistFolders.forEach(f => allItemsCount += f.items.length);
+    folders.forEach(f => allItemsCount += f.items.length);
+    
     if (allItemsCount === 0) {
         window.App.showToast('Ваш список избранного пуст!');
         window.closeCasino();
         return;
     }
 
-    const validFolders = window.App.wishlistFolders.filter(f => f.items.length > 0);
-
+    const validFolders = folders.filter(f => f.items.length > 0);
     if (validFolders.length === 1) {
         window.startCasinoSpin(validFolders[0].id);
         return;
