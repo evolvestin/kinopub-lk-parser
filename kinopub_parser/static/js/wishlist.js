@@ -82,7 +82,7 @@ Object.assign(window.App, {
     renderColorPicker: function(activeColor) {
         const cont = document.getElementById('wl-color-picker');
 
-        cont.innerHTML = FOLDER_COLORS.map(c => `
+        cont.innerHTML = window.App.FOLDER_COLORS.map(c => `
             <div 
                 class="wl-color-btn ${c === activeColor ? 'active' : ''}" 
                 style="background-color: ${c}" 
@@ -94,7 +94,7 @@ Object.assign(window.App, {
     renderIconPicker: function(activeIcon) {
         const cont = document.getElementById('wl-icon-picker');
 
-        cont.innerHTML = FOLDER_ICONS.map(i => `
+        cont.innerHTML = window.App.FOLDER_ICONS.map(i => `
             <div 
                 class="wl-icon-btn ${i === activeIcon ? 'active' : ''}" 
                 onclick="window.App.selectFolderIcon('${i}')">
@@ -148,6 +148,8 @@ Object.assign(window.App, {
         const titleEl = document.getElementById('wl-active-folder-title');
         const container = document.getElementById('wl-items-container');
         const mainHeader = document.getElementById('wl-main-header');
+        // ПРИМЕЧАНИЕ: globalToggle пока оставим здесь, так как он зависит от сложной логики наличия папок,
+        // но в будущем вынесем в ui.wishlistControlsVisible
         const globalToggle = document.getElementById('wl-global-view-toggle');
 
         const folders = window.App.wishlistFolders || [];
@@ -526,11 +528,7 @@ Object.assign(window.App, {
             } catch (e) {}
         }
     },
-    closeItemDeleteModal: function () {
-        window.App.State.setState('modals.wlDelete.isOpen', false);
-        window.App.itemToDeleteId = null;
-        window.App.itemToDeleteElement = null;
-    },
+    closeItemDeleteModal: () => window.App.closeModal('wlDelete'),
     confirmItemDelete: function () {
         if (!window.App.itemToDeleteId) return;
         const keepStats = document.getElementById('wl-del-keep-stats').checked;
@@ -614,12 +612,8 @@ Object.assign(window.App, {
         window.App.renderColorPicker(initialData.color);
         window.App.renderIconPicker(initialData.icon);
     },
-    closeFolderEditModal: function () {
-        window.App.State.setState('modals.wlEdit.isOpen', false);
-    },
-    closeLimitModal: function () {
-        window.App.setState('modals.wlLimit.isOpen', false);
-    },
+    closeFolderEditModal: () => window.App.closeModal('wlEdit'),
+    closeLimitModal: () => window.App.closeModal('wlLimit'),
     selectFolderColor: function (color) {
         document.querySelectorAll('.wl-color-btn').forEach(b => b.classList.remove('active'));
         event.currentTarget.classList.add('active');
@@ -735,9 +729,7 @@ Object.assign(window.App, {
             }
         } catch (e) { if (grid) grid.innerHTML = '<div class="empty">Ошибка загрузки</div>'; }
     },
-    closeFolderModal: function () {
-        window.App.State.setState('modals.wlFolder.isOpen', false);
-    },
+    closeFolderModal: () => window.App.closeModal('wlFolder'),
     addToFolder: async function (folderId) {
         if (!window.App.activeShowForWishlist) return;
         try {

@@ -5,38 +5,22 @@ const tg = window.Telegram?.WebApp;
 
 
 Object.assign(window.App, {
-    D: null,
-    curYear: null,
-    isDark: true,
+    get D() { return window.App.getState('data.stats'); },
+    set D(val) { window.App.setState('data.stats', val); },
+    get isSharedMode() { return window.App.getState('flags.isSharedMode'); },
+    set isSharedMode(val) { window.App.setState('flags.isSharedMode', val); },
+    get curYear() { return window.App.getState('nav.query.y') || 'all'; },
+    get availableYears() { return window.App.getState('data.availableYears'); },
+    set availableYears(val) { window.App.setState('data.availableYears', val); },
 
-    chR: null,
-    chM: null,
-    chW: null,
-    chG: {},
-
-    isSharedMode: false,
+    chR: null, chM: null, chW: null, chG: {},
     SharedDataMap: {},
-    availableYears: [],
-    toastTimer: null,
-    isRenderingBatch: false,
     searchTimer: null,
-
-    curHistData: [],
-    curHistType: '',
-    currentHistoryOffset: 0,
     historyObserver: null,
-
     viewStack: [],
 
     UserAvatarColors: [
-        '#3498db',
-        '#9b59b6',
-        '#f1c40f',
-        '#e67e22',
-        '#e74c3c',
-        '#1abc9c',
-        '#34495e',
-        '#2ecc71',
+        '#3498db', '#9b59b6', '#f1c40f', '#e67e22', '#e74c3c', '#1abc9c', '#34495e', '#2ecc71',
     ],
     fSizeAx: Math.max(10, Math.min(13, window.innerWidth * 0.03)),
 
@@ -134,8 +118,8 @@ Object.assign(window.App, {
     },
 
     plural: function(n, forms) {
-        let n10 = Math.abs(n) % 10;
-        let n100 = Math.abs(n) % 100;
+        const num = Math.abs(parseInt(n)) || 0;
+        let n10 = num % 10, n100 = num % 100;
         if (n100 >= 11 && n100 <= 14) return forms[2];
         if (n10 === 1) return forms[0];
         if (n10 >= 2 && n10 <= 4) return forms[1];
@@ -155,136 +139,9 @@ Object.assign(window.App, {
         });
     },
 
-    render: function() {
-        if (!window.App.D?.meta) return;
-        const n = window.App.D.meta.name || 'Пользователь';
-        const nameEl = document.getElementById('user-name');
-        if (nameEl) {
-            nameEl.textContent = n;
-            requestAnimationFrame(() => window.App.fitText(nameEl));
-        }
-        
-        const avEl = document.getElementById('avatar');
-        if (window.App.D.meta.is_anonymous) {
-            const myId = window.App.D.meta.id || 0;
-            if (myId > 0) {
-                avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${window.App.getUserColor(myId)};color:#fff;font-weight:900;">${myId}</div>`;
-            } else {
-                avEl.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-muted);">${window.App.Icons.user}</div>`;
-            }
-        } else if (window.App.D.meta.photo_url) {
-            avEl.innerHTML = `<img src="${window.App.D.meta.photo_url}" alt="A">`;
-        } else {
-            const u = tg?.initDataUnsafe?.user;
-            if (!window.App.isSharedMode && u && u.photo_url) avEl.innerHTML = `<img src="${u.photo_url}" alt="A">`;
-            else avEl.textContent = n.charAt(0).toUpperCase();
-        }
+    mainTab: (t) => window.App.setState('ui.activeStatsTab', t),
+    pickYear: (y) => window.App.setState('nav.query.y', y),
 
-        document.getElementById('period-label').textContent = window.App.D.summary?.period_label || '';
-        window.App.renderYears();
-
-        const s = window.App.D.summary || {};
-        const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
-        
-        const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
-        const hasGroup = !!window.App.D.group;
-        toggle('main-tabs', hasGroup);
-        toggle('label-overview', true);
-        toggle('grid-overview', true);
-
-        document.getElementById('s-time').textContent  = s.duration_display || '0м';
-        document.getElementById('s-views').textContent = vViews + ' ' + window.App.plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
-        document.getElementById('s-act').textContent   = (s.activity_percent||0) + '%';
-        document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
-        document.getElementById('s-ep').textContent = vEp;
-        
-        const epLbl = document.getElementById('s-ep').nextElementSibling;
-        if (epLbl) epLbl.textContent = window.App.plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
-        
-        const serInfo = vSer + ' ' + window.App.plural(vSer, ['сериал', 'сериала', 'сериалов']);
-        document.getElementById('s-ser').textContent = serInfo + ' · ' + (s.series_duration || '0м');
-        document.getElementById('s-mov').textContent = vMov;
-        
-        const movLbl = document.getElementById('s-mov').nextElementSibling;
-        if (movLbl) movLbl.textContent = window.App.plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
-        document.getElementById('s-uni').textContent = s.movies_duration || '0м';
-        
-        document.getElementById('s-wl-added').textContent = s.wishlist_added || 0;
-        document.getElementById('s-wl-watched').textContent = s.wishlist_watched || 0;
-
-        let welcomeEl = document.getElementById('welcome-empty-state');
-        if (vViews === 0) {
-            if (!welcomeEl) {
-                welcomeEl = document.createElement('div');
-                welcomeEl.id = 'welcome-empty-state';
-                welcomeEl.className = 'card anim-item';
-                welcomeEl.innerHTML = `<div class="empty"><div class="icon">${window.App.Icons.tv}</div>Здесь будет ваша статистика, когда вы начнете смотреть кино.</div>`;
-                document.getElementById('sec-personal').appendChild(welcomeEl);
-            }
-        } else if (welcomeEl) welcomeEl.remove();
-
-        const hasDynamics = window.App.D.monthly_chart?.views?.some(v => v > 0);
-        toggle('card-dynamics', hasDynamics);
-        const hasWeekday = window.App.D.weekday_chart?.data?.some(v => v > 0);
-        toggle('card-weekday', hasWeekday);
-        const hasHeatmap = window.App.D.heatmap?.length > 0;
-        toggle('card-heatmap', hasHeatmap);
-        if (hasHeatmap) {
-            const hmContainer = document.getElementById('heatmaps-wrapper');
-            if (hmContainer) hmContainer.innerHTML = '';
-            window.App.renderHeatmap();
-        }
-        toggle('card-heatmap', hasHeatmap);
-        if (hasHeatmap) window.App.renderHeatmap();
-
-        toggle('card-genres', window.App.D.genres?.length > 0);
-        
-        const hasActors = (window.App.D.actors?.series?.length || window.App.D.actors?.others?.length);
-        toggle('card-actors', hasActors);
-        if (hasActors) window.App.fillList('actors-list', window.App.D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series');
-        
-        const hasDirectors = (window.App.D.directors?.series?.length || window.App.D.directors?.others?.length);
-        toggle('card-directors', hasDirectors);
-        if (hasDirectors) window.App.fillList('directors-list', window.App.D.directors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'directors', 'series');
-
-        const hasWriters = (window.App.D.writers?.series?.length || window.App.D.writers?.others?.length);
-        toggle('card-writers', hasWriters);
-        if (hasWriters) window.App.fillList('writers-list', window.App.D.writers.series, null, ['просмотр', 'просмотра', 'просмотров'], 'writers', 'series');
-        
-        toggle('card-countries', window.App.D.countries?.length > 0);
-        if (window.App.D.countries?.length) window.App.fillList('countries-list', window.App.D.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
-        
-        toggle('card-binges', window.App.D.binges?.length > 0);
-        if (window.App.D.binges?.length) window.App.fillBinges();
-
-        const rt = window.App.D.ratings;
-        toggle('ratings-box', rt && rt.total > 0);
-        if (rt && rt.total > 0) {
-            const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
-            const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
-            const avgEl = document.getElementById('cr-avg');
-            avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
-            avgEl.style.color = ratingPalette[colorIdx];
-            document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${window.App.plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
-            const badge = document.getElementById('cr-badge');
-            if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.background = 'rgba(46, 204, 113, 0.15)'; badge.style.color = '#2ecc71'; }
-            else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.background = 'rgba(56, 139, 253, 0.15)'; badge.style.color = '#60a5fa'; }
-            else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.background = 'rgba(210, 153, 34, 0.15)'; badge.style.color = '#d29922'; }
-            else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
-            window.App.renderRatingsDist();
-        }
-
-        toggle('tab-group-btn', !!window.App.D.group);
-        window.App.renderGroup();
-        window.App.renderCharts();
-    },
-
-    mainTab: function(t) { 
-        window.App.setState('ui.activeStatsTab', t);
-    },
-    pickYear: function(y) {
-        window.App.setState('nav.query.y', y);
-    },
     openShowLayer: async function(showId, fromRouter = false) {
         if (!showId) return false;
         window.App.showLoader();
@@ -457,31 +314,32 @@ Object.assign(window.App, {
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ query: q, init_data: tg?.initData || '' })
                 });
-                if (!r.ok) throw new Error('Ошибка сервера');
                 const data = await r.json();
-                window.App.renderSearchResults(data);
+                window.App.setState('data.search.results', data);
             } catch(e) {
                 resEl.innerHTML = '<div class="empty">Ошибка при поиске</div>';
             }
         }, 500);
     },
-    renderCharts: function() { 
-        if (typeof Chart === 'undefined') return;
+
+    renderCharts: function(data) { 
+        const d = data || window.App.D;
+        if (typeof Chart === 'undefined' || !d) return;
         
-        // Используем requestAnimationFrame для плавности при быстром переключении
         requestAnimationFrame(() => {
             try {
-                window.App.renderMonthly(); 
-                window.App.renderWeekday(); 
-                window.App.renderDonut('c-genre', 'legend-genre', window.App.D.genres, 'genres_top', window.App.D.summary.total_minutes_watched);
-                if (window.App.D.group) {
-                    window.App.renderDonut('c-group-genre', 'legend-group-genre', window.App.D.group.genres, 'group_genres_top', window.App.D.group.total_minutes_watched);
+                window.App.renderMonthly(d); 
+                window.App.renderWeekday(d); 
+                window.App.renderDonut('c-genre', 'legend-genre', d.genres, 'genres_top', d.summary?.total_minutes_watched);
+                if (d.group) {
+                    window.App.renderDonut('c-group-genre', 'legend-group-genre', d.group.genres, 'group_genres_top', d.group.total_minutes_watched);
                 }
             } catch (e) {
                 console.error('Chart render error:', e);
             }
         });
     },
+
     Router: {
         parse() {
             const hash = window.location.hash.startsWith('#/') ? window.location.hash.slice(2) : '';
@@ -613,37 +471,21 @@ Object.assign(window.App, {
     },
 
     load: async function(year, isBackground = false) {
-        if (year === undefined || year === null) {
-            year = window.App.getState('nav.query.y') || 'all';
-        }
+        if (year === undefined || year === null) year = window.App.getState('nav.query.y') || 'all';
 
         const cachedData = window.App.Data.getFromCache(year);
         if (cachedData) {
-            if (!isBackground) {
-                window.App.D = cachedData;
-                window.App.render();
-                window.App.hideLoader();
-                return;
-            }
+            if (!isBackground) { window.App.D = cachedData; window.App.hideLoader(); return; }
         }
 
-        if (!isBackground) {
-            window.App.showLoader();
-        }
+        if (!isBackground) window.App.showLoader();
 
         try {
             const p = year && year !== 'all' ? { period_type: 'year', period_value: year } : { period_type: 'year', period_value: 0 };
-            
-            const payload = { 
-                ...p, 
-                init_data: tg?.initData || '',
-                screen_width: window.innerWidth,
-                screen_height: window.innerHeight
-            };
+            const payload = { ...p, init_data: tg?.initData || '', screen_width: window.innerWidth, screen_height: window.innerHeight };
 
             const r = await fetch('/api/webapp/detailed_stats/', { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, 
                 body: JSON.stringify(payload) 
             });
             
@@ -659,14 +501,10 @@ Object.assign(window.App, {
             }
 
             if (year === window.App.getState('nav.query.y')) {
-                window.App.D = j;
-                window.App.render();
+                window.App.D = j; // Это само вызовет подписчик и обновит UI
             }
         } catch (e) { 
             console.error('Load error:', e); 
-            if (!isBackground) {
-                document.getElementById('app').innerHTML = `<div style="padding: 40px; text-align:center;"><div style="font-size: 40px;">❌</div>Ошибка загрузки</div>`;
-            }
         } finally { 
             if (!isBackground) window.App.hideLoader();
         }
@@ -682,6 +520,8 @@ Object.assign(window.App, {
         el.style.fontSize = "";
         const styles = window.getComputedStyle(el);
         const limitWidth = el.clientWidth;
+        if (limitWidth <= 0) return; 
+
         const limitHeight = parseFloat(styles.maxHeight) || el.offsetHeight || 40;
         const isSingleLine = styles.whiteSpace === 'nowrap' || styles.webkitLineClamp === '1';
         let size = parseFloat(styles.fontSize);
@@ -689,30 +529,36 @@ Object.assign(window.App, {
         const originalMaxHeight = el.style.maxHeight;
         const originalClamp = el.style.webkitLineClamp;
         
+        let safetyCounter = 0;
         if (isSingleLine) {
-            while (el.scrollWidth > limitWidth + 1 && size > minSize) {
+            while (el.scrollWidth > limitWidth + 1 && size > minSize && safetyCounter < 50) {
                 size -= 0.5;
                 el.style.fontSize = size + "px";
+                safetyCounter++;
             }
         } else {
             el.style.webkitLineClamp = "none";
             el.style.maxHeight = "none";
-            while (el.scrollHeight > limitHeight + 1 && size > minSize) {
+            while (el.scrollHeight > limitHeight + 1 && size > minSize && safetyCounter < 50) {
                 size -= 0.5;
                 el.style.fontSize = size + "px";
+                safetyCounter++;
             }
             el.style.webkitLineClamp = originalClamp;
             el.style.maxHeight = originalMaxHeight;
         }
     },
+
     fitAll: function(selector, container = document) {
         const elements = container.querySelectorAll(selector);
         elements.forEach(el => window.App.fitText(el));
     },
+
     toggleHistoryEditMode: function() {
         const cur = window.App.State.getState('flags.isHistoryEditMode');
         window.App.State.setState('flags.isHistoryEditMode', !cur);
     },
+
     removeRatingItem: function(btn, payload) {
         const msg = "Удалить эту оценку?";
         const element = btn.closest('.grid-item-wrap') || btn.closest('.hist-item');
@@ -783,20 +629,17 @@ Object.assign(window.App, {
     },
     showStatsHelp: function(e) {
         if (e) { e.preventDefault(); e.stopPropagation(); }
-        const informer = document.getElementById('wl-stats-informer');
-        if (!informer) return;
-        if (informer.classList.contains('show')) {
-            informer.classList.remove('show');
-            return;
+        
+        const isVisible = window.App.getState('ui.helpPopoverVisible');
+        window.App.setState('ui.helpPopoverVisible', !isVisible);
+
+        if (!isVisible) {
+            const closeHandler = () => { 
+                window.App.setState('ui.helpPopoverVisible', false); 
+                document.removeEventListener('click', closeHandler); 
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 10);
         }
-        informer.classList.add('show');
-        const closeHandler = () => { informer.classList.remove('show'); document.removeEventListener('click', closeHandler); };
-        setTimeout(() => document.addEventListener('click', closeHandler), 10);
-    },
-    closeItemDeleteModal: function() {
-        window.App.State.setState('modals.wlDelete.isOpen', false);
-        window.App.itemToDeleteId = null;
-        window.App.itemToDeleteElement = null;
     },
     openAddViewModal: function(showId, title, type) {
         const today = new Date().toISOString().split('T')[0];
@@ -939,7 +782,9 @@ Object.assign(window.App, {
         window.App.i('it-gen-internal', 'masks'); window.App.i('it-act-internal', 'masks'); 
         window.App.i('it-dir-internal', 'film'); window.App.i('it-wri-internal', 'list');
         window.App.i('it-cou-internal', 'globe'); window.App.i('it-bin-internal', 'bolt');
-        window.App.i('it-star-internal', 'star'); window.App.i('ic-weekday-internal', 'days');
+        window.App.i('it-star-internal', 'star'); 
+        window.App.i('it-star-label', 'star'); 
+        window.App.i('ic-weekday-internal', 'days');
 
         window.App.i('ic-stat-history', 'chart'); window.App.i('ic-stat-parser', 'zap');
         window.App.i('ic-stat-shows', 'play_circle'); window.App.i('ic-stat-ratings', 'star');
@@ -977,124 +822,202 @@ Object.assign(window.App, {
             el.innerHTML = window.App.Icons.help;
         });
     },
+
+    updateOverview: function(s) {
+        if (!s) return;
+        const vViews = s.total_views || 0;
+        const vEp = s.total_episodes || 0;
+        const vMov = s.total_movies || 0;
+        const vSer = s.unique_series || 0;
+
+        const elMap = {
+            's-time': s.duration_display || '0м',
+            's-views': `${vViews} ${window.App.plural(vViews, ['просмотр', 'просмотра', 'просмотров'])}`,
+            's-act': `${s.activity_percent || 0}%`,
+            's-daily': `~${s.daily_average_min || 0} мин/день`,
+            's-ep': vEp,
+            's-ser': `${vSer} ${window.App.plural(vSer, ['сериал', 'сериала', 'сериалов'])} · ${s.series_duration || '0м'}`,
+            's-mov': vMov,
+            's-uni': s.movies_duration || '0м',
+            's-wl-added': s.wishlist_added || 0,
+            's-wl-watched': s.wishlist_watched || 0,
+            'period-label': s.period_label || ''
+        };
+
+        Object.entries(elMap).forEach(([id, val]) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        });
+
+        const epLbl = document.getElementById('s-ep')?.nextElementSibling;
+        if (epLbl) epLbl.textContent = window.App.plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+
+        const movLbl = document.getElementById('s-mov')?.nextElementSibling;
+        if (movLbl) movLbl.textContent = window.App.plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
+    },
+
+    updateUserMeta: function(meta) {
+        if (!meta) return;
+        const nameEl = document.getElementById('user-name');
+        if (nameEl) {
+            nameEl.textContent = meta.name || 'Пользователь';
+            requestAnimationFrame(() => window.App.fitText(nameEl));
+        }
+
+        const avEl = document.getElementById('avatar');
+        if (avEl) {
+            if (meta.is_anonymous) {
+                const myId = meta.id || 0;
+                avEl.innerHTML = myId > 0 
+                    ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${window.App.getUserColor(myId)};color:#fff;font-weight:900;">${myId}</div>`
+                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-muted);">${window.App.Icons.user}</div>`;
+            } else if (meta.photo_url) {
+                avEl.innerHTML = `<img src="${meta.photo_url}" alt="A">`;
+            } else {
+                avEl.innerHTML = (meta.name || 'P').charAt(0).toUpperCase();
+            }
+        }
+    },
+
+    updateRatingsSection: function(rt) {
+        const box = document.getElementById('ratings-box');
+        if (!rt || rt.total === 0) {
+            box?.classList.add('hidden');
+            return;
+        }
+        box?.classList.remove('hidden');
+
+        const palette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
+        const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
+        
+        const avgEl = document.getElementById('cr-avg');
+        if (avgEl) {
+            avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
+            avgEl.style.color = palette[colorIdx];
+        }
+
+        const totalEl = document.getElementById('cr-total');
+        if (totalEl) {
+            totalEl.innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${window.App.plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
+        }
+
+        const badge = document.getElementById('cr-badge');
+        if (badge) {
+            if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.cssText = 'background:rgba(46,204,113,0.15);color:#2ecc71'; }
+            else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.cssText = 'background:rgba(56,139,253,0.15);color:#60a5fa'; }
+            else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.cssText = 'background:rgba(210,153,34,0.15);color:#d29922'; }
+            else { badge.textContent = 'Суровый критик'; badge.style.cssText = 'background:rgba(248,81,73,0.15);color:#e74c3c'; }
+        }
+        window.App.renderRatingsDist();
+    },
+
     init: async function() {
         if (window.IS_ADMIN_DASHBOARD) return;
-        window.App.State.setState('flags.isSyncingHash', true);
+        window.App.setState('flags.isSyncingHash', true);
 
+        // 1. Синхронизация UI-флагов
         const savedViewMode = localStorage.getItem('kp_view_mode') || 'grid';
         window.App.setState('ui.viewMode', savedViewMode);
 
-        if (typeof window.App.initWishlistReactivity === 'function') {
-            window.App.initWishlistReactivity();
-        }
+        if (typeof window.App.initWishlistReactivity === 'function') window.App.initWishlistReactivity();
 
+        // 2. РЕАКТИВНЫЙ ДАШБОРД (Новое)
+        window.App.subscribe('data.stats', (d) => {
+            if (!d || !d.meta) return;
+            
+            // Мета и Обзор
+            window.App.updateUserMeta(d.meta);
+            window.App.updateOverview(d.summary);
+            window.App.updateRatingsSection(d.ratings);
+
+            // Видимость карточек
+            const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
+            
+            toggle('main-tabs', !!d.group);
+            toggle('tab-group-btn', !!d.group);
+            toggle('card-dynamics', d.monthly_chart?.views?.some(v => v > 0));
+            toggle('card-weekday', d.weekday_chart?.data?.some(v => v > 0));
+            
+            const hasHeatmap = d.heatmap && d.heatmap.length > 0;
+            toggle('card-heatmap', !hasHeatmap); // В CSS .hidden — это display:none
+            if (hasHeatmap) window.App.renderHeatmap(d.heatmap);
+
+            toggle('card-genres', d.genres && d.genres.length > 0);
+            toggle('card-countries', d.countries && d.countries.length > 0);
+            toggle('card-binges', d.binges && d.binges.length > 0);
+
+            // Группа и графики
+            if (window.App.getState('ui.activeStatsTab') === 'group') window.App.renderGroup(d);
+            window.App.renderCharts(d);
+
+            // Списки (Actors/Directors/Writers) - вызываем принудительное обновление
+            ['actors', 'directors', 'writers'].forEach(cat => {
+                const mode = window.App.getState(`ui.personTabs.${cat}`) || 'series';
+                const hasData = d[cat] && (d[cat].series?.length || d[cat].others?.length);
+                toggle(`card-${cat}`, !!hasData);
+                if (hasData) {
+                    window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
+                }
+            });
+            
+            if (d.binges?.length) window.App.fillBinges(d.binges);
+            if (d.countries?.length) {
+                window.App.fillList('countries-list', d.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+            }
+        });
+
+        // 3. Подписки на табы персон
         ['actors', 'directors', 'writers'].forEach(cat => {
-            window.App.State.subscribe(`ui.personTabs.${cat}`, (mode) => {
-                const container = document.getElementById(`card-${cat}`);
-                if (!container || !window.App.D) return;
-
-                const btns = container.querySelectorAll('.vt-btn');
-                btns.forEach(btn => {
-                    const btnMode = btn.getAttribute('onclick').includes('series') ? 'series' : 'others';
-                    btn.classList.toggle('active', btnMode === mode);
+            window.App.subscribe(`ui.personTabs.${cat}`, (mode) => {
+                const d = window.App.D;
+                if (!d || !d[cat]) return;
+                
+                // Обновляем визуальное состояние кнопок переключателя
+                const card = document.getElementById(`card-${cat}`);
+                card?.querySelectorAll('.vt-btn').forEach(btn => {
+                    const isBtnSeries = btn.getAttribute('onclick').includes('series');
+                    btn.classList.toggle('active', (isBtnSeries && mode === 'series') || (!isBtnSeries && mode === 'others'));
                 });
 
-                const data = window.App.D[cat][mode];
-                window.App.fillList(`${cat}-list`, data, null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
+                window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
             });
         });
 
-        window.App.subscribe('ui.viewMode', (mode) => {
-            localStorage.setItem('kp_view_mode', mode);
-            
-            const top = window.App.viewStack[window.App.viewStack.length - 1];
-            if (top && top.context.type === 'history') {
-                const btns = top.el.querySelectorAll('.layer-header .vt-btn');
-                if (btns.length >= 2) {
-                    btns[0].classList.toggle('active', mode === 'grid');
-                    btns[1].classList.toggle('active', mode === 'list');
-                }
-
-                window.App.currentHistoryOffset = 0;
-                const container = top.el.querySelector('#layer-hist-container');
-                if (container) container.innerHTML = '';
-                
-                if (window.App.historyObserver) window.App.historyObserver.disconnect();
-                window.App.renderHistoryBatchLayer();
-            }
-        });
-
-        window.App.State.subscribe('nav.activeMainView', (view) => {
-            const views = ['search', 'wishlist', 'stats'];
-            views.forEach(v => {
-                const el = document.getElementById(`view-${v}`);
-                if (el) {
-                    el.style.display = (v === view) ? 'flex' : 'none';
-                    el.classList.toggle('active-view', (v === view));
-                }
-                const navBtn = document.getElementById(`bn-${v}`);
+        // 4. Остальные подписки (ViewMode, Search, Tabs, Year, Theme)
+        window.App.subscribe('data.search.results', (val) => val && window.App.renderSearchResults(val));
+        
+        window.App.subscribe('nav.activeMainView', (view) => {
+            ['search', 'wishlist', 'stats'].forEach(v => {
+                const el = document.getElementById(`view-${v}`), navBtn = document.getElementById(`bn-${v}`);
+                if (el) el.style.display = (v === view) ? 'flex' : 'none';
                 if (navBtn) navBtn.classList.toggle('active', v === view);
             });
-
-            const bn = document.getElementById('bottom-nav');
-            if (bn && !window.App.isSharedMode) {
-                bn.style.display = (window.App.viewStack.length === 0) ? 'flex' : 'none';
-            }
         });
 
-        window.App.State.subscribe('forms.search.query', (q) => {
-            if (!q || q.length < 2) {
-                const resEl = document.getElementById('search-results');
-                if (resEl) {
-                    resEl.innerHTML = `<div class="empty"><div class="icon" style="font-size: 48px; opacity: 0.3; margin-bottom: 16px;">${window.App.Icons.search}</div>Введите название для поиска</div>`;
-                }
-                return;
-            }
-            window.App.doSearch(q);
+        window.App.subscribe('data.availableYears', () => window.App.renderYears());
+        window.App.subscribe('forms.search.query', (q) => window.App.doSearch(q || ''));
+        window.App.subscribe('ui.activeStatsTab', (tab) => {
+            document.querySelectorAll('#main-tabs .tab').forEach(btn => btn.classList.toggle('on', btn.dataset.tab === tab));
+            document.getElementById('sec-personal')?.classList.toggle('hidden', tab !== 'personal');
+            document.getElementById('sec-group')?.classList.toggle('hidden', tab !== 'group');
+            if (tab === 'group' && window.App.D) window.App.renderGroup(window.App.D);
         });
 
-        window.App.State.subscribe('ui.activeStatsTab', (tab) => {
-            document.querySelectorAll('#main-tabs .tab').forEach(btn => {
-                btn.classList.toggle('on', btn.dataset.tab === tab);
-            });
-            const pSec = document.getElementById('sec-personal');
-            const gSec = document.getElementById('sec-group');
-            if (pSec) pSec.classList.toggle('hidden', tab !== 'personal');
-            if (gSec) gSec.classList.toggle('hidden', tab !== 'group');
-            
-            if (tab === 'group' && window.App.D && !window.App.D.group) {
-                window.App.renderGroup();
-            }
-        });
-
-        window.App.State.subscribe('nav.query.y', async (year) => {
+        window.App.subscribe('nav.query.y', async (year) => {
             window.App.markYear();
-
             if (window.App.isSharedMode) {
-                if (window.App.SharedDataMap[year]) {
-                    window.App.D = window.App.SharedDataMap[year];
-                    window.App.render();
-                }
+                const sid = (new URLSearchParams(window.location.search).get('shared_id')) || (tg?.initDataUnsafe?.start_param || '').replace('stat_', '');
+                await window.App.loadShared(sid);
             } else {
                 const cached = window.App.Data.getFromCache(year);
-                if (cached) {
-                    window.App.D = cached;
-                    window.App.render();
-                } else if (window.App.D) {
-                    await window.App.load(year);
-                }
+                if (cached) window.App.D = cached; else await window.App.load(year);
             }
-            // После смены года обновляем URL
             window.App.Router.updateUrl();
         });
 
-        window.App.State.subscribe('ui.theme', (theme) => {
+        window.App.subscribe('ui.theme', (theme) => {
             window.App.isDark = (theme === 'dark');
-            document.body.classList.toggle('light', !window.App.isDark);
-            document.querySelectorAll('.theme-btn, .js-theme-toggle').forEach(btn => {
-                btn.innerHTML = window.App.isDark ? window.App.Icons.moon : window.App.Icons.sun;
-            });
-            if (window.App.D) window.App.renderCharts();
+            if (window.App.D) window.App.renderCharts(window.App.D);
         });
 
         window.App.subscribe('data.activeWlFolderId', (val) => {
@@ -1104,126 +1027,61 @@ Object.assign(window.App, {
         });
 
         const modalMap = {
-            'addView': 'add-view-modal',
-            'rateShow': 'rate-show-modal',
-            'share': 'share-modal',
-            'wlFolder': 'wl-modal',
-            'wlEdit': 'wl-edit-modal',
-            'wlLimit': 'wl-limit-modal',
-            'wlDelete': 'wl-item-delete-modal',
-            'casino': 'casino-modal',
-            'details': 'details-modal'
+            'addView': 'add-view-modal', 'rateShow': 'rate-show-modal', 'share': 'share-modal',
+            'wlFolder': 'wl-modal', 'wlEdit': 'wl-edit-modal', 'wlLimit': 'wl-limit-modal',
+            'wlDelete': 'wl-item-delete-modal', 'casino': 'casino-modal', 'details': 'details-modal'
         };
-
-        Object.entries(modalMap).forEach(([stateKey, elId]) => {
-            window.App.State.subscribe(`modals.${stateKey}.isOpen`, (isOpen) => {
-                const el = document.getElementById(elId);
-                if (el) el.classList.toggle('show', !!isOpen);
+        Object.entries(modalMap).forEach(([k, id]) => {
+            window.App.subscribe(`modals.${k}.isOpen`, (open) => {
+                const el = document.getElementById(id); if (el) el.classList.toggle('show', !!open);
             });
         });
 
         const scrollHandler = window.App.State._debounce((e) => {
-            const target = e.target;
-            if (target.id === 'views-container') {
-                const currentView = window.App.State.getState('nav.activeMainView');
-                window.App.State.setState(`ui.scrollPositions.${currentView}`, target.scrollTop);
-            } else if (target.classList.contains('layer')) {
-                const depth = window.App.viewStack.length;
-                window.App.State.setState(`ui.scrollPositions.layer_${depth}`, target.scrollTop);
-            }
+            if (e.target.id === 'views-container') window.App.setState(`ui.scrollPositions.${window.App.getState('nav.activeMainView')}`, e.target.scrollTop);
+            else if (e.target.classList.contains('layer')) window.App.setState(`ui.scrollPositions.layer_${window.App.viewStack.length}`, e.target.scrollTop);
         }, 150);
-
-        const vContainer = document.getElementById('views-container');
-        const dLayers = document.getElementById('dynamic-layers');
-        if (vContainer) vContainer.addEventListener('scroll', scrollHandler);
-        if (dLayers) dLayers.addEventListener('scroll', scrollHandler, true);
+        const vC = document.getElementById('views-container'), dL = document.getElementById('dynamic-layers');
+        if (vC) vC.addEventListener('scroll', scrollHandler); if (dL) dL.addEventListener('scroll', scrollHandler, true);
 
         window.App.initIcons();
         window.App.State.syncAllBindings();
 
+        // 5. Первоначальный роутинг
         try {
             const { segments } = window.App.Router.parse();
-            const sharedIdFromUrl = new URLSearchParams(window.location.search).get('shared_id');
-            const startParam = tg?.initDataUnsafe?.start_param || '';
-
-            let initialView = 'search';
-            if (sharedIdFromUrl || startParam.startsWith('stat_')) {
-                initialView = 'stats';
-                window.App.isSharedMode = true;
-            } else if (segments.length > 0) {
-                initialView = segments[0];
-            } else {
-                initialView = window.App.State.getState('nav.activeMainView') || 'search';
-            }
-
+            const sId = new URLSearchParams(window.location.search).get('shared_id') || (tg?.initDataUnsafe?.start_param || '').replace('stat_', '');
+            let initialView = sId ? 'stats' : (segments[0] || window.App.getState('nav.activeMainView') || 'search');
+            
+            if (sId) window.App.isSharedMode = true;
             window.App.setState('nav.activeMainView', initialView);
 
             if (window.App.isSharedMode) {
                 document.body.classList.add('has-banner');
-                const shareBtn = document.getElementById('share-btn');
-                if (shareBtn) shareBtn.classList.add('hidden');
-                
-                const bannerContainer = document.getElementById('shared-banner-container');
-                if (bannerContainer) {
-                    bannerContainer.innerHTML = `<div class="shared-banner">Вы просматриваете чужую статистику</div>`;
-                }
-                
-                const sid = sharedIdFromUrl || startParam.replace('stat_', '');
-                await window.App.loadShared(sid);
+                const banner = document.getElementById('shared-banner-container');
+                if (banner) banner.innerHTML = `<div class="shared-banner">Вы просматриваете чужую статистику</div>`;
+                await window.App.loadShared(sId);
             } else {
-                const initialYear = window.App.State.getState('nav.query.y') || 'all';
-                await window.App.load(initialYear);
-
-                if (typeof window.App.loadWishlist === 'function') {
-                    await window.App.loadWishlist();
-                }
-                
-                const role = window.App.D?.meta?.role || 'guest';
+                if (typeof window.App.loadWishlist === 'function') await window.App.loadWishlist();
                 document.body.classList.add('has-nav');
-                const bnStats = document.getElementById('bn-stats');
-                if (role === 'guest' && bnStats) bnStats.classList.add('hidden');
-
-                const savedStack = window.App.State.getState('nav.layerStack') || [];
-                if (savedStack.length > 0) {
-                    for (const ctx of savedStack) {
-                        if (ctx.type === 'show') await window.App.openShowLayer(ctx.showId, true);
-                        else if (ctx.type === 'history') window.App.openHistoryLayer(ctx.htype, ctx.title, ctx.extraId, ctx.extraDate, ctx.extraKey, ctx.extraIndex, true);
-                        else if (['person', 'genre', 'country'].includes(ctx.type)) await window.App.openCollectionLayer(ctx.ctype, ctx.itemId, ctx.titleFallback, true);
-                    }
-                } else if (segments.length > 1) {
-                    const layerSegments = segments.slice(1);
-                    const historyTitles = {
-                        'all': 'Вся история', 'movies': 'Фильмы', 'episodes': 'Эпизоды',
-                        'wishlist_watched': 'Избранное', 'casino': 'История рулетки'
-                    };
-
-                    for (let i = 0; i < Math.floor(layerSegments.length / 2); i++) {
-                        const type = layerSegments[i * 2];
-                        const id = layerSegments[i * 2 + 1];
-                        if (type === 'show') await window.App.openShowLayer(id, true);
-                        else if (type === 'history') window.App.openHistoryLayer(id, historyTitles[id] || 'История', null, null, null, null, true);
-                        else if (['person', 'genre', 'country'].includes(type)) await window.App.openCollectionLayer(type, id, '', true);
-                    }
+                const savedStack = window.App.getState('nav.layerStack') || [];
+                for (const ctx of savedStack) {
+                    if (ctx.type === 'show') await window.App.openShowLayer(ctx.showId, true);
+                    else if (ctx.type === 'history') window.App.openHistoryLayer(ctx.htype, ctx.title, ctx.extraId, ctx.extraDate, ctx.extraKey, ctx.extraIndex, true);
+                    else if (['person', 'genre', 'country'].includes(ctx.type)) await window.App.openCollectionLayer(ctx.ctype, ctx.itemId, ctx.titleFallback, true);
                 }
             }
-        } catch (e) {
-            console.error("Critical Init Error:", e);
         } finally {
             window.App.hideLoader();
-            window.App.State.setState('flags.isSyncingHash', false);
+            window.App.setState('flags.isSyncingHash', false);
+            window.App.setState('ui.isAppReady', true);
             window.App.Router.updateUrl();
             window.App.restoreModals();
-
-            if (tg) {
-                tg.expand();
-                if (tg.ready) tg.ready();
-            }
         }
     },
 
     renderSearchResults: function(data) {
         let html = '';
-        
         if (data.persons?.length) {
             html += `<div class="label"><div class="icon" style="color:#d29922">${window.App.Icons.users}</div>Люди</div>`;
             html += '<div class="h-scroll-container" style="padding-bottom:16px;">';
@@ -1241,21 +1099,16 @@ Object.assign(window.App, {
         }
         
         if (data.shows?.length) {
-            html += `<div class="label"><div class="icon" style="color:var(--info)">${window.App.Icons.film}</div>Фильмы и Сериалы</div>`;
+            html += `<div class="label"><div class="icon" style="color:var(--info)">${window.App.Icons.film}</div>Контент</div>`;
             html += '<div class="hist-grid" style="padding:0 16px;">';
             data.shows.forEach(s => {
                 const poster = s.poster_url ? `<img src="${s.poster_url}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
                 const safeTitle = s.title.replace(/'/g, "\\'");
-                
-                let badgesHtml = '';
-                if (s.user_rating) {
-                    badgesHtml = `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${window.App.Icons.star}${s.user_rating}</span>`;
-                }
+                let badgesHtml = s.user_rating ? `<span class="rating-badge" style="background:rgba(0,0,0,0.6);border:none;">${window.App.Icons.star}${s.user_rating}</span>` : '';
 
                 html += `<div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${s.id})">
                     <div class="grid-item">
-                        ${poster}
-                        <div class="grid-badges">${badgesHtml}</div>
+                        ${poster}<div class="grid-badges">${badgesHtml}</div>
                         ${s.year ? `<div class="grid-year">${s.year}</div>` : ''}
                         <button class="wishlist-add-btn" onclick="event.stopPropagation(); window.App.showFolderModal(${s.id}, '${safeTitle}')">${window.App.Icons.bookmark_plus}</button>
                     </div>
@@ -1269,13 +1122,11 @@ Object.assign(window.App, {
             html = `<div class="empty"><div class="icon">${window.App.Icons.dash}</div>Ничего не найдено</div>`;
         }
 
-        const resultsContainer = document.getElementById('search-results');
-        resultsContainer.innerHTML = html;
-        
-        document.getElementById('search-results').innerHTML = html;
-        requestAnimationFrame(() => {
-            window.App.fitAll('.grid-below-title', resultsContainer);
-        });
+        const resEl = document.getElementById('search-results');
+        if (resEl) {
+            resEl.innerHTML = html;
+            requestAnimationFrame(() => window.App.fitAll('.grid-below-title', resEl));
+        }
     },
 
     i: function(id, name) {
@@ -1363,10 +1214,10 @@ Object.assign(window.App, {
             
             window.App.SharedDataMap = j.data;
             window.App.availableYears = j.metadata.years;
-            window.App.curYear = window.App.availableYears[0];
-            window.App.D = window.App.SharedDataMap[window.App.curYear];
             
-            window.App.render();
+            const initialYear = window.App.availableYears[0];
+            window.App.setState('nav.query.y', initialYear);
+            window.App.D = window.App.SharedDataMap[initialYear];
         } catch(e) { 
             console.error(e); 
             const appEl = document.getElementById('app');
@@ -1435,8 +1286,10 @@ Object.assign(window.App, {
 
     renderYears: function() {
         const c = document.getElementById('years');
-        const yrs = window.App.isSharedMode ? window.App.availableYears : (window.App.D.meta?.years || []);
+        const yrs = window.App.isSharedMode ? window.App.availableYears : (window.App.D?.meta?.years || []);
         
+        if (!c) return;
+
         if (yrs.length <= 1) {
             c.classList.add('hidden');
             return;
@@ -1474,11 +1327,7 @@ Object.assign(window.App, {
     },
 
     showToast: function(text) {
-        let el = document.getElementById('toast-msg');
-        if (!el) { el = document.createElement('div'); el.id = 'toast-msg'; el.className = 'toast'; document.body.appendChild(el); }
-        el.textContent = text; el.classList.add('show');
-        if (window.App.toastTimer) clearTimeout(window.App.toastTimer);
-        window.App.toastTimer = setTimeout(() => { el.classList.remove('show'); }, 2000);
+        window.App.setState('ui.toast', { text, visible: true });
     },
 
     initGlobalHeatmapZoom: function() {
@@ -1536,19 +1385,21 @@ Object.assign(window.App, {
         }, { passive: true });
     },
 
-    renderHeatmap: function() {
+    renderHeatmap: function(data) {
+        const heatmapData = data || window.App.D.heatmap;
         const el = document.getElementById('heatmaps-wrapper'); 
+        if (!el) return;
         el.innerHTML = '<div id="hm-zoom-content"></div>';
         const zoomContent = document.getElementById('hm-zoom-content');
-        if (!window.App.D.heatmap?.length) { el.innerHTML = `<div class="empty"><div class="icon">${window.App.Icons.cal}</div>Нет данных</div>`; return; }
+        if (!heatmapData?.length) { el.innerHTML = `<div class="empty"><div class="icon">${window.App.Icons.cal}</div>Нет данных</div>`; return; }
         
         const fragment = document.createDocumentFragment();
         const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
         
-        window.App.D.heatmap.forEach((hItem, index) => {
-            const yr = hItem.year; const data = hItem.data; const offset = (new Date(yr, 0, 1).getDay() + 6) % 7; const totalColumns = Math.ceil((offset + data.length) / 7);
+        heatmapData.forEach((hItem, index) => {
+            const yr = hItem.year; const hData = hItem.data; const offset = (new Date(yr, 0, 1).getDay() + 6) % 7; const totalColumns = Math.ceil((offset + hData.length) / 7);
             const block = document.createElement('div'); block.className = 'hm-zoom-area'; if (index > 0) block.style.marginTop = '20px';
-            if (window.App.D.heatmap.length > 1) {
+            if (heatmapData.length > 1) {
                 const title = document.createElement('div'); title.style.fontSize = '13px'; title.style.fontWeight = '800'; title.style.color = 'var(--text-muted)'; title.style.marginBottom = '8px'; title.textContent = yr; block.appendChild(title);
             }
             const wrapper = document.createElement('div'); wrapper.className = 'hm-wrapper';
@@ -1558,7 +1409,7 @@ Object.assign(window.App, {
             for (let i = 0; i < offset; i++) { const d = document.createElement('div'); d.className = 'hc'; d.style.opacity = '0'; d.style.pointerEvents = 'none'; hm.appendChild(d); }
             
             let curr = new Date(yr, 0, 1);
-            data.forEach(v => { 
+            hData.forEach(v => { 
                 const d = document.createElement('div'); 
                 const y = curr.getFullYear(), m = String(curr.getMonth() + 1).padStart(2, '0'), day = String(curr.getDate()).padStart(2, '0');
                 const currStr = `${y}-${m}-${day}`, displayDate = `${day}.${m}.${y}`;
@@ -1598,21 +1449,35 @@ Object.assign(window.App, {
             }
 
             const histKey = ['actors', 'directors', 'writers'].includes(categoryKey) ? `${categoryKey}_${mode}` : categoryKey;
-            window.App.D[histKey] = items;
 
             html += `<div class="li li-clickable anim-list-item clickable" onclick="window.App.openHistoryLayer('filter', '${safeName}', null, null, '${histKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
         });
         el.innerHTML = html;
     },
 
-    fillBinges: function() {
+    fillBinges: function(data) {
         const el = document.getElementById('binges-list');
-        if (!window.App.D.binges?.length) return;
+        const binges = data || window.App.D.binges;
+        if (!el || !binges?.length) return;
         let html = '';
-        window.App.D.binges.forEach((b, i) => {
-            const delay = (i + 1) * 0.05, safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-            const posterHtml = b.poster_url ? `<img src="${b.poster_url}" style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.1);" onerror="this.style.display='none'">` : `<div style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
-            html += `<div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="window.App.openHistoryLayer('binge', '${safeTitle}', ${b.show_id}, '${b.date}')"><div class="li-l">${posterHtml}<div><div class="li-name">${b.show_title}</div><div class="li-sub">${b.date}</div></div></div><span class="li-r" style="color:var(--info)">${b.count} ${window.App.plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span></div>`;
+        binges.forEach((b, i) => {
+            const delay = (i + 1) * 0.05;
+            const safeTitle = b.show_title.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+            const posterHtml = b.poster_url 
+                ? `<img src="${b.poster_url}" style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,0.1);" onerror="this.style.display='none'">` 
+                : `<div style="width:clamp(36px, 10vw, 44px);height:clamp(54px, 15vw, 66px);border-radius:6px;flex-shrink:0;background:var(--bg-input);border:1px solid var(--border);"></div>`;
+            
+            html += `
+                <div class="li li-clickable anim-list-item clickable" style="animation-delay:${delay}s" onclick="window.App.openHistoryLayer('binge', '${safeTitle}', ${b.show_id}, '${b.date}')">
+                    <div class="li-l">
+                        ${posterHtml}
+                        <div style="min-width:0;">
+                            <div class="li-name">${b.show_title}</div>
+                            <div class="li-sub">${b.date}</div>
+                        </div>
+                    </div>
+                    <span class="li-r" style="color:var(--info)">${b.count} ${window.App.plural(b.count, ['эпизод', 'эпизода', 'эпизодов'])}</span>
+                </div>`;
         });
         el.innerHTML = html;
     },
@@ -1624,10 +1489,11 @@ Object.assign(window.App, {
         return gradient;
     },
 
-    renderMonthly: function() {
+    renderMonthly: function(data) {
+        const d = data || window.App.D;
         const canvas = document.getElementById('c-monthly'), ctx = canvas.getContext('2d');
         if (window.App.chM) window.App.chM.destroy();
-        const ch = window.App.D.monthly_chart; if (!ch?.labels?.length) return;
+        const ch = d.monthly_chart; if (!ch?.labels?.length) return;
         const c = window.App.cc();
         let fillGradient = window.App.getCtxGradient(ctx, window.App.isDark?'rgba(35, 134, 54, 0.4)':'rgba(46, 160, 67, 0.3)', 'rgba(35, 134, 54, 0.0)'), lineGradient = ctx.createLinearGradient(0, 0, canvas.width || 400, 0);
         lineGradient.addColorStop(0, '#2ea043'); lineGradient.addColorStop(1, '#3fb950');
@@ -1642,10 +1508,11 @@ Object.assign(window.App, {
         });
     },
 
-    renderWeekday: function() {
+    renderWeekday: function(data) {
+        const d = data || window.App.D;
         const canvas = document.getElementById('c-weekday'), ctx = canvas.getContext('2d');
         if (window.App.chW) window.App.chW.destroy();
-        const ch = window.App.D.weekday_chart; if (!ch?.labels?.length) return;
+        const ch = d.weekday_chart; if (!ch?.labels?.length) return;
         const c = window.App.cc(), totalViews = ch.data.reduce((a, b) => a + b, 0);
         let barGradient = window.App.getCtxGradient(ctx, '#2ea043', '#238636'), weGradient = window.App.getCtxGradient(ctx, '#388bfd', '#1f6feb');
         window.App.chW = new Chart(ctx, { 
@@ -1680,11 +1547,11 @@ Object.assign(window.App, {
         const values = top.map(g => (g.minutes / totalMinutesSum) * 100), percents = values.map(v => Math.round(v));
         const centerTextPlugin = { id: 'centerText', afterDraw: (chart) => { const { ctx, chartArea: { top, height, left, width } } = chart; ctx.save(); const centerX = left + width / 2, centerY = top + height / 2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '900 34px system-ui'; ctx.fillStyle = c.t; ctx.fillText(totalHours, centerX, centerY - 8); ctx.font = 'bold 10px system-ui'; ctx.fillStyle = window.App.isDark ? '#6e7681' : '#8c959f'; ctx.letterSpacing = '1px'; ctx.fillText('ЧАСОВ ВСЕГО', centerX, centerY + 22); ctx.restore(); } };
         window.App.chG[canvasId] = new Chart(ctx, { 
-            type: 'doughnut', plugins: [ChartDataLabels, centerTextPlugin],
+            type: 'doughnut', plugins: [centerTextPlugin],
             data: { labels: top.map(g => g.name), datasets: [{ data: top.map(g => g.minutes), backgroundColor: top.map((_, i) => pal[i % pal.length]), borderWidth: 0, hoverOffset: 15, borderRadius: 6, spacing: top.length === 1 ? 0 : 3, weight: 1 }] },
-            options: { responsive: true, maintainAspectRatio: false, cutout: '50%', layout: { padding: 15 }, animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' }, onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; }, onClick: (event, activeElements) => { if (activeElements.length > 0) window.App.openHistoryLayer('filter', top[activeElements[0].index].name, null, null, dataKey, activeElements[0].index); }, plugins: { datalabels: { color: '#fff', font: { weight: '800', size: 10 }, formatter: (value, context) => percents[context.dataIndex] > 5 ? percents[context.dataIndex] + '%' : '', display: 'auto' }, tooltip: { enabled: true, callbacks: { label: (context) => { const val = context.parsed, h = Math.floor(val/60), m = val%60; return ` ${h}ч ${m}м (${percents[context.dataIndex]}%)`; } } }, legend: { display: false } } } 
+            options: { responsive: true, maintainAspectRatio: false, cutout: '50%', layout: { padding: 15 }, animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' }, onHover: (event, activeElements) => { event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default'; }, onClick: (event, activeElements) => { if (activeElements.length > 0) window.App.openHistoryLayer('filter', top[activeElements[0].index].name, null, null, dataKey, activeElements[0].index); }, plugins: { tooltip: { enabled: true, callbacks: { label: (context) => { const val = context.parsed, h = Math.floor(val/60), m = val%60; return ` ${h}ч ${m}м (${percents[context.dataIndex]}%)`; } } }, legend: { display: false } } } 
         });
-        window.App.D[dataKey] = top;
+        
         legendEl.innerHTML = top.map((g, i) => `<div class="legend-item" onclick="window.App.openHistoryLayer('filter', '${g.name.replace(/'/g, "\\'")}', null, null, '${dataKey}', ${i})" onmouseenter="window.App.highlightSegment('${canvasId}', ${i}, true)" onmouseleave="window.App.highlightSegment('${canvasId}', ${i}, false)"><div class="legend-dot" style="background:${pal[i % pal.length]}"></div><div class="legend-name">${g.name}</div><div class="legend-val">${Math.floor(g.minutes / 60) > 0 ? `${Math.floor(g.minutes / 60)}ч ${g.minutes % 60}м` : `${g.minutes % 60}м`} (${percents[i]}%)</div></div>`).join('');
     },
 
@@ -1707,94 +1574,112 @@ Object.assign(window.App, {
     },
 
     openHistoryLayer: function(type, title, extraId, extraDate, extraKey, extraIndex, fromRouter = false) {
-        window.App.curHistType = type;
-        window.App.isHistoryEditMode = false;
+        let rawData = [];
         
         if (type === 'all') { 
-            window.App.curHistData = [...window.App.D.history_movies, ...window.App.D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date)); 
+            rawData = [...window.App.D.history_movies, ...window.App.D.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date)); 
         } 
         else if (type === 'casino') {
-            window.App.curHistData = window.App.D.casino_history;
+            rawData = window.App.D.casino_history || [];
         }
         else if (type === 'day') { 
-            window.App.curHistData = [...window.App.D.history_movies, ...window.App.D.history_episodes].filter(i => i.view_date === extraDate); 
+            rawData = [...window.App.D.history_movies, ...window.App.D.history_episodes].filter(i => i.view_date === extraDate); 
         } 
         else if (type === 'binge') { 
-            window.App.curHistData = window.App.D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => { 
+            rawData = window.App.D.history_episodes.filter(i => i.show_id === extraId && i.view_date === extraDate).sort((a, b) => { 
                 if (a.season_number !== b.season_number) return a.season_number - b.season_number; 
                 return a.episode_number - b.episode_number; 
             }); 
         } 
         else if (type === 'ratings') { 
-            window.App.curHistData = window.App.D.ratings.history; 
+            rawData = window.App.D.ratings.history; 
         } 
         else if (type === 'movies') { 
-            window.App.curHistData = window.App.D.history_movies; 
+            rawData = window.App.D.history_movies; 
         } 
         else if (type === 'episodes') { 
-            window.App.curHistData = window.App.D.history_episodes; 
+            rawData = window.App.D.history_episodes; 
         } 
         else if (type === 'wishlist_watched') {
-            window.App.curHistData = window.App.D.wishlist_watched_items || [];
+            rawData = window.App.D.wishlist_watched_items || [];
         }
         else if (type === 'show_history') {
-            window.App.curHistData = extraKey; 
+            rawData = extraKey; 
         }
         else if (type === 'filter') { 
-            const sourcePool = extraKey.startsWith('group') ? [...window.App.D.group.history_movies, ...window.App.D.group.history_episodes] : [...window.App.D.history_movies, ...window.App.D.history_episodes]; 
-            const allowedIds = window.App.D[extraKey][extraIndex].show_ids || []; 
-            window.App.curHistData = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); 
+            const isGroup = extraKey.startsWith('group');
+            const poolKey = extraKey.replace('group_', '');
+            
+            const histSource = isGroup ? window.App.D.group : window.App.D;
+            const sourcePool = [...histSource.history_movies, ...histSource.history_episodes]; 
+
+            let itemsPool = null;
+            if (poolKey === 'genres_top') {
+                itemsPool = histSource.genres;
+            } else if (poolKey.includes('_')) {
+                const [cat, mode] = poolKey.split('_');
+                itemsPool = window.App.D[cat][mode];
+            } else {
+                itemsPool = window.App.D[poolKey];
+            }
+
+            if (itemsPool && itemsPool[extraIndex]) {
+                const allowedIds = itemsPool[extraIndex].show_ids || []; 
+                rawData = sourcePool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); 
+            }
         } 
         else if (type === 'group_member') { 
             const member = window.App.D.group.members[extraIndex]; 
-            window.App.curHistData = [...window.App.D.group.history_movies, ...window.App.D.group.history_episodes].filter(item => item.user_ids.includes(member.id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); 
+            rawData = [...window.App.D.group.history_movies, ...window.App.D.group.history_episodes].filter(item => item.user_ids.includes(member.id)).sort((a, b) => b.view_date.localeCompare(a.view_date)); 
         } 
         else if (type === 'weekday') { 
-            window.App.curHistData = [...window.App.D.history_movies, ...window.App.D.history_episodes].filter(item => { 
+            rawData = [...window.App.D.history_movies, ...window.App.D.history_episodes].filter(item => { 
                 const date = new Date(item.view_date); 
                 const jsDay = date.getDay(); 
                 return (jsDay === 0 ? 6 : jsDay - 1) === extraIndex; 
             }).sort((a, b) => b.view_date.localeCompare(a.view_date)); 
         } 
         else if (type === 'rating_filter') { 
-            window.App.curHistData = window.App.D.ratings.history.filter(item => { 
+            rawData = window.App.D.ratings.history.filter(item => { 
                 let b = Math.floor(item.rating); 
                 if (b < 1) b = 1; 
                 return b === extraIndex; 
             }); 
-            window.App.curHistType = 'ratings'; 
+            type = 'ratings'; 
         }
 
         let grouping = 'none';
-        const len = window.App.curHistData.length;
-        if (len >= 300) grouping = 'month';
-        else if (len >= 50) grouping = 'year';
+        if (rawData.length >= 300) grouping = 'month';
+        else if (rawData.length >= 50) grouping = 'year';
+
+        window.App.setState('data.history', prev => ({
+            ...prev,
+            list: rawData,
+            type: type,
+            title: title,
+            offset: 0,
+            grouping: grouping,
+            lastGroupKey: null,
+            isRendering: false
+        }));
+
+        window.App.setState('flags.isHistoryEditMode', false);
 
         let headerSectionHtml = '';
-        const isPersonCategory = extraKey && typeof extraKey === 'string' && (extraKey.startsWith('actors') || extraKey.startsWith('directors') || extraKey.startsWith('writers'));
-        
-        if (type === 'filter' && isPersonCategory) {
-            const p = window.App.D[extraKey][extraIndex];
+        if (type === 'filter' && extraKey && (extraKey.includes('actors') || extraKey.includes('directors') || extraKey.includes('writers'))) {
+            const poolKey = extraKey.replace('group_', '');
+            const [cat, mode] = poolKey.split('_');
+            const p = window.App.D[cat][mode][extraIndex];
             const safeName = p.name.replace(/'/g, "\\'");
             const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
             const imgHtml = p.photo_url 
                 ? `<img src="${p.photo_url}" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;" onerror="window.App.handleImgErr(this, ${fb}, '${safeName}')">`
                 : `<div class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px;">${p.name.charAt(0)}</div>`;
-            
-            let profLabel = '';
-            if (extraKey.startsWith('actors')) profLabel = 'Актёр';
-            else if (extraKey.startsWith('directors')) profLabel = 'Режиссёр';
-            else if (extraKey.startsWith('writers')) profLabel = 'Сценарист';
-            
             headerSectionHtml = `
                 <div class="card anim-item clickable" onclick="window.App.openCollectionLayer('person', ${p.id}, '${safeName}')" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm); position:relative;">
                     ${imgHtml}
                     <div style="min-width:0; flex:1;">
                         <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">${p.name}</div>
-                        <div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">${profLabel}</div>
-                    </div>
-                    <div style="color:var(--text-muted); opacity:0.5;">
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M9 18l6-6-6-6"/></svg>
                     </div>
                 </div>`;
         } else if (type === 'filter' && extraKey === 'countries') {
@@ -1806,7 +1691,6 @@ Object.assign(window.App, {
         }
 
         const currentViewMode = window.App.getState('ui.viewMode');
-
         const deleteBtnVisible = (!window.App.isSharedMode && type !== 'ratings');
         const deleteToggleBtn = deleteBtnVisible ? `<button class="wl-edit-btn" id="hist-del-toggle" onclick="window.App.toggleHistoryEditMode()">${window.App.Icons.trash}</button>` : '';
 
@@ -1845,25 +1729,19 @@ Object.assign(window.App, {
             extraDate: extraDate,
             extraKey: extraKey,
             extraIndex: extraIndex,
-            grouping: grouping,
-            lastGroupKey: null,
-            fromRouter: fromRouter
+            fromRouter: fromRouter 
         });
         
-        window.App.currentHistoryOffset = 0;
-        
         const topLayer = window.App.viewStack[window.App.viewStack.length - 1];
-        
-        const mainTitleEl = topLayer.el.querySelector('.layer-title-main');
-        if (mainTitleEl) {
-            setTimeout(() => {
-                window.App.fitText(mainTitleEl);
-            }, 50);
-        }
 
         if (window.App.historyObserver) window.App.historyObserver.disconnect();
         window.App.historyObserver = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting) window.App.renderHistoryBatchLayer();
+            if (entries[0].isIntersecting) {
+                const hState = window.App.getState('data.history');
+                if (hState.offset < hState.list.length && !hState.isRendering) {
+                    window.App.renderHistoryBatchLayer();
+                }
+            }
         }, { root: topLayer.el, rootMargin: '1000px' });
         
         const sentinel = topLayer.el.querySelector('#layer-hist-sentinel');
@@ -1878,6 +1756,16 @@ Object.assign(window.App, {
 
     setViewModeLayer: function(mode) {
         window.App.setState('ui.viewMode', mode);
+        
+        const top = window.App.viewStack[window.App.viewStack.length - 1];
+        if (top && top.context.type === 'history') {
+            const container = top.el.querySelector('#layer-hist-container');
+            if (container) container.innerHTML = '';
+
+            window.App.setState('data.history.offset', 0);
+            window.App.setState('data.history.lastGroupKey', null);
+            window.App.renderHistoryBatchLayer();
+        }
     },
 
     getHistoryItemHtml: function(item, idx, type, mode) {
@@ -1924,7 +1812,7 @@ Object.assign(window.App, {
             const origTitleHtml = (originalTitle && originalTitle !== title) ? `<div class="hist-orig">${originalTitle}</div>` : '';
 
             return `
-                <div class="hist-item clickable ${animClass}" ${style} data-id="${item.id}" onclick="if(!isHistoryEditMode) window.App.openShowLayer(${sid})">
+                <div class="hist-item clickable ${animClass}" ${style} data-id="${item.id}" onclick="if(!window.App.getState('flags.isHistoryEditMode')) window.App.openShowLayer(${sid})">
                     ${deleteBtn}
                     ${poster}
                     <div class="hist-info">
@@ -1957,7 +1845,7 @@ Object.assign(window.App, {
             }
 
             return `
-                <div class="grid-item-wrap ${animClass}" ${style} data-id="${item.id}" onclick="if(!isHistoryEditMode) window.App.openShowLayer(${sid})">
+                <div class="grid-item-wrap ${animClass}" ${style} data-id="${item.id}" onclick="if(!window.App.getState('flags.isHistoryEditMode')) window.App.openShowLayer(${sid})">
                     ${deleteBtn}
                     <div class="grid-item">
                         ${posterHtml}${yearHtml}
@@ -1970,7 +1858,8 @@ Object.assign(window.App, {
     },
 
     renderHistoryBatchLayer: function() {
-        if (window.App.isRenderingBatch || window.App.currentHistoryOffset >= window.App.curHistData.length) return;
+        const hState = window.App.getState('data.history');
+        if (hState.isRendering || hState.offset >= hState.list.length) return;
         
         const topLayer = window.App.viewStack[window.App.viewStack.length - 1];
         if (!topLayer || topLayer.context.type !== 'history') return;
@@ -1978,48 +1867,45 @@ Object.assign(window.App, {
         const container = topLayer.el.querySelector('#layer-hist-container');
         if (!container) return;
 
-        window.App.isRenderingBatch = true;
+        window.App.setState('data.history.isRendering', true);
         
-        const start = window.App.currentHistoryOffset;
-        const end = start + historyBatchSize;
-        const batch = window.App.curHistData.slice(start, end);
-        window.App.currentHistoryOffset = end; 
+        const start = hState.offset;
+        const end = start + (hState.batchSize || 80);
+        const batch = hState.list.slice(start, end);
 
-        if (window.App.curHistData.length === 0) {
+        if (hState.list.length === 0 && start === 0) {
             container.innerHTML = `<div class="empty"><div class="icon">${window.App.Icons.dash}</div>Нет данных</div>`;
-            window.App.isRenderingBatch = false;
+            window.App.setState('data.history.isRendering', false);
             return;
         }
 
-        const grouping = topLayer.context.grouping;
         const mode = window.App.getState('ui.viewMode');
         let html = '';
+        let lastKey = hState.lastGroupKey;
         
         batch.forEach((item, idx) => {
-            if (grouping !== 'none') {
+            if (hState.grouping !== 'none') {
                 const dateStr = item.view_date || item.date;
                 if (dateStr) {
                     const dateObj = new Date(dateStr);
-                    let groupKey = '';
-                    if (grouping === 'month') {
-                        groupKey = `${window.App.RU_MONTHS[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
-                    } else if (grouping === 'year') {
-                        groupKey = `${dateObj.getFullYear()}`;
-                    }
+                    let currentKey = hState.grouping === 'month' 
+                        ? `${window.App.RU_MONTHS[dateObj.getMonth()]} ${dateObj.getFullYear()}`
+                        : `${dateObj.getFullYear()}`;
 
-                    if (groupKey && groupKey !== topLayer.context.lastGroupKey) {
-                        topLayer.context.lastGroupKey = groupKey;
+                    if (currentKey !== lastKey) {
+                        lastKey = currentKey;
                         html += `
-                            <div class="hist-group-divider anim-item" data-label="${groupKey}">
-                                <span class="hist-group-divider-text">${groupKey}</span>
+                            <div class="hist-group-divider anim-item" data-label="${currentKey}">
+                                <span class="hist-group-divider-text">${currentKey}</span>
                             </div>`;
                     }
                 }
             }
-            html += window.App.getHistoryItemHtml(item, start + idx, window.App.curHistType, mode);
+            html += window.App.getHistoryItemHtml(item, start + idx, hState.type, mode);
         });
+
+        window.App.setState('data.history.lastGroupKey', lastKey);
         
-        // 4. Вставка в DOM
         if (start === 0) {
             const wrapClass = mode === 'list' ? 'card' : 'hist-grid';
             const wrapStyle = mode === 'list' ? 'margin:0; padding:0; border:none; background:transparent;' : '';
@@ -2029,24 +1915,21 @@ Object.assign(window.App, {
             if (target) target.insertAdjacentHTML('beforeend', html);
         }
 
-        // 5. Финализация (один раз в следующем кадре)
+        window.App.setState('data.history.offset', end);
+
         requestAnimationFrame(() => {
-            // Подгоняем размеры заголовков
             window.App.fitAll('.grid-below-title', container);
             window.App.fitAll('.hist-title', container);
 
-            // Если есть группировка, вызываем scroll для корректного отображения "липких" заголовков
-            if (grouping !== 'none') {
+            if (hState.grouping !== 'none') {
                 topLayer.el.dispatchEvent(new Event('scroll'));
             }
 
-            // Отключаем обсервер, если данные кончились
-            if (window.App.currentHistoryOffset >= window.App.curHistData.length && window.App.historyObserver) {
+            if (end >= hState.list.length && window.App.historyObserver) {
                 window.App.historyObserver.disconnect();
             }
 
-            // Снимаем блокировку рендеринга строго в конце
-            window.App.isRenderingBatch = false;
+            window.App.setState('data.history.isRendering', false);
         });
     },
 
@@ -2079,9 +1962,8 @@ Object.assign(window.App, {
                     label.textContent = groupText;
                     window.App.fitText(label);
                 }
-
-                const isDividerUnderHeader = activeDivider.offsetTop <= scrollTop + (headerHeight / 2);
-                header.classList.toggle('has-group', isDividerUnderHeader);
+                const isUnder = activeDivider.offsetTop <= scrollTop + (headerHeight / 2);
+                header.classList.toggle('has-group', isUnder);
             } else {
                 header.classList.remove('has-group');
             }
@@ -2199,7 +2081,6 @@ Object.assign(window.App, {
             window.App.viewStack[window.App.viewStack.length - 1].el.style.display = 'none';
         }
         
-        document.getElementById('bottom-nav').style.display = 'none';
 
         window.App.viewStack.push({ el: layer, context: contextData });
         
@@ -2245,15 +2126,17 @@ Object.assign(window.App, {
         </div>`;
     },
 
-    renderGroup: function() {
+    renderGroup: function(data) {
+        const d = data || window.App.D;
         const el = document.getElementById('group-root');
-        if (!window.App.D.group) { 
+        if (!el) return;
+        if (!d.group) { 
             el.innerHTML = `<div class="card hoverable"><div class="empty"><div class="icon" style="font-size:clamp(36px, 10vw, 48px);line-height:1;color:var(--text-muted)">${window.App.Icons.users}</div>Вы не состоите в группе</div></div>`; 
             return; 
         }
         
-        const g = window.App.D.group, p = window.App.D.summary;
-        const subjectLabel = window.App.isSharedMode ? window.App.D.meta.name : 'Вы';
+        const g = d.group, p = d.summary;
+        const subjectLabel = d.meta?.name || 'Вы';
         
         const rows = [ 
             { lb:'Просмотры', i:window.App.Icons.tv, y:p.total_views, gv:g.total_views }, 
@@ -2264,8 +2147,8 @@ Object.assign(window.App, {
         
         let hasDiff = false;
         const cmpH = rows.map((r, idx) => { 
-            const d = r.y - r.gv; 
-            let dh = d===0 ? `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(12px, 3.2vw, 14px);display:inline-block;vertical-align:middle;line-height:1">${window.App.Icons.check}</div> Мэтч</span>` : (hasDiff = true, `<span class="cmp-d ${d>0?'d-up':'d-dn'}">${d>0?'+':''}${d}</span>`); 
+            const diff = r.y - r.gv; 
+            let dh = diff===0 ? `<span class="cmp-d d-eq"><div class="icon" style="font-size:clamp(12px, 3.2vw, 14px);display:inline-block;vertical-align:middle;line-height:1">${window.App.Icons.check}</div> Мэтч</span>` : (hasDiff = true, `<span class="cmp-d ${diff>0?'d-up':'d-dn'}">${diff>0?'+':''}${diff}</span>`); 
             return `<div class="cmp anim-item" style="animation-delay:${(idx+1)*0.05}s"><span class="cmp-lb"><div class="icon" style="font-size:clamp(16px, 4.5vw, 20px);line-height:1;color:var(--text-muted)">${r.i}</div>${r.lb}</span><div class="cmp-vs"><span class="cmp-v cmp-you">${r.y}</span><span style="color:var(--text-muted);font-size:clamp(11px, 3vw, 13px)">vs</span><span class="cmp-v cmp-grp">${r.gv}</span>${dh}</div></div>`; 
         }).join('');
         
@@ -2454,10 +2337,13 @@ if (tg) {
 
 
 (function initTheme() {
-    if (window.tg && tg.colorScheme === 'light') window.App.isDark = false;
+    let isDark = true;
+    if (window.tg && tg.colorScheme === 'light') isDark = false;
     const stored = localStorage.getItem('kt');
-    if (stored === 'l') window.App.isDark = false;
-    if (stored === 'd') window.App.isDark = true;
+    if (stored === 'l') isDark = false;
+    if (stored === 'd') isDark = true;
     
-    if (!window.App.isDark) document.body.classList.add('light');
+    // Вместо прямой установки переменных и классов просто обновляем состояние.
+    // Это запустит всю цепочку реактивности.
+    window.App.setState('ui.theme', isDark ? 'dark' : 'light');
 })();

@@ -145,7 +145,8 @@ class StateManager {
 
 const DEFAULT_APP_STATE = {
     ui: {
-        isLoading: true, // Добавлено состояние загрузки
+        isLoading: true,
+        isAppReady: false,
         activeStatsTab: 'personal',
         personTabs: {
             actors: 'series',
@@ -157,13 +158,18 @@ const DEFAULT_APP_STATE = {
         wlViewMode: 'grid',
         sortMode: 'default',
         isSortMenuOpen: false,
-        scrollPositions: {}
+        scrollPositions: {},
+        toast: { text: '', type: 'info', visible: false },
+        helpPopoverVisible: false, // Новый флаг для подсказки в вишлисте
+        bottomNavVisible: true,    // Управление видимостью меню
+        shareBtnVisible: true      // Управление видимостью кнопки шаринга
     },
     flags: {
         isReorderMode: false,
         isItemsReorderMode: false,
         isHistoryEditMode: false,
-        isSyncingHash: false
+        isSyncingHash: false,
+        isSharedMode: false
     },
     nav: {
         activeMainView: 'search',
@@ -171,8 +177,23 @@ const DEFAULT_APP_STATE = {
         layerStack: []
     },
     data: {
+        stats: null, 
+        availableYears: [],
         wishlistFolders: [],
-        activeWlFolderId: null
+        activeWlFolderId: null,
+        search: {
+            results: null
+        },
+        history: {
+            list: [],
+            type: '',
+            title: '',
+            offset: 0,
+            batchSize: 80,
+            grouping: 'none',
+            lastGroupKey: null,
+            isRendering: false
+        }
     },
     forms: {
         search: { query: '' },
@@ -213,20 +234,43 @@ const stateInstance = new StateManager(DEFAULT_APP_STATE);
 function initUIEffects(App) {
     App.subscribe('ui.isLoading', (loading) => {
         const loader = document.getElementById('loader');
-        const app = document.getElementById('app');
+        if (!loader) return;
         if (loading) {
-            if (loader) {
-                loader.classList.remove('hidden');
-                loader.style.opacity = '1';
-            }
+            loader.classList.remove('hidden');
+            loader.style.opacity = '1';
         } else {
-            if (loader) {
-                loader.style.opacity = '0';
-                setTimeout(() => {
-                    if (!App.getState('ui.isLoading')) loader.classList.add('hidden');
-                }, 400);
-            }
-            if (app) app.classList.remove('hidden');
+            loader.style.opacity = '0';
+            setTimeout(() => {
+                if (!App.getState('ui.isLoading')) loader.classList.add('hidden');
+            }, 400);
+        }
+    });
+
+    // Новое: управление видимостью всего приложения
+    App.subscribe('ui.isAppReady', (ready) => {
+        const appEl = document.getElementById('app');
+        if (appEl && ready) {
+            appEl.classList.remove('hidden');
+        }
+    });
+
+    App.subscribe('ui.toast', (toast) => {
+        let el = document.getElementById('toast-msg');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'toast-msg';
+            el.className = 'toast';
+            document.body.appendChild(el);
+        }
+        if (toast.visible) {
+            el.textContent = toast.text;
+            el.classList.add('show');
+            if (App._toastTimer) clearTimeout(App._toastTimer);
+            App._toastTimer = setTimeout(() => {
+                App.setState('ui.toast.visible', false);
+            }, 2500);
+        } else {
+            el.classList.remove('show');
         }
     });
 
@@ -302,6 +346,36 @@ function initUIEffects(App) {
     App.subscribe('flags.isItemsReorderMode', val => {
         const container = document.getElementById('wl-items-container');
         if (container) container.classList.toggle('reorder-items-mode', val);
+    });
+
+    App.subscribe('ui.helpPopoverVisible', (visible) => {
+        const informer = document.getElementById('wl-stats-informer');
+        if (informer) informer.classList.toggle('show', visible);
+    });
+
+    App.subscribe('ui.bottomNavVisible', (visible) => {
+        const bn = document.getElementById('bottom-nav');
+        if (bn) bn.style.display = visible ? 'flex' : 'none';
+    });
+
+    App.subscribe('ui.shareBtnVisible', (visible) => {
+        const btn = document.getElementById('share-btn');
+        if (btn) btn.classList.toggle('hidden', !visible);
+    });
+
+    // Реакция на изменение стека слоев для управления Bottom Nav
+    App.subscribe('nav.layerStack', (stack) => {
+        const isShared = App.getState('flags.isSharedMode');
+        // Если слоев нет и мы не в режиме шаринга — показываем навигацию
+        App.setState('ui.bottomNavVisible', stack.length === 0 && !isShared);
+    });
+
+    // Реакция на режим шаринга для кнопки Share
+    App.subscribe('flags.isSharedMode', (isShared) => {
+        App.setState('ui.shareBtnVisible', !isShared);
+        // Также обновляем навигацию, если флаг изменился внезапно
+        const stack = App.getState('nav.layerStack');
+        App.setState('ui.bottomNavVisible', stack.length === 0 && !isShared);
     });
 }
 

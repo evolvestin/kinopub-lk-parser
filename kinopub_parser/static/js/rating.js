@@ -319,16 +319,17 @@ Object.assign(window.App, {
     },
 
     closeRateModal: function() {
-        const ctx = window.App.State.getState('modals.rateShow.context');
+        const ctx = window.App.getState('modals.rateShow.context');
+        const showId = ctx?.showId;
+        const needsRefresh = ctx?.needsRefresh;
         
-        // Используем общий метод
         window.App.closeModal('rateShow');
 
-        if (ctx && ctx.needsRefresh) {
-            if (window.App.State.getState('nav.activeMainView') === 'stats') {
+        if (needsRefresh && showId) {
+            if (window.App.getState('nav.activeMainView') === 'stats') {
                 window.App.load(window.App.getState('nav.query.y'));
             }
-            window.App.openShowLayer(ctx.showId);
+            window.App.openShowLayer(showId);
         }
     },
 
