@@ -7,12 +7,9 @@ class StateManager {
         this.listeners = new Map();
         this.defaultState = defaultState;
         this.state = this._deepClone(defaultState);
-        
         this.saveSessionDebounced = this._debounce(() => this._saveToSession(), 300);
         this._loadFromSession();
     }
-
-    // --- ПУБЛИЧНЫЕ МЕТОДЫ ---
 
     getState(path) {
         if (!path) return this.state;
@@ -28,62 +25,41 @@ class StateManager {
         }, this.state);
 
         const oldValue = target[lastKey];
-        const newValue = typeof valueOrFn === 'function' 
-            ? valueOrFn(oldValue) 
-            : valueOrFn;
+        const newValue = typeof valueOrFn === 'function' ? valueOrFn(oldValue) : valueOrFn;
 
-        // Обновляем только если значение реально изменилось
-        if (oldValue !== newValue) {
+        if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
             target[lastKey] = newValue;
             this._emit(path, newValue);
             this.saveSessionDebounced();
         }
     }
 
-    /**
-     * Подписка на изменение пути
-     * @returns {Function} Функция для отписки
-     */
     subscribe(path, callback) {
         if (!this.listeners.has(path)) this.listeners.set(path, []);
         this.listeners.get(path).push(callback);
-        
-        // Сразу вызываем колбэк с текущим значением (начальная синхронизация)
         callback(this.getState(path));
-
         return () => {
             const filtered = this.listeners.get(path).filter(cb => cb !== callback);
             this.listeners.set(path, filtered);
         };
     }
 
-    /**
-     * Принудительная синхронизация всех элементов с data-state-bind
-     */
     syncAllBindings() {
         document.querySelectorAll('[data-state-bind]').forEach(el => {
-            const path = el.getAttribute('data-state-bind');
-            this._updateElementValue(el, this.getState(path));
+            this._updateElementValue(el, this.getState(el.getAttribute('data-state-bind')));
         });
     }
-
-    // --- ПРИВАТНЫЕ МЕТОДЫ ---
 
     _emit(path, value) {
         if (this.listeners.has(path)) {
             this.listeners.get(path).forEach(cb => cb(value));
         }
-
         const parts = path.split('.');
         if (parts.length > 1) {
-            // Идем вверх по дереву и уведомляем всех слушателей wildcard
-            // Пример: если изменилось 'modals.rateShow.isOpen', 
-            // уведомим 'modals.rateShow.*' и 'modals.*'
             for (let i = 1; i < parts.length; i++) {
                 const parentPath = parts.slice(0, -i).join('.') + '.*';
                 if (this.listeners.has(parentPath)) {
-                    const subState = this.getState(parts.slice(0, -i).join('.'));
-                    this.listeners.get(parentPath).forEach(cb => cb(subState));
+                    this.listeners.get(parentPath).forEach(cb => cb(this.getState(parts.slice(0, -i).join('.'))));
                 }
             }
         }
@@ -91,14 +67,9 @@ class StateManager {
 
     _updateElementValue(el, val) {
         if (val === undefined || val === null) return;
-        
-        if (el.type === 'checkbox') {
-            el.checked = !!val;
-        } else if (el.type === 'radio') {
-            el.checked = (el.value === String(val));
-        } else {
-            if (el.value !== String(val)) el.value = val;
-        }
+        if (el.type === 'checkbox') el.checked = !!val;
+        else if (el.type === 'radio') el.checked = (el.value === String(val));
+        else if (el.value !== String(val)) el.value = val;
     }
 
     _saveToSession() {
@@ -126,10 +97,7 @@ class StateManager {
         return { ...target, ...source };
     }
 
-    _deepClone(obj) {
-        return JSON.parse(JSON.stringify(obj));
-    }
-
+    _deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
     _debounce(func, wait) {
         let timeout;
         return (...args) => {
@@ -376,6 +344,71 @@ function initUIEffects(App) {
         // Также обновляем навигацию, если флаг изменился внезапно
         const stack = App.getState('nav.layerStack');
         App.setState('ui.bottomNavVisible', stack.length === 0 && !isShared);
+    });
+
+    App.subscribe('data.stats', (d) => {
+        if (!d) return;
+        
+        // 1. Мета-данные и Счетчики
+        if (typeof window.App.updateUserMeta === 'function') window.App.updateUserMeta(d.meta);
+        if (typeof window.App.updateOverview === 'function') window.App.updateOverview(d.summary);
+        if (typeof window.App.updateRatingsSection === 'function') window.App.updateRatingsSection(d.ratings);
+        
+        // 2. Списки (Actors, Directors, Writers, Countries, Binges)
+        const categories = ['actors', 'directors', 'writers'];
+        categories.forEach(cat => {
+            const mode = App.getState(`ui.personTabs.${cat}`) || 'series';
+            const listId = `${cat}-list`;
+            if (d[cat] && d[cat][mode]) {
+                window.App.fillList(listId, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
+            }
+        });
+
+        if (d.countries) window.App.fillList('countries-list', d.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+        if (d.binges) window.App.fillBinges(d.binges);
+
+        // 3. Графики
+        if (typeof window.App.renderCharts === 'function') window.App.renderCharts(d);
+        
+        // 4. Групповая статистика
+        if (App.getState('ui.activeStatsTab') === 'group' && typeof window.App.renderGroup === 'function') {
+            window.App.renderGroup(d);
+        }
+    });
+
+    // Подписка на переключение табов людей (сериалы/фильмы)
+    ['actors', 'directors', 'writers'].forEach(cat => {
+        App.subscribe(`ui.personTabs.${cat}`, (mode) => {
+            const d = App.getState('data.stats');
+            if (d && d[cat] && d[cat][mode]) {
+                window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
+            }
+        });
+    });
+
+    // Подписка на активную вкладку статистики (Личная/Группа)
+    App.subscribe('ui.activeStatsTab', (tab) => {
+        document.querySelectorAll('.tab[data-tab]').forEach(el => {
+            el.classList.toggle('on', el.dataset.tab === tab);
+        });
+        document.getElementById('sec-personal')?.classList.toggle('hidden', tab !== 'personal');
+        document.getElementById('sec-group')?.classList.toggle('hidden', tab !== 'group');
+        
+        const d = App.getState('data.stats');
+        if (tab === 'group' && d) window.App.renderGroup(d);
+    });
+
+    // Подписка на режим отображения истории (Сетка/Список)
+    App.subscribe('ui.viewMode', (mode) => {
+        const top = window.App.viewStack[window.App.viewStack.length - 1];
+        if (top && top.context.type === 'history') {
+            const container = top.el.querySelector('#layer-hist-container');
+            if (container) container.innerHTML = '';
+            App.setState('data.history.offset', 0);
+            App.setState('data.history.lastGroupKey', null);
+            window.App.renderHistoryBatchLayer();
+        }
+        localStorage.setItem('kp_view_mode', mode);
     });
 }
 

@@ -7,11 +7,7 @@ const tg = window.Telegram?.WebApp;
 Object.assign(window.App, {
     get D() { return window.App.getState('data.stats'); },
     set D(val) { window.App.setState('data.stats', val); },
-    get isSharedMode() { return window.App.getState('flags.isSharedMode'); },
-    set isSharedMode(val) { window.App.setState('flags.isSharedMode', val); },
     get curYear() { return window.App.getState('nav.query.y') || 'all'; },
-    get availableYears() { return window.App.getState('data.availableYears'); },
-    set availableYears(val) { window.App.setState('data.availableYears', val); },
 
     chR: null, chM: null, chW: null, chG: {},
     SharedDataMap: {},
@@ -115,6 +111,126 @@ Object.assign(window.App, {
         sort_arrow: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line style="fill:none;" x1="12" y1="5" x2="12" y2="19"></line><polyline style="fill:none;" points="19 12 12 19 5 12"></polyline></svg>',
         help: '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle style="fill:none;" cx="12" cy="12" r="10"></circle><path style="fill:none;" d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line style="fill:none;" x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
         person_placeholder: '<svg viewBox="0 0 2048 2048" xmlns="http://www.w3.org/2000/svg"><path transform="translate(994,64)" d="m0 0h61l40 2 36 3 39 5 35 6 38 8 43 11 42 13 42 15 39 16 26 12 21 10 19 10 29 16 23 14 17 11 24 16 17 12 12 9 13 10 15 12 11 9 28 24 4 3v2l4 2 10 10 8 7 31 31 7 8 16 17 9 11 13 15 10 13 11 14 15 20 13 18 11 17 13 20 9 15 15 26 12 23 10 19 14 29 12 28 14 36 14 41 9 30 12 48 7 35 8 49 4 35 3 40 1 29v33l-1 37-3 47-5 43-8 47-8 38-13 50-15 47-13 34-13 32-11 24-12 25-17 33-10 17-12 20-14 22-10 15-20 28-12 17-13 16-9 11-13 15-9 10-7 8-12 13-15 16-21 21h-2v2h-2v2l-8 7-13 12-11 9-10 9-13 10-13 11-17 13-18 13-30 20-19 12-25 15-18 10-24 13-32 16-34 15-27 11-36 13-45 14-56 14-36 7-44 7-32 4-35 3-35 2h-68l-46-3-49-5-47-8-43-9-45-12-38-12-36-13-30-12-36-16-56-27-15-9-25-16-19-12-10-7-12-8-14-10-17-13-28-22-13-11-10-9-8-7-10-9-15-14-39-39-7-8-15-16-7-8-12-14-14-17-15-20-14-19-13-19-19-29-15-25-16-28-19-38-13-28-15-36-9-24-12-36-9-30-11-44-9-42-7-44-5-41-3-37-1-19v-64l2-37 4-39 5-37 8-45 8-37 13-49 17-52 14-36 12-28 13-28 15-30 11-20 16-27 8-13 19-29 10-14 9-13 11-15 8-11 11-13 9-11 9-10 9-11 9-10 7-8 6-7h2l2-4 39-39 8-7 11-10 11-9 15-13 14-11 16-13 18-13 16-11 20-14 19-12 20-12 17-10 23-13 38-19 27-12 27-11 29-11 36-12 34-10 44-11 47-9 47-7 46-4z" fill="currentColor"/><path transform="translate(993,543)" d="m0 0h65l45 3 21 2 21 4 29 10 26 11 33 16 16 8 19 10 23 14 16 12 15 13 15 14 21 21 6 5 7 8 23 23v2h2l7 8 12 14 11 15 12 21 14 26 16 33 16 37 12 36 3 16 3 35 1 22v70l-2 45-3 31-4 17-11 31-13 30-17 35-14 27-14 24-10 14-12 14-9 9-7 8-17 17-1 2h-2v2l-8 7-20 20-8 7-14 14-11 9-9 7-17 10-42 22-31 15-34 14-33 11-24 4-36 3-47 2h-32l-46-2-36-3-21-5-34-13-21-9-20-9-19-10-9-4h-3l-8 16-11 18-9 16-14 24-17 29-13 22-11 19-17 29-15 25-17 29-18 30-16 27-15 25-15 26-10 17-10 18-13 25-8 18-2 1-10-6v-22l-1-58-1-96v-550l2-122 2-52 3-34 3-15 6-18 11-29 16-34 14-28 13-22 11-17 6-11 9-13 9-11h2l2-4 6-6h2l2-4 56-56h2v-2l8-7 8-8 11-9 15-10 22-13 23-12 17-9 26-12 37-14 21-7 25-4 23-2z" fill="#CAD0D8"/><path transform="translate(1014,895)" d="m0 0h16l19 3 20 6 16 7 14 8 13 11 11 12 9 14 11 23 5 15 2 10 1 12v13l-2 17-4 16-7 18-10 18-11 12-12 12-15 10-21 10-20 6-12 2-11 1h-10l-21-3-16-5-21-10-13-9-16-15-11-14-7-12-8-20-4-15-2-11-1-16 2-18 5-20 8-20 7-12 9-12 12-12 18-13 19-10 18-6z" fill="currentColor"/></svg>',
+    },
+
+    initStatsSubscriber: function() {
+        window.App.subscribe('data.stats', (d) => {
+            if (!d || !d.meta) return;
+
+            // 1. Обновление мета-данных пользователя
+            const nameEl = document.getElementById('user-name');
+            if (nameEl) {
+                nameEl.textContent = d.meta.name || 'Пользователь';
+                requestAnimationFrame(() => window.App.fitText(nameEl));
+            }
+
+            const avEl = document.getElementById('avatar');
+            if (avEl) {
+                if (d.meta.is_anonymous) {
+                    const myId = d.meta.id || 0;
+                    avEl.innerHTML = myId > 0 
+                        ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${window.App.getUserColor(myId)};color:#fff;font-weight:900;">${myId}</div>`
+                        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-muted);">${window.App.Icons.user}</div>`;
+                } else if (d.meta.photo_url) {
+                    avEl.innerHTML = `<img src="${d.meta.photo_url}" alt="A">`;
+                } else {
+                    avEl.innerHTML = (d.meta.name || 'P').charAt(0).toUpperCase();
+                }
+            }
+
+            // 2. Обновление Overview (счетчики)
+            const s = d.summary || {};
+            const vViews = s.total_views || 0;
+            const vEp = s.total_episodes || 0;
+
+            const elMap = {
+                's-time': s.duration_display || '0м',
+                's-views': `${vViews} ${window.App.plural(vViews, ['просмотр', 'просмотра', 'просмотров'])}`,
+                's-act': `${s.activity_percent || 0}%`,
+                's-daily': `~${s.daily_average_min || 0} мин/день`,
+                's-ep': vEp,
+                's-ser': `${s.unique_series || 0} ${window.App.plural(s.unique_series || 0, ['сериал', 'сериала', 'сериалов'])} · ${s.series_duration || '0м'}`,
+                's-mov': s.total_movies || 0,
+                's-uni': s.movies_duration || '0м',
+                's-wl-added': s.wishlist_added || 0,
+                's-wl-watched': s.wishlist_watched || 0,
+                'period-label': s.period_label || ''
+            };
+
+            Object.entries(elMap).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = val;
+            });
+
+            const epLbl = document.getElementById('s-ep')?.nextElementSibling;
+            if (epLbl) epLbl.textContent = window.App.plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
+
+            // 3. Обновление блока рейтинга
+            const rt = d.ratings;
+            const box = document.getElementById('ratings-box');
+            if (!rt || rt.total === 0) {
+                box?.classList.add('hidden');
+            } else {
+                box?.classList.remove('hidden');
+                const palette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
+                const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
+                
+                const avgEl = document.getElementById('cr-avg');
+                if (avgEl) {
+                    avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
+                    avgEl.style.color = palette[colorIdx];
+                }
+
+                const totalEl = document.getElementById('cr-total');
+                if (totalEl) {
+                    totalEl.innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${window.App.plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
+                }
+
+                const badge = document.getElementById('cr-badge');
+                if (badge) {
+                    if (rt.avg >= 8.5) badge.textContent = 'Восторженный зритель';
+                    else if (rt.avg >= 7.0) badge.textContent = 'Позитивный критик';
+                    else if (rt.avg >= 5.5) badge.textContent = 'Объективный судья';
+                    else badge.textContent = 'Суровый критик';
+                }
+                window.App.renderRatingsDist();
+            }
+
+            // 4. Управление видимостью карточек и отрисовка списков
+            const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
+            
+            toggle('main-tabs', !!d.group);
+            toggle('tab-group-btn', !!d.group);
+            toggle('card-dynamics', d.monthly_chart?.views?.some(v => v > 0));
+            toggle('card-weekday', d.weekday_chart?.data?.some(v => v > 0));
+            
+            if (d.heatmap?.length) {
+                toggle('card-heatmap', false);
+                window.App.renderHeatmap(d.heatmap);
+            } else {
+                toggle('card-heatmap', true);
+            }
+
+            toggle('card-genres', d.genres?.length > 0);
+            toggle('card-countries', d.countries?.length > 0);
+            toggle('card-binges', d.binges?.length > 0);
+
+            // Отрисовка графиков
+            window.App.renderCharts(d);
+
+            // Списки (Actors/Directors/Writers)
+            ['actors', 'directors', 'writers'].forEach(cat => {
+                const mode = window.App.getState(`ui.personTabs.${cat}`) || 'series';
+                const hasData = d[cat] && (d[cat].series?.length || d[cat].others?.length);
+                toggle(`card-${cat}`, !hasData);
+                if (hasData) window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
+            });
+            
+            if (d.binges?.length) window.App.fillBinges(d.binges);
+            if (d.countries?.length) window.App.fillList('countries-list', d.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+            
+            if (window.App.getState('ui.activeStatsTab') === 'group') window.App.renderGroup(d);
+        });
     },
 
     plural: function(n, forms) {
@@ -823,261 +939,39 @@ Object.assign(window.App, {
         });
     },
 
-    updateOverview: function(s) {
-        if (!s) return;
-        const vViews = s.total_views || 0;
-        const vEp = s.total_episodes || 0;
-        const vMov = s.total_movies || 0;
-        const vSer = s.unique_series || 0;
 
-        const elMap = {
-            's-time': s.duration_display || '0м',
-            's-views': `${vViews} ${window.App.plural(vViews, ['просмотр', 'просмотра', 'просмотров'])}`,
-            's-act': `${s.activity_percent || 0}%`,
-            's-daily': `~${s.daily_average_min || 0} мин/день`,
-            's-ep': vEp,
-            's-ser': `${vSer} ${window.App.plural(vSer, ['сериал', 'сериала', 'сериалов'])} · ${s.series_duration || '0м'}`,
-            's-mov': vMov,
-            's-uni': s.movies_duration || '0м',
-            's-wl-added': s.wishlist_added || 0,
-            's-wl-watched': s.wishlist_watched || 0,
-            'period-label': s.period_label || ''
-        };
-
-        Object.entries(elMap).forEach(([id, val]) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = val;
-        });
-
-        const epLbl = document.getElementById('s-ep')?.nextElementSibling;
-        if (epLbl) epLbl.textContent = window.App.plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
-
-        const movLbl = document.getElementById('s-mov')?.nextElementSibling;
-        if (movLbl) movLbl.textContent = window.App.plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
-    },
-
-    updateUserMeta: function(meta) {
-        if (!meta) return;
-        const nameEl = document.getElementById('user-name');
-        if (nameEl) {
-            nameEl.textContent = meta.name || 'Пользователь';
-            requestAnimationFrame(() => window.App.fitText(nameEl));
-        }
-
-        const avEl = document.getElementById('avatar');
-        if (avEl) {
-            if (meta.is_anonymous) {
-                const myId = meta.id || 0;
-                avEl.innerHTML = myId > 0 
-                    ? `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${window.App.getUserColor(myId)};color:#fff;font-weight:900;">${myId}</div>`
-                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-input);color:var(--text-muted);">${window.App.Icons.user}</div>`;
-            } else if (meta.photo_url) {
-                avEl.innerHTML = `<img src="${meta.photo_url}" alt="A">`;
-            } else {
-                avEl.innerHTML = (meta.name || 'P').charAt(0).toUpperCase();
-            }
-        }
-    },
-
-    updateRatingsSection: function(rt) {
-        const box = document.getElementById('ratings-box');
-        if (!rt || rt.total === 0) {
-            box?.classList.add('hidden');
-            return;
-        }
-        box?.classList.remove('hidden');
-
-        const palette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
-        const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
-        
-        const avgEl = document.getElementById('cr-avg');
-        if (avgEl) {
-            avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
-            avgEl.style.color = palette[colorIdx];
-        }
-
-        const totalEl = document.getElementById('cr-total');
-        if (totalEl) {
-            totalEl.innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${window.App.plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
-        }
-
-        const badge = document.getElementById('cr-badge');
-        if (badge) {
-            if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.cssText = 'background:rgba(46,204,113,0.15);color:#2ecc71'; }
-            else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.cssText = 'background:rgba(56,139,253,0.15);color:#60a5fa'; }
-            else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.cssText = 'background:rgba(210,153,34,0.15);color:#d29922'; }
-            else { badge.textContent = 'Суровый критик'; badge.style.cssText = 'background:rgba(248,81,73,0.15);color:#e74c3c'; }
-        }
-        window.App.renderRatingsDist();
-    },
-
-    init: async function() {
-        if (window.IS_ADMIN_DASHBOARD) return;
-        window.App.setState('flags.isSyncingHash', true);
-
-        // 1. Синхронизация UI-флагов
-        const savedViewMode = localStorage.getItem('kp_view_mode') || 'grid';
-        window.App.setState('ui.viewMode', savedViewMode);
-
-        if (typeof window.App.initWishlistReactivity === 'function') window.App.initWishlistReactivity();
-
-        // 2. РЕАКТИВНЫЙ ДАШБОРД (Новое)
-        window.App.subscribe('data.stats', (d) => {
-            if (!d || !d.meta) return;
-            
-            // Мета и Обзор
-            window.App.updateUserMeta(d.meta);
-            window.App.updateOverview(d.summary);
-            window.App.updateRatingsSection(d.ratings);
-
-            // Видимость карточек
-            const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
-            
-            toggle('main-tabs', !!d.group);
-            toggle('tab-group-btn', !!d.group);
-            toggle('card-dynamics', d.monthly_chart?.views?.some(v => v > 0));
-            toggle('card-weekday', d.weekday_chart?.data?.some(v => v > 0));
-            
-            const hasHeatmap = d.heatmap && d.heatmap.length > 0;
-            toggle('card-heatmap', !hasHeatmap); // В CSS .hidden — это display:none
-            if (hasHeatmap) window.App.renderHeatmap(d.heatmap);
-
-            toggle('card-genres', d.genres && d.genres.length > 0);
-            toggle('card-countries', d.countries && d.countries.length > 0);
-            toggle('card-binges', d.binges && d.binges.length > 0);
-
-            // Группа и графики
-            if (window.App.getState('ui.activeStatsTab') === 'group') window.App.renderGroup(d);
-            window.App.renderCharts(d);
-
-            // Списки (Actors/Directors/Writers) - вызываем принудительное обновление
-            ['actors', 'directors', 'writers'].forEach(cat => {
-                const mode = window.App.getState(`ui.personTabs.${cat}`) || 'series';
-                const hasData = d[cat] && (d[cat].series?.length || d[cat].others?.length);
-                toggle(`card-${cat}`, !!hasData);
-                if (hasData) {
-                    window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
-                }
-            });
-            
-            if (d.binges?.length) window.App.fillBinges(d.binges);
-            if (d.countries?.length) {
-                window.App.fillList('countries-list', d.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
-            }
-        });
-
-        // 3. Подписки на табы персон
-        ['actors', 'directors', 'writers'].forEach(cat => {
-            window.App.subscribe(`ui.personTabs.${cat}`, (mode) => {
-                const d = window.App.D;
-                if (!d || !d[cat]) return;
-                
-                // Обновляем визуальное состояние кнопок переключателя
-                const card = document.getElementById(`card-${cat}`);
-                card?.querySelectorAll('.vt-btn').forEach(btn => {
-                    const isBtnSeries = btn.getAttribute('onclick').includes('series');
-                    btn.classList.toggle('active', (isBtnSeries && mode === 'series') || (!isBtnSeries && mode === 'others'));
-                });
-
-                window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
-            });
-        });
-
-        // 4. Остальные подписки (ViewMode, Search, Tabs, Year, Theme)
-        window.App.subscribe('data.search.results', (val) => val && window.App.renderSearchResults(val));
-        
-        window.App.subscribe('nav.activeMainView', (view) => {
-            ['search', 'wishlist', 'stats'].forEach(v => {
-                const el = document.getElementById(`view-${v}`), navBtn = document.getElementById(`bn-${v}`);
-                if (el) el.style.display = (v === view) ? 'flex' : 'none';
-                if (navBtn) navBtn.classList.toggle('active', v === view);
-            });
-        });
-
-        window.App.subscribe('data.availableYears', () => window.App.renderYears());
-        window.App.subscribe('forms.search.query', (q) => window.App.doSearch(q || ''));
-        window.App.subscribe('ui.activeStatsTab', (tab) => {
-            document.querySelectorAll('#main-tabs .tab').forEach(btn => btn.classList.toggle('on', btn.dataset.tab === tab));
-            document.getElementById('sec-personal')?.classList.toggle('hidden', tab !== 'personal');
-            document.getElementById('sec-group')?.classList.toggle('hidden', tab !== 'group');
-            if (tab === 'group' && window.App.D) window.App.renderGroup(window.App.D);
-        });
-
-        window.App.subscribe('nav.query.y', async (year) => {
-            window.App.markYear();
-            if (window.App.isSharedMode) {
-                const sid = (new URLSearchParams(window.location.search).get('shared_id')) || (tg?.initDataUnsafe?.start_param || '').replace('stat_', '');
-                await window.App.loadShared(sid);
-            } else {
-                const cached = window.App.Data.getFromCache(year);
-                if (cached) window.App.D = cached; else await window.App.load(year);
-            }
-            window.App.Router.updateUrl();
-        });
-
-        window.App.subscribe('ui.theme', (theme) => {
-            window.App.isDark = (theme === 'dark');
-            if (window.App.D) window.App.renderCharts(window.App.D);
-        });
-
-        window.App.subscribe('data.activeWlFolderId', (val) => {
-            window.App.activeWlFolderId = val;
-            window.App.renderWishlistFolders(); 
-            window.App.renderActiveWlFolder();
-        });
-
-        const modalMap = {
-            'addView': 'add-view-modal', 'rateShow': 'rate-show-modal', 'share': 'share-modal',
-            'wlFolder': 'wl-modal', 'wlEdit': 'wl-edit-modal', 'wlLimit': 'wl-limit-modal',
-            'wlDelete': 'wl-item-delete-modal', 'casino': 'casino-modal', 'details': 'details-modal'
-        };
-        Object.entries(modalMap).forEach(([k, id]) => {
-            window.App.subscribe(`modals.${k}.isOpen`, (open) => {
-                const el = document.getElementById(id); if (el) el.classList.toggle('show', !!open);
-            });
-        });
-
-        const scrollHandler = window.App.State._debounce((e) => {
-            if (e.target.id === 'views-container') window.App.setState(`ui.scrollPositions.${window.App.getState('nav.activeMainView')}`, e.target.scrollTop);
-            else if (e.target.classList.contains('layer')) window.App.setState(`ui.scrollPositions.layer_${window.App.viewStack.length}`, e.target.scrollTop);
-        }, 150);
-        const vC = document.getElementById('views-container'), dL = document.getElementById('dynamic-layers');
-        if (vC) vC.addEventListener('scroll', scrollHandler); if (dL) dL.addEventListener('scroll', scrollHandler, true);
-
-        window.App.initIcons();
-        window.App.State.syncAllBindings();
-
-        // 5. Первоначальный роутинг
+    openShowLayer: async function(showId, fromRouter = false) {
+        window.App.showLoader();
         try {
-            const { segments } = window.App.Router.parse();
-            const sId = new URLSearchParams(window.location.search).get('shared_id') || (tg?.initDataUnsafe?.start_param || '').replace('stat_', '');
-            let initialView = sId ? 'stats' : (segments[0] || window.App.getState('nav.activeMainView') || 'search');
-            
-            if (sId) window.App.isSharedMode = true;
-            window.App.setState('nav.activeMainView', initialView);
-
-            if (window.App.isSharedMode) {
-                document.body.classList.add('has-banner');
-                const banner = document.getElementById('shared-banner-container');
-                if (banner) banner.innerHTML = `<div class="shared-banner">Вы просматриваете чужую статистику</div>`;
-                await window.App.loadShared(sId);
-            } else {
-                if (typeof window.App.loadWishlist === 'function') await window.App.loadWishlist();
-                document.body.classList.add('has-nav');
-                const savedStack = window.App.getState('nav.layerStack') || [];
-                for (const ctx of savedStack) {
-                    if (ctx.type === 'show') await window.App.openShowLayer(ctx.showId, true);
-                    else if (ctx.type === 'history') window.App.openHistoryLayer(ctx.htype, ctx.title, ctx.extraId, ctx.extraDate, ctx.extraKey, ctx.extraIndex, true);
-                    else if (['person', 'genre', 'country'].includes(ctx.type)) await window.App.openCollectionLayer(ctx.ctype, ctx.itemId, ctx.titleFallback, true);
-                }
-            }
-        } finally {
-            window.App.hideLoader();
-            window.App.setState('flags.isSyncingHash', false);
-            window.App.setState('ui.isAppReady', true);
-            window.App.Router.updateUrl();
-            window.App.restoreModals();
-        }
+            const r = await fetch(`/api/webapp/show/${showId}/?init_data=${encodeURIComponent(tg?.initData || '')}`);
+            const show = await r.json();
+            const safeTitle = show.title.replace(/'/g, "\\'");
+            const html = `
+                ${window.App.getLayerHeader('О шоу')}
+                <div class="hero-container">
+                    <div class="hero-bg" style="background-image: url('${show.poster_large || show.poster_medium}')"></div>
+                    <div class="hero-gradient"></div>
+                    <div style="position: relative; z-index: 3; height: 85%; max-width: 65%; display: flex; align-items: flex-end;">
+                        ${window.App.Templates.poster(show.poster_large, 'big')}
+                        <button class="wishlist-add-btn detail-wishlist-btn" onclick="window.App.showFolderModal(${show.id}, '${safeTitle}')">${window.App.Icons.bookmark_plus}</button>
+                        <button class="detail-add-view-btn" style="top:40px !important" onclick="window.App.openAddViewModal(${show.id}, '${safeTitle}', '${show.type}')">${window.App.Icons.eye}</button>
+                        <button class="detail-add-view-btn detail-rate-btn" onclick="window.App.openRateModal(${show.id}, '${safeTitle}', ${show.personal_rating || 'null'}, '${show.type}')">${window.App.Icons.star}</button>
+                    </div>
+                </div>
+                <div class="show-info">
+                    <div class="show-title">${show.title}</div>
+                    <div class="show-meta-tags">
+                        ${show.countries.map(c => `<div class="sm-tag clickable" onclick="window.App.openCollectionLayer('country', ${c.id}, '${c.name.replace(/'/g, "\\'")}')">${c.emoji || ''} ${c.name}</div>`).join('')}
+                    </div>
+                    <div class="show-meta-tags">
+                        <div class="sm-tag">${show.year || '?'}</div>
+                        <div class="sm-tag" style="color:var(--info)">${window.App.SHOW_TYPE_RU[show.type] || show.type}</div>
+                    </div>
+                </div>
+                <div class="plot-box">${show.plot || ''}</div>
+            `;
+            window.App.pushLayer(html, { type: 'show', showId, fromRouter });
+        } catch (e) { window.App.showToast('Ошибка загрузки'); } finally { window.App.hideLoader(); }
     },
 
     renderSearchResults: function(data) {
@@ -1422,11 +1316,11 @@ Object.assign(window.App, {
         zoomContent.appendChild(fragment); window.App.initGlobalHeatmapZoom();
     },
 
-    fillList: function(id, items, ico, unit, categoryKey, mode = 'series') {
+     fillList: function(id, items, ico, unit, categoryKey, mode = 'series') {
         const el = document.getElementById(id);
         if (!el) return;
         if (!items?.length) {
-            el.innerHTML = '<div class="empty" style="padding: 20px 0;"><div class="icon" style="font-size:24px;">' + window.App.Icons.dash + '</div>Нет данных</div>';
+            el.innerHTML = `<div class="empty" style="padding: 20px 0;"><div class="icon" style="font-size:24px;">${window.App.Icons.dash}</div>Нет данных</div>`;
             return;
         }
         let html = '';
@@ -1434,25 +1328,58 @@ Object.assign(window.App, {
             const cnt = it.count || it.views || 0, sub = it.sub || (it.shows ? `${it.shows} ${window.App.plural(it.shows, ['шоу', 'шоу', 'шоу'])}` : '');
             const lbl = Array.isArray(unit) ? `${cnt} ${window.App.plural(cnt, unit)}` : (unit ? `${cnt} ${unit}` : cnt);
             const delay = (i + 1) * 0.05;
-            
             const safeName = it.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
             let visual = '';
             if (it.photo_url) {
                 const fb = it.fallback_photo_url ? `'${it.fallback_photo_url}'` : 'null';
-                visual = `<img src="${it.photo_url}" style="width:clamp(24px, 6vw, 32px);height:clamp(24px, 6vw, 32px);border-radius:50%;object-fit:cover;margin-right:6px;vertical-align:middle;display:inline-block;" 
-                    onerror="window.App.handleImgErr(this, ${fb}, '${safeName}')"
-                    onload="window.App.handleKpPlaceholder(this, '${safeName}')">`;
+                visual = `<img src="${it.photo_url}" class="person-avatar" style="width:32px;height:32px;margin-right:6px;" onerror="window.App.handleImgErr(this, ${fb}, '${safeName}')">`;
             } else if (it.emoji) {
-                visual = `<span style="font-size:clamp(18px,5vw,22px);line-height:1;margin-right:6px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.1))">${it.emoji}</span>`;
+                visual = `<span style="font-size:22px;margin-right:6px;">${it.emoji}</span>`;
             } else if (ico) {
-                visual = `<div class="icon" style="color:var(--text-muted);display:inline-block;vertical-align:middle;margin-right:6px;">${ico}</div>`;
+                visual = `<div class="icon" style="margin-right:6px;">${ico}</div>`;
             }
 
             const histKey = ['actors', 'directors', 'writers'].includes(categoryKey) ? `${categoryKey}_${mode}` : categoryKey;
 
-            html += `<div class="li li-clickable anim-list-item clickable" onclick="window.App.openHistoryLayer('filter', '${safeName}', null, null, '${histKey}', ${i})" style="animation-delay:${delay}s"><div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div><span class="li-r" style="color:var(--info)">${lbl}</span></div>`;
+            html += `<div class="li li-clickable anim-list-item clickable" onclick="window.App.openHistoryLayer('filter', '${safeName}', null, null, '${histKey}', ${i})" style="animation-delay:${delay}s">
+                <div class="li-l"><span class="li-rank">${i+1}</span><div><div class="li-name">${visual} ${it.name}</div>${sub?`<div class="li-sub">${sub}</div>`:''}</div></div>
+                <span class="li-r" style="color:var(--info)">${lbl}</span>
+            </div>`;
         });
         el.innerHTML = html;
+        window.App.fitAll('.li-name', el);
+    },
+
+    updateOverview: function(s) {
+        if (!s) return;
+        const elMap = {
+            's-time': s.duration_display || '0м',
+            's-views': `${s.total_views} ${window.App.plural(s.total_views, ['просмотр', 'просмотра', 'просмотров'])}`,
+            's-act': `${s.activity_percent || 0}%`,
+            's-daily': `~${s.daily_average_min || 0} мин/день`,
+            's-ep': s.total_episodes,
+            's-ser': `${s.unique_series || 0} ${window.App.plural(s.unique_series || 0, ['сериал', 'сериала', 'сериалов'])}`,
+            's-mov': s.total_movies || 0,
+            's-uni': s.movies_duration || '0м',
+            's-wl-added': s.wishlist_added || 0,
+            's-wl-watched': s.wishlist_watched || 0,
+            'period-label': s.period_label || ''
+        };
+        Object.entries(elMap).forEach(([id, val]) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        });
+    },
+
+    updateUserMeta: function(meta) {
+        if (!meta) return;
+        const nameEl = document.getElementById('user-name');
+        if (nameEl) nameEl.textContent = meta.name || 'Пользователь';
+        const avEl = document.getElementById('avatar');
+        if (avEl) {
+            if (meta.photo_url) avEl.innerHTML = `<img src="${meta.photo_url}" alt="A">`;
+            else avEl.textContent = (meta.name || 'P').charAt(0).toUpperCase();
+        }
     },
 
     fillBinges: function(data) {
@@ -1574,6 +1501,11 @@ Object.assign(window.App, {
     },
 
     openHistoryLayer: function(type, title, extraId, extraDate, extraKey, extraIndex, fromRouter = false) {
+        if (type !== 'show_history' && !window.App.D) {
+            console.warn('openHistoryLayer: skipping because stats data (D) is null. Type:', type);
+            return;
+        }
+
         let rawData = [];
         
         if (type === 'all') { 

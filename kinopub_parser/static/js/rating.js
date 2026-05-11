@@ -84,7 +84,9 @@ Object.assign(window.App, {
     },
 
     updateSliderUI: function(withPulse = false) {
-        const ctx = window.App.State.getState('modals.rateShow.context');
+        const ctx = window.App.getState('modals.rateShow.context');
+        if (!ctx) return;
+
         const val = ctx.currentVal;
         const percent = ((val - 1) / 9) * 100;
         
@@ -92,27 +94,17 @@ Object.assign(window.App, {
         const handle = document.getElementById('rate-slider-handle');
         const huge = document.getElementById('rate-huge-val');
         const modalContent = document.querySelector('#rate-show-modal .modal-content');
-        const delBtn = document.getElementById('btn-delete-rating');
 
         if (fill) fill.style.width = `${percent}%`;
         if (handle) handle.style.left = `${percent}%`;
-        if (huge) huge.innerHTML = `${val.toFixed(1 === val % 1 ? 0 : 1)}<span>/ 10</span>`;
+        if (huge) huge.innerHTML = `${val.toFixed(val % 1 === 0 ? 0 : 1)}<span>/ 10</span>`;
 
-        if (withPulse && huge) {
-            huge.classList.remove('rate-pulse');
-            void huge.offsetWidth;
-            huge.classList.add('rate-pulse');
-        }
-
-        if (modalContent && (ctx.level === 'show' || ctx.level === 'score')) {
+        if (modalContent) {
             modalContent.classList.remove('score-low', 'score-mid', 'score-high');
             if (val < 5) modalContent.classList.add('score-low');
             else if (val < 8) modalContent.classList.add('score-mid');
             else modalContent.classList.add('score-high');
         }
-
-        const isInputView = (ctx.level === 'show' || ctx.level === 'score');
-        if (delBtn) delBtn.style.display = (isInputView && ctx.hasExistingRating) ? 'block' : 'none';
     },
 
     setRateLevel: function (level, params = {}) {
