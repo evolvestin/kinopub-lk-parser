@@ -83,9 +83,14 @@ class StateManager {
             const saved = sessionStorage.getItem('app_state_v1');
             if (saved) {
                 const parsed = JSON.parse(saved);
+                // Важно: мержим глубоко, но отдаем приоритет сохраненным данным
                 this.state = this._mergeDeep(this._deepClone(this.defaultState), parsed);
+            } else {
+                this.state = this._deepClone(this.defaultState);
             }
-        } catch (e) { this.state = this._deepClone(this.defaultState); }
+        } catch (e) { 
+            this.state = this._deepClone(this.defaultState); 
+        }
     }
 
     _mergeDeep(target, source) {
@@ -116,11 +121,11 @@ const DEFAULT_APP_STATE = {
         isLoading: true,
         isAppReady: false,
         activeStatsTab: 'personal',
-        personTabs: { actors: 'series', directors: 'series', writers: 'series' },
-        theme: localStorage.getItem('kt') === 'l' ? 'light' : 'dark',
-        viewMode: localStorage.getItem('kp_view_mode') || 'grid',
-        wlViewMode: localStorage.getItem('kp_wl_view_mode') || 'grid',
-        sortMode: localStorage.getItem('kp_sort_mode') || 'default',
+        personTabs: { actors: 'series', directors: 'series', writers: 'series'},
+        theme: 'dark',
+        viewMode: 'grid',
+        wlViewMode: 'grid',
+        sortMode: 'default',
         isSortMenuOpen: false,
         helpPopoverVisible: false,
         bottomNavVisible: true,
@@ -353,6 +358,8 @@ function initUIEffects(App) {
 
     ['actors', 'directors', 'writers'].forEach(cat => {
         App.subscribe(`ui.personTabs.${cat}`, (mode) => {
+            const current = App.getState('ui.personTabs');
+            localStorage.setItem('kp_person_tabs', JSON.stringify(current));
             const d = App.getState('data.stats');
             if (d && d[cat] && d[cat][mode]) {
                 window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
@@ -361,6 +368,7 @@ function initUIEffects(App) {
     });
 
     App.subscribe('ui.activeStatsTab', (tab) => {
+        localStorage.setItem('kp_active_stats_tab', tab);
         document.querySelectorAll('.tab[data-tab]').forEach(el => {
             el.classList.toggle('on', el.dataset.tab === tab);
         });
@@ -425,4 +433,22 @@ Object.assign(window.App, {
 document.addEventListener('DOMContentLoaded', () => {
     initUIEffects(window.App);
     stateInstance.syncAllBindings();
+
+    // Добавляем автоматическое обновление State при вводе в input/select/textarea
+    document.addEventListener('input', (e) => {
+        const path = e.target.getAttribute('data-state-bind');
+        if (!path) return;
+
+        let value;
+        if (e.target.type === 'checkbox') {
+            value = e.target.checked;
+        } else if (e.target.type === 'number') {
+            value = e.target.value === '' ? '' : parseFloat(e.target.value);
+        } else {
+            value = e.target.value;
+        }
+
+        // Обновляем состояние без циклического вызова syncAllBindings для этого же элемента
+        stateInstance.setState(path, value);
+    });
 });

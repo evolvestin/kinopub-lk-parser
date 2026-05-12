@@ -2403,3 +2403,5 @@ def merge_persons_api(request):
         return JsonResponse({'error': 'Master person not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+

@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_vite',
     'app',
     'channels',
 ]
@@ -160,6 +161,13 @@ STATICFILES_DIRS = []
 static_src = BASE_DIR / 'kinopub_parser' / 'static'
 if static_src.exists():
     STATICFILES_DIRS.append(static_src)
+
+DJANGO_VITE_ASSETS_PATH = BASE_DIR / 'frontend_webapp' / 'dist'
+STATICFILES_DIRS.append(DJANGO_VITE_ASSETS_PATH)
+
+DJANGO_VITE_DEV_MODE = DEBUG
+DJANGO_VITE_DEV_SERVER_PORT = 5173
+DJANGO_VITE_DEV_SERVER_HOST = 'localhost'
 
 ASGI_APPLICATION = 'kinopub_parser.asgi.application'
 

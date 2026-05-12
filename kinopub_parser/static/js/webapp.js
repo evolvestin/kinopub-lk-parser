@@ -305,14 +305,18 @@ Object.assign(window.App, {
             });
 
             const query = new URLSearchParams();
+            
             const y = window.App.getState('nav.query.y');
             if (y && y !== 'all') query.set('y', y);
             
+            const tab = window.App.getState('ui.activeStatsTab');
+            if (path.startsWith('stats') && tab && tab !== 'personal') query.set('tab', tab);
+            
             const q = window.App.getState('forms.search.query');
-            if (path.startsWith('search') && q) query.set('q', q);
+            if (q) query.set('q', q);
             
             const folderId = window.App.getState('data.activeWlFolderId');
-            if (path.startsWith('wishlist') && folderId) query.set('folder', folderId);
+            if (path.includes('wishlist') && folderId) query.set('folder', folderId);
 
             const qStr = query.toString();
             return '#/' + path + (qStr ? '?' + qStr : '');
@@ -320,7 +324,7 @@ Object.assign(window.App, {
 
         updateUrl() {
             if (window.App.getState('flags.isSyncingHash')) return;
-            const newHash = this.serialize();
+            const newHash = window.App.Router.serialize();
             if (window.location.hash !== newHash) history.pushState(null, "", newHash);
         },
 
@@ -329,52 +333,53 @@ Object.assign(window.App, {
             window.App.setState('flags.isSyncingHash', true);
 
             try {
-                const { segments, params } = this.parse();
+                const { segments, params } = window.App.Router.parse();
                 const targetMainView = segments[0] || 'search';
                 
-                // Синхронизация основного вида
+                if (params.has('y')) window.App.setState('nav.query.y', params.get('y'));
+                if (params.has('tab')) window.App.setState('ui.activeStatsTab', params.get('tab'));
+                if (params.has('q')) window.App.setState('forms.search.query', params.get('q'));
+                if (params.has('folder')) window.App.setState('data.activeWlFolderId', parseInt(params.get('folder')));
+
                 if (window.App.getState('nav.activeMainView') !== targetMainView) {
                     window.App.clearLayers();
                     window.App.setState('nav.activeMainView', targetMainView);
                 }
 
-                // Синхронизация фильтров
-                const year = params.get('y') || 'all';
-                window.App.setState('nav.query.y', year);
-
-                const q = params.get('q') || '';
-                window.App.setState('forms.search.query', q);
-
-                const fId = params.get('folder');
-                if (fId) window.App.setState('data.activeWlFolderId', parseInt(fId));
-
-                // Синхронизация стека слоев
-                const layerSegments = segments.slice(1);
-                const targetStackDepth = Math.floor(layerSegments.length / 2);
-                
-                // Удаляем лишние слои из DOM и массива
-                while (window.App.viewStack.length > targetStackDepth) {
-                    const top = window.App.viewStack.pop();
-                    if (top) top.el.remove();
+                if (targetMainView === 'search' && params.has('q')) {
+                    window.App.doSearch(params.get('q'));
                 }
 
-                // Достраиваем недостающие слои
+                const layerSegments = segments.slice(1);
+                const targetStackDepth = Math.floor(layerSegments.length / 2);
+                const savedStack = window.App.getState('nav.layerStack') || [];
+
+                while (window.App.viewStack.length > targetStackDepth) {
+                    const top = window.App.viewStack.pop();
+                    if (top && top.el) top.el.remove();
+                }
+
                 for (let i = window.App.viewStack.length; i < targetStackDepth; i++) {
                     const type = layerSegments[i * 2];
                     const id = layerSegments[i * 2 + 1];
-                    if (type === 'show') await window.App.openShowLayer(id, true);
-                    else if (type === 'history') window.App.openHistoryLayer(id, 'История', null, null, null, null, true);
-                    else if (['person', 'genre', 'country'].includes(type)) await window.App.openCollectionLayer(type, id, '', true);
+                    const savedCtx = savedStack[i] || {};
+
+                    if (type === 'show') {
+                        await window.App.openShowLayer(id, true);
+                    } else if (type === 'history') {
+                        window.App.openHistoryLayer(id, savedCtx.title || 'История', savedCtx.extraId, savedCtx.extraDate, savedCtx.extraKey, savedCtx.extraIndex, true);
+                    } else if (['person', 'genre', 'country'].includes(type)) {
+                        const fallbackTitle = savedCtx.titleFallback || savedCtx.title || 'Загрузка...';
+                        await window.App.openCollectionLayer(type, id, fallbackTitle, true);
+                    }
                 }
 
-                // Управление видимостью слоев
                 window.App.viewStack.forEach((layer, idx) => {
                     layer.el.style.display = (idx === window.App.viewStack.length - 1) ? 'block' : 'none';
                 });
 
-                const stackData = window.App.viewStack.map(item => item.context);
-                window.App.setState('nav.layerStack', stackData);
-
+                window.App.setState('nav.layerStack', window.App.viewStack.map(item => item.context));
+                
             } finally {
                 window.App.setState('flags.isSyncingHash', false);
             }
@@ -447,9 +452,11 @@ Object.assign(window.App, {
         const styles = window.getComputedStyle(el);
         const limitWidth = el.clientWidth;
         
-        if (limitWidth <= 0 || styles.display === 'none') return; 
+        if (limitWidth <= 0 || styles.display === 'none' || styles.visibility === 'hidden') return; 
 
-        const limitHeight = parseFloat(styles.maxHeight) || el.offsetHeight || 40;
+        const stylesMaxHeight = parseFloat(styles.maxHeight);
+        const limitHeight = (!isNaN(stylesMaxHeight) && stylesMaxHeight > 0) ? stylesMaxHeight : (el.offsetHeight || 40);
+        
         const isSingleLine = styles.whiteSpace === 'nowrap' || styles.webkitLineClamp === '1';
         let size = parseFloat(styles.fontSize);
         const minSize = 9;
@@ -483,139 +490,46 @@ Object.assign(window.App, {
 
     init: async function() {
         if (window.IS_ADMIN_DASHBOARD) return;
+        
         window.App.setState('flags.isSyncingHash', true);
-
         const savedViewMode = localStorage.getItem('kp_view_mode') || 'grid';
         window.App.setState('ui.viewMode', savedViewMode);
 
-        if (typeof window.App.initWishlistReactivity === 'function') {
-            window.App.initWishlistReactivity();
-        }
-
+        if (typeof window.App.initWishlistReactivity === 'function') window.App.initWishlistReactivity();
         window.App.initIcons();
 
-        // Единый консолидированный подписчик на статистику
-        window.App.subscribe('data.stats', (d) => {
-            if (!d || !d.meta) return;
-            
-            // 1. Мета пользователя
-            const nameEl = document.getElementById('user-name');
-            if (nameEl) {
-                nameEl.textContent = d.meta.name || 'Пользователь';
-                requestAnimationFrame(() => window.App.fitText(nameEl));
+        window.App.subscribe('forms.search.query', (q) => {
+            if (!window.App.getState('flags.isSyncingHash')) {
+                window.App.Router.updateUrl();
             }
-            const avEl = document.getElementById('avatar');
-            if (avEl) {
-                if (d.meta.photo_url) avEl.innerHTML = `<img src="${d.meta.photo_url}" alt="A">`;
-                else avEl.textContent = (d.meta.name || 'P').charAt(0).toUpperCase();
-            }
-
-            // 2. Обзор (Overview)
-            if (typeof window.App.updateOverview === 'function') {
-                window.App.updateOverview(d.summary);
-            }
-
-            // 3. Рейтинги
-            if (typeof window.App.updateRatingsSection === 'function') {
-                window.App.updateRatingsSection(d.ratings);
-            } else if (d.ratings && d.ratings.total > 0) {
-                // Фоллбэк если функция не определена
-                const box = document.getElementById('ratings-box');
-                if (box) {
-                    box.classList.remove('hidden');
-                    window.App.renderRatingsDist();
-                }
-            }
-
-            // 4. Управление карточками
-            const toggle = (id, show) => document.getElementById(id)?.classList.toggle('hidden', !show);
-            
-            toggle('main-tabs', !!d.group);
-            toggle('tab-group-btn', !!d.group);
-            toggle('card-dynamics', d.monthly_chart?.views?.some(v => v > 0));
-            toggle('card-weekday', d.weekday_chart?.data?.some(v => v > 0));
-            toggle('card-heatmap', !(d.heatmap && d.heatmap.length > 0));
-            
-            if (d.heatmap?.length) window.App.renderHeatmap(d.heatmap);
-
-            toggle('card-genres', d.genres && d.genres.length > 0);
-            toggle('card-countries', d.countries && d.countries.length > 0);
-            toggle('card-binges', d.binges && d.binges.length > 0);
-
-            if (window.App.getState('ui.activeStatsTab') === 'group') window.App.renderGroup(d);
-            window.App.renderCharts(d);
-
-            ['actors', 'directors', 'writers'].forEach(cat => {
-                const mode = window.App.getState(`ui.personTabs.${cat}`) || 'series';
-                const hasData = d[cat] && (d[cat].series?.length || d[cat].others?.length);
-                toggle(`card-${cat}`, !hasData);
-                if (hasData) {
-                    window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
-                }
-            });
-            
-            if (d.binges?.length) window.App.fillBinges(d.binges);
-            if (d.countries?.length) {
-                window.App.fillList('countries-list', d.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries');
+            if (window.App.getState('nav.activeMainView') === 'search') {
+                window.App.doSearch(q || '');
             }
         });
 
-        // Подписки на табы персон
-        ['actors', 'directors', 'writers'].forEach(cat => {
-            window.App.subscribe(`ui.personTabs.${cat}`, (mode) => {
-                const d = window.App.D;
-                if (!d || !d[cat]) return;
-                window.App.fillList(`${cat}-list`, d[cat][mode], null, ['просмотр', 'просмотра', 'просмотров'], cat, mode);
-            });
-        });
+        window.App.initStatsSubscriber();
 
-        window.App.subscribe('data.search.results', (val) => val && window.App.renderSearchResults(val));
-        window.App.subscribe('forms.search.query', (q) => window.App.doSearch(q || ''));
-        
-        window.App.subscribe('nav.activeMainView', (view) => {
-            ['search', 'wishlist', 'stats'].forEach(v => {
-                const el = document.getElementById(`view-${v}`), navBtn = document.getElementById(`bn-${v}`);
-                if (el) el.style.display = (v === view) ? 'flex' : 'none';
-                if (navBtn) navBtn.classList.toggle('active', v === view);
-            });
-        });
-
-        // Синхронизация роутера
         try {
-            const { segments, params } = window.App.Router.parse();
-            const sId = params.get('shared_id') || (tg?.initDataUnsafe?.start_param || '').replace('stat_', '');
-            let initialView = sId ? 'stats' : (segments[0] || window.App.getState('nav.activeMainView') || 'search');
-            
-            if (sId) window.App.isSharedMode = true;
-            window.App.setState('nav.activeMainView', initialView);
+            await window.App.Router.sync();
 
-            if (window.App.isSharedMode) {
+            const { params } = window.App.Router.parse();
+            const sId = params.get('shared_id') || (tg?.initDataUnsafe?.start_param || '').replace('stat_', '');
+            
+            if (sId) {
+                window.App.isSharedMode = true;
                 document.body.classList.add('has-banner');
                 const banner = document.getElementById('shared-banner-container');
                 if (banner) banner.innerHTML = `<div class="shared-banner">Вы просматриваете чужую статистику</div>`;
                 await window.App.loadShared(sId);
             } else {
                 if (typeof window.App.loadWishlist === 'function') await window.App.loadWishlist();
-                
-                // Если мы на вкладке поиска и есть запрос в URL - запускаем поиск
-                const q = params.get('q');
-                if (initialView === 'search' && q) {
-                    window.App.setState('forms.search.query', q);
-                    window.App.doSearch(q);
-                }
-
                 document.body.classList.add('has-nav');
-                const savedStack = window.App.getState('nav.layerStack') || [];
-                for (const ctx of savedStack) {
-                    if (ctx.type === 'show') await window.App.openShowLayer(ctx.showId, true);
-                    else if (ctx.type === 'history') window.App.openHistoryLayer(ctx.htype, ctx.title, ctx.extraId, ctx.extraDate, ctx.extraKey, ctx.extraIndex, true);
-                    else if (['person', 'genre', 'country'].includes(ctx.type)) await window.App.openCollectionLayer(ctx.ctype, ctx.itemId, ctx.titleFallback, true);
-                }
             }
         } finally {
             window.App.hideLoader();
             window.App.setState('flags.isSyncingHash', false);
             window.App.setState('ui.isAppReady', true);
+            
             window.App.Router.updateUrl();
             window.App.restoreModals();
         }
@@ -1830,83 +1744,81 @@ Object.assign(window.App, {
 
     openCollectionLayer: async function(type, id, titleFallback, fromRouter = false) {
         window.App.showLoader();
-        document.getElementById('loader').classList.remove('hidden');
-        document.getElementById('loader').style.opacity = '1';
+        const displayTitle = titleFallback || 'Загрузка...';
 
         try {
+            const existingLayer = this.viewStack.find(l => l.context.type === 'collection' && l.context.itemId == id);
+            if (!existingLayer) {
+                const initialHtml = `
+                    ${window.App.getLayerHeader(displayTitle)}
+                    <div id="layer-loader-body" style="padding: 40px; text-align:center;"><div class="spinner"></div></div>
+                    <div class="hist-grid" style="padding: 0 16px; opacity: 0;"></div>
+                `;
+                window.App.pushLayer(initialHtml, { 
+                    type: 'collection', 
+                    ctype: type, 
+                    itemId: id,
+                    titleFallback: displayTitle,
+                    fromRouter: fromRouter 
+                });
+            }
+
             const r = await fetch(`/api/webapp/collection/${type}/${id}/?init_data=${encodeURIComponent(tg?.initData || '')}`);
             if (!r.ok) throw new Error('Not found');
             const data = await r.json();
 
-            let gridHtml = data.items.map(item => {
-                const mediumPoster = item.poster_url || '';
-                const posterHtml = mediumPoster ? `<img src="${mediumPoster}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
-                
-                let ratingBadge = '';
-                if (item.user_rating) {
-                    ratingBadge = `<div class="rating-badge" style="position:absolute; top:8px; left:8px; z-index:5; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); color:var(--accent);">${window.App.Icons.star}${item.user_rating}</div>`;
-                }
+            const gridHtml = data.items.length ? data.items.map(item => {
+                const posterHtml = item.poster_url ? `<img src="${item.poster_url}" class="grid-poster" loading="lazy">` : '<div class="grid-poster"></div>';
+                const ratingBadge = item.user_rating ? `<div class="rating-badge" style="position:absolute; top:8px; left:8px; z-index:5; background:rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.1); color:var(--accent);">${window.App.Icons.star}${item.user_rating}</div>` : '';
 
                 return `
                 <div class="grid-item-wrap anim-item" onclick="window.App.openShowLayer(${item.id})">
-                    <div class="grid-item">
-                        ${posterHtml}
-                        ${ratingBadge}
-                        ${item.year ? `<div class="grid-year">${item.year}</div>` : ''}
-                    </div>
+                    <div class="grid-item">${posterHtml}${ratingBadge}${item.year ? `<div class="grid-year">${item.year}</div>` : ''}</div>
                     <div class="grid-below-title">${item.title}</div>
                 </div>`;
-            }).join('');
-
-            if (data.items.length === 0) {
-                gridHtml = `<div class="empty" style="grid-column: 1/-1"><div class="icon">${window.App.Icons.film}</div>Пусто</div>`;
-            }
+            }).join('') : `<div class="empty" style="grid-column: 1/-1"><div class="icon">${window.App.Icons.film}</div>Пусто</div>`;
 
             let headerSectionHtml = '';
             if (data.person_info) {
                 const p = data.person_info;
                 const fb = p.fallback_photo_url ? `'${p.fallback_photo_url}'` : 'null';
-                const safeName = titleFallback.replace(/'/g, "\\'");
+                const safeName = data.title.replace(/'/g, "\\'");
                 const imgHtml = p.photo_url 
-                    ? `<img src="${p.photo_url}" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;" 
-                        onerror="window.App.handleImgErr(this, ${fb}, '${safeName}')"
-                        onload="window.App.handleKpPlaceholder(this, '${safeName}')">`
+                    ? `<img src="${p.photo_url}" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;" onerror="window.App.handleImgErr(this, ${fb}, '${safeName}')">`
                     : `<div class="person-avatar" style="width:60px; height:60px; flex-shrink:0;">${window.App.Icons.person_placeholder}</div>`;
                 
-                const profsHtml = p.professions && p.professions.length > 0 
-                    ? `<div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">${p.professions.join(' · ')}</div>`
-                    : '';
-
                 headerSectionHtml = `
-                    <div class="card anim-item" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; background:var(--bg-card); box-shadow:var(--shadow-sm);">
+                    <div class="card anim-item" style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px;">
                         ${imgHtml}
                         <div style="min-width:0; flex:1;">
-                            <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">${titleFallback}</div>
-                            ${profsHtml}
+                            <div class="layer-title-main" style="font-size:20px; text-align:left;">${data.title}</div>
+                            ${p.professions ? `<div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px;">${p.professions.join(' · ')}</div>` : ''}
                         </div>
                     </div>`;
             } else {
-                headerSectionHtml = `<div class="label"><div class="icon" style="color:var(--info)">${window.App.Icons.star}</div>${data.title || titleFallback}</div>`;
+                headerSectionHtml = `<div class="label"><div class="icon" style="color:var(--info)">${window.App.Icons.star}</div>${data.title}</div>`;
             }
 
-            const html = `
-                ${window.App.getLayerHeader(data.title || titleFallback)}
+            const finalHtml = `
+                ${window.App.getLayerHeader(data.title)}
                 ${headerSectionHtml}
-                <div class="hist-grid" style="padding: 0 16px;">
-                    ${gridHtml}
-                </div>
+                <div class="hist-grid" style="padding: 0 16px;">${gridHtml}</div>
             `;
 
-            window.App.pushLayer(html, { 
-                type: 'collection', 
-                ctype: type, 
-                itemId: id,
-                titleFallback: titleFallback,
-                fromRouter: fromRouter 
-            });
+            const currentLayer = this.viewStack[this.viewStack.length - 1];
+            if (currentLayer && currentLayer.context.type === 'collection' && currentLayer.context.itemId == id) {
+                currentLayer.el.innerHTML = finalHtml;
+                currentLayer.context.titleFallback = data.title;
+                requestAnimationFrame(() => {
+                    this.fitText(currentLayer.el.querySelector('.layer-title-main'));
+                    this.fitAll('.grid-below-title', currentLayer.el);
+                });
+            }
+
             return true;
         } catch (e) {
-            window.App.showToast('Не удалось загрузить данные коллекции');
+            window.App.showToast('Ошибка загрузки');
+            if (!fromRouter) history.back();
             return false;
         } finally {
             window.App.hideLoader();
@@ -1937,14 +1849,20 @@ Object.assign(window.App, {
         this.setState('nav.layerStack', stackData);
 
         if (tg?.BackButton) {
-            tg.BackButton.show();
-            tg.BackButton.onClick(() => history.back());
+            if (this.viewStack.length > 0) {
+                tg.BackButton.show();
+            } else {
+                tg.BackButton.hide();
+            }
         }
 
+        // Если это не процесс синхронизации из URL - обновляем хеш
         if (!isSync) this.Router.updateUrl();
         
         requestAnimationFrame(() => {
-            const titleEl = this.viewStack[this.viewStack.length-1].el.querySelector('.layer-title-main');
+            const current = this.viewStack[this.viewStack.length-1];
+            if (!current) return;
+            const titleEl = current.el.querySelector('.layer-title-main');
             if (titleEl) this.fitText(titleEl);
         });
     },
