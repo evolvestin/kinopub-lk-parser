@@ -251,7 +251,7 @@ const ratingBadgeStyle = computed(() => {
   if (avg >= 8.5) c = { bg: 'rgba(46, 204, 113, 0.15)', text: '#2ecc71' }
   else if (avg >= 7.0) c = { bg: 'rgba(56, 139, 253, 0.15)', text: '#60a5fa' }
   else if (avg >= 5.5) c = { bg: 'rgba(210, 153, 34, 0.15)', text: '#d29922' }
-  return { background: c.bg, color: c.text }
+  return { backgroundColor: c.bg, color: c.text }
 })
 
 const ratingsChartData = computed(() => ({
@@ -295,8 +295,9 @@ const groupCompareRows = computed(() => {
 const groupMaxViews = computed(() => Math.max(...(statsStore.currentStats?.group?.members || []).map(m => m.views), 1))
 
 const openHistory = (type, title, extraId = null, extraDate = null) => {
-  const items = type === 'episodes' ? statsStore.currentStats.history_episodes : statsStore.currentStats.history_movies
-  uiStore.openLayer('history', { type, title, items, extraId, extraDate })
+  // В URL-архитектуре мы не можем пробросить массив items напрямую через router.push.
+  // Данные должны браться из стора в самом HistoryLayer на основе переданного типа.
+  uiStore.openLayer('history', type)
 }
 const handleHeatmapClick = ({ date, value }) => value > 0 && openHistory('day', date, null, date)
 

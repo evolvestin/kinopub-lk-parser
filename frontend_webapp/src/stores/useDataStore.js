@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
 
@@ -7,17 +7,28 @@ export const useDataStore = defineStore('data', () => {
   const api = useApi()
   const uiStore = useUIStore()
 
-  const searchQuery = ref('')
-  const searchResults = ref({ shows: [], persons: [] })
+  // Восстановление из sessionStorage
+  const savedSearch = JSON.parse(sessionStorage.getItem('kp_search_cache') || '{"query":"","results":{"shows":[],"persons":[]}}')
+
+  const searchQuery = ref(savedSearch.query)
+  const searchResults = ref(savedSearch.results)
   const isSearching = ref(false)
-  const hasSearched = ref(false)
+  const hasSearched = ref(savedSearch.query.length > 0)
+
+  // Авто-сохранение при изменениях
+  watch([searchQuery, searchResults], () => {
+    sessionStorage.setItem('kp_search_cache', JSON.stringify({
+      query: searchQuery.value,
+      results: searchResults.value
+    }))
+  }, { deep: true })
 
   async function performSearch(query) {
     if (query.length < 2) {
       clearSearch()
       return
     }
-
+    searchQuery.value = query
     isSearching.value = true
     hasSearched.value = true
 
@@ -27,29 +38,17 @@ export const useDataStore = defineStore('data', () => {
         searchResults.value = data
       }
     } catch (error) {
-      if (searchQuery.value === query) {
-        uiStore.showToast('Ошибка при поиске')
-        searchResults.value = { shows: [], persons: [] }
-      }
+      uiStore.showToast('Ошибка поиска')
     } finally {
-      if (searchQuery.value === query) {
-        isSearching.value = false
-      }
+      isSearching.value = false
     }
   }
 
   function clearSearch() {
+    searchQuery.value = ''
     searchResults.value = { shows: [], persons: [] }
     hasSearched.value = false
-    isSearching.value = false
   }
 
-  return {
-    searchQuery,
-    searchResults,
-    isSearching,
-    hasSearched,
-    performSearch,
-    clearSearch
-  }
+  return { searchQuery, searchResults, isSearching, hasSearched, performSearch, clearSearch }
 })

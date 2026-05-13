@@ -13,13 +13,13 @@
       <img :src="show.poster_large" class="hero-poster">
       
       <div class="hero-controls" style="position: relative; z-index: 3; height: 85%; max-width: 65%; display: flex; align-items: flex-end;">
-        <button class="wishlist-add-btn detail-wishlist-btn anim-item" @click="toggleWishlist">
+        <button class="wishlist-add-btn detail-wishlist-btn anim-item" @click="openWishlistModal">
           <span v-html="icons.bookmark_plus"></span>
         </button>
-        <button class="detail-add-view-btn anim-item" style="top:40px !important" @click="openAddView">
+        <button class="detail-add-view-btn anim-item" @click="openAddView">
           <span v-html="icons.eye"></span>
         </button>
-        <button class="detail-add-view-btn detail-rate-btn anim-item" style="top:92px !important" @click="openRating">
+        <button class="detail-add-view-btn detail-rate-btn anim-item" @click="openRating">
           <span v-html="icons.star"></span>
         </button>
       </div>
@@ -30,7 +30,9 @@
       <div class="show-orig" v-if="show.original_title !== show.title">{{ show.original_title }}</div>
       
       <div class="show-meta-tags">
-        <div v-for="c in show.countries" :key="c.id" class="sm-tag">{{ c.emoji }} {{ c.name }}</div>
+        <div v-for="c in show.countries" :key="c.id" class="sm-tag clickable" @click="uiStore.openLayer('country', c.id)">
+          {{ c.emoji }} {{ c.name }}
+        </div>
       </div>
 
       <div class="show-meta-tags">
@@ -47,6 +49,15 @@
     </div>
 
     <div class="plot-box" v-if="show.plot">{{ show.plot }}</div>
+
+    <div class="label" v-if="show.genres?.length">
+      <div class="icon" style="color:var(--info)" v-html="icons.star"></div> Жанры
+    </div>
+    <div class="h-scroll-container" v-if="show.genres?.length" style="padding-bottom: 30px;">
+      <div v-for="g in show.genres" :key="g.id" class="genre-pill" @click="uiStore.openLayer('genre', g.id)">
+        {{ g.name }}
+      </div>
+    </div>
     
     <template v-for="group in show.crew" :key="group.profession">
       <div class="label">{{ group.profession }}</div>
@@ -79,7 +90,10 @@ onMounted(async () => {
   }
 })
 
-const openRating = () => uiStore.showToast('Будет в след. итерации')
-const openAddView = () => uiStore.showToast('Будет в след. итерации')
-const toggleWishlist = () => uiStore.showToast('Добавлено')
+const openWishlistModal = () => {
+  uiStore.openModal('wlFolder', { showId: show.value.id, title: show.value.title })
+}
+
+const openRating = () => uiStore.openModal('rateShow', { showId: show.value.id, title: show.value.title })
+const openAddView = () => uiStore.openModal('addView', { showId: show.value.id, title: show.value.title })
 </script>

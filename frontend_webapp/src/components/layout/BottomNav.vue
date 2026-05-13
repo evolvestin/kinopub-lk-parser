@@ -1,27 +1,22 @@
 <template>
   <div class="bottom-nav" id="bottom-nav">
-    <button class="bn-btn" :class="{ active: currentRoute === 'search' }" @click="navigate('search')">
+    <button class="bn-btn" :class="{ active: uiStore.activeView === 'search' }" @click="uiStore.switchBaseView('search')">
       <div class="icon" v-html="icons.search"></div> Поиск
     </button>
-    <button class="bn-btn" :class="{ active: currentRoute === 'wishlist' }" @click="navigate('wishlist')">
+    <button class="bn-btn" :class="{ active: uiStore.activeView === 'wishlist' }" @click="uiStore.switchBaseView('wishlist')">
       <div class="icon" v-html="icons.bookmark"></div> Избранное
     </button>
-    <button v-if="!userStore.isGuest" class="bn-btn" :class="{ active: currentRoute === 'stats' }" @click="navigate('stats')">
+    <button v-if="!userStore.isGuest" class="bn-btn" :class="{ active: uiStore.activeView === 'stats' }" @click="uiStore.switchBaseView('stats')">
       <div class="icon" v-html="icons.nav_stats"></div> Статистика
     </button>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useUIStore } from '../../stores/uiStore'
 import { useUserStore } from '../../stores/userStore'
 import { icons } from '../../utils/icons'
 
-const router = useRouter()
-const route = useRoute()
+const uiStore = useUIStore()
 const userStore = useUserStore()
-
-const currentRoute = computed(() => route.name)
-const navigate = (name) => router.push({ name })
 </script>

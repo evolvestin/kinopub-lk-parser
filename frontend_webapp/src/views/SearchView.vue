@@ -27,7 +27,7 @@
       </template>
     </div>
 
-    <div class="search-container">
+    <div class="search-bar-fixed">
       <div style="display: flex; gap: 12px; align-items: center; width: 100%;">
         <input type="text" 
                v-model="query" 
@@ -79,14 +79,25 @@ watch(() => dataStore.searchQuery, (newVal) => {
 #view-search {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
 }
 #search-results {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 20px;
+  padding-bottom: 10px;
 }
-.search-container {
+.search-bar-fixed {
   flex-shrink: 0;
+  padding: 12px 16px;
+  background: rgba(20, 24, 31, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  /* Отступ снизу для навигации + безопасная зона iOS */
+  margin-bottom: calc(70px + env(safe-area-inset-bottom));
+}
+.light .search-bar-fixed {
+  background: rgba(246, 248, 250, 0.85);
 }
 </style>

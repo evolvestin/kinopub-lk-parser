@@ -92,6 +92,7 @@ body {
     display: block;
     position: relative;
     overscroll-behavior-y: contain;
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
 }
 
 
@@ -615,7 +616,7 @@ body.has-banner #app {
     overflow-y: scroll;
     scrollbar-gutter: stable;
     animation: layerFadeIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    padding-bottom: clamp(24px, 8vw, 36px);
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
 }
 @keyframes layerFadeIn {
     from { opacity: 0; transform: scale(0.96); }
@@ -800,7 +801,10 @@ body.has-banner #app {
 /* BOTTOM NAVIGATION & SEARCH */
 
 .bottom-nav {
-    flex-shrink: 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
     background: rgba(20, 24, 31, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -809,7 +813,7 @@ body.has-banner #app {
     justify-content: space-around;
     padding: 10px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom));
-    z-index: 40;
+    z-index: 100;
 }
 .light .bottom-nav { background: rgba(246, 248, 250, 0.85); border-top-color: rgba(0,0,0,0.05); }
 
