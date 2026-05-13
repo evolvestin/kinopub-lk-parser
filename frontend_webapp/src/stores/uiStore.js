@@ -6,39 +6,25 @@ export const useUIStore = defineStore('ui', () => {
   const isAppReady = ref(false)
   const theme = ref(localStorage.getItem('kt') === 'l' ? 'light' : 'dark')
   const toast = ref({ text: '', visible: false })
-
-  // Стек слоев (Layers)
   const layerStack = ref([])
   
   // Состояния модалок
   const modals = ref({
-    rating: { isOpen: false, showId: null, title: '', initialValue: 5, type: 'Movie' },
-    casino: { isOpen: false },
-    folderEdit: { isOpen: false, isEdit: false, folderId: null }
+    share: { isOpen: false }
   })
+
+  const hasOpenLayers = computed(() => layerStack.value.length > 0)
 
   function openLayer(type, props = {}) {
     layerStack.value.push({ type, props })
-    updateTelegramBackButton()
+    const tg = window.Telegram?.WebApp
+    if (tg?.BackButton) tg.BackButton.show()
   }
 
   function popLayer() {
-    if (layerStack.value.length > 0) {
-      layerStack.value.pop()
-      updateTelegramBackButton()
-    }
-  }
-
-  function openRatingModal(showId, title, initialValue, type) {
-    modals.value.rating = { isOpen: true, showId, title, initialValue, type }
-  }
-
-  function updateTelegramBackButton() {
+    if (layerStack.value.length > 0) layerStack.value.pop()
     const tg = window.Telegram?.WebApp
-    if (tg?.BackButton) {
-      if (layerStack.value.length > 0) tg.BackButton.show()
-      else tg.BackButton.hide()
-    }
+    if (layerStack.value.length === 0 && tg?.BackButton) tg.BackButton.hide()
   }
 
   function showToast(text) {
@@ -51,9 +37,13 @@ export const useUIStore = defineStore('ui', () => {
     localStorage.setItem('kt', theme.value === 'dark' ? 'd' : 'l')
   }
 
+  function openModal(name) {
+    if (modals.value[name]) modals.value[name].isOpen = true
+  }
+
   return {
-    isLoading, isAppReady, theme, toast, layerStack, modals,
-    openLayer, popLayer, openRatingModal, showToast, toggleTheme,
+    isLoading, isAppReady, theme, toast, layerStack, hasOpenLayers, modals,
+    openLayer, popLayer, showToast, toggleTheme, openModal,
     setLoading: (val) => { isLoading.value = val },
     setAppReady: (val) => { isAppReady.value = val }
   }

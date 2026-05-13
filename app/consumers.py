@@ -1,5 +1,7 @@
+import asyncio
 import json
 
+import websockets
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.apps import apps
@@ -81,3 +83,47 @@ class LogConsumer(AsyncWebsocketConsumer):
                     }
                 )
             )
+
+
+class ViteHMRConsumer(AsyncWebsocketConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.vite_ws = None
+        self.proxy_task = None
+
+    async def connect(self):
+        requested_protocols = self.scope.get('subprotocols', [])
+
+        try:
+            # Важно: путь здесь должен строго соответствовать base + path из vite.config.js
+            self.vite_ws = await websockets.connect(
+                'ws://frontend:5173/__vite__/hmr', subprotocols=requested_protocols
+            )
+
+            await self.accept(subprotocol=self.vite_ws.subprotocol)
+
+            self.proxy_task = asyncio.create_task(self._forward_vite_to_client())
+        except Exception as e:
+            # Логируем ошибку подключения к внутреннему серверу Vite для отладки
+            print(f'[ViteHMR] Connection to Vite failed: {e}')
+            await self.close()
+
+    async def disconnect(self, close_code):
+        if self.proxy_task:
+            self.proxy_task.cancel()
+        if self.vite_ws:
+            await self.vite_ws.close()
+
+    async def receive(self, text_data=None, bytes_data=None):
+        if self.vite_ws:
+            await self.vite_ws.send(text_data or bytes_data)
+
+    async def _forward_vite_to_client(self):
+        try:
+            async for message in self.vite_ws:
+                await self.send(
+                    text_data=message if isinstance(message, str) else None,
+                    bytes_data=message if isinstance(message, bytes) else None,
+                )
+        except Exception:
+            await self.close()

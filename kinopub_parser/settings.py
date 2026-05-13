@@ -76,6 +76,10 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+if DEBUG:
+    # Middleware для исправления хоста Vite должен идти после CommonMiddleware
+    MIDDLEWARE.insert(4, 'app.middleware.ViteHostMiddleware')
+
 if not DEBUG:
     MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
@@ -172,12 +176,10 @@ _public_url = os.getenv('WEBAPP_PUBLIC_URL', '')
 IS_TUNNEL = 'trycloudflare.com' in _public_url
 
 if DEBUG:
-    # В режиме разработки заставляем django-vite генерировать относительные ссылки 
-    # или ссылки на текущий хост (туннель), чтобы они проходили через наш прокси
     DJANGO_VITE_DEV_MODE = True
-    DJANGO_VITE_DEV_SERVER_PORT = None # Убираем порт, чтобы запросы шли на 80/443 туннеля
-    # Хост будет определяться автоматически из запроса
-    DJANGO_VITE_DEV_SERVER_HOST = None 
+    DJANGO_VITE_DEV_SERVER_HOST = 'dynamic-vite-host.internal'
+    DJANGO_VITE_DEV_SERVER_PORT = 443
+    DJANGO_VITE_DEV_SERVER_PROTOCOL = 'https'
 else:
     DJANGO_VITE_DEV_MODE = False
 

@@ -1,35 +1,25 @@
 <template>
-  <div :class="{ hidden: !uiStore.isAppReady }">
-    <div id="views-container">
+  <div :class="[uiStore.theme, { 'is-webapp': true }]">
+    <!-- Показываем контент только когда приложение готово -->
+    <div v-if="uiStore.isAppReady" id="views-container" v-show="!uiStore.hasOpenLayers" class="app-viewport">
       <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
+        <keep-alive>
           <component :is="Component" />
-        </transition>
+        </keep-alive>
       </router-view>
     </div>
 
-    <!-- Слой Оверлеев (Layers) -->
-    <div id="dynamic-layers">
-      <transition-group name="layer">
-        <div v-for="(layer, index) in uiStore.layerStack" 
-             :key="index" 
-             class="layer" 
-             :style="{ zIndex: 1000 + index }">
-          
-          <ShowDetailsLayer v-if="layer.type === 'show'" v-bind="layer.props" />
-          <HistoryLayer v-if="layer.type === 'history'" v-bind="layer.props" />
-        </div>
-      </transition-group>
+    <div id="dynamic-layers" v-if="uiStore.hasOpenLayers">
+      <div v-for="(layer, index) in uiStore.layerStack" 
+           :key="index" 
+           class="layer" 
+           :style="{ zIndex: 1000 + index, display: index === uiStore.layerStack.length - 1 ? 'block' : 'none' }">
+        <ShowDetailsLayer v-if="layer.type === 'show'" v-bind="layer.props" />
+        <HistoryLayer v-if="layer.type === 'history'" v-bind="layer.props" />
+      </div>
     </div>
     
-    <!-- Глобальные модалки -->
-    <RatingModal v-if="uiStore.modals.rating.isOpen" 
-                 v-bind="uiStore.modals.rating" 
-                 @close="uiStore.modals.rating.isOpen = false" />
-                 
-    <CasinoModal v-if="uiStore.modals.casino.isOpen" />
-
-    <BottomNav v-show="uiStore.layerStack.length === 0" />
+    <BottomNav v-show="!uiStore.hasOpenLayers && uiStore.isAppReady" />
     <Loader />
     <Toast />
   </div>
@@ -38,43 +28,33 @@
 <script setup>
 import { onMounted, watch } from 'vue'
 import { useUIStore } from './stores/uiStore'
-import ShowDetailsLayer from './components/layers/ShowDetailsLayer.vue'
-import HistoryLayer from './components/layers/HistoryLayer.vue'
-import RatingModal from './components/modals/RatingModal.vue'
-import CasinoModal from './components/modals/CasinoModal.vue'
 import { useUserStore } from './stores/userStore'
 import { useTelegram } from './composables/useTelegram'
 import BottomNav from './components/layout/BottomNav.vue'
 import Loader from './components/layout/Loader.vue'
 import Toast from './components/layout/Toast.vue'
+import ShowDetailsLayer from './components/layers/ShowDetailsLayer.vue'
+import HistoryLayer from './components/layers/HistoryLayer.vue'
 
 const uiStore = useUIStore()
 const userStore = useUserStore()
-const { tg, initData } = useTelegram()
+const { tg } = useTelegram()
 
-watch(() => uiStore.theme, (newTheme) => {
-  document.body.classList.toggle('light', newTheme === 'light')
-  document.body.classList.toggle('dark', newTheme === 'dark')
-}, { immediate: true })
-
-onMounted(() => {
-  if (window.Telegram?.WebApp) {
-    window.Telegram.WebApp.ready()
-    window.Telegram.WebApp.expand()
-    window.Telegram.WebApp.BackButton.onClick(() => {
-      uiStore.popLayer()
-    })
+onMounted(async () => {
+  if (tg) {
+    tg.ready()
+    tg.expand()
+    userStore.setUser(tg.initDataUnsafe?.user)
+    tg.BackButton.onClick(() => uiStore.popLayer())
   }
-
-  uiStore.setAppReady(true)
-  uiStore.setLoading(false)
+  // Даем приложению время на инициализацию роутера и сторов
+  setTimeout(() => {
+    uiStore.setLoading(false)
+    uiStore.setAppReady(true)
+  }, 100)
 })
-</script>
 
-<style>
-.layer-enter-active, .layer-leave-active {
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
-}
-.layer-enter-from { transform: translateX(100%); opacity: 0; }
-.layer-leave-to { transform: translateX(100%); opacity: 0; }
-</style>
+watch(() => uiStore.theme, (val) => {
+  document.body.className = val === 'light' ? 'light' : ''
+}, { immediate: true })
+</script>

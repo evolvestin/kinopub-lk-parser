@@ -2,15 +2,16 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, re_path
 from django.views.generic.base import RedirectView
-from django.conf import settings
-from app.views import vite_proxy_view
 
 from app import views
 from app.admin_site import admin_site
+from app.views import vite_proxy_view
 
 if settings.DEBUG:
     proxy_patterns = [
-        re_path(r'^static/(?P<path>.*)$', vite_proxy_view),
+        # Убеждаемся, что захватываем всё, что начинается с __vite__
+        re_path(r'^__vite__/(?P<path>.*)$', vite_proxy_view),
+        path('__vite__/', vite_proxy_view, {'path': ''}),
     ]
 else:
     proxy_patterns = []
@@ -19,6 +20,7 @@ urlpatterns = proxy_patterns + [
     path('robots.txt', views.robots_txt, name='robots_txt'),
     path('', views.index, name='index'),
     path('admin/', admin_site.urls),
+    path('api/internal/set_url', views.internal_set_url, name='internal_set_url'),
     path(
         'api/admin/wishlist/folder/<int:folder_id>/',
         views.admin_get_folder_content,

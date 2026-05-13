@@ -513,7 +513,7 @@ async def handle_stats_command(message: Message, bot: Bot):
 
     user_id = message.from_user.id
     role = await client.check_user_role(user_id)
-    
+
     debug_info = ''
     if role == UserRole.ADMIN:
         debug_info = f'\n\n🔧 {italic(f"URL: {base_url}")}'

@@ -8,24 +8,24 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   plugins: [vue()],
   root: __dirname,
-  base: '/static/', // База должна совпадать с префиксом Django
+  base: '/__vite__/', 
   server: {
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    cors: true,
+    allowedHosts: true,
     watch: {
       usePolling: true,
     },
     hmr: {
-      // Это критично: через туннель HMR работает только по WSS
       protocol: 'wss',
-      // Мы не знаем адрес туннеля заранее, поэтому клиент должен 
-      // использовать тот же хост, на котором открыта страница
       clientPort: 443,
+      path: 'hmr' // Будет доступен по адресу /__vite__/hmr
     },
     fs: {
       allow: [
-        resolve(__dirname, '..'),
+        '/app',
       ],
     },
   },

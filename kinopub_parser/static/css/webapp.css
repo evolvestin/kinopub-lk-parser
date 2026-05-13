@@ -57,8 +57,6 @@ body.is-webapp {
     overflow: hidden !important;
     overscroll-behavior: none !important;
     position: fixed !important;
-    padding: 0 !important;
-    margin: 0 !important;
 }
 
 body {
@@ -73,7 +71,14 @@ body {
 }
 
 #app {
-    height: 100dvh; /* Используем динамическую высоту вьюпорта */
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.app-viewport {
+    flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -829,18 +834,12 @@ body.has-banner #app {
 .bn-btn:active .icon { transform: scale(0.9); }
 
 .search-container {
+    flex-shrink: 0;
     padding: 12px 16px;
     background: rgba(20, 24, 31, 0.85);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    z-index: 45;
     border-top: 1px solid var(--border);
-    /* Отключаем fixed, чтобы инпут был частью флекс-потока вьюхи */
-    position: relative;
-    bottom: auto;
-    left: auto;
-    right: auto;
-    padding-bottom: 12px;
 }
 .light .search-container { 
     background: rgba(246, 248, 250, 0.85); 
@@ -861,10 +860,8 @@ body.has-banner #app {
 
 #search-results {
     flex: 1;
-    display: flex;
-    flex-direction: column;
     overflow-y: auto;
-    padding-bottom: 24px;
+    -webkit-overflow-scrolling: touch;
 }
 
 #search-results > .empty {

@@ -3,15 +3,12 @@ import hashlib
 import json
 import logging
 import random
-import traceback
 import urllib.parse
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
-import logging
-import requests
-from django.http import StreamingHttpResponse, HttpResponse
 
+import requests
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
@@ -2411,45 +2408,71 @@ def merge_persons_api(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-def vite_proxy_view(request, path):
-    """
-    Прокси с расширенным логированием для диагностики 'белого экрана'.
-    """
-    # request.path уже включает префикс /static/
-    upstream_url = f"http://frontend:5173{request.path}"
-    
-    if request.GET:
-        upstream_url += f"?{request.GET.urlencode()}"
+@csrf_exempt
+def vite_proxy_view(request, path=''):
+    # Используем QUERY_STRING напрямую, чтобы сохранить исходный формат параметров Vite
+    query_string = request.META.get('QUERY_STRING', '')
+    upstream_url = f'http://frontend:5173/__vite__/{path}'
 
-    logger.info(f"[ViteProxy] Incoming request: {request.path} -> Targeting: {upstream_url}")
+    if query_string:
+        upstream_url += f'?{query_string}'
 
     try:
-        # Устанавливаем таймаут чуть больше, чтобы не отваливаться на тяжелых модулях
-        proxy_response = requests.get(upstream_url, stream=False, timeout=10)
-        
-        # Логируем результат от Vite
-        logger.info(
-            f"[ViteProxy] Upstream status: {proxy_response.status_code} | "
-            f"Content-Type: {proxy_response.headers.get('Content-Type')} | "
-            f"Size: {len(proxy_response.content)} bytes"
-        )
+        # Копируем заголовки запроса от браузера, исключая хост
+        headers = {k: v for k, v in request.headers.items() if k.lower() != 'host'}
+
+        # requests автоматически обрабатывает zlib/gzip декомпрессию
+        proxy_response = requests.get(upstream_url, headers=headers, stream=False, timeout=10)
 
         response = HttpResponse(
             proxy_response.content,
             status=proxy_response.status_code,
-            content_type=proxy_response.headers.get('Content-Type')
+            content_type=proxy_response.headers.get('Content-Type'),
         )
-        
-        # Пробрасываем CORS заголовки (важно для HMR и загрузки модулей)
-        for header in ['Access-Control-Allow-Origin', 'Access-Control-Allow-Methods']:
-            if header in proxy_response.headers:
-                response[header] = proxy_response.headers[header]
-                
+
+        # Список заголовков, которые НЕ должны передаваться от проксируемого сервера к браузеру
+        excluded_headers = {
+            'content-encoding',
+            'transfer-encoding',
+            'content-length',
+            'connection',
+            'keep-alive',
+            'proxy-authenticate',
+            'proxy-authorization',
+        }
+
+        for key, value in proxy_response.headers.items():
+            if key.lower() not in excluded_headers:
+                response[key] = value
+
+        response['Access-Control-Allow-Origin'] = '*'
         return response
-        
-    except requests.RequestException as e:
-        logger.error(f"[ViteProxy] CONNECTION FAILURE: {e}")
-        return HttpResponse(f"Frontend container (Vite) at {upstream_url} is unreachable.", status=502)
+
     except Exception as e:
-        logger.error(f"[ViteProxy] UNEXPECTED ERROR: {e}\n{traceback.format_exc()}")
-        return HttpResponse("Internal Proxy Error", status=500)
+        logger.error(f'[ViteProxy] FAILED {upstream_url}: {str(e)}')
+        return HttpResponse(status=502)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def internal_set_url(request):
+    """
+    Принимает новый URL от tunnel-monitor и сохраняет его в кэш.
+    Используется для генерации корректных ссылок в боте и письмах.
+    """
+    expected_token = settings.BOT_TOKEN
+    if request.headers.get('X-Bot-Token') != expected_token:
+        return JsonResponse({'ok': False, 'error': 'Unauthorized'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        url = data.get('url')
+        if not url:
+            return JsonResponse({'ok': False, 'error': 'No URL provided'}, status=400)
+
+        # Сохраняем в кэш Redis на 24 часа
+        cache.set('live_webapp_url', url.rstrip('/'), timeout=86400)
+        logger.info(f'[System] WebApp URL updated via Monitor: {url}')
+        return JsonResponse({'ok': True})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)

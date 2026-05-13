@@ -9,6 +9,10 @@ TARGET_CONTAINER_KEYWORD = 'tunnel'
 BOT_API_HOST = os.getenv('BOT_API_HOST', 'telegram-bot')
 BOT_API_PORT = os.getenv('BOT_API_PORT', '8081')
 BOT_API_URL = f'http://{BOT_API_HOST}:{BOT_API_PORT}/api/internal/set_url'
+
+# Добавляем адрес Django (контейнер web)
+DJANGO_URL = 'http://web:8000/api/internal/set_url'
+
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 POLL_INTERVAL = 5
 SYNC_INTERVAL = 30
@@ -21,22 +25,34 @@ def extract_url(log_data):
     return matches[-1] if matches else None
 
 
-def send_to_bot(url):
+def sync_url(url):
+    """Отправляет URL и в Бот, и в Django."""
+    headers = {'X-Bot-Token': BOT_TOKEN}
+    success = True
+
+    # 1. Синхронизация с Ботом
     try:
-        headers = {'X-Bot-Token': BOT_TOKEN}
         resp = requests.post(BOT_API_URL, json={'url': url}, headers=headers, timeout=5)
-        if resp.status_code == 200:
-            return True
-        else:
-            print(f'Bot API returned error {resp.status_code}: {resp.text}', flush=True)
+        if resp.status_code != 200:
+            print(f'Bot API error {resp.status_code}: {resp.text}', flush=True)
+            success = False
     except requests.RequestException:
-        # Silence connection errors as bot might be restarting
-        pass
-    return False
+        success = False
+
+    # 2. Синхронизация с Django
+    try:
+        resp = requests.post(DJANGO_URL, json={'url': url}, headers=headers, timeout=5)
+        if resp.status_code != 200:
+            print(f'Django API error {resp.status_code}: {resp.text}', flush=True)
+            success = False
+    except requests.RequestException:
+        success = False
+
+    return success
 
 
 def main():
-    print('Starting Tunnel Monitor (Active Sync Mode)...', flush=True)
+    print('Starting Tunnel Monitor (Multi-Sync Mode)...', flush=True)
 
     client = None
     socket_path = '/var/run/docker.sock'
@@ -79,13 +95,10 @@ def main():
 
             if current_url:
                 now = time.time()
-                # Продвигаем URL в бот если:
-                # 1. URL изменился
-                # 2. Прошло время SYNC_INTERVAL (на случай рестарта бота)
                 if current_url != last_url or (now - last_sync_time) > SYNC_INTERVAL:
-                    if send_to_bot(current_url):
+                    if sync_url(current_url):
                         if current_url != last_url:
-                            print(f'Detected and synced new URL: {current_url}', flush=True)
+                            print(f'Synced new URL: {current_url}', flush=True)
                         last_url = current_url
                         last_sync_time = now
 

@@ -1,13 +1,16 @@
 import logging
 import os
 from datetime import timedelta
+
 from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 from redis import Redis
+
 from shared.constants import DATETIME_FORMAT
 
 logger = logging.getLogger(__name__)
+
 
 def update_heartbeat():
     if getattr(settings, 'LOCAL_RUN', False):
