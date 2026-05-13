@@ -6,3 +6,4 @@ __pycache__/
 /staticfiles/
 /kinopub_parser/static/logo.png
 celerybeat-schedule
+/frontend_webapp/node_modules/

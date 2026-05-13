@@ -32,6 +32,7 @@ LOCAL_RUN = False
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-fallback-key-for-dev')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = ['*']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 _web_port = os.getenv('WEB_PORT', '8012')
 CSRF_TRUSTED_ORIGINS = [
@@ -163,11 +164,22 @@ if static_src.exists():
     STATICFILES_DIRS.append(static_src)
 
 DJANGO_VITE_ASSETS_PATH = BASE_DIR / 'frontend_webapp' / 'dist'
-STATICFILES_DIRS.append(DJANGO_VITE_ASSETS_PATH)
 
-DJANGO_VITE_DEV_MODE = DEBUG
-DJANGO_VITE_DEV_SERVER_PORT = 5173
-DJANGO_VITE_DEV_SERVER_HOST = 'localhost'
+if DJANGO_VITE_ASSETS_PATH.exists():
+    STATICFILES_DIRS.append(DJANGO_VITE_ASSETS_PATH)
+
+_public_url = os.getenv('WEBAPP_PUBLIC_URL', '')
+IS_TUNNEL = 'trycloudflare.com' in _public_url
+
+if DEBUG:
+    # В режиме разработки заставляем django-vite генерировать относительные ссылки 
+    # или ссылки на текущий хост (туннель), чтобы они проходили через наш прокси
+    DJANGO_VITE_DEV_MODE = True
+    DJANGO_VITE_DEV_SERVER_PORT = None # Убираем порт, чтобы запросы шли на 80/443 туннеля
+    # Хост будет определяться автоматически из запроса
+    DJANGO_VITE_DEV_SERVER_HOST = None 
+else:
+    DJANGO_VITE_DEV_MODE = False
 
 ASGI_APPLICATION = 'kinopub_parser.asgi.application'
 

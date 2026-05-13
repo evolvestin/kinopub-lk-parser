@@ -18,41 +18,36 @@ export const useStatsStore = defineStore('stats', () => {
   const hasGroup = computed(() => !!currentStats.value?.group)
 
   async function fetchStats(year = 'all', isBackground = false) {
-    if (statsCache.value.has(year)) {
+    const cacheKey = `stats_${year}`
+    if (statsCache.value.has(cacheKey)) {
       currentYear.value = year
       return
     }
 
-    if (!isBackground) {
-      uiStore.setLoading(true)
-    }
+    if (!isBackground) uiStore.setLoading(true)
 
     try {
-      const payload = {
+      const data = await api.post('detailed_stats/', {
         period_type: 'year',
         period_value: year === 'all' ? 0 : year,
         screen_width: window.innerWidth,
         screen_height: window.innerHeight
-      }
+      })
 
-      const data = await api.post('detailed_stats/', payload)
-
-      statsCache.value.set(year, data)
+      statsCache.value.set(cacheKey, data)
       currentYear.value = year
 
-      if (!availableYears.value.length && data.meta?.years) {
-        availableYears.value = [...data.meta.years]
+      if (data.meta?.years) {
+        availableYears.value = data.meta.years
       }
       
-      if (userStore.userData && data.meta?.photo_url) {
+      if (data.meta?.photo_url && userStore.userData) {
         userStore.userData.photo_url = data.meta.photo_url
       }
     } catch (error) {
-      uiStore.showToast('Ошибка загрузки статистики')
+      uiStore.showToast(error.message)
     } finally {
-      if (!isBackground) {
-        uiStore.setLoading(false)
-      }
+      if (!isBackground) uiStore.setLoading(false)
     }
   }
 

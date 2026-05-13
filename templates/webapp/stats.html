@@ -6,11 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow, noarchive">
     <title>Kinopub Observer</title>
+    <script>
+        console.log("HTML Template loaded. Looking for Vite assets...");
+        window.onerror = function(msg, url, line) {
+            console.error("GLOBAL ERROR: " + msg + "\nURL: " + url + "\nLine: " + line);
+        };
+    </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     {% vite_hmr_client %}
-    {% vite_asset 'main.js' %}
+    {% vite_asset 'src/main.js' %}
 </head>
 <body>
     <div id="app"></div>
+    <script>
+        console.log("Target div#app rendered. If screen is white, main.js failed to load or execute.");
+    </script>
 </body>
 </html>

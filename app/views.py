@@ -3,10 +3,14 @@ import hashlib
 import json
 import logging
 import random
+import traceback
 import urllib.parse
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
+import logging
+import requests
+from django.http import StreamingHttpResponse, HttpResponse
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
@@ -73,6 +77,8 @@ from shared.constants import (
 )
 from shared.formatters import format_precision_date, format_se
 from shared.media import get_poster_url
+
+logger = logging.getLogger('app')
 
 
 def robots_txt(request):
@@ -2405,3 +2411,45 @@ def merge_persons_api(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+def vite_proxy_view(request, path):
+    """
+    Прокси с расширенным логированием для диагностики 'белого экрана'.
+    """
+    # request.path уже включает префикс /static/
+    upstream_url = f"http://frontend:5173{request.path}"
+    
+    if request.GET:
+        upstream_url += f"?{request.GET.urlencode()}"
+
+    logger.info(f"[ViteProxy] Incoming request: {request.path} -> Targeting: {upstream_url}")
+
+    try:
+        # Устанавливаем таймаут чуть больше, чтобы не отваливаться на тяжелых модулях
+        proxy_response = requests.get(upstream_url, stream=False, timeout=10)
+        
+        # Логируем результат от Vite
+        logger.info(
+            f"[ViteProxy] Upstream status: {proxy_response.status_code} | "
+            f"Content-Type: {proxy_response.headers.get('Content-Type')} | "
+            f"Size: {len(proxy_response.content)} bytes"
+        )
+
+        response = HttpResponse(
+            proxy_response.content,
+            status=proxy_response.status_code,
+            content_type=proxy_response.headers.get('Content-Type')
+        )
+        
+        # Пробрасываем CORS заголовки (важно для HMR и загрузки модулей)
+        for header in ['Access-Control-Allow-Origin', 'Access-Control-Allow-Methods']:
+            if header in proxy_response.headers:
+                response[header] = proxy_response.headers[header]
+                
+        return response
+        
+    except requests.RequestException as e:
+        logger.error(f"[ViteProxy] CONNECTION FAILURE: {e}")
+        return HttpResponse(f"Frontend container (Vite) at {upstream_url} is unreachable.", status=502)
+    except Exception as e:
+        logger.error(f"[ViteProxy] UNEXPECTED ERROR: {e}\n{traceback.format_exc()}")
+        return HttpResponse("Internal Proxy Error", status=500)

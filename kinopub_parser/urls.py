@@ -1,12 +1,21 @@
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path
+from django.urls import path, re_path
 from django.views.generic.base import RedirectView
+from django.conf import settings
+from app.views import vite_proxy_view
 
 from app import views
 from app.admin_site import admin_site
 
-urlpatterns = [
+if settings.DEBUG:
+    proxy_patterns = [
+        re_path(r'^static/(?P<path>.*)$', vite_proxy_view),
+    ]
+else:
+    proxy_patterns = []
+
+urlpatterns = proxy_patterns + [
     path('robots.txt', views.robots_txt, name='robots_txt'),
     path('', views.index, name='index'),
     path('admin/', admin_site.urls),

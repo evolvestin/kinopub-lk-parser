@@ -1,3 +1,14 @@
+# Этап 1: Сборка фронтенда
+FROM node:20-alpine AS build-stage
+WORKDIR /app/frontend_webapp
+COPY frontend_webapp/package*.json ./
+RUN npm install
+COPY frontend_webapp/ ./
+# Копируем внешние зависимости стилей, которые импортируются во фронтенд
+COPY kinopub_parser/static/css/ /app/kinopub_parser/static/css/
+RUN npm run build
+
+# Этап 2: Основной образ Python
 FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,6 +36,9 @@ RUN pip install --no-cache-dir setuptools && \
     pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=app:app . /app/
+
+# Копируем собранный фронтенд из первого этапа в директорию, ожидаемую Django
+COPY --from=build-stage --chown=app:app /app/frontend_webapp/dist /app/frontend_webapp/dist
 
 RUN python manage.py collectstatic --noinput
 
