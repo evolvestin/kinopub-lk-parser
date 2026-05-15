@@ -13,8 +13,9 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onBeforeMount } from 'vue'
 import { icons } from '../../utils/icons'
+import { isImageBroken, markImageAsBroken } from '../../utils/helpers'
 
 const props = defineProps({
   photoUrl: String,
@@ -22,27 +23,48 @@ const props = defineProps({
   name: String
 })
 
-const currentUrl = ref(props.photoUrl || props.fallbackUrl)
+const currentUrl = ref(null)
 const triedFallback = ref(false)
+
+const initUrl = () => {
+  // Если основная ссылка уже помечена как битая, сразу берем fallback
+  if (props.photoUrl && !isImageBroken(props.photoUrl)) {
+    currentUrl.value = props.photoUrl
+    triedFallback.value = false
+  } else if (props.fallbackUrl && !isImageBroken(props.fallbackUrl)) {
+    currentUrl.value = props.fallbackUrl
+    triedFallback.value = true
+  } else {
+    currentUrl.value = null
+  }
+}
+
+onBeforeMount(initUrl)
 
 const handleLoad = (event) => {
   const img = event.target
+  // Проверка на фейковую заглушку Кинопоиска
   if (img.naturalWidth === 208 && img.naturalHeight === 304) {
     handleError()
   }
 }
 
 const handleError = () => {
+  if (currentUrl.value) {
+    markImageAsBroken(currentUrl.value)
+  }
+
   if (props.fallbackUrl && !triedFallback.value && currentUrl.value !== props.fallbackUrl) {
     triedFallback.value = true
-    currentUrl.value = props.fallbackUrl
+    if (!isImageBroken(props.fallbackUrl)) {
+      currentUrl.value = props.fallbackUrl
+    } else {
+      currentUrl.value = null
+    }
   } else {
     currentUrl.value = null
   }
 }
 
-watch(() => props.photoUrl, (newVal) => {
-  currentUrl.value = newVal || props.fallbackUrl
-  triedFallback.value = false
-})
+watch(() => props.photoUrl, initUrl)
 </script>

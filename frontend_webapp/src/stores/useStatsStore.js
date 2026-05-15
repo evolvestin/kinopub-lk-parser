@@ -22,41 +22,64 @@ export const useStatsStore = defineStore('stats', () => {
   async function resolveAllImages(data) {
     if (!data) return
 
-    const imagesToPreload = new Set()
-
+    // 1. Прелоад постеров из истории (первые 100 элементов)
     const history = [...(data.history_movies || []), ...(data.history_episodes || [])]
     history.slice(0, 100).forEach(item => {
-      if (item.poster_url) imagesToPreload.add(item.poster_url)
+      if (item.poster_url) preloadImage(item.poster_url)
     })
 
+    // 2. Прелоад аватаров лидеров (Актеры, Режиссеры, Сценаристы)
     const leaderCategories = ['actors', 'directors', 'writers']
     leaderCategories.forEach(cat => {
       const categoryData = data[cat]
-      if (categoryData) {
-        ['series', 'others'].forEach(subKey => {
-          if (Array.isArray(categoryData[subKey])) {
-            categoryData[subKey].forEach(person => {
-              if (person.photo_url) imagesToPreload.add(person.photo_url)
-              if (person.fallback_photo_url) imagesToPreload.add(person.fallback_photo_url)
-            })
-          }
-        })
-      }
+      if (!categoryData) return
+
+      ['series', 'others'].forEach(subKey => {
+        const persons = categoryData[subKey]
+        if (Array.isArray(persons)) {
+          persons.forEach(person => {
+            if (person.photo_url) {
+              // Цепочка: если TMDB падает, грузим фоллбэк
+              preloadImage(person.photo_url).then(success => {
+                if (!success && person.fallback_photo_url) {
+                  preloadImage(person.fallback_photo_url)
+                }
+              })
+            } else if (person.fallback_photo_url) {
+              preloadImage(person.fallback_photo_url)
+            }
+          })
+        }
+      })
     })
 
+    // 3. Прелоад для стран
     if (Array.isArray(data.countries)) {
       data.countries.forEach(c => {
-        if (c.photo_url) imagesToPreload.add(c.photo_url)
+        if (c.photo_url) preloadImage(c.photo_url)
       })
     }
 
+    // 4. Прелоад для марафонов (binges)
+    if (Array.isArray(data.binges)) {
+      data.binges.forEach(b => {
+        if (b.poster_url) preloadImage(b.poster_url)
+      })
+    }
+
+    // 5. Прелоад для участников группы
     if (data.group?.members) {
       data.group.members.forEach(m => {
-        if (m.photo_url) imagesToPreload.add(m.photo_url)
+        if (m.photo_url) preloadImage(m.photo_url)
       })
     }
-
-    imagesToPreload.forEach(url => preloadImage(url))
+    
+    // 6. Прелоад для просмотренных из избранного
+    if (Array.isArray(data.wishlist_watched_items)) {
+      data.wishlist_watched_items.forEach(item => {
+        if (item.poster_url) preloadImage(item.poster_url)
+      })
+    }
   }
 
   async function fetchStats(year = 'all', isBackground = false) {

@@ -1,3 +1,13 @@
+const brokenImages = new Set();
+
+export function isImageBroken(url) {
+  return url ? brokenImages.has(url) : false;
+}
+
+export function markImageAsBroken(url) {
+  if (url) brokenImages.add(url);
+}
+
 export function plural(n, forms) {
   const num = Math.abs(parseInt(n)) || 0;
   const n10 = num % 10;
@@ -18,7 +28,7 @@ export function getUserColor(id) {
 const preloadPool = new Set();
 
 export function preloadImage(url, priority = 'auto') {
-  if (!url || typeof url !== 'string') return Promise.resolve(false);
+  if (!url || typeof url !== 'string' || brokenImages.has(url)) return Promise.resolve(false);
   
   return new Promise((resolve) => {
     const img = new Image();
@@ -26,6 +36,7 @@ export function preloadImage(url, priority = 'auto') {
     img.onload = () => {
       preloadPool.delete(img);
       if (img.naturalWidth === 208 && img.naturalHeight === 304) {
+        brokenImages.add(url); // Заглушка Кинопоиска считается битой ссылкой
         resolve(false);
       } else {
         resolve(true);
@@ -34,6 +45,7 @@ export function preloadImage(url, priority = 'auto') {
     
     img.onerror = () => {
       preloadPool.delete(img);
+      brokenImages.add(url); // Запоминаем битую ссылку
       resolve(false);
     };
 

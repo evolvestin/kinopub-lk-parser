@@ -20,16 +20,26 @@ const props = defineProps({
 const canvasRef = ref(null)
 let chartInstance = null
 
+const getContext = () => canvasRef.value?.getContext('2d')
+
 const render = () => {
   if (chartInstance) chartInstance.destroy()
-  if (!canvasRef.value) return
-  
-  // Если данных нет или массивы пусты, не рисуем
-  if (!props.data?.datasets?.length) return
+  const ctx = getContext()
+  if (!ctx || !props.data?.datasets?.length) return
 
-  chartInstance = new Chart(canvasRef.value, {
+  // Применяем логику градиентов для линейных графиков (Динамика)
+  const dataCopy = JSON.parse(JSON.stringify(props.data))
+  
+  if (props.type === 'line' && dataCopy.datasets[0]) {
+    const fillGradient = ctx.createLinearGradient(0, 0, 0, props.height);
+    fillGradient.addColorStop(0, 'rgba(46, 160, 67, 0.4)');
+    fillGradient.addColorStop(1, 'rgba(46, 160, 67, 0)');
+    dataCopy.datasets[0].backgroundColor = fillGradient;
+  }
+
+  chartInstance = new Chart(ctx, {
     type: props.type,
-    data: props.data,
+    data: dataCopy,
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -39,6 +49,16 @@ const render = () => {
 }
 
 onMounted(render)
-watch(() => props.data, render, { deep: true })
+
+// Используем watch с флагом immediate: false, так как первый рендер в onMounted
+watch(() => props.data, () => {
+  render()
+}, { deep: true })
+
+// Следим за темой
+watch(() => props.options, () => {
+  render()
+}, { deep: true })
+
 onUnmounted(() => chartInstance?.destroy())
 </script>

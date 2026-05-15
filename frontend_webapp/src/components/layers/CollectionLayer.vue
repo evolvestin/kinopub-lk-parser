@@ -48,6 +48,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useUIStore } from '../../stores/uiStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
+import { preloadImage } from '../../utils/helpers'
 import ShowCard from '../shared/ShowCard.vue'
 import PersonAvatar from '../shared/PersonAvatar.vue'
 
