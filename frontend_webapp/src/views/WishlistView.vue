@@ -27,9 +27,8 @@
       </div>
     </div>
 
-    <!-- Список папок -->
     <div v-if="wishlistStore.folders.length > 1" style="padding: 10px 16px;" id="wl-folders-wrapper">
-      <div ref="foldersGridRef" class="wl-folders-grid" :class="{ 'reorder-mode': wishlistStore.isReorderFoldersMode }">
+      <div class="wl-folders-grid" :class="{ 'reorder-mode': wishlistStore.isReorderFoldersMode }">
         <FolderCard 
           v-for="folder in wishlistStore.folders" 
           :key="folder.id"
@@ -41,11 +40,10 @@
       </div>
     </div>
 
-    <!-- Содержимое активной папки -->
     <div v-if="wishlistStore.activeFolder" id="wl-active-folder-content">
       <div class="wl-active-header" v-if="wishlistStore.folders.length > 1">
-        <div id="wl-active-folder-title">
-          <span :style="{ color: wishlistStore.activeFolder.color }" v-html="icons[wishlistStore.activeFolder.icon] || icons.folder"></span>
+        <div id="wl-active-folder-title" style="display:flex; align-items:center;">
+          <span :style="{ color: wishlistStore.activeFolder.color, marginRight: '8px' }" v-html="icons[wishlistStore.activeFolder.icon] || icons.folder"></span>
           {{ wishlistStore.activeFolder.name }}
         </div>
       </div>
@@ -56,10 +54,13 @@
         </div>
         
         <div v-else :class="wishlistStore.viewMode === 'list' ? 'card-list-wrapper' : 'hist-grid'">
+          <!-- Используем context="wishlist" чтобы не показывать оверлеи истории -->
           <ShowCard 
             v-for="item in wishlistStore.sortedItems" 
             :key="item.id" 
-            :show="item" 
+            :show="item"
+            :view-mode="wishlistStore.viewMode"
+            context="wishlist"
           />
         </div>
       </div>
@@ -70,25 +71,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { onMounted, computed } from 'vue'
-import { useWishlistStore } from '../stores/wishlistStore'
-import { useUIStore } from '../stores/uiStore'
-import { icons } from '../utils/icons'
-import FolderCard from '../components/wishlist/FolderCard.vue'
-import ShowCard from '../components/shared/ShowCard.vue'
-
-const wishlistStore = useWishlistStore()
-const uiStore = useUIStore()
-
-const themeIcon = computed(() => uiStore.theme === 'dark' ? icons.moon : icons.sun)
-
-onMounted(async () => {
-  if (!wishlistStore.folders.length) {
-    uiStore.setLoading(true)
-    await wishlistStore.fetchWishlist()
-    uiStore.setLoading(false)
-  }
-})
-</script>

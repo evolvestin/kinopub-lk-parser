@@ -22,12 +22,17 @@ export const useWishlistStore = defineStore('wishlist', () => {
     return [...activeFolder.value.items] // Сортировку можно добавить позже по аналогии с оригиналом
   })
 
-  async function fetchWishlist() {
+async function fetchWishlist() {
     try {
       const data = await api.post('wishlist/', { action: 'get' })
       folders.value = data.folders || []
-      if (folders.value.length > 0 && !activeFolderId.value) {
-        activeFolderId.value = folders.value[0].id
+      
+      if (folders.value.length > 0) {
+        if (!activeFolderId.value || !folders.value.some(f => f.id === activeFolderId.value)) {
+          activeFolderId.value = folders.value[0].id
+        }
+      } else {
+        activeFolderId.value = null
       }
     } catch (error) {
       uiStore.showToast('Ошибка загрузки избранного')

@@ -78,11 +78,10 @@ body {
 }
 
 .app-viewport {
-    flex: 1;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    position: relative;
+    overflow: hidden; /* Контейнер не скроллится сам */
 }
 
 #views-container {
@@ -130,11 +129,15 @@ body {
 }
 
 .view {
+    flex: 1;
     display: none;
     flex-direction: column;
-    width: 100%;
-    min-height: 100%;
-    position: relative;
+    overflow-y: auto; /* Скроллится каждая вьюха по отдельности */
+    -webkit-overflow-scrolling: touch;
+}
+
+.view.active-view {
+    display: flex;
 }
 
 .header { 
@@ -376,10 +379,40 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 }
 .hist-orig { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px; }
 .hist-meta { font-size: clamp(12px, 3.2vw, 14px); color: var(--text-secondary); display: flex; gap: clamp(8px, 2.5vw, 12px); align-items: center; flex-wrap: wrap; font-weight: 600; }
-.hist-badge { background: var(--bg-input); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; font-size: clamp(11px, 3vw, 13px); font-weight: 800; color: var(--text-primary); border: 1px solid var(--border); letter-spacing: 0.5px; }
-.rating-badge { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: 800; font-size: clamp(12px, 3.2vw, 14px); background: var(--accent-dim); padding: clamp(2px, 0.5vw, 4px) clamp(6px, 1.5vw, 8px); border-radius: 6px; }
+.hist-badge {
+    background: rgba(0, 0, 0, 0.75);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+.rating-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: #fff;
+    font-weight: 800;
+    font-size: 14px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
 .rating-badge.show-lvl { color: var(--text-primary); background: var(--bg-input); }
-.rating-badge svg { font-size: clamp(14px, 3.8vw, 16px); margin-top: -2px; }
+.rating-badge svg {
+    font-size: 14px;
+}
+
+.rating-high { background: rgba(46, 204, 113, 0.85); border-color: rgba(46, 204, 113, 0.3); }
+.rating-mid { background: rgba(241, 196, 15, 0.85); border-color: rgba(241, 196, 15, 0.3); }
+.rating-low { background: rgba(231, 76, 60, 0.85); border-color: rgba(231, 76, 60, 0.3); }
+
 .big-rating-badge { display: flex; align-items: center; justify-content: center; width: clamp(40px, 11vw, 48px); height: clamp(40px, 11vw, 48px); border-radius: 12px; font-size: clamp(16px, 4.5vw, 18px); font-weight: 900; color: #fff; flex-shrink: 0; box-shadow: var(--shadow-sm); }
 .glow-text { text-shadow: 0 0 12px rgba(255,255,255,0.2); }
 .critic-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; padding-top: 10px;}
@@ -542,7 +575,17 @@ body.has-banner #app {
     padding: 8px; 
     pointer-events: none; 
 }
-.grid-badges { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; pointer-events: none; }
+.grid-badges {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+    pointer-events: none;
+    z-index: 10;
+}
 
 .grid-below-title {
     font-size: 14px;
@@ -574,7 +617,21 @@ body.has-banner #app {
     display: block; 
 }
 
-.grid-year { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.85); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; z-index: 2; }
+.grid-year {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 6px;
+    z-index: 5;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
 .grid-user-avatar { 
     width: 22px; 
     height: 22px; 
@@ -1184,12 +1241,39 @@ body.has-banner #app {
     100% { transform: rotate(-1.5deg) translate(0, 0); }
 }
 
+.wiggle {
+    animation: iosWiggle 0.55s infinite ease-in-out !important;
+    will-change: transform;
+}
+
+.wiggle:nth-child(2n) {
+    animation-delay: -0.07s !important;
+}
+
+.wiggle:nth-child(3n) {
+    animation-delay: -0.15s !important;
+}
+
+.wiggle:nth-child(5n) {
+    animation-delay: -0.22s !important;
+}
+
+.wiggle:nth-child(7n) {
+    animation-delay: -0.11s !important;
+}
+
+.layer-header .tab.header-back-btn {
+    color: var(--text-primary) !important;
+    background: var(--bg-input);
+}
+
 /* Применяем анимацию только когда включен режим редактирования */
 .reorder-mode .wl-folder-card,
 .reorder-items-mode .grid-item-wrap,
-.reorder-items-mode .hist-item {
+.reorder-items-mode .hist-item,
+.history-edit-mode .grid-item-wrap,
+.history-edit-mode .hist-item {
     animation: iosWiggle 0.55s infinite ease-in-out;
-    cursor: grab;
 }
 
 /* Сдвиг фазы, чтобы не дребезжали синхронно */
@@ -1560,14 +1644,14 @@ body.has-banner #app {
 }
 
 .layer-header-center {
-    flex: 0 0 auto;
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding: 0 4px;
     text-align: center;
     min-width: 0;
-    max-width: 45%;
+    max-width: 60%;
     position: relative;
     justify-content: center;
 }

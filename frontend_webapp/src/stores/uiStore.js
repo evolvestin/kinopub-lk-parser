@@ -7,6 +7,7 @@ export const useUIStore = defineStore('ui', () => {
   const isAppReady = ref(false)
   const theme = ref(localStorage.getItem('kt') === 'l' ? 'light' : 'dark')
   const toast = ref({ text: '', visible: false })
+  const isHistoryEditMode = ref(false)
 
   const modals = ref({
     share: { isOpen: false, context: null },
@@ -27,7 +28,11 @@ export const useUIStore = defineStore('ui', () => {
       if (type && id) {
         stack.push({
           type,
-          props: { [`${type}Id`]: id, itemId: id, type: type },
+          props: { 
+            [`${type}Id`]: id,
+            itemId: id,
+            type: type 
+          },
           key: `${type}-${id}-${i}`
         })
       }
@@ -45,16 +50,19 @@ export const useUIStore = defineStore('ui', () => {
     return 'search'
   })
 
-  function openLayer(type, id) {
-    const currentPath = router.currentRoute.value.path.replace(/\/$/, '')
-    router.push(`${currentPath}/${type}/${id}`)
+  function openLayer(type, id, query = {}) {
+    const currentPath = router.currentRoute.value.path
+    const newPath = `${currentPath}/${type}/${id}`.replace(/\/+/g, '/')
+    router.push({ path: newPath, query })
   }
 
   function popLayer() {
+    isHistoryEditMode.value = false
     router.back()
   }
 
   function switchBaseView(viewName) {
+    isHistoryEditMode.value = false
     router.push({ name: viewName })
   }
 
@@ -68,23 +76,49 @@ export const useUIStore = defineStore('ui', () => {
     localStorage.setItem('kt', theme.value === 'dark' ? 'd' : 'l')
   }
 
-  function openModal(key, context = null) {
-    if (modals.value[key]) {
-      modals.value[key].isOpen = true
-      modals.value[key].context = context
+  function fitText(el) {
+    if (!el) return
+    el.style.fontSize = ""
+    const styles = window.getComputedStyle(el)
+    const limitWidth = el.clientWidth
+    if (limitWidth <= 0) return
+
+    const stylesMaxHeight = parseFloat(styles.maxHeight)
+    const limitHeight = (!isNaN(stylesMaxHeight) && stylesMaxHeight > 0) ? stylesMaxHeight : (el.offsetHeight || 40)
+    
+    const isSingleLine = styles.whiteSpace === 'nowrap' || styles.webkitLineClamp === '1'
+    let size = parseFloat(styles.fontSize)
+    const minSize = 9
+    
+    if (isSingleLine) {
+      while (el.scrollWidth > limitWidth + 1 && size > minSize) {
+        size -= 0.5
+        el.style.fontSize = size + "px"
+      }
+    } else {
+      const originalClamp = el.style.webkitLineClamp
+      el.style.webkitLineClamp = "none"
+      el.style.maxHeight = "none"
+      while (el.scrollHeight > limitHeight + 1 && size > minSize) {
+        size -= 0.5
+        el.style.fontSize = size + "px"
+      }
+      el.style.webkitLineClamp = originalClamp
     }
   }
 
-  function closeModal(key) {
-    if (modals.value[key]) {
-      modals.value[key].isOpen = false
-    }
+  function fitAll(selector, container = document) {
+    const elements = container.querySelectorAll(selector)
+    elements.forEach(el => fitText(el))
   }
 
   return {
     isLoading, isAppReady, theme, toast, layerStack, hasOpenLayers, activeView, modals,
-    openLayer, popLayer, switchBaseView, showToast, toggleTheme, openModal, closeModal,
+    isHistoryEditMode,
+    openLayer, popLayer, switchBaseView, showToast, toggleTheme, fitText, fitAll,
     setLoading: (v) => { isLoading.value = v },
-    setAppReady: (v) => { isAppReady.value = v }
+    setAppReady: (v) => { isAppReady.value = v },
+    openModal: (key, context = null) => { if (modals.value[key]) { modals.value[key].isOpen = true; modals.value[key].context = context; } },
+    closeModal: (key) => { if (modals.value[key]) modals.value[key].isOpen = false; }
   }
 })

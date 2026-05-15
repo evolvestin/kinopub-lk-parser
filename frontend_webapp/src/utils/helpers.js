@@ -14,6 +14,8 @@ export function getUserColor(id) {
     '#3498db', '#9b59b6', '#f1c40f', '#e67e22', 
     '#e74c3c', '#1abc9c', '#34495e', '#2ecc71'
   ];
-  if (id === 0) return 'var(--bg-input)';
-  return colors[(id - 1) % colors.length];
+  // В старом коде было (id - 1) % length. 
+  // Если id=0 (аноним), вернет фоллбэк.
+  if (!id || id === 0) return 'var(--bg-input)';
+  return colors[Math.abs(id - 1) % colors.length];
 }
