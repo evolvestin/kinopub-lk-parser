@@ -37,3 +37,21 @@ Any code generating new database records must follow this "Save-As-Is" architect
 3.  **Feedback**: Confirmation of manual actions must be sent directly to the user (private message) or displayed as UI feedback (Toasts/Modals), preferably via background tasks to keep the UI responsive.
 
 
+## Media & Asset Loading Policy
+
+**RULE**: Frontend must prioritize user experience by minimizing layout shifts and loading states through proactive preloading and intelligent fallback logic.
+
+1.  **Image Source Priority**:
+    *   Always attempt to load **TMDB** photos/posters first (highest quality, consistent sizing).
+    *   Use **Kinopoisk** as the secondary fallback.
+    *   Use the app's internal **SVG Placeholder** only if all external sources fail.
+
+2.  **Kinopoisk "Fake Success" Detection**:
+    *   **CRITICAL**: Kinopoisk often returns a `200 OK` with a "no-poster.gif" image instead of a `404`. 
+    *   This image has fixed dimensions: **208x304** pixels.
+    *   Implementation: Every image load event from a Kinopoisk source MUST check `naturalWidth` and `naturalHeight`. If they match 208x304, the image must be treated as a failure and replaced by the internal SVG placeholder.
+
+3.  **Proactive Background Preloading**:
+    *   Data and assets are not the same. When a JSON response with statistics or search results is received, the application must immediately start downloading the associated images in the background.
+    *   This applies to hidden tabs (e.g., "Movies" tab in Actors leaderboards), items below the fold, and secondary scroll areas.
+    *   Goal: By the time the user interacts (scrolls or switches tabs), the assets must already be in the browser cache.

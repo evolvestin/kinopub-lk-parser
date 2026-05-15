@@ -3,6 +3,26 @@ import { ref, computed } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
 import { useUserStore } from './userStore'
+import { resolvePersonImage, preloadImage } from '../utils/helpers'
+
+const _initializeResolvedUrls = (data) => {
+  if (!data) return;
+  const categories = ['actors', 'directors', 'writers'];
+  categories.forEach(cat => {
+    const categoryData = data[cat];
+    if (!categoryData) return;
+    ['series', 'others'].forEach(sub => {
+      if (Array.isArray(categoryData[sub])) {
+        categoryData[sub].forEach(person => {
+          // Важно: инициализируем свойство для реактивности
+          if (person.resolvedUrl === undefined) {
+            person.resolvedUrl = undefined;
+          }
+        });
+      }
+    });
+  });
+};
 
 export const useStatsStore = defineStore('stats', () => {
   const api = useApi()
@@ -13,13 +33,127 @@ export const useStatsStore = defineStore('stats', () => {
   const activeTab = ref('personal')
   const currentYear = ref('all')
   const availableYears = ref([])
+  const isPreloadingYears = ref(false)
 
   const currentStats = computed(() => statsCache.value.get(currentYear.value) || null)
   const hasGroup = computed(() => !!currentStats.value?.group)
 
+  function getHistoryByType(type, { date, idx, key, showId }) {
+    const D = currentStats.value
+    if (!D) return []
+
+    switch (type) {
+      case 'all':
+        return [...(D.history_movies || []), ...(D.history_episodes || [])]
+          .sort((a, b) => b.view_date.localeCompare(a.view_date))
+      case 'movies':
+        return D.history_movies || []
+      case 'episodes':
+        return D.history_episodes || []
+      case 'ratings':
+        return D.ratings?.history || []
+      case 'wishlist_watched':
+        return D.wishlist_watched_items || []
+      case 'casino':
+        return D.casino_history || []
+      case 'day':
+        return [...(D.history_movies || []), ...(D.history_episodes || [])]
+          .filter(i => i.view_date === date)
+      case 'binge':
+        return (D.history_episodes || [])
+          .filter(i => i.show_id === showId && i.view_date === date)
+          .sort((a, b) => {
+            if (a.season_number !== b.season_number) return a.season_number - b.season_number
+            return a.episode_number - b.episode_number
+          })
+      case 'weekday':
+        return [...(D.history_movies || []), ...(D.history_episodes || [])]
+          .filter(item => {
+            const d = new Date(item.view_date)
+            const jsDay = d.getDay()
+            return (jsDay === 0 ? 6 : jsDay - 1) === idx
+          }).sort((a, b) => b.view_date.localeCompare(a.view_date))
+      case 'rating_filter':
+        return (D.ratings?.history || []).filter(item => Math.floor(item.rating || 1) === idx)
+      case 'group_member':
+        const member = D.group?.members?.[idx]
+        return [...(D.group?.history_movies || []), ...(D.group?.history_episodes || [])]
+          .filter(item => item.user_ids?.includes(member?.id))
+          .sort((a, b) => b.view_date.localeCompare(a.view_date))
+      case 'filter':
+        const isGroup = key?.startsWith('group_')
+        const poolKey = key?.replace('group_', '')
+        const source = isGroup ? D.group : D
+        const pool = [...(source.history_movies || []), ...(source.history_episodes || [])]
+
+        let targetItem = null
+        if (poolKey === 'genres_top') targetItem = source.genres?.[idx]
+        else if (poolKey?.includes('_')) {
+          const [cat, sub] = poolKey.split('_')
+          targetItem = D[cat]?.[sub]?.[idx]
+        } else {
+          targetItem = D[poolKey]?.[idx]
+        }
+
+        const allowedIds = targetItem?.show_ids || []
+        return pool.filter(i => allowedIds.includes(i.show_id))
+          .sort((a, b) => b.view_date.localeCompare(a.view_date))
+      case 'show_history':
+        return key || []
+      default:
+        return []
+    }
+  }
+
+  async function resolveAllImages(data, yearKey) {
+    if (!data) return
+
+    const personCategories = ['actors', 'directors', 'writers']
+    const tasks = []
+
+    personCategories.forEach(cat => {
+      const category = data[cat]
+      if (!category) return
+      ['series', 'others'].forEach(sub => {
+        if (Array.isArray(category[sub])) {
+          category[sub].forEach(person => {
+            if (person.resolvedUrl !== undefined && person.resolvedUrl !== null) return
+            tasks.push((async () => {
+              const url = await resolvePersonImage(person.photo_url, person.fallback_photo_url)
+              person.resolvedUrl = url
+            })())
+          })
+        }
+      })
+    })
+
+    if (data.group?.members) {
+      data.group.members.forEach(m => {
+        if (m.resolvedUrl !== undefined) return
+        tasks.push((async () => {
+          m.resolvedUrl = await resolvePersonImage(m.photo_url, null)
+        })())
+      })
+    }
+
+    const history = [...(data.history_movies || []), ...(data.history_episodes || [])]
+    history.slice(0, 40).forEach(item => {
+      if (item.poster_url) tasks.push(preloadImage(item.poster_url))
+    })
+
+    if (tasks.length > 0) {
+      await Promise.allSettled(tasks)
+      statsCache.value.set(yearKey, { ...data })
+    }
+  }
+
   async function fetchStats(year = 'all', isBackground = false) {
-    if (!isBackground && statsCache.value.has(year)) {
-      currentYear.value = year
+    const cached = statsCache.value.get(year)
+    if (cached) {
+      if (!isBackground) {
+        currentYear.value = year
+        resolveAllImages(cached, year)
+      }
       return
     }
 
@@ -33,130 +167,48 @@ export const useStatsStore = defineStore('stats', () => {
         screen_height: window.innerHeight
       })
 
-      statsCache.value.set(year, data)
-      currentYear.value = year
-
       if (data.meta) {
         let years = data.meta.years || []
-        if (years.length > 0 && !years.includes('all')) {
-          years = ['all', ...years]
-        }
+        if (years.length > 0 && !years.includes('all')) years = ['all', ...years]
         availableYears.value = years
-        
         if (data.meta.role) userStore.userRole = data.meta.role
-        if (data.meta.photo_url && userStore.userData) {
-          userStore.userData.photo_url = data.meta.photo_url
-        }
       }
+
+      _initializeResolvedUrls(data)
+
+      if (!isBackground) {
+        currentYear.value = year
+      }
+      
+      statsCache.value.set(year, data)
+      await resolveAllImages(data, year)
+
+      if (!isBackground && !isPreloadingYears.value) {
+        triggerBackgroundPreload()
+      }
+
     } catch (error) {
-      uiStore.showToast('Ошибка загрузки данных')
+      if (!isBackground) uiStore.showToast('Ошибка загрузки данных')
     } finally {
       if (!isBackground) uiStore.setLoading(false)
     }
   }
 
-  async function removeHistoryItem(historyId) {
-    try {
-      await api.post('remove_view/', { view_history_id: historyId })
-      
-      statsCache.value.forEach(stat => {
-        if (stat.history_movies) {
-          stat.history_movies = stat.history_movies.filter(i => i.id !== historyId)
-        }
-        if (stat.history_episodes) {
-          stat.history_episodes = stat.history_episodes.filter(i => i.id !== historyId)
-        }
-        if (stat.group) {
-          if (stat.group.history_movies) {
-            stat.group.history_movies = stat.group.history_movies.filter(i => i.id !== historyId)
-          }
-          if (stat.group.history_episodes) {
-            stat.group.history_episodes = stat.group.history_episodes.filter(i => i.id !== historyId)
-          }
-        }
-      })
-      
-      uiStore.showToast('Просмотр удален')
-    } catch (e) {
-      uiStore.showToast('Не удалось удалить')
-    }
-  }
-
-  const getHistoryByType = (type, params = {}) => {
-    const s = currentStats.value
-    if (!s) return []
-    
-    if (type === 'all') {
-      return [...s.history_movies, ...s.history_episodes].sort((a, b) => b.view_date.localeCompare(a.view_date))
-    }
-    if (type === 'movies') return s.history_movies || []
-    if (type === 'episodes') return s.history_episodes || []
-    if (type === 'ratings') return s.ratings?.history || []
-    if (type === 'wishlist_watched') return s.wishlist_watched_items || []
-    if (type === 'casino') return s.casino_history || []
-    
-    if (type === 'day') {
-      return [...s.history_movies, ...s.history_episodes].filter(i => i.view_date === params.date)
-    }
-    
-    if (type === 'weekday') {
-      return [...s.history_movies, ...s.history_episodes].filter(item => {
-        const dateStr = item.view_date || item.date
-        if (!dateStr) return false
-        const [y, m, d] = dateStr.split('-').map(Number)
-        const date = new Date(y, m - 1, d)
-        const jsDay = date.getDay()
-        const kpDay = (jsDay === 0 ? 6 : jsDay - 1)
-        return kpDay === params.idx
-      }).sort((a, b) => b.view_date.localeCompare(a.view_date))
-    }
-
-    if (type === 'rating_filter') {
-      return (s.ratings?.history || []).filter(item => {
-        let b = Math.floor(item.rating)
-        if (b < 1) b = 1
-        return b === params.idx
-      })
-    }
-
-    if (type === 'filter' && params.key) {
-      const isGroup = params.key.startsWith('group_')
-      const source = isGroup ? s.group : s
-      const pool = isGroup ? [...source.history_movies, ...source.history_episodes] : [...s.history_movies, ...s.history_episodes]
-      
-      const keyParts = params.key.replace('group_', '').split('_')
-      let itemsList = []
-      
-      if (keyParts.length === 2) {
-          itemsList = s[keyParts[0]]?.[keyParts[1]] || []
-      } else {
-          itemsList = source[keyParts[0]] || []
+  async function triggerBackgroundPreload() {
+    if (isPreloadingYears.value) return
+    isPreloadingYears.value = true
+    for (const year of availableYears.value) {
+      if (!statsCache.value.has(year)) {
+        await new Promise(r => setTimeout(r, 1200))
+        await fetchStats(year, true)
       }
-
-      const entry = itemsList[params.idx]
-      const allowedIds = entry?.show_ids || []
-      return pool.filter(i => allowedIds.includes(i.show_id)).sort((a, b) => b.view_date.localeCompare(a.view_date))
     }
-
-    if (type === 'group_member' && s.group?.members) {
-      const member = s.group.members[params.idx]
-      if (!member) return []
-      return [...s.group.history_movies, ...s.group.history_episodes]
-        .filter(item => item.user_ids.includes(member.id))
-        .sort((a, b) => b.view_date.localeCompare(a.view_date))
-    }
-
-    if (type === 'binge') {
-        return s.history_episodes.filter(i => i.show_id === params.showId && i.view_date === params.date)
-          .sort((a, b) => (a.season_number - b.season_number) || (a.episode_number - b.episode_number))
-    }
-    
-    return []
+    isPreloadingYears.value = false
   }
 
   return {
     statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup,
-    fetchStats, getHistoryByType, removeHistoryItem,
+    fetchStats, resolveAllImages, getHistoryByType,
     setActiveTab: (tab) => { activeTab.value = tab },
     setYear: (year) => fetchStats(year)
   }

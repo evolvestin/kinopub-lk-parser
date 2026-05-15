@@ -1,31 +1,3 @@
-<script setup>
-import { ref, computed } from 'vue'
-import { icons } from '../../utils/icons'
-import { plural } from '../../utils/helpers'
-import { useUIStore } from '../../stores/uiStore'
-
-const props = defineProps({
-  category: { type: String, required: true }, // e.g., 'actors'
-  title: { type: String, required: true },
-  icon: { type: String, required: true },
-  iconColor: { type: String, default: 'var(--accent)' },
-  data: { type: Object, required: true },
-  unitForms: { type: Array, default: () => ['просмотр', 'просмотра', 'просмотров'] }
-})
-
-const uiStore = useUIStore()
-const activeTab = ref('series')
-const currentItems = computed(() => props.data[activeTab.value] || [])
-
-const openItemHistory = (item, index) => {
-    uiStore.openLayer('history', 'filter', {
-        key: `${props.category}_${activeTab.value}`,
-        idx: index,
-        title: item.name
-    })
-}
-</script>
-
 <template>
   <div class="card hoverable anim-item">
     <div class="label" style="justify-content: space-between; padding: 0 0 12px 0;">
@@ -47,8 +19,15 @@ const openItemHistory = (item, index) => {
       >
         <div class="li-l">
           <span class="li-rank">{{ idx + 1 }}</span>
-          <img v-if="item.photo_url" :src="item.photo_url" class="person-avatar" style="width:32px; height:32px; object-fit: cover;">
-          <div v-else class="person-avatar" style="width:32px; height:32px; font-size:12px;">{{ item.name.charAt(0) }}</div>
+          
+          <img 
+            v-if="item.resolvedUrl" 
+            :src="item.resolvedUrl" 
+            class="person-avatar"
+            style="object-fit: cover;"
+          >
+          <div v-else class="person-avatar is-placeholder" v-html="icons.person_placeholder"></div>
+
           <div style="min-width: 0;">
             <div class="li-name">{{ item.name }}</div>
             <div class="li-sub" v-if="item.sub">{{ item.sub }}</div>
@@ -60,3 +39,31 @@ const openItemHistory = (item, index) => {
     <div v-else class="empty" style="padding: 20px 0;"><div class="icon" v-html="icons.dash"></div>Нет данных</div>
   </div>
 </template>
+
+<script setup>
+import { ref, computed } from 'vue'
+import { icons } from '../../utils/icons'
+import { plural } from '../../utils/helpers'
+import { useUIStore } from '../../stores/uiStore'
+
+const props = defineProps({
+  category: { type: String, required: true },
+  title: { type: String, required: true },
+  icon: { type: String, required: true },
+  iconColor: { type: String, default: 'var(--accent)' },
+  data: { type: Object, required: true },
+  unitForms: { type: Array, default: () => ['просмотр', 'просмотра', 'просмотров'] }
+})
+
+const uiStore = useUIStore()
+const activeTab = ref('series')
+const currentItems = computed(() => props.data[activeTab.value] || [])
+
+const openItemHistory = (item, index) => {
+    uiStore.openLayer('history', 'filter', {
+        key: `${props.category}_${activeTab.value}`,
+        idx: index,
+        title: item.name
+    })
+}
+</script>

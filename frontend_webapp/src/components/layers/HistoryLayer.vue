@@ -1,6 +1,6 @@
 <template>
-  <div class="layer-content" @scroll="handleScroll">
-    <div class="layer-header" id="layer-header-node" :class="{ 'has-group': !!stickyLabel }">
+  <div class="layer-content" @scroll="onScroll" ref="containerEl">
+    <div class="layer-header" id="layer-header-node" :class="{ 'has-group': showSticky }">
       <div style="flex-shrink: 0;">
         <button class="tab clickable header-back-btn" @click="uiStore.popLayer">
           <span v-html="icons.chevron_left"></span> Назад
@@ -26,6 +26,23 @@
       </div>
     </div>
 
+    <div v-if="personInfo" 
+         class="card anim-item clickable" 
+         @click="uiStore.openLayer('person', personInfo.id)"
+         style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; position:relative;">
+        <img v-if="personInfo.photo_url" :src="personInfo.photo_url" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;">
+        <div v-else class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px; display:flex; align-items:center; justify-content:center; background:var(--bg-input);">
+            {{ personInfo.name.charAt(0) }}
+        </div>
+        <div style="min-width:0; flex:1;">
+            <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">{{ personInfo.name }}</div>
+            <div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">{{ personInfo.professionLabel }}</div>
+        </div>
+        <div style="color:var(--text-muted); opacity:0.5;">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+    </div>
+
     <div 
       class="hist-container" 
       :class="[viewMode === 'grid' ? 'hist-grid' : 'card-list-wrapper', { 'history-edit-mode': uiStore.isHistoryEditMode }]" 
@@ -33,7 +50,11 @@
       id="layer-hist-container"
     >
       <template v-for="(item, idx) in visibleList" :key="item.id || `hist-${idx}`">
-        <div v-if="shouldShowDivider(item, idx)" class="hist-group-divider anim-item" :data-label="getGroupKey(item)">
+        <div 
+          v-if="shouldShowDivider(item, idx)" 
+          class="hist-group-divider anim-item js-group-divider" 
+          :data-label="getGroupKey(item).toUpperCase()"
+        >
            <span class="hist-group-divider-text">{{ getGroupKey(item) }}</span>
         </div>
         <ShowCard 
@@ -45,16 +66,12 @@
       </template>
       
       <div ref="sentinelEl" id="layer-hist-sentinel" style="height: 100px; width: 100%; margin-top: -50px; pointer-events: none;"></div>
-      
-      <div v-if="!items.length && !statsStore.isLoading" class="empty" style="grid-column: 1 / -1;">
-        <div class="icon" v-html="icons.dash"></div> Нет данных
-      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
@@ -66,35 +83,43 @@ const route = useRoute()
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
 
-const viewMode = ref(localStorage.getItem('kp_view_mode') || 'grid')
-const offset = ref(80)
+const containerEl = ref(null)
 const sentinelEl = ref(null)
 const titleEl = ref(null)
+const stickyLabelEl = ref(null)
+
+const viewMode = ref(localStorage.getItem('kp_view_mode') || 'grid')
+const offset = ref(80)
 const stickyLabel = ref('')
+const showSticky = ref(false)
+let ticking = false
 
 const isShared = computed(() => !!route.query.shared_id || window.location.hash.includes('shared_id'))
 const canEdit = computed(() => !isShared.value && props.historyId !== 'ratings')
 
+const personInfo = computed(() => {
+  if (props.historyId !== 'filter' || !route.query.key || route.query.idx === null) return null
+  const key = route.query.key
+  const idx = parseInt(route.query.idx)
+  const stats = statsStore.currentStats
+  if (!stats) return null
+  const keyParts = key.replace('group_', '').split('_')
+  let personData = null
+  if (keyParts.length === 2) personData = stats[keyParts[0]]?.[keyParts[1]]?.[idx]
+  else personData = stats[keyParts[0]]?.[idx]
+  if (!personData || !['actors', 'directors', 'writers'].some(p => key.includes(p))) return null
+  let label = 'Профиль'; if (key.includes('actors')) label = 'Актёр'; else if (key.includes('directors')) label = 'Режиссёр'; else if (key.includes('writers')) label = 'Сценарист'
+  return { ...personData, professionLabel: label }
+})
+
 const items = computed(() => {
-  const params = {
-    date: route.query.date,
-    idx: route.query.idx ? parseInt(route.query.idx) : null,
-    key: route.query.key,
-    showId: route.query.show_id ? parseInt(route.query.show_id) : null
-  }
+  const params = { date: route.query.date, idx: route.query.idx ? parseInt(route.query.idx) : null, key: route.query.key, showId: route.query.show_id ? parseInt(route.query.show_id) : null }
   return statsStore.getHistoryByType(props.historyId, params)
 })
 
 const displayTitle = computed(() => {
   if (route.query.title) return route.query.title
-  const titles = { 
-    all: 'Вся история', 
-    movies: 'Фильмы', 
-    episodes: 'Эпизоды', 
-    ratings: 'Все оценки', 
-    wishlist_watched: 'Из избранного',
-    casino: 'История рулетки'
-  }
+  const titles = { all: 'Вся история', movies: 'Фильмы', episodes: 'Эпизоды', ratings: 'Все оценки', wishlist_watched: 'Из избранного', casino: 'История рулетки' }
   return titles[props.historyId] || 'История'
 })
 
@@ -105,12 +130,8 @@ const RU_MONTHS = ["Январь", "Февраль", "Март", "Апрель",
 const getGroupKey = (item) => {
   const dateStr = item.view_date || item.date || ''
   if (!dateStr) return ''
-  const dateObj = new Date(dateStr)
-  if (isNaN(dateObj.getTime())) return ''
-  
-  if (items.value.length >= 300) {
-    return RU_MONTHS[dateObj.getMonth()] + ' ' + dateObj.getFullYear()
-  }
+  const dateObj = new Date(dateStr); if (isNaN(dateObj.getTime())) return ''
+  if (items.value.length >= 300) return RU_MONTHS[dateObj.getMonth()] + ' ' + dateObj.getFullYear()
   return String(dateObj.getFullYear())
 }
 
@@ -121,59 +142,72 @@ const shouldShowDivider = (item, idx) => {
   return currentKey !== prevKey
 }
 
-const handleScroll = (e) => {
-    const dividers = Array.from(e.target.querySelectorAll('.hist-group-divider'))
-    const headerHeight = 64
-    const scrollTop = e.target.scrollTop
-    let activeDivider = null
+const updateStickyState = () => {
+  const container = containerEl.value
+  if (!container) return
 
-    for (let i = dividers.length - 1; i >= 0; i--) {
-        if (dividers[i].offsetTop <= scrollTop + headerHeight + 5) {
-            activeDivider = dividers[i]
-            break
-        }
+  const containerRect = container.getBoundingClientRect()
+  const dividers = container.querySelectorAll('.js-group-divider')
+  const headerThreshold = 64
+
+  let activeDivider = null
+
+  for (let i = dividers.length - 1; i >= 0; i--) {
+    const div = dividers[i]
+    const rect = div.getBoundingClientRect()
+    const relativeTop = rect.top - containerRect.top
+
+    if (relativeTop <= headerThreshold) {
+      activeDivider = div
+      break
     }
-    stickyLabel.value = activeDivider ? activeDivider.dataset.label : ''
+  }
+
+  if (activeDivider) {
+    const label = activeDivider.dataset.label
+    if (stickyLabel.value !== label) {
+      stickyLabel.value = label
+      nextTick(() => {
+        if (stickyLabelEl.value) uiStore.fitText(stickyLabelEl.value)
+      })
+    }
+    showSticky.value = true
+  } else {
+    showSticky.value = false
+  }
+  
+  ticking = false
 }
 
+const onScroll = () => {
+  if (!ticking) {
+    requestAnimationFrame(updateStickyState)
+    ticking = true
+  }
+}
+
+let observer = null
+
 onMounted(() => {
-  const obs = new IntersectionObserver((entries) => {
+  observer = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting && offset.value < items.value.length) {
       offset.value += 40
     }
   }, { rootMargin: '1000px' })
   
-  if (sentinelEl.value) obs.observe(sentinelEl.value)
+  if (sentinelEl.value) observer.observe(sentinelEl.value)
   
   nextTick(() => {
     if (titleEl.value) uiStore.fitText(titleEl.value)
+    updateStickyState()
   })
 })
 
-watch(viewMode, (val) => localStorage.setItem('kp_view_mode', val))
+onUnmounted(() => {
+  if (observer) observer.disconnect()
+})
 
-watch(() => items.value.length, () => {
-    nextTick(() => {
-        const container = document.getElementById('layer-hist-container')
-        if (container) uiStore.fitAll('.grid-below-title', container)
-    })
+watch([viewMode, visibleList], () => {
+  nextTick(updateStickyState)
 })
 </script>
-
-<style scoped>
-.header-back-btn {
-    background: var(--bg-input) !important;
-    color: var(--text-primary) !important;
-    border: none !important;
-    padding: 8px 12px !important;
-}
-.card-list-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    background: var(--bg-card);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
-    overflow: hidden;
-}
-</style>

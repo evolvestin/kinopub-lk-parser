@@ -5,22 +5,19 @@ import StatsView from '../views/StatsView.vue'
 
 const routes = [
   {
-    path: '/search',
+    path: '/search/:layers*',
     name: 'search',
-    component: SearchView,
-    children: [{ path: ':layers(.*)*', name: 'search-stack' }]
+    component: SearchView
   },
   {
-    path: '/wishlist',
+    path: '/wishlist/:layers*',
     name: 'wishlist',
-    component: WishlistView,
-    children: [{ path: ':layers(.*)*', name: 'wishlist-stack' }]
+    component: WishlistView
   },
   {
-    path: '/stats',
+    path: '/stats/:layers*',
     name: 'stats',
-    component: StatsView,
-    children: [{ path: ':layers(.*)*', name: 'stats-stack' }]
+    component: StatsView
   },
   { path: '/', redirect: '/search' }
 ]

@@ -16,10 +16,28 @@
       <div class="spinner"></div>
     </div>
 
-    <div v-else class="hist-grid" style="padding: 0 16px;">
-      <ShowCard v-for="item in items" :key="item.id" :show="item" />
-      <div v-if="!items.length" class="empty">Пусто</div>
-    </div>
+    <template v-else>
+      <!-- КАРТОЧКА ПЕРСОНЫ В КОЛЛЕКЦИИ -->
+      <div v-if="personInfo" 
+           class="card anim-item" 
+           style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px;">
+          <img v-if="personInfo.photo_url" :src="personInfo.photo_url" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;">
+          <div v-else class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px; display:flex; align-items:center; justify-content:center; background:var(--bg-input);">
+              {{ title.charAt(0) }}
+          </div>
+          <div style="min-width:0; flex:1;">
+              <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">{{ title }}</div>
+              <div v-if="personInfo.professions?.length" style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">
+                  {{ personInfo.professions.join(' · ') }}
+              </div>
+          </div>
+      </div>
+
+      <div class="hist-grid" style="padding: 0 16px;">
+        <ShowCard v-for="item in items" :key="item.id" :show="item" />
+        <div v-if="!items.length" class="empty">Пусто</div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -36,6 +54,7 @@ const api = useApi()
 
 const title = ref('Загрузка...')
 const items = ref([])
+const personInfo = ref(null)
 const loading = ref(true)
 
 const loadData = async () => {
@@ -44,6 +63,7 @@ const loadData = async () => {
     const data = await api.get(`collection/${props.type}/${props.itemId}/`)
     title.value = data.title
     items.value = data.items
+    personInfo.value = data.person_info
   } catch (e) {
     uiStore.showToast('Ошибка загрузки коллекции')
   } finally {

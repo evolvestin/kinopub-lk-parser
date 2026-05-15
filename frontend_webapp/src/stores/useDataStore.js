@@ -2,12 +2,12 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
+import { preloadImage } from '../utils/helpers'
 
 export const useDataStore = defineStore('data', () => {
   const api = useApi()
   const uiStore = useUIStore()
 
-  // Восстановление из sessionStorage
   const savedSearch = JSON.parse(sessionStorage.getItem('kp_search_cache') || '{"query":"","results":{"shows":[],"persons":[]}}')
 
   const searchQuery = ref(savedSearch.query)
@@ -15,7 +15,6 @@ export const useDataStore = defineStore('data', () => {
   const isSearching = ref(false)
   const hasSearched = ref(savedSearch.query.length > 0)
 
-  // Авто-сохранение при изменениях
   watch([searchQuery, searchResults], () => {
     sessionStorage.setItem('kp_search_cache', JSON.stringify({
       query: searchQuery.value,
@@ -36,6 +35,17 @@ export const useDataStore = defineStore('data', () => {
       const data = await api.post('search/', { query })
       if (searchQuery.value === query) {
         searchResults.value = data
+        
+        // Архитектурное требование: прелоадинг результатов поиска
+        if (data.shows) {
+          data.shows.forEach(s => s.poster_url && preloadImage(s.poster_url));
+        }
+        if (data.persons) {
+          data.persons.forEach(p => {
+            if (p.photo_url) preloadImage(p.photo_url);
+            if (p.fallback_photo_url) preloadImage(p.fallback_photo_url);
+          });
+        }
       }
     } catch (error) {
       uiStore.showToast('Ошибка поиска')

@@ -22,9 +22,7 @@ onMounted(async () => {
     tg.BackButton.onClick(() => uiStore.popLayer())
   }
   
-  // При старте загружаем базовые данные, чтобы получить роль пользователя
-  // Это автоматически обновит BottomNav и покажет кнопку Статистики
-  await statsStore.fetchStats('all', true)
+  await statsStore.fetchStats('all', false)
   
   uiStore.setLoading(false)
   uiStore.setAppReady(true)
