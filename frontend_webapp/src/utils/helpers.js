@@ -23,10 +23,8 @@ export function preloadImage(url, priority = 'auto') {
   return new Promise((resolve) => {
     const img = new Image();
     
-    // Согласно архитектурному правилу: всегда проверяем размеры для Кинопоиска
     img.onload = () => {
       preloadPool.delete(img);
-      // Детекция заглушки Кинопоиска (no-poster.gif) 208x304
       if (img.naturalWidth === 208 && img.naturalHeight === 304) {
         resolve(false);
       } else {
@@ -46,23 +44,6 @@ export function preloadImage(url, priority = 'auto') {
     preloadPool.add(img);
     img.src = url;
   });
-}
-
-export async function resolvePersonImage(primary, secondary) {
-  // Если URL пуст, сразу возвращаем null
-  if (!primary && !secondary) return null;
-
-  if (primary) {
-    const ok = await preloadImage(primary);
-    if (ok) return primary;
-  }
-  
-  if (secondary) {
-    const ok = await preloadImage(secondary);
-    if (ok) return secondary;
-  }
-  
-  return null;
 }
 
 export function validateImageGeom(event, onPlaceholderNeeded) {

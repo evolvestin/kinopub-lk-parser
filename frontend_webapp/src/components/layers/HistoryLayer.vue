@@ -32,10 +32,12 @@
          class="card anim-item clickable" 
          @click="uiStore.openLayer('person', personInfo.id)"
          style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px; position:relative;">
-        <img v-if="personInfo.photo_url" :src="personInfo.photo_url" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;">
-        <div v-else class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px; display:flex; align-items:center; justify-content:center; background:var(--bg-input);">
-            {{ personInfo.name.charAt(0) }}
-        </div>
+        <PersonAvatar 
+          :photo-url="personInfo.photo_url" 
+          :fallback-url="personInfo.fallback_photo_url"
+          :name="personInfo.name"
+          style="width:60px; height:60px;"
+        />
         <div style="min-width:0; flex:1;">
             <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">{{ personInfo.name }}</div>
             <div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">{{ personInfo.professionLabel }}</div>
@@ -80,6 +82,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { icons } from '../../utils/icons'
 import ShowCard from '../shared/ShowCard.vue'
+import PersonAvatar from '../shared/PersonAvatar.vue'
 
 const props = defineProps(['historyId'])
 const route = useRoute()
@@ -156,21 +159,18 @@ const updateStickyState = () => {
 
   const containerRect = container.getBoundingClientRect()
   const dividers = container.querySelectorAll('.js-group-divider')
-  const headerHeight = 64 // Высота хедера из CSS
+  const headerHeight = 64 
 
   let activeDivider = null
 
-  // Ищем последний разделитель, который пересек линию хедера
   for (let i = 0; i < dividers.length; i++) {
     const div = dividers[i]
     const rect = div.getBoundingClientRect()
-    // Расстояние от верха контейнера до разделителя
     const relativeTop = rect.top - containerRect.top
 
     if (relativeTop <= headerHeight) {
       activeDivider = div
     } else {
-      // Разделители упорядочены, если текущий ниже хедера, остальные тоже ниже
       break
     }
   }
@@ -201,7 +201,6 @@ const onScroll = () => {
 let observer = null
 
 onMounted(() => {
-  // Бесконечный скролл
   observer = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting && offset.value < items.value.length) {
       offset.value += 40
@@ -210,7 +209,6 @@ onMounted(() => {
   
   if (sentinelEl.value) observer.observe(sentinelEl.value)
   
-  // Первоначальная подгонка текста и состояния
   nextTick(() => {
     if (titleEl.value) uiStore.fitText(titleEl.value)
     updateStickyState()
@@ -221,7 +219,6 @@ onUnmounted(() => {
   if (observer) observer.disconnect()
 })
 
-// При изменении режима вида или подгрузке данных пересчитываем липкость
 watch([viewMode, visibleList], () => {
   nextTick(updateStickyState)
 })

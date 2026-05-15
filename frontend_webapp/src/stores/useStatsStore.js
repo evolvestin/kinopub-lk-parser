@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
 import { useUserStore } from './userStore'
-import { resolvePersonImage, preloadImage } from '../utils/helpers'
+import { preloadImage } from '../utils/helpers'
 
 export const useStatsStore = defineStore('stats', () => {
   const api = useApi()
@@ -19,60 +19,68 @@ export const useStatsStore = defineStore('stats', () => {
   const currentStats = computed(() => statsCache.value.get(currentYear.value) || null)
   const hasGroup = computed(() => !!currentStats.value?.group)
 
-  async function resolvePerson(person) {
-    if (person.resolvedUrl !== undefined && person.resolvedUrl !== null) return
-    person.resolvedUrl = await resolvePersonImage(person.photo_url, person.fallback_photo_url)
-  }
-
-  function resolvePersonList(list) {
-    if (!Array.isArray(list)) return
-    list.forEach(p => {
-      if (p.resolvedUrl === undefined) p.resolvedUrl = undefined
-      resolvePerson(p)
-    })
-  }
-
-  function resolveCrew(crew) {
-    if (!Array.isArray(crew)) return
-    crew.forEach(group => resolvePersonList(group.persons))
-  }
-
   function _initializeResolvedUrls(data) {
     if (!data) return
-    ['actors', 'directors', 'writers'].forEach(cat => {
+    const categories = ['actors', 'directors', 'writers']
+    
+    categories.forEach(cat => {
       const category = data[cat]
       if (category) {
         ['series', 'others'].forEach(sub => {
           if (Array.isArray(category[sub])) {
-            category[sub].forEach(p => { p.resolvedUrl = undefined })
+            category[sub].forEach(p => { 
+              p.resolvedUrl = p.photo_url || p.fallback_photo_url || null 
+            })
           }
         })
       }
     })
+
     if (data.group?.members) {
-      data.group.members.forEach(m => { m.resolvedUrl = undefined })
+      data.group.members.forEach(m => { 
+        m.resolvedUrl = m.photo_url || null 
+      })
     }
   }
 
   async function resolveAllImages(data) {
     if (!data) return
 
-    ['actors', 'directors', 'writers'].forEach(cat => {
-      const category = data[cat]
-      if (category) {
-        resolvePersonList(category.series)
-        resolvePersonList(category.others)
+    const imagesToPreload = new Set()
+
+    const history = [...(data.history_movies || []), ...(data.history_episodes || [])]
+    history.slice(0, 100).forEach(item => {
+      if (item.poster_url) imagesToPreload.add(item.poster_url)
+    })
+
+    const leaderCategories = ['actors', 'directors', 'writers']
+    leaderCategories.forEach(cat => {
+      const categoryData = data[cat]
+      if (categoryData) {
+        ['series', 'others'].forEach(subKey => {
+          if (Array.isArray(categoryData[subKey])) {
+            categoryData[subKey].forEach(person => {
+              if (person.photo_url) imagesToPreload.add(person.photo_url)
+              if (person.fallback_photo_url) imagesToPreload.add(person.fallback_photo_url)
+            })
+          }
+        })
       }
     })
 
-    if (data.group?.members) {
-      resolvePersonList(data.group.members)
+    if (Array.isArray(data.countries)) {
+      data.countries.forEach(c => {
+        if (c.photo_url) imagesToPreload.add(c.photo_url)
+      })
     }
 
-    const history = [...(data.history_movies || []), ...(data.history_episodes || [])]
-    history.slice(0, 40).forEach(item => {
-      if (item.poster_url) preloadImage(item.poster_url)
-    })
+    if (data.group?.members) {
+      data.group.members.forEach(m => {
+        if (m.photo_url) imagesToPreload.add(m.photo_url)
+      })
+    }
+
+    imagesToPreload.forEach(url => preloadImage(url))
   }
 
   async function fetchStats(year = 'all', isBackground = false) {
@@ -204,7 +212,7 @@ export const useStatsStore = defineStore('stats', () => {
 
   return {
     statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup,
-    fetchStats, resolveAllImages, getHistoryByType, resolveCrew,
+    fetchStats, resolveAllImages, getHistoryByType,
     setActiveTab: (tab) => { activeTab.value = tab },
     setYear: (year) => fetchStats(year)
   }

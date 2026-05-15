@@ -21,10 +21,12 @@
       <div v-if="personInfo" 
            class="card anim-item" 
            style="display:flex; align-items:center; gap:16px; margin:12px 16px; padding:16px; border-radius:20px;">
-          <img v-if="personInfo.photo_url" :src="personInfo.photo_url" class="person-avatar" style="width:60px; height:60px; object-fit:cover; flex-shrink:0;">
-          <div v-else class="person-avatar" style="width:60px; height:60px; flex-shrink:0; font-size:24px; display:flex; align-items:center; justify-content:center; background:var(--bg-input);">
-              {{ title.charAt(0) }}
-          </div>
+          <PersonAvatar 
+            :photo-url="personInfo.photo_url" 
+            :fallback-url="personInfo.fallback_photo_url"
+            :name="title"
+            style="width:60px; height:60px;"
+          />
           <div style="min-width:0; flex:1;">
               <div style="font-size:20px; font-weight:900; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px;">{{ title }}</div>
               <div v-if="personInfo.professions?.length" style="font-size:13px; color:var(--text-muted); font-weight:600; margin-top:4px; letter-spacing:0.3px;">
@@ -47,6 +49,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
 import ShowCard from '../shared/ShowCard.vue'
+import PersonAvatar from '../shared/PersonAvatar.vue'
 
 const props = defineProps(['type', 'itemId'])
 const uiStore = useUIStore()
@@ -64,6 +67,12 @@ const loadData = async () => {
     title.value = data.title
     items.value = data.items
     personInfo.value = data.person_info
+
+    if (data.items) {
+      data.items.forEach(item => {
+        if (item.poster_url) preloadImage(item.poster_url)
+      })
+    }
   } catch (e) {
     uiStore.showToast('Ошибка загрузки коллекции')
   } finally {

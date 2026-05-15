@@ -20,13 +20,12 @@
         <div class="li-l">
           <span class="li-rank">{{ idx + 1 }}</span>
           
-          <img 
-            v-if="item.resolvedUrl" 
-            :src="item.resolvedUrl" 
-            class="person-avatar"
-            style="object-fit: cover;"
-          >
-          <div v-else class="person-avatar is-placeholder" v-html="icons.person_placeholder"></div>
+          <PersonAvatar 
+            :photo-url="item.photo_url" 
+            :fallback-url="item.fallback_photo_url"
+            :name="item.name"
+            style="width:60px; height:60px;"
+          />
 
           <div style="min-width: 0;">
             <div class="li-name">{{ item.name }}</div>
@@ -45,6 +44,7 @@ import { ref, computed } from 'vue'
 import { icons } from '../../utils/icons'
 import { plural } from '../../utils/helpers'
 import { useUIStore } from '../../stores/uiStore'
+import PersonAvatar from '../shared/PersonAvatar.vue'
 
 const props = defineProps({
   category: { type: String, required: true },
