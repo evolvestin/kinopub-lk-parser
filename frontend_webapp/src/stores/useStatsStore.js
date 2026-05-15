@@ -5,25 +5,6 @@ import { useUIStore } from './uiStore'
 import { useUserStore } from './userStore'
 import { resolvePersonImage, preloadImage } from '../utils/helpers'
 
-const _initializeResolvedUrls = (data) => {
-  if (!data) return;
-  const categories = ['actors', 'directors', 'writers'];
-  categories.forEach(cat => {
-    const categoryData = data[cat];
-    if (!categoryData) return;
-    ['series', 'others'].forEach(sub => {
-      if (Array.isArray(categoryData[sub])) {
-        categoryData[sub].forEach(person => {
-          // Важно: инициализируем свойство для реактивности
-          if (person.resolvedUrl === undefined) {
-            person.resolvedUrl = undefined;
-          }
-        });
-      }
-    });
-  });
-};
-
 export const useStatsStore = defineStore('stats', () => {
   const api = useApi()
   const uiStore = useUIStore()
@@ -37,6 +18,122 @@ export const useStatsStore = defineStore('stats', () => {
 
   const currentStats = computed(() => statsCache.value.get(currentYear.value) || null)
   const hasGroup = computed(() => !!currentStats.value?.group)
+
+  async function resolvePerson(person) {
+    if (person.resolvedUrl !== undefined && person.resolvedUrl !== null) return
+    person.resolvedUrl = await resolvePersonImage(person.photo_url, person.fallback_photo_url)
+  }
+
+  function resolvePersonList(list) {
+    if (!Array.isArray(list)) return
+    list.forEach(p => {
+      if (p.resolvedUrl === undefined) p.resolvedUrl = undefined
+      resolvePerson(p)
+    })
+  }
+
+  function resolveCrew(crew) {
+    if (!Array.isArray(crew)) return
+    crew.forEach(group => resolvePersonList(group.persons))
+  }
+
+  function _initializeResolvedUrls(data) {
+    if (!data) return
+    ['actors', 'directors', 'writers'].forEach(cat => {
+      const category = data[cat]
+      if (category) {
+        ['series', 'others'].forEach(sub => {
+          if (Array.isArray(category[sub])) {
+            category[sub].forEach(p => { p.resolvedUrl = undefined })
+          }
+        })
+      }
+    })
+    if (data.group?.members) {
+      data.group.members.forEach(m => { m.resolvedUrl = undefined })
+    }
+  }
+
+  async function resolveAllImages(data) {
+    if (!data) return
+
+    ['actors', 'directors', 'writers'].forEach(cat => {
+      const category = data[cat]
+      if (category) {
+        resolvePersonList(category.series)
+        resolvePersonList(category.others)
+      }
+    })
+
+    if (data.group?.members) {
+      resolvePersonList(data.group.members)
+    }
+
+    const history = [...(data.history_movies || []), ...(data.history_episodes || [])]
+    history.slice(0, 40).forEach(item => {
+      if (item.poster_url) preloadImage(item.poster_url)
+    })
+  }
+
+  async function fetchStats(year = 'all', isBackground = false) {
+    const cached = statsCache.value.get(year)
+    if (cached) {
+      if (!isBackground) {
+        currentYear.value = year
+        resolveAllImages(cached)
+      }
+      return
+    }
+
+    if (!isBackground) uiStore.setLoading(true)
+
+    try {
+      const data = await api.post('detailed_stats/', {
+        period_type: 'year',
+        period_value: year === 'all' ? 0 : year,
+        screen_width: window.innerWidth,
+        screen_height: window.innerHeight
+      })
+
+      if (data.meta) {
+        let years = data.meta.years || []
+        if (years.length > 0 && !years.includes('all')) years = ['all', ...years]
+        availableYears.value = years
+        if (data.meta.role) userStore.userRole = data.meta.role
+      }
+
+      _initializeResolvedUrls(data)
+      statsCache.value.set(year, data)
+      
+      if (!isBackground) {
+        currentYear.value = year
+      }
+
+      const reactiveData = statsCache.value.get(year)
+      resolveAllImages(reactiveData)
+
+      if (!isBackground && !isPreloadingYears.value) {
+        triggerBackgroundPreload()
+      }
+
+    } catch (error) {
+      if (!isBackground) uiStore.showToast('Ошибка загрузки данных')
+    } finally {
+      if (!isBackground) uiStore.setLoading(false)
+    }
+  }
+
+  async function triggerBackgroundPreload() {
+    if (isPreloadingYears.value) return
+    isPreloadingYears.value = true
+    for (const year of availableYears.value) {
+      if (!statsCache.value.has(year)) {
+        await new Promise(r => setTimeout(r, 1200))
+        await fetchStats(year, true)
+      }
+    }
+    isPreloadingYears.value = false
+  }
 
   function getHistoryByType(type, { date, idx, key, showId }) {
     const D = currentStats.value
@@ -105,110 +202,9 @@ export const useStatsStore = defineStore('stats', () => {
     }
   }
 
-  async function resolveAllImages(data, yearKey) {
-    if (!data) return
-
-    const personCategories = ['actors', 'directors', 'writers']
-    const tasks = []
-
-    personCategories.forEach(cat => {
-      const category = data[cat]
-      if (!category) return
-      ['series', 'others'].forEach(sub => {
-        if (Array.isArray(category[sub])) {
-          category[sub].forEach(person => {
-            if (person.resolvedUrl !== undefined && person.resolvedUrl !== null) return
-            tasks.push((async () => {
-              const url = await resolvePersonImage(person.photo_url, person.fallback_photo_url)
-              person.resolvedUrl = url
-            })())
-          })
-        }
-      })
-    })
-
-    if (data.group?.members) {
-      data.group.members.forEach(m => {
-        if (m.resolvedUrl !== undefined) return
-        tasks.push((async () => {
-          m.resolvedUrl = await resolvePersonImage(m.photo_url, null)
-        })())
-      })
-    }
-
-    const history = [...(data.history_movies || []), ...(data.history_episodes || [])]
-    history.slice(0, 40).forEach(item => {
-      if (item.poster_url) tasks.push(preloadImage(item.poster_url))
-    })
-
-    if (tasks.length > 0) {
-      await Promise.allSettled(tasks)
-      statsCache.value.set(yearKey, { ...data })
-    }
-  }
-
-  async function fetchStats(year = 'all', isBackground = false) {
-    const cached = statsCache.value.get(year)
-    if (cached) {
-      if (!isBackground) {
-        currentYear.value = year
-        resolveAllImages(cached, year)
-      }
-      return
-    }
-
-    if (!isBackground) uiStore.setLoading(true)
-
-    try {
-      const data = await api.post('detailed_stats/', {
-        period_type: 'year',
-        period_value: year === 'all' ? 0 : year,
-        screen_width: window.innerWidth,
-        screen_height: window.innerHeight
-      })
-
-      if (data.meta) {
-        let years = data.meta.years || []
-        if (years.length > 0 && !years.includes('all')) years = ['all', ...years]
-        availableYears.value = years
-        if (data.meta.role) userStore.userRole = data.meta.role
-      }
-
-      _initializeResolvedUrls(data)
-
-      if (!isBackground) {
-        currentYear.value = year
-      }
-      
-      statsCache.value.set(year, data)
-      await resolveAllImages(data, year)
-
-      if (!isBackground && !isPreloadingYears.value) {
-        triggerBackgroundPreload()
-      }
-
-    } catch (error) {
-      if (!isBackground) uiStore.showToast('Ошибка загрузки данных')
-    } finally {
-      if (!isBackground) uiStore.setLoading(false)
-    }
-  }
-
-  async function triggerBackgroundPreload() {
-    if (isPreloadingYears.value) return
-    isPreloadingYears.value = true
-    for (const year of availableYears.value) {
-      if (!statsCache.value.has(year)) {
-        await new Promise(r => setTimeout(r, 1200))
-        await fetchStats(year, true)
-      }
-    }
-    isPreloadingYears.value = false
-  }
-
   return {
     statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup,
-    fetchStats, resolveAllImages, getHistoryByType,
+    fetchStats, resolveAllImages, getHistoryByType, resolveCrew,
     setActiveTab: (tab) => { activeTab.value = tab },
     setYear: (year) => fetchStats(year)
   }

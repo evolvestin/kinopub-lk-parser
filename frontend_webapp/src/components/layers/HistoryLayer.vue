@@ -1,5 +1,6 @@
 <template>
   <div class="layer-content" @scroll="onScroll" ref="containerEl">
+    <!-- Шапка слоя -->
     <div class="layer-header" id="layer-header-node" :class="{ 'has-group': showSticky }">
       <div style="flex-shrink: 0;">
         <button class="tab clickable header-back-btn" @click="uiStore.popLayer">
@@ -8,7 +9,7 @@
       </div>
       <div class="layer-header-center">
         <div class="layer-title-main" ref="titleEl">{{ displayTitle }}</div>
-        <div class="layer-group-label" id="sticky-group-text">{{ stickyLabel }}</div>
+        <div class="layer-group-label" ref="stickyLabelEl" id="sticky-group-text">{{ stickyLabel }}</div>
       </div>
       <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
          <button 
@@ -26,6 +27,7 @@
       </div>
     </div>
 
+    <!-- Карточка персоны (если открыто через фильтр по человеку) -->
     <div v-if="personInfo" 
          class="card anim-item clickable" 
          @click="uiStore.openLayer('person', personInfo.id)"
@@ -43,6 +45,7 @@
         </div>
     </div>
 
+    <!-- Список элементов -->
     <div 
       class="hist-container" 
       :class="[viewMode === 'grid' ? 'hist-grid' : 'card-list-wrapper', { 'history-edit-mode': uiStore.isHistoryEditMode }]" 
@@ -113,7 +116,12 @@ const personInfo = computed(() => {
 })
 
 const items = computed(() => {
-  const params = { date: route.query.date, idx: route.query.idx ? parseInt(route.query.idx) : null, key: route.query.key, showId: route.query.show_id ? parseInt(route.query.show_id) : null }
+  const params = { 
+    date: route.query.date, 
+    idx: route.query.idx ? parseInt(route.query.idx) : null, 
+    key: route.query.key, 
+    showId: route.query.show_id ? parseInt(route.query.show_id) : null 
+  }
   return statsStore.getHistoryByType(props.historyId, params)
 })
 
@@ -148,17 +156,21 @@ const updateStickyState = () => {
 
   const containerRect = container.getBoundingClientRect()
   const dividers = container.querySelectorAll('.js-group-divider')
-  const headerThreshold = 64
+  const headerHeight = 64 // Высота хедера из CSS
 
   let activeDivider = null
 
-  for (let i = dividers.length - 1; i >= 0; i--) {
+  // Ищем последний разделитель, который пересек линию хедера
+  for (let i = 0; i < dividers.length; i++) {
     const div = dividers[i]
     const rect = div.getBoundingClientRect()
+    // Расстояние от верха контейнера до разделителя
     const relativeTop = rect.top - containerRect.top
 
-    if (relativeTop <= headerThreshold) {
+    if (relativeTop <= headerHeight) {
       activeDivider = div
+    } else {
+      // Разделители упорядочены, если текущий ниже хедера, остальные тоже ниже
       break
     }
   }
@@ -189,6 +201,7 @@ const onScroll = () => {
 let observer = null
 
 onMounted(() => {
+  // Бесконечный скролл
   observer = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting && offset.value < items.value.length) {
       offset.value += 40
@@ -197,6 +210,7 @@ onMounted(() => {
   
   if (sentinelEl.value) observer.observe(sentinelEl.value)
   
+  // Первоначальная подгонка текста и состояния
   nextTick(() => {
     if (titleEl.value) uiStore.fitText(titleEl.value)
     updateStickyState()
@@ -207,6 +221,7 @@ onUnmounted(() => {
   if (observer) observer.disconnect()
 })
 
+// При изменении режима вида или подгрузке данных пересчитываем липкость
 watch([viewMode, visibleList], () => {
   nextTick(updateStickyState)
 })

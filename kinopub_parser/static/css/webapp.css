@@ -1717,6 +1717,16 @@ body.has-banner #app {
     transform: translateY(6px);
 }
 
+.layer-content {
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+}
+
+
 .hist-group-divider {
     grid-column: 1 / -1;
     display: flex;
