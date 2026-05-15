@@ -74,6 +74,7 @@ const loadData = async () => {
       })
     }
   } catch (e) {
+    console.error('[CollectionLayer] Failed to load collection:', e)
     uiStore.showToast('Ошибка загрузки коллекции')
   } finally {
     loading.value = false

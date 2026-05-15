@@ -13,7 +13,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { icons } from '../../utils/icons'
 
 const props = defineProps({
@@ -44,11 +44,5 @@ const handleError = () => {
 watch(() => props.photoUrl, (newVal) => {
   currentUrl.value = newVal || props.fallbackUrl
   triedFallback.value = false
-})
-
-watch(() => props.fallbackUrl, (newVal) => {
-  if (!currentUrl.value && !triedFallback.value) {
-    currentUrl.value = newVal
-  }
 })
 </script>

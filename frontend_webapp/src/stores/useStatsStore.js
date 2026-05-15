@@ -19,30 +19,6 @@ export const useStatsStore = defineStore('stats', () => {
   const currentStats = computed(() => statsCache.value.get(currentYear.value) || null)
   const hasGroup = computed(() => !!currentStats.value?.group)
 
-  function _initializeResolvedUrls(data) {
-    if (!data) return
-    const categories = ['actors', 'directors', 'writers']
-    
-    categories.forEach(cat => {
-      const category = data[cat]
-      if (category) {
-        ['series', 'others'].forEach(sub => {
-          if (Array.isArray(category[sub])) {
-            category[sub].forEach(p => { 
-              p.resolvedUrl = p.photo_url || p.fallback_photo_url || null 
-            })
-          }
-        })
-      }
-    })
-
-    if (data.group?.members) {
-      data.group.members.forEach(m => { 
-        m.resolvedUrl = m.photo_url || null 
-      })
-    }
-  }
-
   async function resolveAllImages(data) {
     if (!data) return
 
@@ -110,21 +86,20 @@ export const useStatsStore = defineStore('stats', () => {
         if (data.meta.role) userStore.userRole = data.meta.role
       }
 
-      _initializeResolvedUrls(data)
       statsCache.value.set(year, data)
       
       if (!isBackground) {
         currentYear.value = year
       }
 
-      const reactiveData = statsCache.value.get(year)
-      resolveAllImages(reactiveData)
+      resolveAllImages(data)
 
       if (!isBackground && !isPreloadingYears.value) {
         triggerBackgroundPreload()
       }
 
     } catch (error) {
+      console.error('[StatsStore] Fetch error:', error)
       if (!isBackground) uiStore.showToast('Ошибка загрузки данных')
     } finally {
       if (!isBackground) uiStore.setLoading(false)

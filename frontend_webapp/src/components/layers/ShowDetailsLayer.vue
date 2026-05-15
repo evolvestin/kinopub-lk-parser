@@ -84,11 +84,8 @@ onMounted(async () => {
   try {
     const data = await api.get(`show/${props.showId}/`)
     show.value = data
-    // Запускаем фоновое разрешение ссылок на фото персон в деталке
-    if (data.crew) {
-      statsStore.resolveCrew(data.crew)
-    }
   } catch (e) {
+    console.error('[ShowDetailsLayer] Failed to load show:', e)
     uiStore.showToast('Ошибка загрузки')
     uiStore.popLayer()
   }
