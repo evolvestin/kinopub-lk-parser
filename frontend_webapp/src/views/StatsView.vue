@@ -96,11 +96,11 @@
                 <span style="font-size: 11px; opacity: 0.7;">{{ plural(statsStore.currentStats.ratings.total || 0, ['оценка', 'оценки', 'оценок']) }}</span>
               </div>
           </div>
-          <BaseChart 
-            type="bar" 
-            :data="ratingsChartData" 
-            :options="ratingsChartOptions"
-            :height="180"
+          <BouncyBarChart 
+            :labels="['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']"
+            :data="statsStore.currentStats.ratings.distribution"
+            :palette="['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353']"
+            @node-click="(idx) => openHistory('rating_filter', { idx: idx + 1, title: 'Оценка: ' + (idx + 1) })"
           />
           <div class="stat clickable" style="flex-direction: row; justify-content: center; align-items: center; padding: 12px; margin-top: 12px; border-radius: 15px;" @click="openHistory('ratings')">
               <span style="font-weight: 800; font-size: 14px;">Посмотреть все оценки</span>
@@ -115,7 +115,16 @@
 
         <div class="card hoverable anim-item" v-if="hasWeekdayData" style="margin-top: 16px;">
           <div class="label more-pad"><div class="icon" style="color:#2ecc71" v-html="icons.days"></div> Дни недели</div>
-          <BaseChart type="bar" :data="weekdayChartData" :options="weekdayChartOptions" :height="200" />
+          <BouncyBarChart 
+            :labels="['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']"
+            :data="statsStore.currentStats.weekday_chart.data"
+            :palette="['#2ea043', '#2ea043', '#2ea043', '#2ea043', '#2ea043', '#388bfd', '#388bfd']"
+            :show-values="true"
+            @node-click="(idx) => {
+              const fullDays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+              openHistory('weekday', { idx, title: fullDays[idx] })
+            }"
+          />
         </div>
 
         <ActivityHeatmap 
@@ -217,6 +226,7 @@ import GenreDonut from '../components/stats/GenreDonut.vue'
 import LeaderList from '../components/stats/LeaderList.vue'
 import ShareModal from '../components/modals/ShareModal.vue'
 import BaseChart from '../components/shared/BaseChart.vue'
+import BouncyBarChart from '../components/shared/BouncyBarChart.vue'
 
 const statsStore = useStatsStore()
 const uiStore = useUIStore()
@@ -257,19 +267,19 @@ const ratingBadgeStyle = computed(() => {
 const ratingsChartData = computed(() => {
   const dist = statsStore.currentStats?.ratings?.distribution || [];
   const palette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
-  const hoverPalette = ['#ff6b66', '#ff6b66', '#ff9a4d', '#ff9a4d', '#f0b442', '#f0b442', '#5ca1ff', '#5ca1ff', '#3ed65b', '#52f56d'];
+  const pressPalette = ['#d32f2f', '#d32f2f', '#c2410c', '#c2410c', '#b45309', '#b45309', '#1d4ed8', '#1d4ed8', '#15803d', '#166534'];
   
   return {
     labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
     datasets: [{
       data: dist,
       backgroundColor: palette,
-      hoverBackgroundColor: hoverPalette,
-      hoverBorderWidth: 2,
-      hoverBorderColor: '#ffffff',
+      hoverBackgroundColor: pressPalette,
       borderRadius: 6,
+      borderWidth: 0,
       borderSkipped: false,
-      borderWidth: 0
+      // Эффект физического сжатия при нажатии
+      hoverInflateAmount: -5 
     }]
   };
 });
@@ -285,23 +295,26 @@ const ratingsChartOptions = computed(() => {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    animation: {
-      duration: 1000,
-      easing: 'easeOutBack',
-      delay: (context) => (context.type === 'data' && context.mode === 'default' && !context.active) ? context.dataIndex * 80 : 0
-    },
+    // Настройка поведения при переходе в активное состояние (нажатие)
     transitions: {
       active: {
         animation: {
-          duration: 300
+          duration: 200,
+          easing: 'easeOutBack'
         }
       }
+    },
+    animation: {
+      duration: 1000,
+      easing: 'easeOutBack',
+      delay: (context) => (context.type === 'data' && context.mode === 'default' && !context.active) ? context.dataIndex * 40 : 0
     },
     onHover: (event, activeElements) => {
       event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default';
     },
     onClick: (event, activeElements) => {
       if (activeElements.length > 0) {
+        if (window.navigator.vibrate) window.navigator.vibrate(10);
         const score = activeElements[0].index + 1;
         openHistory('rating_filter', { idx: score, title: `Оценка: ${score}` });
       }
@@ -324,11 +337,12 @@ const ratingsChartOptions = computed(() => {
       }
     },
     scales: {
-      x: { ticks: { color: c.t, font: { size: fSize, weight: '600' } }, grid: { display: false } },
+      x: { ticks: { color: c.t, font: { size: fSize, weight: '700' } }, grid: { display: false } },
       y: { display: false, beginAtZero: true }
     }
   };
 });
+
 
 const monthlyChartData = computed(() => {
   const ch = statsStore.currentStats?.monthly_chart || { labels: [], views: [], hours: [] };
@@ -435,20 +449,20 @@ const weekdayChartData = computed(() => {
   const ch = statsStore.currentStats?.weekday_chart || { labels: [], data: [] };
   const barColor = '#2ea043';
   const weekendColor = '#388bfd';
-  const barHoverColor = '#3fb950';
-  const weekendHoverColor = '#60a5fa';
+  const pressBar = '#166534';
+  const pressWeekend = '#1d4ed8';
 
   return {
     labels: ch.labels,
     datasets: [{
       data: ch.data,
       backgroundColor: ch.data.map((_, i) => i >= 5 ? weekendColor : barColor),
-      hoverBackgroundColor: ch.data.map((_, i) => i >= 5 ? weekendHoverColor : barHoverColor),
-      hoverBorderWidth: 2,
-      hoverBorderColor: '#ffffff',
+      hoverBackgroundColor: ch.data.map((_, i) => i >= 5 ? pressWeekend : pressBar),
       borderRadius: 8,
+      borderWidth: 0,
       borderSkipped: false,
-      borderWidth: 0
+      // Эффект физического сжатия при нажатии
+      hoverInflateAmount: -5
     }]
   };
 });
@@ -457,8 +471,7 @@ const weekdayChartOptions = computed(() => {
   const isDark = uiStore.theme === 'dark';
   const c = {
     t: isDark ? 'rgba(229, 231, 235, .8)' : 'rgba(31, 35, 40, .8)',
-    g: isDark ? 'rgba(255, 255, 255, .05)' : 'rgba(0, 0, 0, .05)',
-    b: isDark ? '#2d333b' : '#d0d7de'
+    g: isDark ? 'rgba(255, 255, 255, .05)' : 'rgba(0, 0, 0, .05)'
   };
   const totalViews = statsStore.currentStats?.weekday_chart?.data.reduce((a, b) => a + b, 0) || 0;
   const fSize = Math.max(10, Math.min(13, window.innerWidth * 0.03));
@@ -466,23 +479,25 @@ const weekdayChartOptions = computed(() => {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    animation: {
-      duration: 1000,
-      easing: 'easeOutBack',
-      delay: (context) => (context.type === 'data' && context.mode === 'default' && !context.active) ? context.dataIndex * 100 : 0
-    },
     transitions: {
       active: {
         animation: {
-          duration: 300
+          duration: 200,
+          easing: 'easeOutBack'
         }
       }
+    },
+    animation: {
+      duration: 1000,
+      easing: 'easeOutBack',
+      delay: (context) => (context.type === 'data' && context.mode === 'default' && !context.active) ? context.dataIndex * 60 : 0
     },
     onHover: (event, activeElements) => {
       event.native.target.style.cursor = activeElements.length ? 'pointer' : 'default';
     },
     onClick: (event, activeElements) => {
       if (activeElements.length > 0) {
+        if (window.navigator.vibrate) window.navigator.vibrate(10);
         const idx = activeElements[0].index;
         const fullDays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
         openHistory('weekday', { idx: idx, title: fullDays[idx] });
@@ -494,8 +509,7 @@ const weekdayChartOptions = computed(() => {
         backgroundColor: isDark ? 'rgba(22, 27, 34, 0.95)' : 'rgba(255, 255, 255, 0.95)',
         titleColor: isDark ? '#f0f6fc' : '#1f2328',
         bodyColor: isDark ? '#8b949e' : '#59636e',
-        borderColor: c.b,
-        borderWidth: 1,
+        borderWidth: 0,
         cornerRadius: 10,
         padding: 12,
         displayColors: false,
@@ -509,7 +523,7 @@ const weekdayChartOptions = computed(() => {
       }
     },
     scales: {
-      x: { ticks: { color: c.t, font: { size: fSize, weight: '600' } }, grid: { display: false } },
+      x: { ticks: { color: c.t, font: { size: fSize, weight: '700' } }, grid: { display: false } },
       y: { ticks: { color: c.t, font: { size: fSize }, precision: 0 }, grid: { color: c.g }, beginAtZero: true, border: { display: false } }
     }
   };

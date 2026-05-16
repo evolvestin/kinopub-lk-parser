@@ -78,7 +78,11 @@ export const useUIStore = defineStore('ui', () => {
 
   function fitText(el) {
     if (!el) return
+    
     el.style.fontSize = ""
+    
+    if (el.offsetWidth === 0 && el.offsetHeight === 0) return
+
     const styles = window.getComputedStyle(el)
     const limitWidth = el.clientWidth
     if (limitWidth <= 0) return
@@ -97,13 +101,18 @@ export const useUIStore = defineStore('ui', () => {
       }
     } else {
       const originalClamp = el.style.webkitLineClamp
+      const originalMaxH = el.style.maxHeight
+      
       el.style.webkitLineClamp = "none"
       el.style.maxHeight = "none"
+      
       while (el.scrollHeight > limitHeight + 1 && size > minSize) {
         size -= 0.5
         el.style.fontSize = size + "px"
       }
+      
       el.style.webkitLineClamp = originalClamp
+      el.style.maxHeight = originalMaxH
     }
   }
 

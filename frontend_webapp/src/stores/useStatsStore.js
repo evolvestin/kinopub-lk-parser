@@ -10,25 +10,23 @@ export const useStatsStore = defineStore('stats', () => {
   const uiStore = useUIStore()
   const userStore = useUserStore()
 
-  const statsCache = ref(new Map())
+  const statsCache = ref({})
   const activeTab = ref('personal')
   const currentYear = ref('all')
   const availableYears = ref([])
   const isPreloadingYears = ref(false)
 
-  const currentStats = computed(() => statsCache.value.get(currentYear.value) || null)
+  const currentStats = computed(() => statsCache.value[currentYear.value] || null)
   const hasGroup = computed(() => !!currentStats.value?.group)
 
   async function resolveAllImages(data) {
     if (!data) return
 
-    // 1. Прелоад постеров из истории (первые 100 элементов)
     const history = [...(data.history_movies || []), ...(data.history_episodes || [])]
     history.slice(0, 100).forEach(item => {
       if (item.poster_url) preloadImage(item.poster_url)
     })
 
-    // 2. Прелоад аватаров лидеров (Актеры, Режиссеры, Сценаристы)
     const leaderCategories = ['actors', 'directors', 'writers']
     leaderCategories.forEach(cat => {
       const categoryData = data[cat]
@@ -39,7 +37,6 @@ export const useStatsStore = defineStore('stats', () => {
         if (Array.isArray(persons)) {
           persons.forEach(person => {
             if (person.photo_url) {
-              // Цепочка: если TMDB падает, грузим фоллбэк
               preloadImage(person.photo_url).then(success => {
                 if (!success && person.fallback_photo_url) {
                   preloadImage(person.fallback_photo_url)
@@ -53,28 +50,24 @@ export const useStatsStore = defineStore('stats', () => {
       })
     })
 
-    // 3. Прелоад для стран
     if (Array.isArray(data.countries)) {
       data.countries.forEach(c => {
         if (c.photo_url) preloadImage(c.photo_url)
       })
     }
 
-    // 4. Прелоад для марафонов (binges)
     if (Array.isArray(data.binges)) {
       data.binges.forEach(b => {
         if (b.poster_url) preloadImage(b.poster_url)
       })
     }
 
-    // 5. Прелоад для участников группы
     if (data.group?.members) {
       data.group.members.forEach(m => {
         if (m.photo_url) preloadImage(m.photo_url)
       })
     }
     
-    // 6. Прелоад для просмотренных из избранного
     if (Array.isArray(data.wishlist_watched_items)) {
       data.wishlist_watched_items.forEach(item => {
         if (item.poster_url) preloadImage(item.poster_url)
@@ -83,11 +76,10 @@ export const useStatsStore = defineStore('stats', () => {
   }
 
   async function fetchStats(year = 'all', isBackground = false) {
-    const cached = statsCache.value.get(year)
-    if (cached) {
+    if (statsCache.value[year]) {
       if (!isBackground) {
         currentYear.value = year
-        resolveAllImages(cached)
+        resolveAllImages(statsCache.value[year])
       }
       return
     }
@@ -109,7 +101,7 @@ export const useStatsStore = defineStore('stats', () => {
         if (data.meta.role) userStore.userRole = data.meta.role
       }
 
-      statsCache.value.set(year, data)
+      statsCache.value[year] = data
       
       if (!isBackground) {
         currentYear.value = year
@@ -133,7 +125,7 @@ export const useStatsStore = defineStore('stats', () => {
     if (isPreloadingYears.value) return
     isPreloadingYears.value = true
     for (const year of availableYears.value) {
-      if (!statsCache.value.has(year)) {
+      if (!statsCache.value[year]) {
         await new Promise(r => setTimeout(r, 1200))
         await fetchStats(year, true)
       }

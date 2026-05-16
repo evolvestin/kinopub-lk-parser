@@ -34,6 +34,13 @@ async function fetchWishlist() {
       } else {
         activeFolderId.value = null
       }
+
+      folders.value.forEach(f => {
+        f.items.forEach(item => {
+          if (item.poster_url) preloadImage(item.poster_url);
+        });
+      });
+      
     } catch (error) {
       uiStore.showToast('Ошибка загрузки избранного')
     }
