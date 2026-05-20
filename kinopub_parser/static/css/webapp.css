@@ -555,7 +555,11 @@ body.has-banner #app {
 .vt-btn svg { width: 18px; height: 18px; }
 
 .hist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: clamp(10px, 3vw, 14px); }
-.grid-item-wrap { display: flex; flex-direction: column; gap: 2px; cursor: pointer; transition: transform 0.2s; }
+.grid-item-wrap {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 180px;
+    contain: layout style paint;
+}
 .grid-item-wrap:active {
     transform: none !important;
 }
@@ -1188,7 +1192,11 @@ body.has-banner #app {
 }
 .grid-item-wrap:hover .wl-item-del, .hist-item:hover .wl-item-del { opacity: 1; }
 .wl-item-del:active { transform: scale(0.9); }
-.hist-item { position: relative; } 
+.hist-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 90px;
+    contain: layout style paint;
+}
 .hist-item:active {
     background: var(--bg-input) !important;
     transform: none !important;
@@ -1197,7 +1205,9 @@ body.has-banner #app {
     transform: scale(0.92) !important;
 }
 
-.grid-item-wrap, .hist-item { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.grid-item-wrap, .hist-item {
+    transform: translateZ(0);
+}
 
 .wl-delete-badge {
     position: absolute;

@@ -98,6 +98,7 @@ const viewMode = ref(localStorage.getItem('kp_view_mode') || 'grid')
 const offset = ref(80)
 const stickyLabel = ref('')
 const showSticky = ref(false)
+const cachedOffsets = ref([])
 let ticking = false
 
 const isShared = computed(() => !!route.query.shared_id || window.location.hash.includes('shared_id'))
@@ -153,35 +154,46 @@ const shouldShowDivider = (item, idx) => {
   return currentKey !== prevKey
 }
 
+const cacheDividerOffsets = () => {
+  const container = containerEl.value
+  if (!container) return
+  
+  requestAnimationFrame(() => {
+    const dividers = container.querySelectorAll('.js-group-divider')
+    const offsets = []
+    dividers.forEach(div => {
+      offsets.push({
+        top: div.offsetTop,
+        label: div.dataset.label
+      })
+    })
+    cachedOffsets.value = offsets
+    updateStickyState()
+  })
+}
+
 const updateStickyState = () => {
   const container = containerEl.value
   if (!container) return
 
-  const containerRect = container.getBoundingClientRect()
-  const dividers = container.querySelectorAll('.js-group-divider')
+  const scrollTop = container.scrollTop
   const headerHeight = 64 
 
   let activeDivider = null
+  const offsets = cachedOffsets.value
 
-  for (let i = 0; i < dividers.length; i++) {
-    const div = dividers[i]
-    const rect = div.getBoundingClientRect()
-    const relativeTop = rect.top - containerRect.top
-
-    if (relativeTop <= headerHeight) {
-      activeDivider = div
+  for (let i = 0; i < offsets.length; i++) {
+    if (offsets[i].top <= scrollTop + headerHeight + 5) {
+      activeDivider = offsets[i]
     } else {
       break
     }
   }
 
   if (activeDivider) {
-    const label = activeDivider.dataset.label
+    const label = activeDivider.label
     if (stickyLabel.value !== label) {
       stickyLabel.value = label
-      nextTick(() => {
-        if (stickyLabelEl.value) uiStore.fitText(stickyLabelEl.value)
-      })
     }
     showSticky.value = true
   } else {
@@ -211,7 +223,7 @@ onMounted(() => {
   
   nextTick(() => {
     if (titleEl.value) uiStore.fitText(titleEl.value)
-    updateStickyState()
+    cacheDividerOffsets()
   })
 })
 
@@ -220,6 +232,6 @@ onUnmounted(() => {
 })
 
 watch([viewMode, visibleList], () => {
-  nextTick(updateStickyState)
+  cacheDividerOffsets()
 })
 </script>

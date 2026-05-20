@@ -11,7 +11,7 @@
 
     <div class="grid-item">
       <div v-if="isBroken" class="grid-poster is-placeholder" v-html="icons.person_placeholder"></div>
-      <img v-else :src="currentPosterUrl" class="grid-poster" loading="lazy" @load="validateImage" @error="handleError">
+      <img v-else :src="currentPosterUrl" class="grid-poster" loading="lazy" decoding="async" @load="validateImage" @error="handleError">
       
       <div class="grid-badges">
         <span v-if="season > 0" class="hist-badge">
@@ -37,7 +37,7 @@
         <span v-html="icons.bookmark_plus"></span>
       </button>
     </div>
-    <div class="grid-below-title" ref="titleEl">{{ show.show__title || show.title }}</div>
+    <div class="grid-below-title">{{ show.show__title || show.title }}</div>
   </div>
 
   <div v-else class="hist-item clickable anim-item" :class="{ 'wiggle': isWiggling }" @click="handleClick">
@@ -46,7 +46,7 @@
     </div>
 
     <div v-if="isBroken" class="hist-poster is-placeholder" v-html="icons.person_placeholder"></div>
-    <img v-else :src="currentPosterUrl" class="hist-poster" loading="lazy" @load="validateImage" @error="handleError">
+    <img v-else :src="currentPosterUrl" class="hist-poster" loading="lazy" decoding="async" @load="validateImage" @error="handleError">
     <div class="hist-info">
       <div class="hist-title">{{ show.show__title || show.title }}</div>
       <div class="hist-orig" v-if="show.show__original_title && show.show__original_title !== (show.show__title || show.title)">
@@ -68,7 +68,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref } from 'vue'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useTelegram } from '../../composables/useTelegram'
@@ -85,7 +85,6 @@ const props = defineProps({
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const { showConfirm } = useTelegram()
-const titleEl = ref(null)
 const isBroken = ref(false)
 
 const isHistory = computed(() => props.context === 'history')
@@ -138,8 +137,4 @@ const addToWishlist = () => {
     title: props.show.show__title || props.show.title 
   })
 }
-
-onMounted(() => {
-    if (titleEl.value) uiStore.fitText(titleEl.value)
-})
 </script>

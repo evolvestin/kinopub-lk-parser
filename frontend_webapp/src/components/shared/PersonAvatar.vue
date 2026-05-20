@@ -7,6 +7,7 @@
       @load="handleLoad"
       :alt="name"
       loading="lazy"
+      decoding="async"
     />
     <div v-else v-html="icons.person_placeholder"></div>
   </div>
@@ -27,7 +28,6 @@ const currentUrl = ref(null)
 const triedFallback = ref(false)
 
 const initUrl = () => {
-  // Если основная ссылка уже помечена как битая, сразу берем fallback
   if (props.photoUrl && !isImageBroken(props.photoUrl)) {
     currentUrl.value = props.photoUrl
     triedFallback.value = false
@@ -43,7 +43,6 @@ onBeforeMount(initUrl)
 
 const handleLoad = (event) => {
   const img = event.target
-  // Проверка на фейковую заглушку Кинопоиска
   if (img.naturalWidth === 208 && img.naturalHeight === 304) {
     handleError()
   }

@@ -102,15 +102,15 @@
             :palette="['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353']"
             @node-click="(idx) => openHistory('rating_filter', { idx: idx + 1, title: 'Оценка: ' + (idx + 1) })"
           />
-          <div class="stat clickable" style="flex-direction: row; justify-content: center; align-items: center; padding: 12px; margin-top: 12px; border-radius: 15px;" @click="openHistory('ratings')">
-              <span style="font-weight: 800; font-size: 14px;">Посмотреть все оценки</span>
+          <div class="stat clickable centered-stat-btn" style="flex-direction: row; justify-content: center; align-items: center; padding: 16px; margin-top: 12px; border-radius: 15px;" @click="openHistory('ratings')">
+              <span style="font-weight: 800; font-size: 14px; color: var(--text-primary);">Все оценки</span>
           </div>
         </div>
 
         <!-- Перенесено из .grid для полной ширины -->
         <div class="card hoverable anim-item" v-if="hasMonthlyData" style="margin-top: 16px;">
           <div class="label"><div class="icon" style="color:var(--info)" v-html="icons.chart"></div> Динамика</div>
-          <BaseChart type="line" :data="monthlyChartData" :options="monthlyChartOptions" :height="200" />
+          <BaseChart type="line" :data="monthlyChartData" :options="monthlyChartOptions" :height="320" />
         </div>
 
         <div class="card hoverable anim-item" v-if="hasWeekdayData" style="margin-top: 16px;">
@@ -422,7 +422,12 @@ const monthlyChartOptions = computed(() => {
     },
     scales: {
       x: {
-        ticks: { color: textColor, font: { size: fSize } },
+        ticks: { 
+          color: textColor, 
+          font: { size: fSize },
+          maxRotation: 45,
+          minRotation: 45
+        },
         grid: { display: false }
       },
       y: {
@@ -553,3 +558,12 @@ const handleHeatmapClick = ({ date, value }) => value > 0 && openHistory('day', 
 
 onMounted(() => { if (!statsStore.currentStats) statsStore.fetchStats('all') })
 </script>
+
+<style scoped>
+/* Добавить в конец блока style */
+.centered-stat-btn::after {
+    top: 50% !important;
+    transform: translateY(-50%) rotate(45deg) !important;
+    right: 20px !important;
+}
+</style>
