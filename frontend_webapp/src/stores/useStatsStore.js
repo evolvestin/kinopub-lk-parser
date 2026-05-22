@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, markRaw } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
 import { useUserStore } from './userStore'
@@ -101,7 +101,7 @@ export const useStatsStore = defineStore('stats', () => {
         if (data.meta.role) userStore.userRole = data.meta.role
       }
 
-      statsCache.value[year] = data
+      statsCache.value[year] = markRaw(data)
       
       if (!isBackground) {
         currentYear.value = year
@@ -131,6 +131,52 @@ export const useStatsStore = defineStore('stats', () => {
       }
     }
     isPreloadingYears.value = false
+  }
+
+  async function removeHistoryItem(historyId) {
+    const originalCache = JSON.parse(JSON.stringify(statsCache.value))
+
+    Object.keys(statsCache.value).forEach(year => {
+      const stats = statsCache.value[year]
+      if (stats) {
+        let updated = false
+        let history_movies = stats.history_movies
+        let history_episodes = stats.history_episodes
+
+        if (Array.isArray(history_movies)) {
+          const filtered = history_movies.filter(item => item.id !== historyId)
+          if (filtered.length !== history_movies.length) {
+            history_movies = filtered
+            updated = true
+          }
+        }
+        if (Array.isArray(history_episodes)) {
+          const filtered = history_episodes.filter(item => item.id !== historyId)
+          if (filtered.length !== history_episodes.length) {
+            history_episodes = filtered
+            updated = true
+          }
+        }
+
+        if (updated) {
+          statsCache.value[year] = markRaw({
+            ...stats,
+            history_movies,
+            history_episodes
+          })
+        }
+      }
+    })
+
+    uiStore.showToast('Просмотр удален')
+
+    try {
+      await api.post('remove_view/', { view_history_id: historyId })
+    } catch (error) {
+      console.error('[StatsStore] Failed to remove history item:', error)
+      uiStore.showToast('Не удалось удалить просмотр на сервере')
+      statsCache.value = originalCache
+    }
   }
 
   function getHistoryByType(type, { date, idx, key, showId }) {
@@ -202,7 +248,7 @@ export const useStatsStore = defineStore('stats', () => {
 
   return {
     statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup,
-    fetchStats, resolveAllImages, getHistoryByType,
+    fetchStats, resolveAllImages, getHistoryByType, removeHistoryItem,
     setActiveTab: (tab) => { activeTab.value = tab },
     setYear: (year) => fetchStats(year)
   }

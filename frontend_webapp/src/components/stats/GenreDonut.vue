@@ -189,14 +189,14 @@ onUnmounted(() => {
 .legend-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 6px;
     margin-top: 20px;
 }
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
+    gap: clamp(4px, 1.5vw, 6px);
+    padding: 5px clamp(6px, 1.8vw, 8px);
     background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -209,13 +209,13 @@ onUnmounted(() => {
     background: var(--bg-card);
 }
 .legend-dot {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
 }
 .legend-name {
-    font-size: 13px;
+    font-size: clamp(10px, 2.8vw, 12px);
     font-weight: 700;
     color: var(--text-primary);
     white-space: nowrap;
@@ -223,7 +223,7 @@ onUnmounted(() => {
     text-overflow: ellipsis;
 }
 .legend-val {
-    font-size: 11px;
+    font-size: clamp(9px, 2.4vw, 10px);
     color: var(--text-muted);
     font-weight: 600;
     margin-left: auto;

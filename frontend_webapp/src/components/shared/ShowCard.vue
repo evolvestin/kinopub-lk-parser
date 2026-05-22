@@ -1,6 +1,7 @@
 <template>
   <div 
     v-if="viewMode === 'grid'" 
+    v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge]"
     class="grid-item-wrap anim-item" 
     :class="{ 'history-mode': isHistory, 'wiggle': isWiggling }"
     @click="handleClick"
@@ -40,7 +41,7 @@
     <div class="grid-below-title">{{ show.show__title || show.title }}</div>
   </div>
 
-  <div v-else class="hist-item clickable anim-item" :class="{ 'wiggle': isWiggling }" @click="handleClick">
+  <div v-else v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge]" class="hist-item clickable anim-item" :class="{ 'wiggle': isWiggling }" @click="handleClick">
     <div v-if="showDeleteBadge" class="wl-delete-badge" style="left: -5px; top: -5px;" @click.stop="onDelete">
       <span v-html="icons.minus"></span>
     </div>
@@ -125,9 +126,21 @@ const handleClick = () => {
   if (id) uiStore.openLayer('show', id)
 }
 
-const onDelete = () => {
+const onDelete = (event) => {
+  const el = event?.currentTarget?.closest('.grid-item-wrap, .hist-item')
+
   showConfirm("Удалить эту запись?", (ok) => {
-    if (ok) statsStore.removeHistoryItem(props.show.id)
+    if (ok) {
+      if (el) {
+        el.classList.remove('wiggle')
+        el.classList.add('anim-shrink')
+        setTimeout(() => {
+          statsStore.removeHistoryItem(props.show.id)
+        }, 350)
+      } else {
+        statsStore.removeHistoryItem(props.show.id)
+      }
+    }
   })
 }
 

@@ -104,7 +104,7 @@ const handleClick = (idx) => {
   max-width: 36px;
   border-radius: 8px 8px 4px 4px;
   position: relative;
-  transition: height 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: height 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s ease, filter 0.2s ease;
   will-change: height;
   display: flex;
   align-items: center;
@@ -119,6 +119,13 @@ const handleClick = (idx) => {
 
 .bar-item-wrap:active:not(.is-empty) .bar-fill {
   filter: brightness(1.2);
+}
+
+@media (hover: hover) {
+  .bar-item-wrap:hover:not(.is-empty) .bar-fill {
+    filter: brightness(1.1);
+    transform: translateY(-2px);
+  }
 }
 
 .bar-label {
