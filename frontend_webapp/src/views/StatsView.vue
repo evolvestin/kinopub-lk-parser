@@ -1,7 +1,6 @@
 <template>
   <div class="view active-view" style="display: flex; flex-direction: column; overflow-y: auto;">
     <template v-if="statsStore.currentStats">
-      <!-- Header, Tabs, Years remain same ... -->
       <div class="header">
         <div class="header-left">
           <div class="avatar">
@@ -67,8 +66,8 @@
             :icon="icons.tv"
             :value="summary.total_episodes || 0"
             label="Эпизодов"
-            :sub-value="summary.unique_series || 0"
-            :sub-label="plural(summary.unique_series || 0, ['сериал', 'сериала', 'сериалов'])"
+            :sub-value="`${summary.unique_series || 0} ${plural(summary.unique_series || 0, ['сериал', 'сериала', 'сериалов'])}`"
+            :sub-label="`· ${summary.series_duration || '0м'}`"
             sub-color-class="purple"
             :clickable="true"
             @click="openHistory('episodes')"
@@ -81,6 +80,20 @@
             sub-color-class="orange"
             :clickable="true"
             @click="openHistory('movies')"
+          />
+          <StatCard
+            :icon="icons.bookmark"
+            :value="summary.wishlist_added || 0"
+            label="Добавлено в избранное"
+            :clickable="true"
+            @click="uiStore.switchBaseView('wishlist')"
+          />
+          <StatCard
+            :icon="icons.check"
+            :value="summary.wishlist_watched || 0"
+            label="Просмотрено из избранного"
+            :clickable="true"
+            @click="openHistory('wishlist_watched')"
           />
         </div>
 
@@ -107,7 +120,6 @@
           </div>
         </div>
 
-        <!-- Перенесено из .grid для полной ширины -->
         <div class="card hoverable anim-item" v-if="hasMonthlyData" style="margin-top: 16px;">
           <div class="label"><div class="icon" style="color:var(--info)" v-html="icons.chart"></div> Динамика</div>
           <BaseChart type="line" :data="monthlyChartData" :options="monthlyChartOptions" :height="320" />
@@ -140,7 +152,6 @@
           :is-dark="uiStore.theme === 'dark'"
         />
 
-        <!-- Leaders list ... -->
         <LeaderList 
           v-if="hasActorsData"
           category="actors"
@@ -159,10 +170,56 @@
           title="Сценаристы" icon-color="#3498db" :icon="icons.list"
           :data="statsStore.currentStats.writers"
         />
+
+        <div class="card hoverable anim-item" v-if="hasCountriesData">
+          <div class="label">
+            <div class="icon" style="color: #388bfd" v-html="icons.globe"></div>
+            Страны
+          </div>
+          <div>
+            <div 
+              v-for="(item, idx) in statsStore.currentStats.countries" 
+              :key="item.name" 
+              class="li li-clickable clickable"
+              @click="openHistory('filter', { key: 'countries', idx, title: item.name })"
+            >
+              <div class="li-l">
+                <span class="li-rank">{{ idx + 1 }}</span>
+                <span v-if="item.emoji" style="font-size: clamp(18px, 5vw, 22px); margin-right: 6px; line-height: 1;">{{ item.emoji }}</span>
+                <div class="li-name">{{ item.name }}</div>
+              </div>
+              <span class="li-r" style="color: var(--info)">{{ item.count }} {{ plural(item.count, ['просмотр', 'просмотра', 'просмотров']) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card hoverable anim-item" v-if="hasBingesData">
+          <div class="label">
+            <div class="icon" style="color: #a371f7" v-html="icons.bolt"></div>
+            Марафоны
+          </div>
+          <div>
+            <div 
+              v-for="b in statsStore.currentStats.binges" 
+              :key="b.show_id + '-' + b.date" 
+              class="li li-clickable clickable"
+              @click="openHistory('binge', { show_id: b.show_id, date: b.date, title: b.show_title })"
+            >
+              <div class="li-l">
+                <img v-if="b.poster_url" :src="b.poster_url" style="width: clamp(36px, 10vw, 44px); height: clamp(54px, 15vw, 66px); border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--bg-input); border: 1px solid var(--border);" />
+                <div v-else style="width: clamp(36px, 10vw, 44px); height: clamp(54px, 15vw, 66px); border-radius: 6px; flex-shrink: 0; background: var(--bg-input); border: 1px solid var(--border);"></div>
+                <div style="min-width: 0;">
+                  <div class="li-name">{{ b.show_title }}</div>
+                  <div class="li-sub">{{ b.date }}</div>
+                </div>
+              </div>
+              <span class="li-r" style="color: var(--info)">{{ b.count }} {{ plural(b.count, ['эпизод', 'эпизода', 'эпизодов']) }}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div v-if="statsStore.activeTab === 'group'" id="sec-group">
-          <!-- Group section remains same ... -->
           <div class="empty" v-if="!statsStore.currentStats.group">
               <div class="icon" v-html="icons.users"></div>Вы не состоите в группе
           </div>
@@ -244,6 +301,8 @@ const hasWeekdayData = computed(() => statsStore.currentStats?.weekday_chart?.da
 const hasActorsData = computed(() => statsStore.currentStats?.actors?.series?.length || statsStore.currentStats?.actors?.others?.length)
 const hasDirectorsData = computed(() => statsStore.currentStats?.directors?.series?.length || statsStore.currentStats?.directors?.others?.length)
 const hasWritersData = computed(() => statsStore.currentStats?.writers?.series?.length || statsStore.currentStats?.writers?.others?.length)
+const hasCountriesData = computed(() => statsStore.currentStats?.countries?.length)
+const hasBingesData = computed(() => statsStore.currentStats?.binges?.length)
 
 const ratingColor = computed(() => {
   const avg = statsStore.currentStats?.ratings?.avg || 0
@@ -278,7 +337,6 @@ const ratingsChartData = computed(() => {
       borderRadius: 6,
       borderWidth: 0,
       borderSkipped: false,
-      // Эффект физического сжатия при нажатии
       hoverInflateAmount: -5 
     }]
   };
@@ -295,7 +353,6 @@ const ratingsChartOptions = computed(() => {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    // Настройка поведения при переходе в активное состояние (нажатие)
     transitions: {
       active: {
         animation: {
@@ -466,7 +523,6 @@ const weekdayChartData = computed(() => {
       borderRadius: 8,
       borderWidth: 0,
       borderSkipped: false,
-      // Эффект физического сжатия при нажатии
       hoverInflateAmount: -5
     }]
   };
@@ -560,7 +616,6 @@ onMounted(() => { if (!statsStore.currentStats) statsStore.fetchStats('all') })
 </script>
 
 <style scoped>
-/* Добавить в конец блока style */
 .centered-stat-btn::after {
     top: 50% !important;
     transform: translateY(-50%) rotate(45deg) !important;

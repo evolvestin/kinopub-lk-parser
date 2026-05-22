@@ -1,0 +1,56 @@
+<template>
+  <div class="modal-overlay show" @click.self="close">
+    <div class="modal-content">
+      <div class="modal-header" style="margin-bottom: 8px;">
+        <div class="modal-title" style="font-size: 12px; opacity: 0.5; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
+          Добавить в список
+        </div>
+        <button class="modal-close" @click="close">×</button>
+      </div>
+      <div style="font-size: 22px; font-weight: 900; color: var(--text-primary); margin-bottom: 24px; line-height: 1.1; letter-spacing: -0.5px; padding-right: 20px;">
+        {{ context.title }}
+      </div>
+      <div style="font-size: 13px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
+        Выберите папку
+      </div>
+      <div id="wl-modal-folders">
+        <div v-for="f in wishlistStore.folders" 
+             :key="f.id" 
+             class="wl-folder-card" 
+             @click="addToFolder(f.id)">
+          <div class="wl-folder-icon" :style="{ color: f.color }">
+            <span v-html="icons[f.icon] || icons.folder"></span>
+          </div>
+          <div class="wl-folder-info">
+            <div class="wl-folder-name">{{ f.name }}</div>
+            <div class="wl-folder-count">
+              {{ f.items.length }} {{ plural(f.items.length, ['элемент', 'элемента', 'элементов']) }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import { useUIStore } from '../../stores/uiStore'
+import { useWishlistStore } from '../../stores/wishlistStore'
+import { icons } from '../../utils/icons'
+import { plural } from '../../utils/helpers'
+
+const uiStore = useUIStore()
+const wishlistStore = useWishlistStore()
+
+const context = computed(() => uiStore.modals.wlFolder.context || {})
+
+const close = () => {
+  uiStore.closeModal('wlFolder')
+}
+
+const addToFolder = async (folderId) => {
+  await wishlistStore.addItemToFolder(folderId, context.value.showId)
+  close()
+}
+</script>

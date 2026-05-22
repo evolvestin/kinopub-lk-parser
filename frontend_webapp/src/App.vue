@@ -11,6 +11,15 @@ import ShowDetailsLayer from './components/layers/ShowDetailsLayer.vue'
 import CollectionLayer from './components/layers/CollectionLayer.vue'
 import HistoryLayer from './components/layers/HistoryLayer.vue'
 
+import ShareModal from './components/modals/ShareModal.vue'
+import CasinoModal from './components/modals/CasinoModal.vue'
+import RatingModal from './components/modals/RatingModal.vue'
+import AddViewModal from './components/modals/AddViewModal.vue'
+import WlFolderModal from './components/modals/WlFolderModal.vue'
+import WlEditModal from './components/modals/WlEditModal.vue'
+import WlLimitModal from './components/modals/WlLimitModal.vue'
+import WlDeleteModal from './components/modals/WlDeleteModal.vue'
+
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const { tg } = useTelegram()
@@ -65,5 +74,14 @@ watch(() => uiStore.theme, (val) => {
     <BottomNav v-show="!uiStore.hasOpenLayers && uiStore.isAppReady" />
     <Loader />
     <Toast />
+
+    <ShareModal v-if="uiStore.modals.share.isOpen" />
+    <CasinoModal v-if="uiStore.modals.casino.isOpen" />
+    <RatingModal v-if="uiStore.modals.rateShow.isOpen" v-bind="uiStore.modals.rateShow.context" @close="uiStore.closeModal('rateShow')" />
+    <AddViewModal v-if="uiStore.modals.addView.isOpen" v-bind="uiStore.modals.addView.context" />
+    <WlFolderModal v-if="uiStore.modals.wlFolder.isOpen" />
+    <WlEditModal v-if="uiStore.modals.wlEdit.isOpen" />
+    <WlLimitModal v-if="uiStore.modals.wlLimit.isOpen" />
+    <WlDeleteModal v-if="uiStore.modals.wlDelete.isOpen" />
   </div>
 </template>

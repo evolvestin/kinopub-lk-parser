@@ -36,6 +36,8 @@
               :class="getIntensityClass(val)"
               :title="formatTitleDate(item.year, idx)"
               @click="handleCellClick(item.year, idx, val)"
+              @touchstart="handleCellTouchStart"
+              @touchend.prevent="handleCellTouchEnd($event, item.year, idx, val)"
             ></div>
           </div>
         </div>
@@ -87,7 +89,6 @@ const getYearMeta = (year) => {
 }
 
 const handleCellClick = (year, dayIndex, value) => {
-  if (scale.value > 1.05) return
   const date = new Date(year, 0, 1)
   date.setDate(date.getDate() + dayIndex)
   const y = date.getFullYear()
@@ -111,6 +112,25 @@ let startMidX = 0
 let startMidY = 0
 let startTranslateX = 0
 let startTranslateY = 0
+
+let cellTouchStartX = 0
+let cellTouchStartY = 0
+
+const handleCellTouchStart = (e) => {
+  const touch = e.touches[0]
+  cellTouchStartX = touch.clientX
+  cellTouchStartY = touch.clientY
+}
+
+const handleCellTouchEnd = (e, year, dayIndex, value) => {
+  const touch = e.changedTouches[0]
+  const distX = Math.abs(touch.clientX - cellTouchStartX)
+  const distY = Math.abs(touch.clientY - cellTouchStartY)
+  
+  if (distX < 10 && distY < 10) {
+    handleCellClick(year, dayIndex, value)
+  }
+}
 
 const touchActionStyle = computed(() => {
   return scale.value > 1.05 ? 'none' : 'pan-y'

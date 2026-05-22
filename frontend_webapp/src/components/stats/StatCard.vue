@@ -3,7 +3,7 @@
     <div class="stat-icon" v-html="icon"></div>
     <div class="stat-val">{{ value }}</div>
     <div class="stat-lbl">{{ label }}</div>
-    <div v-if="subValue !== undefined" class="stat-sub" :class="subColorClass">
+    <div v-if="subValue !== undefined && subValue !== null && subValue !== ''" class="stat-sub" :class="subColorClass">
       {{ subValue }} {{ subLabel }}
     </div>
   </div>

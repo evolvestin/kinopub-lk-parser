@@ -88,9 +88,15 @@ const statsStore = useStatsStore()
 const { showConfirm } = useTelegram()
 const isBroken = ref(false)
 
-const isHistory = computed(() => props.context === 'history')
-const isWiggling = computed(() => isHistory.value && uiStore.isHistoryEditMode)
-const showDeleteBadge = computed(() => isHistory.value && uiStore.isHistoryEditMode && props.historyId !== 'ratings')
+const isHistory = computed(() => props.context === 'history' || props.context === 'wishlist')
+const isWiggling = computed(() => {
+  if (props.context === 'wishlist') return wishlistStoreActive.value && wishlistStoreActive.value.isReorderItemsMode
+  return props.context === 'history' && uiStore.isHistoryEditMode
+})
+const showDeleteBadge = computed(() => {
+  if (props.context === 'wishlist') return true
+  return props.context === 'history' && uiStore.isHistoryEditMode && props.historyId !== 'ratings'
+})
 const itemYear = computed(() => props.show.show__year || props.show.year)
 const displayDate = computed(() => props.show.view_date || props.show.date)
 const season = computed(() => props.show.season_number ?? props.show.season)
@@ -101,6 +107,15 @@ const currentPosterUrl = computed(() => {
   const url = props.show.poster_url || ''
   if (!url) return ''
   return props.viewMode === 'grid' ? url.replace('/small/', '/medium/') : url
+})
+
+import { useWishlistStore } from '../../stores/wishlistStore'
+const wishlistStoreActive = computed(() => {
+  try {
+    return useWishlistStore()
+  } catch (e) {
+    return null
+  }
 })
 
 const validateImage = (e) => {
@@ -121,12 +136,18 @@ const getRatingClass = (val) => {
 }
 
 const handleClick = () => {
+  if (props.context === 'wishlist' && wishlistStoreActive.value?.isReorderItemsMode) return
   if (uiStore.isHistoryEditMode) return
   const id = props.show.show_id || props.show.id
   if (id) uiStore.openLayer('show', id)
 }
 
 const onDelete = (event) => {
+  if (props.context === 'wishlist') {
+    uiStore.openModal('wlDelete', { id: props.show.id, title: props.show.show__title || props.show.title })
+    return
+  }
+
   const el = event?.currentTarget?.closest('.grid-item-wrap, .hist-item')
 
   showConfirm("Удалить эту запись?", (ok) => {

@@ -131,7 +131,7 @@ const items = computed(() => {
 
 const displayTitle = computed(() => {
   if (route.query.title) return route.query.title
-  const titles = { all: 'Вся история', movies: 'Фильмы', episodes: 'Эпизоды', ratings: 'Все оценки', wishlist_watched: 'Из избранного', casino: 'История рулетки' }
+  const titles = { all: 'Вся история', movies: 'Фильмы', episodes: 'Эпизоды', ratings: 'Все оценки', wishlist_watched: 'Просмотрено из избранного', casino: 'История рулетки' }
   return titles[props.historyId] || 'История'
 })
 

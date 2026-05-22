@@ -14,7 +14,11 @@ export const useUIStore = defineStore('ui', () => {
     casino: { isOpen: false, context: null },
     rateShow: { isOpen: false, context: null },
     addView: { isOpen: false, context: null },
-    details: { isOpen: false, context: null }
+    details: { isOpen: false, context: null },
+    wlFolder: { isOpen: false, context: null },
+    wlEdit: { isOpen: false, context: null },
+    wlLimit: { isOpen: false, context: null },
+    wlDelete: { isOpen: false, context: null }
   })
 
   const layerStack = computed(() => {
