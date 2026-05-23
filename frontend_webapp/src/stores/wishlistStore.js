@@ -80,23 +80,41 @@ export const useWishlistStore = defineStore('wishlist', () => {
   }
 
   async function createFolder(name, icon, color) {
+    const trimmedName = name?.trim() || ''
+    if (!trimmedName) {
+      uiStore.showToast('Название папки не может быть пустым')
+      return
+    }
+    if (trimmedName.length > 100) {
+      uiStore.showToast('Название папки не должно превышать 100 символов')
+      return
+    }
     try {
-      const data = await api.post('wishlist/', { action: 'create_folder', name, icon, color })
+      const data = await api.post('wishlist/', { action: 'create_folder', name: trimmedName, icon, color })
       await fetchWishlist()
       if (data.id) activeFolderId.value = data.id
       uiStore.showToast('Папка создана')
-    } catch (e) {
-      uiStore.showToast('Ошибка создания папки')
+    } catch (error) {
+      uiStore.showToast(error.message || 'Ошибка создания папки')
     }
   }
 
   async function editFolder(folderId, name, icon, color) {
+    const trimmedName = name?.trim() || ''
+    if (!trimmedName) {
+      uiStore.showToast('Название папки не может быть пустым')
+      return
+    }
+    if (trimmedName.length > 100) {
+      uiStore.showToast('Название папки не должно превышать 100 символов')
+      return
+    }
     try {
-      await api.post('wishlist/', { action: 'edit_folder', folder_id: folderId, name, icon, color })
+      await api.post('wishlist/', { action: 'edit_folder', folder_id: folderId, name: trimmedName, icon, color })
       await fetchWishlist()
       uiStore.showToast('Папка изменена')
-    } catch (e) {
-      uiStore.showToast('Ошибка изменения папки')
+    } catch (error) {
+      uiStore.showToast(error.message || 'Ошибка изменения папки')
     }
   }
 
@@ -134,6 +152,13 @@ export const useWishlistStore = defineStore('wishlist', () => {
   }
 
   async function reorderFolders(order) {
+    const newFolders = []
+    order.forEach(id => {
+      const f = folders.value.find(x => x.id === id)
+      if (f) newFolders.push(f)
+    })
+    folders.value = newFolders
+
     try {
       await api.post('wishlist/', { action: 'reorder_folders', order })
     } catch (e) {
@@ -142,6 +167,16 @@ export const useWishlistStore = defineStore('wishlist', () => {
   }
 
   async function reorderItems(folderId, order) {
+    const folder = folders.value.find(f => f.id === folderId)
+    if (folder) {
+      const newItems = []
+      order.forEach(id => {
+        const it = folder.items.find(x => x.id === id)
+        if (it) newItems.push(it)
+      })
+      folder.items = newItems
+    }
+
     try {
       await api.post('wishlist/', { action: 'reorder_items', folder_id: folderId, order })
     } catch (e) {

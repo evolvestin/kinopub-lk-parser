@@ -1,10 +1,12 @@
 <template>
   <div 
     v-if="viewMode === 'grid'" 
-    v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge]"
-    class="grid-item-wrap anim-item" 
-    :class="{ 'history-mode': isHistory, 'wiggle': isWiggling }"
+    v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge, isAnimated]"
+    class="grid-item-wrap" 
+    :class="{ 'anim-item': isAnimated, 'history-mode': isHistory, 'wiggle': isWiggling }"
+    :data-id="show.id || show.show_id"
     @click="handleClick"
+    @animationend="handleAnimationEnd"
   >
     <div v-if="showDeleteBadge" class="wl-delete-badge" @click.stop="onDelete">
       <span v-html="icons.minus"></span>
@@ -41,7 +43,15 @@
     <div class="grid-below-title">{{ show.show__title || show.title }}</div>
   </div>
 
-  <div v-else v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge]" class="hist-item clickable anim-item" :class="{ 'wiggle': isWiggling }" @click="handleClick">
+  <div 
+    v-else 
+    v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge, isAnimated]" 
+    class="hist-item clickable" 
+    :class="{ 'anim-item': isAnimated, 'wiggle': isWiggling }" 
+    :data-id="show.id || show.show_id" 
+    @click="handleClick"
+    @animationend="handleAnimationEnd"
+  >
     <div v-if="showDeleteBadge" class="wl-delete-badge" style="left: -5px; top: -5px;" @click.stop="onDelete">
       <span v-html="icons.minus"></span>
     </div>
@@ -87,6 +97,7 @@ const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const { showConfirm } = useTelegram()
 const isBroken = ref(false)
+const isAnimated = ref(true)
 
 const isHistory = computed(() => props.context === 'history' || props.context === 'wishlist')
 const isWiggling = computed(() => {
@@ -98,7 +109,7 @@ const showDeleteBadge = computed(() => {
   return props.context === 'history' && uiStore.isHistoryEditMode && props.historyId !== 'ratings'
 })
 const itemYear = computed(() => props.show.show__year || props.show.year)
-const displayDate = computed(() => props.show.view_date || props.show.date)
+const displayDate = computed(() => props.show.view_date || props.show.date || props.show.added_at)
 const season = computed(() => props.show.season_number ?? props.show.season)
 const episode = computed(() => props.show.episode_number ?? props.show.episode)
 const rating = computed(() => props.show.user_rating || props.show.rating || props.show.user_show_rating)
@@ -117,6 +128,10 @@ const wishlistStoreActive = computed(() => {
     return null
   }
 })
+
+const handleAnimationEnd = () => {
+  isAnimated.value = false
+}
 
 const validateImage = (e) => {
   if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {

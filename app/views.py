@@ -1787,7 +1787,12 @@ def webapp_wishlist_data(request):
             if WishlistFolder.objects.filter(user=view_user, is_deleted=False).count() >= 12:
                 return JsonResponse({'error': 'Достигнут лимит в 12 папок'}, status=400)
 
-            name = body.get('name', '').strip() or ''
+            name = body.get('name', '').strip()
+            if not name:
+                return JsonResponse({'error': 'Название папки не может быть пустым'}, status=400)
+            if len(name) > 100:
+                return JsonResponse({'error': 'Название папки не должно превышать 100 символов'}, status=400)
+
             icon = body.get('icon', 'folder')
             color = body.get('color', '#60a5fa')
             max_order = (
@@ -1818,7 +1823,12 @@ def webapp_wishlist_data(request):
 
         elif action == 'edit_folder':
             folder_id = body.get('folder_id')
-            name = body.get('name', '').strip() or ''
+            name = body.get('name', '').strip()
+            if not name:
+                return JsonResponse({'error': 'Название папки не может быть пустым'}, status=400)
+            if len(name) > 100:
+                return JsonResponse({'error': 'Название папки не должно превышать 100 символов'}, status=400)
+
             icon = body.get('icon')
             color = body.get('color')
             WishlistFolder.objects.filter(id=folder_id, user=view_user, is_deleted=False).update(

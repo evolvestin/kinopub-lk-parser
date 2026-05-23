@@ -16,7 +16,7 @@
         <span v-html="folderIcon"></span>
       </div>
       <div class="wl-folder-info">
-        <div class="wl-folder-name">{{ folder.name }}</div>
+        <div class="wl-folder-name" ref="folderNameRef">{{ folder.name }}</div>
         <div class="wl-folder-count">
           {{ folder.items.length }} {{ plural(folder.items.length, ['шоу', 'шоу', 'шоу']) }}
         </div>
@@ -26,9 +26,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { icons } from '../../utils/icons'
 import { plural } from '../../utils/helpers'
+import { useUIStore } from '../../stores/uiStore'
 
 const props = defineProps({
   folder: { type: Object, required: true },
@@ -37,6 +38,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['select', 'edit', 'delete'])
+
+const uiStore = useUIStore()
+const folderNameRef = ref(null)
 
 const folderIcon = computed(() => icons[props.folder.icon] || icons.folder)
 
@@ -62,4 +66,17 @@ const handleClick = () => {
     emit('select', props.folder.id)
   }
 }
+
+const adjustFont = () => {
+  nextTick(() => {
+    if (folderNameRef.value) {
+      uiStore.fitText(folderNameRef.value)
+    }
+  })
+}
+
+onMounted(adjustFont)
+watch(() => props.folder.name, adjustFont)
+watch(() => props.isActive, adjustFont)
+watch(() => props.isReorderMode, adjustFont)
 </script>

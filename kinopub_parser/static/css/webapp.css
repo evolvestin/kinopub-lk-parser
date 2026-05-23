@@ -1098,14 +1098,22 @@ body.has-banner #app {
     color: var(--text-primary);
     display: flex;
     align-items: center;
-    white-space: nowrap;
-    /* Убираем overflow: hidden здесь, чтобы scrollWidth считался корректно внутри fitText */
-    /* Сама функция подгонит размер так, чтобы переполнения не было */
     overflow: visible; 
     min-width: 0;
     flex: 1;
     margin-right: 12px;
-    height: 1.4em;
+    height: auto;
+    max-height: 2.5em;
+    line-height: 1.2;
+}
+
+.wl-active-folder-name-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    line-height: 1.2;
 }
 
 #wl-active-folder-title span {
@@ -1911,4 +1919,15 @@ img {
 .history-edit-mode .hist-item {
     content-visibility: visible;
     contain: none;
+}
+
+/* Vue Modal Transition */
+.modal-enter-from,
+.modal-leave-to {
+    opacity: 0 !important;
+}
+
+.modal-enter-from .modal-content,
+.modal-leave-to .modal-content {
+    transform: translateY(100%) !important;
 }

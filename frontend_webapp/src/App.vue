@@ -48,7 +48,7 @@ watch(() => uiStore.theme, (val) => {
 
 <template>
   <div :class="[uiStore.theme, 'is-webapp']">
-    <div v-show="uiStore.isAppReady" id="views-container" class="app-viewport">
+    <div v-show="uiStore.isAppReady && !uiStore.hasOpenLayers" id="views-container" class="app-viewport">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component :is="Component" :key="uiStore.activeView" />
@@ -75,13 +75,29 @@ watch(() => uiStore.theme, (val) => {
     <Loader />
     <Toast />
 
-    <ShareModal v-if="uiStore.modals.share.isOpen" />
-    <CasinoModal v-if="uiStore.modals.casino.isOpen" />
-    <RatingModal v-if="uiStore.modals.rateShow.isOpen" v-bind="uiStore.modals.rateShow.context" @close="uiStore.closeModal('rateShow')" />
-    <AddViewModal v-if="uiStore.modals.addView.isOpen" v-bind="uiStore.modals.addView.context" />
-    <WlFolderModal v-if="uiStore.modals.wlFolder.isOpen" />
-    <WlEditModal v-if="uiStore.modals.wlEdit.isOpen" />
-    <WlLimitModal v-if="uiStore.modals.wlLimit.isOpen" />
-    <WlDeleteModal v-if="uiStore.modals.wlDelete.isOpen" />
+    <Transition name="modal">
+      <ShareModal v-if="uiStore.modals.share.isOpen" />
+    </Transition>
+    <Transition name="modal">
+      <CasinoModal v-if="uiStore.modals.casino.isOpen" />
+    </Transition>
+    <Transition name="modal">
+      <RatingModal v-if="uiStore.modals.rateShow.isOpen" v-bind="uiStore.modals.rateShow.context" @close="uiStore.closeModal('rateShow')" />
+    </Transition>
+    <Transition name="modal">
+      <AddViewModal v-if="uiStore.modals.addView.isOpen" v-bind="uiStore.modals.addView.context" />
+    </Transition>
+    <Transition name="modal">
+      <WlFolderModal v-if="uiStore.modals.wlFolder.isOpen" />
+    </Transition>
+    <Transition name="modal">
+      <WlEditModal v-if="uiStore.modals.wlEdit.isOpen" />
+    </Transition>
+    <Transition name="modal">
+      <WlLimitModal v-if="uiStore.modals.wlLimit.isOpen" />
+    </Transition>
+    <Transition name="modal">
+      <WlDeleteModal v-if="uiStore.modals.wlDelete.isOpen" />
+    </Transition>
   </div>
 </template>

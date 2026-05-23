@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useWishlistStore } from '../stores/wishlistStore'
 import { useUIStore } from '../stores/uiStore'
 import { icons } from '../utils/icons'
@@ -16,6 +16,8 @@ const themeIcon = computed(() => uiStore.theme === 'dark' ? icons.moon : icons.s
 
 const foldersGridRef = ref(null)
 const itemsGridRef = ref(null)
+const mainHeaderRef = ref(null)
+const activeFolderTitleRef = ref(null)
 
 let foldersSortable = null
 let itemsSortable = null
@@ -49,6 +51,17 @@ const setSort = (mode) => {
   }
   wishlistStore.setSortMode(newMode)
   isSortMenuOpen.value = false
+}
+
+const adjustHeaderFonts = () => {
+  nextTick(() => {
+    if (mainHeaderRef.value) {
+      uiStore.fitText(mainHeaderRef.value)
+    }
+    if (activeFolderTitleRef.value) {
+      uiStore.fitText(activeFolderTitleRef.value)
+    }
+  })
 }
 
 const initSortable = () => {
@@ -85,6 +98,7 @@ onMounted(async () => {
   await wishlistStore.fetchWishlist()
   isInitialLoading.value = false
   initSortable()
+  adjustHeaderFonts()
 })
 
 onUnmounted(() => {
@@ -97,7 +111,9 @@ watch(() => wishlistStore.isReorderFoldersMode, (val) => {
 })
 
 watch(() => wishlistStore.isReorderItemsMode, (val) => {
-  if (itemsSortable) itemsSortable.option('disabled', !val)
+  if (itemsSortable) {
+    itemsSortable.option('disabled', !val)
+  }
 })
 
 watch(() => wishlistStore.activeFolderId, () => {
@@ -106,10 +122,25 @@ watch(() => wishlistStore.activeFolderId, () => {
     itemsSortable = null
   }
   setTimeout(initSortable, 50)
+  adjustHeaderFonts()
+})
+
+watch(() => wishlistStore.folders, () => {
+  adjustHeaderFonts()
+}, { deep: true })
+
+watch(() => wishlistStore.activeFolder?.name, () => {
+  adjustHeaderFonts()
 })
 
 const handleEditFolder = (folderId) => {
   uiStore.openModal('wlEdit', { isEdit: true, folderId })
+}
+
+const handleDeleteFolder = async (folderId) => {
+  if (confirm('Удалить папку и всё её содержимое?')) {
+    await wishlistStore.deleteFolder(folderId)
+  }
 }
 
 const handleCreateFolder = () => {
@@ -124,7 +155,7 @@ const handleCreateFolder = () => {
 <template>
   <div class="view active-view" id="view-wishlist">
     <div class="header" style="padding-bottom: 8px;">
-      <div class="header-name glow-text" id="wl-main-header">
+      <div class="header-name glow-text" id="wl-main-header" ref="mainHeaderRef">
         <template v-if="wishlistStore.folders.length === 1 && wishlistStore.activeFolder">
            <span :style="{ color: wishlistStore.activeFolder.color, marginRight: '10px' }" 
                  v-html="icons[wishlistStore.activeFolder.icon] || icons.folder"></span>
@@ -169,15 +200,16 @@ const handleCreateFolder = () => {
             :is-reorder-mode="wishlistStore.isReorderFoldersMode"
             @select="wishlistStore.activeFolderId = $event"
             @edit="handleEditFolder"
+            @delete="handleDeleteFolder"
           />
         </div>
       </div>
 
       <div v-if="wishlistStore.activeFolder" id="wl-active-folder-content">
         <div class="wl-active-header">
-          <div id="wl-active-folder-title" v-if="wishlistStore.folders.length > 1">
-            <span :style="{ color: wishlistStore.activeFolder.color, marginRight: '8px' }" v-html="icons[wishlistStore.activeFolder.icon] || icons.folder"></span>
-            {{ wishlistStore.activeFolder.name }}
+          <div id="wl-active-folder-title" v-if="wishlistStore.folders.length > 1" ref="activeFolderTitleRef">
+            <span :style="{ color: wishlistStore.activeFolder.color, marginRight: '8px' }" v-html="icons[wishlistStore.activeFolder.icon] || icons.folder" style="display: inline-flex; align-items: center;"></span>
+            <span class="wl-active-folder-name-text">{{ wishlistStore.activeFolder.name }}</span>
           </div>
           <div style="display: flex; gap: 8px; align-items: center; margin-left: auto; flex-shrink: 0;">
             <div class="sort-dropdown-container">

@@ -91,8 +91,10 @@ export const useUIStore = defineStore('ui', () => {
     const limitWidth = el.clientWidth
     if (limitWidth <= 0) return
 
-    const stylesMaxHeight = parseFloat(styles.maxHeight)
-    const limitHeight = (!isNaN(stylesMaxHeight) && stylesMaxHeight > 0) ? stylesMaxHeight : (el.offsetHeight || 40)
+    let limitHeight = parseFloat(styles.maxHeight)
+    if (isNaN(limitHeight) || !styles.maxHeight.includes('px')) {
+      limitHeight = el.offsetHeight || 40
+    }
     
     const isSingleLine = styles.whiteSpace === 'nowrap' || styles.webkitLineClamp === '1'
     let size = parseFloat(styles.fontSize)
