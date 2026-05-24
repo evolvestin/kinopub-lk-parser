@@ -526,6 +526,7 @@ class WishlistItem(BaseModel):
 class CasinoSpin(BaseModel):
     user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='casino_spins')
     show = models.ForeignKey(Show, on_delete=models.CASCADE)
+    is_deleted = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Casino Spin'

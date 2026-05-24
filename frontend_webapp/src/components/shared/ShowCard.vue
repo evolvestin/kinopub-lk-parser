@@ -167,14 +167,15 @@ const onDelete = (event) => {
 
   showConfirm("Удалить эту запись?", (ok) => {
     if (ok) {
+      const itemId = props.show.id || props.show.show_id;
       if (el) {
         el.classList.remove('wiggle')
         el.classList.add('anim-shrink')
         setTimeout(() => {
-          statsStore.removeHistoryItem(props.show.id)
+          statsStore.removeHistoryItem(itemId, props.historyId)
         }, 350)
       } else {
-        statsStore.removeHistoryItem(props.show.id)
+        statsStore.removeHistoryItem(itemId, props.historyId)
       }
     }
   })

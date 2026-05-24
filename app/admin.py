@@ -1929,10 +1929,14 @@ class WishlistFolderAdmin(admin.ModelAdmin):
 
 @admin.register(CasinoSpin, site=admin_site)
 class CasinoSpinAdmin(admin.ModelAdmin):
-    list_display = ('user', 'show', 'created_at')
+    list_display = ('user', 'show', 'get_is_active', 'created_at')
     list_filter = ('user', 'created_at')
     autocomplete_fields = ('user', 'show')
     readonly_fields = ('created_at', 'updated_at')
+
+    @admin.display(description='Активна', boolean=True, ordering='is_deleted')
+    def get_is_active(self, obj):
+        return not obj.is_deleted
 
 
 @admin.register(WishlistItem, site=admin_site)

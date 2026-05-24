@@ -8,7 +8,9 @@
         </button>
       </div>
       <div class="layer-header-center">
-        <div class="layer-title-main" ref="titleEl">{{ displayTitle }}</div>
+        <div class="layer-title-main" 
+             :style="{ opacity: titleReady ? 1 : 0, transition: 'opacity 0.15s ease' }" 
+             ref="titleEl">{{ displayTitle }}</div>
         <div class="layer-group-label" ref="stickyLabelEl" id="sticky-group-text">{{ stickyLabel }}</div>
       </div>
       <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
@@ -99,6 +101,7 @@ const offset = ref(80)
 const stickyLabel = ref('')
 const showSticky = ref(false)
 const cachedOffsets = ref([])
+const titleReady = ref(false)
 let ticking = false
 
 const isShared = computed(() => !!route.query.shared_id || window.location.hash.includes('shared_id'))
@@ -210,6 +213,17 @@ const onScroll = () => {
   }
 }
 
+const checkAndFetchAdditionalData = async () => {
+  if (props.historyId === 'casino') {
+    uiStore.setLoading(true)
+    await statsStore.fetchCasinoHistory()
+    uiStore.setLoading(false)
+    nextTick(() => {
+      cacheDividerOffsets()
+    })
+  }
+}
+
 let observer = null
 
 onMounted(() => {
@@ -223,6 +237,7 @@ onMounted(() => {
   
   nextTick(() => {
     if (titleEl.value) uiStore.fitText(titleEl.value)
+    titleReady.value = true
     cacheDividerOffsets()
   })
 })
@@ -234,4 +249,14 @@ onUnmounted(() => {
 watch([viewMode, visibleList], () => {
   cacheDividerOffsets()
 })
+
+watch(
+  [() => statsStore.currentStats, () => props.historyId],
+  async ([newStats]) => {
+    if (newStats) {
+      await checkAndFetchAdditionalData()
+    }
+  },
+  { immediate: true }
+)
 </script>

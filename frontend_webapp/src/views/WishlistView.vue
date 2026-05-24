@@ -12,6 +12,7 @@ const uiStore = useUIStore()
 
 const isInitialLoading = ref(true)
 const isSortMenuOpen = ref(false)
+const headersReady = ref(false)
 const themeIcon = computed(() => uiStore.theme === 'dark' ? icons.moon : icons.sun)
 
 const foldersGridRef = ref(null)
@@ -54,13 +55,17 @@ const setSort = (mode) => {
 }
 
 const adjustHeaderFonts = () => {
+  headersReady.value = false
   nextTick(() => {
-    if (mainHeaderRef.value) {
-      uiStore.fitText(mainHeaderRef.value)
-    }
-    if (activeFolderTitleRef.value) {
-      uiStore.fitText(activeFolderTitleRef.value)
-    }
+    setTimeout(() => {
+      if (mainHeaderRef.value) {
+        uiStore.fitText(mainHeaderRef.value)
+      }
+      if (activeFolderTitleRef.value) {
+        uiStore.fitText(activeFolderTitleRef.value)
+      }
+      headersReady.value = true
+    }, 50)
   })
 }
 
@@ -155,7 +160,11 @@ const handleCreateFolder = () => {
 <template>
   <div class="view active-view" id="view-wishlist">
     <div class="header" style="padding-bottom: 8px;">
-      <div class="header-name glow-text" id="wl-main-header" ref="mainHeaderRef">
+      <div class="header-name glow-text" 
+           :class="{ 'single-folder': wishlistStore.folders.length === 1 && wishlistStore.activeFolder }" 
+           :style="{ opacity: headersReady ? 1 : 0, transition: 'opacity 0.15s ease' }"
+           id="wl-main-header" 
+           ref="mainHeaderRef">
         <template v-if="wishlistStore.folders.length === 1 && wishlistStore.activeFolder">
            <span :style="{ color: wishlistStore.activeFolder.color, marginRight: '10px' }" 
                  v-html="icons[wishlistStore.activeFolder.icon] || icons.folder"></span>
@@ -207,7 +216,10 @@ const handleCreateFolder = () => {
 
       <div v-if="wishlistStore.activeFolder" id="wl-active-folder-content">
         <div class="wl-active-header">
-          <div id="wl-active-folder-title" v-if="wishlistStore.folders.length > 1" ref="activeFolderTitleRef">
+          <div id="wl-active-folder-title" 
+               v-if="wishlistStore.folders.length > 1" 
+               :style="{ opacity: headersReady ? 1 : 0, transition: 'opacity 0.15s ease' }"
+               ref="activeFolderTitleRef">
             <span :style="{ color: wishlistStore.activeFolder.color, marginRight: '8px' }" v-html="icons[wishlistStore.activeFolder.icon] || icons.folder" style="display: inline-flex; align-items: center;"></span>
             <span class="wl-active-folder-name-text">{{ wishlistStore.activeFolder.name }}</span>
           </div>
@@ -239,7 +251,7 @@ const handleCreateFolder = () => {
           </div>
         </div>
 
-        <div ref="itemsGridRef" id="wl-items-container" style="padding: 0 16px 24px;">
+        <div ref="itemsGridRef" id="wl-items-container" :class="{ 'reorder-items-mode': wishlistStore.isReorderItemsMode }" style="padding: 0 16px 24px;">
           <div v-if="!wishlistStore.activeFolder.items.length" class="empty">
             <div class="icon" v-html="icons.film"></div> Папка пуста
           </div>

@@ -91,14 +91,18 @@ export const useUIStore = defineStore('ui', () => {
     const limitWidth = el.clientWidth
     if (limitWidth <= 0) return
 
-    let limitHeight = parseFloat(styles.maxHeight)
-    if (isNaN(limitHeight) || !styles.maxHeight.includes('px')) {
-      limitHeight = el.offsetHeight || 40
-    }
-    
-    const isSingleLine = styles.whiteSpace === 'nowrap' || styles.webkitLineClamp === '1'
-    let size = parseFloat(styles.fontSize)
+    const initialFontSize = parseFloat(styles.fontSize) || 16
+    const initialMaxHeight = parseFloat(styles.maxHeight)
+    const hasMaxHeight = !isNaN(initialMaxHeight) && styles.maxHeight.includes('px')
+    const emRatio = hasMaxHeight ? (initialMaxHeight / initialFontSize) : null
+
+    let limitHeight = hasMaxHeight ? initialMaxHeight : (el.offsetHeight || 40)
+    let size = initialFontSize
     const minSize = 9
+
+    const isSingleLine = styles.whiteSpace === 'nowrap' || styles.webkitLineClamp === '1'
+    const originalMaxHeight = el.style.maxHeight
+    const originalClamp = el.style.webkitLineClamp
     
     if (isSingleLine) {
       while (el.scrollWidth > limitWidth + 1 && size > minSize) {
@@ -106,19 +110,20 @@ export const useUIStore = defineStore('ui', () => {
         el.style.fontSize = size + "px"
       }
     } else {
-      const originalClamp = el.style.webkitLineClamp
-      const originalMaxH = el.style.maxHeight
-      
       el.style.webkitLineClamp = "none"
       el.style.maxHeight = "none"
       
-      while (el.scrollHeight > limitHeight + 1 && size > minSize) {
+      while (size > minSize) {
+        const currentLimitHeight = emRatio ? (size * emRatio) : limitHeight
+        if (el.scrollHeight <= currentLimitHeight + 1) {
+          break
+        }
         size -= 0.5
         el.style.fontSize = size + "px"
       }
       
       el.style.webkitLineClamp = originalClamp
-      el.style.maxHeight = originalMaxH
+      el.style.maxHeight = originalMaxHeight
     }
   }
 

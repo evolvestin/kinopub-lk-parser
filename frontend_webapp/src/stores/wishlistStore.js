@@ -81,10 +81,6 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
   async function createFolder(name, icon, color) {
     const trimmedName = name?.trim() || ''
-    if (!trimmedName) {
-      uiStore.showToast('Название папки не может быть пустым')
-      return
-    }
     if (trimmedName.length > 100) {
       uiStore.showToast('Название папки не должно превышать 100 символов')
       return
@@ -101,10 +97,6 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
   async function editFolder(folderId, name, icon, color) {
     const trimmedName = name?.trim() || ''
-    if (!trimmedName) {
-      uiStore.showToast('Название папки не может быть пустым')
-      return
-    }
     if (trimmedName.length > 100) {
       uiStore.showToast('Название папки не должно превышать 100 символов')
       return

@@ -1788,8 +1788,6 @@ def webapp_wishlist_data(request):
                 return JsonResponse({'error': 'Достигнут лимит в 12 папок'}, status=400)
 
             name = body.get('name', '').strip()
-            if not name:
-                return JsonResponse({'error': 'Название папки не может быть пустым'}, status=400)
             if len(name) > 100:
                 return JsonResponse({'error': 'Название папки не должно превышать 100 символов'}, status=400)
 
@@ -1824,8 +1822,6 @@ def webapp_wishlist_data(request):
         elif action == 'edit_folder':
             folder_id = body.get('folder_id')
             name = body.get('name', '').strip()
-            if not name:
-                return JsonResponse({'error': 'Название папки не может быть пустым'}, status=400)
             if len(name) > 100:
                 return JsonResponse({'error': 'Название папки не должно превышать 100 символов'}, status=400)
 
@@ -1988,8 +1984,8 @@ def webapp_casino(request):
                     folder__user=view_user, folder__id=folder_id
                 ).select_related('show')
 
-            if not items.exists():
-                return JsonResponse({'error': 'Empty folder'}, status=400)
+                if not items.exists():
+                    return JsonResponse({'error': 'Empty folder'}, status=400)
 
             winner_item = random.choice(list(items))
             winner_show = winner_item.show
@@ -2018,7 +2014,7 @@ def webapp_casino(request):
 
         elif action == 'history':
             spins = (
-                CasinoSpin.objects.filter(user=view_user)
+                CasinoSpin.objects.filter(user=view_user, is_deleted=False)
                 .order_by('-created_at')
                 .select_related('show')
             )
@@ -2026,6 +2022,7 @@ def webapp_casino(request):
             for s in spins:
                 history.append(
                     {
+                        'id': s.id,
                         'show_id': s.show.id,
                         'show__title': s.show.title,
                         'show__original_title': s.show.original_title,
@@ -2038,6 +2035,11 @@ def webapp_casino(request):
                     }
                 )
             return JsonResponse({'history': history})
+
+        elif action == 'delete_spin':
+            spin_id = body.get('spin_id')
+            CasinoSpin.objects.filter(id=spin_id, user=view_user).update(is_deleted=True)
+            return JsonResponse({'status': 'ok'})
 
         elif action == 'reset':
             now = timezone.now()
