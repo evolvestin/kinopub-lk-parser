@@ -55,3 +55,25 @@ Any code generating new database records must follow this "Save-As-Is" architect
     *   Data and assets are not the same. When a JSON response with statistics or search results is received, the application must immediately start downloading the associated images in the background.
     *   This applies to hidden tabs (e.g., "Movies" tab in Actors leaderboards), items below the fold, and secondary scroll areas.
     *   Goal: By the time the user interacts (scrolls or switches tabs), the assets must already be in the browser cache.
+
+## State Persistence & Routing Policy
+
+**RULE**: All UI states (selected year, active tab, active folder, search query, active sort/view modes, and currently open modals with their contexts) MUST be persisted and synchronized via URL path and query parameters using `vue-router`.
+
+1. **State representation**:
+    *   **Layers** (show details, collections, history) are represented as path segments: `/:base_view/:layer_type/:layer_id/...`.
+    *   **Filters and tabs** are stored as query parameters:
+        *   `y` - Selected year (`all` or year string).
+        *   `tab` - Selected statistics tab (`personal` or `group`).
+        *   `folder` - Selected wishlist folder ID.
+        *   `sort` - Wishlist sort mode.
+        *   `view` - Wishlist/History view mode.
+        *   `q` - Active search query.
+    *   **Modals** are stored as query parameters starting with `modal_`:
+        *   `modal` - Name of the currently open modal.
+        *   `modal_showId`, `modal_title`, `modal_type`, `modal_folderId`, `modal_isEdit`, etc. - Context values for the active modal.
+
+2. **Synchronization Implementation**:
+    *   Do NOT use `localStorage` or `sessionStorage` for storing transient UI state like year, active tab, folder, or modal contexts.
+    *   Stores (Pinia) must initialize their states by reading from the current route's query parameters on boot or on route changes.
+    *   When store state changes, the query parameters must be updated reactively via `router.replace` (to avoid polluting the browser back button history with minor state changes).

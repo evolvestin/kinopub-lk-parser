@@ -965,30 +965,66 @@ def webapp_index(request):
     return render(request, 'webapp/stats.html', context)
 
 
+
+def get_webapp_user(request) -> ViewUser | None:
+    init_data = None
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            init_data = body.get('init_data')
+        except Exception:
+            pass
+    if not init_data:
+        init_data = request.GET.get('init_data')
+
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        if token and token != 'null' and token != 'undefined':
+            init_data = token
+
+    if init_data:
+        tg_user = validate_telegram_init_data(init_data)
+        if tg_user:
+            user, _ = ViewUser.objects.get_or_create(
+                telegram_id=tg_user.get('id'),
+                defaults={
+                    'username': tg_user.get('username'),
+                    'name': tg_user.get('first_name', ''),
+                    'language': tg_user.get('language_code', 'ru'),
+                    'role': UserRole.GUEST,
+                }
+            )
+            return user
+
+    if settings.DEBUG:
+        mock_user = ViewUser.objects.filter(role=UserRole.ADMIN).first()
+        if not mock_user:
+            mock_user = ViewUser.objects.create(
+                telegram_id=999999,
+                username='dev_admin',
+                name='Dev Admin',
+                role=UserRole.ADMIN,
+            )
+        return mock_user
+
+    return None
+
+
 @csrf_exempt
 @require_http_methods(['POST'])
 def webapp_get_stats(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
-            return JsonResponse({'error': 'Invalid authentication data'}, status=403)
-
-        telegram_id = tg_user.get('id')
-        try:
-            view_user = ViewUser.objects.get(telegram_id=telegram_id)
-        except ViewUser.DoesNotExist:
-            return JsonResponse({'error': 'User not found in database'}, status=404)
+        view_user = get_webapp_user(request)
+        if not view_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
 
         current_year = timezone.now().year
         stats = generate_user_stats(view_user, year=current_year)
-
         return JsonResponse(stats)
 
     except Exception as e:
-        logging.error(f'WebApp Error: {e}', exc_info=True)
+        logger.error(f'WebApp Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Internal server error'}, status=500)
 
 
@@ -996,9 +1032,11 @@ def webapp_get_stats(request):
 @require_http_methods(['POST'])
 def webapp_get_detailed_stats(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
+        view_user = get_webapp_user(request)
+        if not view_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
 
+        body = json.loads(request.body)
         period_value = body.get('period_value') or body.get('year')
 
         if period_value in (0, '0', 'all', None):
@@ -1006,31 +1044,14 @@ def webapp_get_detailed_stats(request):
         else:
             year = str(period_value).split('-')[0]
 
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
-            return JsonResponse({'error': 'Unauthorized'}, status=403)
-
-        try:
-            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
-
-            view_user.update_personal_details(
-                username=tg_user.get('username'),
-                name=tg_user.get('first_name'),
-                language=tg_user.get('language_code'),
-                photo_url=tg_user.get('photo_url'),
-                screen_width=body.get('screen_width'),
-                screen_height=body.get('screen_height'),
-            )
-        except ViewUser.DoesNotExist:
-            view_user = ViewUser.objects.create(
-                telegram_id=tg_user.get('id'),
-                username=tg_user.get('username'),
-                name=tg_user.get('first_name'),
-                language=tg_user.get('language_code', 'ru'),
-                role=UserRole.GUEST,
-                screen_width=body.get('screen_width'),
-                screen_height=body.get('screen_height'),
-            )
+        view_user.update_personal_details(
+            username=view_user.username,
+            name=view_user.name,
+            language=view_user.language,
+            photo_url=view_user.photo_url,
+            screen_width=body.get('screen_width'),
+            screen_height=body.get('screen_height'),
+        )
 
         stats = generate_user_stats(view_user, year=year)
 
@@ -1041,7 +1062,7 @@ def webapp_get_detailed_stats(request):
         return JsonResponse(stats)
 
     except Exception as e:
-        logging.error(f'WebApp Stats Error: {e}', exc_info=True)
+        logger.error(f'WebApp Stats Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
 
 
@@ -1049,18 +1070,11 @@ def webapp_get_detailed_stats(request):
 @require_http_methods(['POST'])
 def webapp_bake_stats(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
+        view_user = get_webapp_user(request)
+        if not view_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-        try:
-            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
-        except ViewUser.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
-
+        body = json.loads(request.body)
         config = body.get('config', {})
         years = config.get('years', [])
         anon_user = config.get('anon_user', False)
@@ -1118,7 +1132,7 @@ def webapp_bake_stats(request):
                     uid = 1 if group_exists else 0
                 else:
                     name = view_user.name or view_user.username
-                    uid = 1 if group_exists else 0  # В группе всегда есть ID
+                    uid = 1 if group_exists else 0
 
                 user_info_map[view_user.id] = {
                     'id': uid,
@@ -1154,8 +1168,8 @@ def webapp_bake_stats(request):
                 stat['meta']['id'] = 1 if group_exists else 0
             else:
                 stat['meta']['id'] = user_info_map[view_user.id]['id']
-                if tg_user.get('photo_url'):
-                    stat['meta']['photo_url'] = tg_user.get('photo_url')
+                if view_user.photo_url:
+                    stat['meta']['photo_url'] = view_user.photo_url
 
             baked_data[str(yr)] = stat
 
@@ -1193,12 +1207,7 @@ def webapp_get_show_full(request, show_id):
             'countries', 'genres', 'showcrew_set__person__master_person'
         ).get(id=show_id)
 
-        view_user = None
-        init_data = request.GET.get('init_data')
-        if init_data:
-            tg_user = validate_telegram_init_data(init_data)
-            if tg_user:
-                view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
+        view_user = get_webapp_user(request)
 
         internal_rating, _ = show.get_internal_rating_data()
 
@@ -1216,7 +1225,6 @@ def webapp_get_show_full(request, show_id):
                 )
                 visible_ids.update(mate_ids)
 
-            # Получаем конкретно общую оценку проекта пользователем
             rating_obj = UserRating.objects.filter(
                 user=view_user, show=show, season_number__isnull=True
             ).first()
@@ -1401,13 +1409,7 @@ def webapp_get_collection(request, collection_type, item_id):
 
         shows = shows.order_by('-year', '-id').distinct()[:50]
 
-        # Идентификация пользователя
-        view_user = None
-        init_data = request.GET.get('init_data')
-        if init_data:
-            tg_user = validate_telegram_init_data(init_data)
-            if tg_user:
-                view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
+        view_user = get_webapp_user(request)
 
         user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])
 
@@ -1436,13 +1438,12 @@ def webapp_get_collection(request, collection_type, item_id):
 @require_http_methods(['POST'])
 def webapp_search(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-        query = body.get('query', '').strip()
-
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
+        view_user = get_webapp_user(request)
+        if not view_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        body = json.loads(request.body)
+        query = body.get('query', '').strip()
 
         if len(query) < 2:
             return JsonResponse({'shows': [], 'persons': []})
@@ -1451,7 +1452,6 @@ def webapp_search(request):
             Q(title__icontains=query) | Q(original_title__icontains=query)
         ).order_by('-year', '-id')[:15]
 
-        view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
         user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])
 
         persons = (
@@ -1497,7 +1497,7 @@ def webapp_search(request):
 
         return JsonResponse({'shows': show_results, 'persons': person_results})
     except Exception as e:
-        logging.error(f'WebApp Search Error: {e}', exc_info=True)
+        logger.error(f'WebApp Search Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
 
 
@@ -1718,24 +1718,12 @@ def queue_update_details(request):
 @require_http_methods(['POST'])
 def webapp_wishlist_data(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-        action = body.get('action')
-
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
+        view_user = get_webapp_user(request)
+        if not view_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-        try:
-            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
-        except ViewUser.DoesNotExist:
-            view_user = ViewUser.objects.create(
-                telegram_id=tg_user.get('id'),
-                username=tg_user.get('username'),
-                name=tg_user.get('first_name'),
-                language=tg_user.get('language_code', 'ru'),
-                role=UserRole.GUEST,
-            )
+        body = json.loads(request.body)
+        action = body.get('action')
 
         if action == 'get':
             if not WishlistFolder.objects.filter(user=view_user, is_deleted=False).exists():
@@ -1924,18 +1912,12 @@ def webapp_wishlist_data(request):
 @require_http_methods(['POST'])
 def webapp_casino(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-        action = body.get('action')
-
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
+        view_user = get_webapp_user(request)
+        if not view_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-        try:
-            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
-        except ViewUser.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
+        body = json.loads(request.body)
+        action = body.get('action')
 
         if action == 'status':
             latest_spin = CasinoSpin.objects.filter(user=view_user).order_by('-created_at').first()
@@ -2107,17 +2089,11 @@ def admin_get_folder_content(request, folder_id):
 @require_http_methods(['POST'])
 def webapp_add_view(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
+        view_user = get_webapp_user(request)
+        if not view_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-        try:
-            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
-        except ViewUser.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
-
+        body = json.loads(request.body)
         show_id = body.get('show_id')
         season = int(body.get('season') or 0)
         episode = int(body.get('episode') or 0)
@@ -2177,20 +2153,13 @@ def webapp_add_view(request):
 @require_http_methods(['POST'])
 def webapp_remove_view(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
+        view_user = get_webapp_user(request)
+        if not view_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-        try:
-            view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
-        except ViewUser.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=404)
-
+        body = json.loads(request.body)
         history_id = body.get('view_history_id')
         if not history_id:
-            # Обратная совместимость на время деплоя/кэша
             show_id = body.get('show_id')
             season = int(body.get('season') or 0)
             episode = int(body.get('episode') or 0)
@@ -2233,17 +2202,12 @@ def webapp_remove_view(request):
 @require_http_methods(['POST'])
 def webapp_get_episodes(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-        show_id = body.get('show_id')
-
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
+        view_user = get_webapp_user(request)
+        if not view_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-        view_user = ViewUser.objects.filter(telegram_id=tg_user.get('id')).first()
-        if not view_user:
-            return JsonResponse({'error': 'User not found'}, status=404)
+        body = json.loads(request.body)
+        show_id = body.get('show_id')
 
         durations = ShowDuration.objects.filter(
             show_id=show_id, season_number__isnull=False, episode_number__isnull=False
@@ -2279,13 +2243,11 @@ def webapp_get_episodes(request):
 @require_http_methods(['POST'])
 def webapp_rate_show(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
+        view_user = get_webapp_user(request)
+        if not view_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-        view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        body = json.loads(request.body)
         show_id = body.get('show_id')
         rating = float(body.get('rating'))
 
@@ -2337,13 +2299,11 @@ def webapp_rate_show(request):
 @require_http_methods(['POST'])
 def webapp_delete_rating(request):
     try:
-        body = json.loads(request.body)
-        init_data = body.get('init_data')
-        tg_user = validate_telegram_init_data(init_data)
-        if not tg_user:
+        view_user = get_webapp_user(request)
+        if not view_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
-        view_user = ViewUser.objects.get(telegram_id=tg_user.get('id'))
+        body = json.loads(request.body)
         show_id = body.get('show_id')
 
         season = body.get('season')
@@ -2422,19 +2382,19 @@ def merge_persons_api(request):
 
 @csrf_exempt
 def vite_proxy_view(request, path=''):
-    # Используем QUERY_STRING напрямую, чтобы сохранить исходный формат параметров Vite
     query_string = request.META.get('QUERY_STRING', '')
     upstream_url = f'http://frontend:5173/__vite__/{path}'
 
     if query_string:
         upstream_url += f'?{query_string}'
 
+    if cache.get('vite_frontend_alive') is False:
+        return HttpResponse(status=502)
+
     try:
-        # Копируем заголовки запроса от браузера, исключая хост
         headers = {k: v for k, v in request.headers.items() if k.lower() != 'host'}
 
-        # requests автоматически обрабатывает zlib/gzip декомпрессию
-        proxy_response = requests.get(upstream_url, headers=headers, stream=False, timeout=10)
+        proxy_response = requests.get(upstream_url, headers=headers, stream=False, timeout=(0.5, 5.0))
 
         response = HttpResponse(
             proxy_response.content,
@@ -2442,7 +2402,6 @@ def vite_proxy_view(request, path=''):
             content_type=proxy_response.headers.get('Content-Type'),
         )
 
-        # Список заголовков, которые НЕ должны передаваться от проксируемого сервера к браузеру
         excluded_headers = {
             'content-encoding',
             'transfer-encoding',
@@ -2458,10 +2417,12 @@ def vite_proxy_view(request, path=''):
                 response[key] = value
 
         response['Access-Control-Allow-Origin'] = '*'
+        cache.set('vite_frontend_alive', True, timeout=30)
         return response
 
     except Exception as e:
         logger.error(f'[ViteProxy] FAILED {upstream_url}: {str(e)}')
+        cache.set('vite_frontend_alive', False, timeout=10)
         return HttpResponse(status=502)
 
 

@@ -9,16 +9,30 @@ export const useUIStore = defineStore('ui', () => {
   const toast = ref({ text: '', visible: false })
   const isHistoryEditMode = ref(false)
 
-  const modals = ref({
-    share: { isOpen: false, context: null },
-    casino: { isOpen: false, context: null },
-    rateShow: { isOpen: false, context: null },
-    addView: { isOpen: false, context: null },
-    details: { isOpen: false, context: null },
-    wlFolder: { isOpen: false, context: null },
-    wlEdit: { isOpen: false, context: null },
-    wlLimit: { isOpen: false, context: null },
-    wlDelete: { isOpen: false, context: null }
+  const modals = computed(() => {
+    const active = router.currentRoute.value.query.modal || null
+    const query = router.currentRoute.value.query
+    const ctx = {}
+    Object.keys(query).forEach(key => {
+      if (key.startsWith('modal_')) {
+        const cleanKey = key.replace('modal_', '')
+        let val = query[key]
+        if (val === 'true') val = true
+        else if (val === 'false') val = false
+        else if (/^\d+$/.test(val)) val = parseInt(val)
+        ctx[cleanKey] = val
+      }
+    })
+
+    const result = {}
+    const keys = ['share', 'casino', 'rateShow', 'addView', 'details', 'wlFolder', 'wlEdit', 'wlLimit', 'wlDelete']
+    keys.forEach(k => {
+      result[k] = {
+        isOpen: active === k,
+        context: active === k ? ctx : {}
+      }
+    })
+    return result
   })
 
   const layerStack = computed(() => {
@@ -57,7 +71,7 @@ export const useUIStore = defineStore('ui', () => {
   function openLayer(type, id, query = {}) {
     const currentPath = router.currentRoute.value.path
     const newPath = `${currentPath}/${type}/${id}`.replace(/\/+/g, '/')
-    router.push({ path: newPath, query })
+    router.push({ path: newPath, query: { ...router.currentRoute.value.query, ...query } })
   }
 
   function popLayer() {
@@ -67,7 +81,7 @@ export const useUIStore = defineStore('ui', () => {
 
   function switchBaseView(viewName) {
     isHistoryEditMode.value = false
-    router.push({ name: viewName })
+    router.push({ name: viewName, query: router.currentRoute.value.query })
   }
 
   function showToast(text) {
@@ -78,6 +92,33 @@ export const useUIStore = defineStore('ui', () => {
   function toggleTheme() {
     theme.value = theme.value === 'dark' ? 'light' : 'dark'
     localStorage.setItem('kt', theme.value === 'dark' ? 'd' : 'l')
+  }
+
+  function openModal(key, context = null) {
+    const currentQuery = { ...router.currentRoute.value.query }
+    Object.keys(currentQuery).forEach(k => {
+      if (k.startsWith('modal_')) delete currentQuery[k]
+    })
+    currentQuery.modal = key
+    if (context) {
+      Object.keys(context).forEach(ck => {
+        if (context[ck] !== null && context[ck] !== undefined) {
+          currentQuery[`modal_${ck}`] = String(context[ck])
+        }
+      })
+    }
+    router.replace({ query: currentQuery })
+  }
+
+  function closeModal(key) {
+    const currentQuery = { ...router.currentRoute.value.query }
+    if (currentQuery.modal === key) {
+      delete currentQuery.modal
+      Object.keys(currentQuery).forEach(k => {
+        if (k.startsWith('modal_')) delete currentQuery[k]
+      })
+      router.replace({ query: currentQuery })
+    }
   }
 
   function fitText(el) {
@@ -136,9 +177,8 @@ export const useUIStore = defineStore('ui', () => {
     isLoading, isAppReady, theme, toast, layerStack, hasOpenLayers, activeView, modals,
     isHistoryEditMode,
     openLayer, popLayer, switchBaseView, showToast, toggleTheme, fitText, fitAll,
+    openModal, closeModal,
     setLoading: (v) => { isLoading.value = v },
-    setAppReady: (v) => { isAppReady.value = v },
-    openModal: (key, context = null) => { if (modals.value[key]) { modals.value[key].isOpen = true; modals.value[key].context = context; } },
-    closeModal: (key) => { if (modals.value[key]) modals.value[key].isOpen = false; }
+    setAppReady: (v) => { isAppReady.value = v }
   }
 })

@@ -1,15 +1,19 @@
 import { useTelegram } from './useTelegram'
 
 export function useApi() {
-  const { initData } = useTelegram()
-
   async function request(endpoint, method = 'GET', payload = null) {
+    const { initData } = useTelegram()
+    
     const options = {
       method,
       headers: {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
       }
+    }
+
+    if (initData) {
+      options.headers['Authorization'] = `Bearer ${initData}`
     }
 
     if (payload) {
@@ -28,13 +32,13 @@ export function useApi() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         const errorMsg = errorData.error || `Server Error: ${response.status}`
-        console.error(`[API Error] ${method} ${endpoint}:`, errorMsg);
+        console.error(`[API Error] ${method} ${endpoint}:`, errorMsg)
         throw new Error(errorMsg)
       }
 
       return await response.json()
     } catch (e) {
-      console.error(`[API Fetch Exception] ${method} ${endpoint}:`, e);
+      console.error(`[API Fetch Exception] ${method} ${endpoint}:`, e)
       throw e
     }
   }

@@ -31,10 +31,14 @@ onMounted(async () => {
     tg.BackButton.onClick(() => uiStore.popLayer())
   }
   
-  await statsStore.fetchStats('all', false)
-  
-  uiStore.setLoading(false)
-  uiStore.setAppReady(true)
+  try {
+    await statsStore.fetchStats('all', false)
+  } catch (e) {
+    console.error('[App] Failed to fetch initial stats:', e)
+  } finally {
+    uiStore.setLoading(false)
+    uiStore.setAppReady(true)
+  }
 })
 
 watch(() => uiStore.hasOpenLayers, (val) => {

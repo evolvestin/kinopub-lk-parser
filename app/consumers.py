@@ -5,6 +5,7 @@ import websockets
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.apps import apps
+from django.core.cache import cache
 
 from app.utils import get_scheduled_tasks_info
 from shared.constants import DATETIME_FORMAT
@@ -94,18 +95,23 @@ class ViteHMRConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         requested_protocols = self.scope.get('subprotocols', [])
 
+        if await cache.aget('vite_frontend_alive') is False:
+            await self.close()
+            return
+
         try:
-            # Важно: путь здесь должен строго соответствовать base + path из vite.config.js
             self.vite_ws = await websockets.connect(
-                'ws://frontend:5173/__vite__/hmr', subprotocols=requested_protocols
+                'ws://frontend:5173/__vite__/hmr',
+                subprotocols=requested_protocols,
+                open_timeout=1.0
             )
 
             await self.accept(subprotocol=self.vite_ws.subprotocol)
 
             self.proxy_task = asyncio.create_task(self._forward_vite_to_client())
         except Exception as e:
-            # Логируем ошибку подключения к внутреннему серверу Vite для отладки
             print(f'[ViteHMR] Connection to Vite failed: {e}')
+            await cache.aset('vite_frontend_alive', False, timeout=10)
             await self.close()
 
     async def disconnect(self, close_code):

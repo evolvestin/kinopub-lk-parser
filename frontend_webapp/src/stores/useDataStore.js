@@ -1,33 +1,38 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
 import { preloadImage } from '../utils/helpers'
+import router from '../router'
 
 export const useDataStore = defineStore('data', () => {
   const api = useApi()
   const uiStore = useUIStore()
 
-  const savedSearch = JSON.parse(sessionStorage.getItem('kp_search_cache') || '{"query":"","results":{"shows":[],"persons":[]}}')
-
-  const searchQuery = ref(savedSearch.query)
-  const searchResults = ref(savedSearch.results)
+  const searchResults = ref({ shows: [], persons: [] })
   const isSearching = ref(false)
-  const hasSearched = ref(savedSearch.query.length > 0)
+  const hasSearched = ref(false)
 
-  watch([searchQuery, searchResults], () => {
-    sessionStorage.setItem('kp_search_cache', JSON.stringify({
-      query: searchQuery.value,
-      results: searchResults.value
-    }))
-  }, { deep: true })
+  const searchQuery = computed({
+    get() {
+      return router.currentRoute.value.query.q || ''
+    },
+    set(val) {
+      const query = { ...router.currentRoute.value.query }
+      if (!val) {
+        delete query.q
+      } else {
+        query.q = val
+      }
+      router.replace({ query })
+    }
+  })
 
   async function performSearch(query) {
     if (query.length < 2) {
       clearSearch()
       return
     }
-    searchQuery.value = query
     isSearching.value = true
     hasSearched.value = true
 
@@ -36,15 +41,14 @@ export const useDataStore = defineStore('data', () => {
       if (searchQuery.value === query) {
         searchResults.value = data
         
-        // Архитектурное требование: прелоадинг результатов поиска
         if (data.shows) {
-          data.shows.forEach(s => s.poster_url && preloadImage(s.poster_url));
+          data.shows.forEach(s => s.poster_url && preloadImage(s.poster_url))
         }
         if (data.persons) {
           data.persons.forEach(p => {
-            if (p.photo_url) preloadImage(p.photo_url);
-            if (p.fallback_photo_url) preloadImage(p.fallback_photo_url);
-          });
+            if (p.photo_url) preloadImage(p.photo_url)
+            if (p.fallback_photo_url) preloadImage(p.fallback_photo_url)
+          })
         }
       }
     } catch (error) {
@@ -59,6 +63,15 @@ export const useDataStore = defineStore('data', () => {
     searchResults.value = { shows: [], persons: [] }
     hasSearched.value = false
   }
+
+  watch(() => searchQuery.value, (newQuery) => {
+    if (newQuery && newQuery.length >= 2) {
+      performSearch(newQuery)
+    } else {
+      searchResults.value = { shows: [], persons: [] }
+      hasSearched.value = false
+    }
+  }, { immediate: true })
 
   return { searchQuery, searchResults, isSearching, hasSearched, performSearch, clearSearch }
 })

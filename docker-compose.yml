@@ -95,6 +95,7 @@ services:
     volumes:
       - .:/app:delegated
       - /app/frontend_webapp/dist # Сохраняем билд фронта
+      - ./data:/data
     environment:
       - VITE_DEV_SERVER_HOST=frontend
     command: daphne -b 0.0.0.0 -p 8001 kinopub_parser.asgi:application
@@ -189,13 +190,13 @@ services:
   tunnel:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: tunnel --url http://web:8000 --protocol http2
+    command: tunnel --url http://asgi:8001 --protocol http2
     profiles:
       - dev 
     networks:
       - kinopub-net
     depends_on:
-      web:
+      asgi:
         condition: service_healthy
   
   tunnel-monitor:
@@ -246,10 +247,11 @@ services:
       - "5173:5173"
     environment:
       - NODE_ENV=development
-      # Добавляем проброс переменной внутрь контейнера для HMR (Hot Module Replacement)
       - VITE_DEV_SERVER_HOST=${VITE_DEV_SERVER_HOST:-localhost}
     networks:
-      - kinopub-net
+      kinopub-net:
+        aliases:
+          - dynamic-vite-host.internal
     profiles:
       - dev
 

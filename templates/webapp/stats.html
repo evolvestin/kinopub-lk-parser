@@ -14,6 +14,31 @@
         };
     </script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        (function() {
+            let initData = window.Telegram?.WebApp?.initData || '';
+            if (!initData) {
+                const hash = window.location.hash || '';
+                const search = window.location.search || '';
+                const params = new URLSearchParams(hash.replace('#', '?') || search);
+                initData = params.get('tgWebAppData') || params.get('init_data') || '';
+                if (!initData && hash.includes('tgWebAppData=')) {
+                    const match = hash.match(/tgWebAppData=([^&]+)/);
+                    if (match) {
+                        initData = decodeURIComponent(match[1]);
+                    }
+                }
+            }
+            if (initData && initData !== 'undefined' && initData !== 'null') {
+                window.__telegram_init_data__ = initData;
+                try { sessionStorage.setItem('tg_init_data', initData); } catch (e) {}
+                try { localStorage.setItem('tg_init_data', initData); } catch (e) {}
+                try {
+                    document.cookie = "tg_init_data=" + encodeURIComponent(initData) + "; path=/; SameSite=Lax; max-age=604800";
+                } catch (e) {}
+            }
+        })();
+    </script>
     {% vite_hmr_client %}
     {% vite_asset 'src/main.js' %}
 </head>

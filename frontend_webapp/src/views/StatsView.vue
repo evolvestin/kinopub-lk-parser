@@ -612,7 +612,7 @@ const openGroupMemberHistory = (index, name) => {
 
 const handleHeatmapClick = ({ date, value }) => value > 0 && openHistory('day', { date: date, title: date })
 
-onMounted(() => { if (!statsStore.currentStats) statsStore.fetchStats('all') })
+onMounted(() => { if (!statsStore.currentStats) statsStore.fetchStats(statsStore.currentYear) })
 </script>
 
 <style scoped>

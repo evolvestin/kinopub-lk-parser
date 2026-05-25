@@ -21,7 +21,7 @@ export default defineConfig({
     hmr: {
       protocol: 'wss',
       clientPort: 443,
-      path: 'hmr' // Будет доступен по адресу /__vite__/hmr
+      path: 'hmr'
     },
     fs: {
       allow: [
@@ -34,9 +34,7 @@ export default defineConfig({
     manifest: true,
     emptyOutDir: true,
     rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'src/main.js'),
-      },
+      input: 'src/main.js',
     },
   },
 })

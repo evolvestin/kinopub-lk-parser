@@ -1,17 +1,15 @@
 import { defineStore } from 'pinia'
-import { ref, computed, markRaw } from 'vue'
+import { ref, computed, watch, markRaw } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
 import { preloadImage } from '../utils/helpers'
+import router from '../router'
 
 export const useWishlistStore = defineStore('wishlist', () => {
   const api = useApi()
   const uiStore = useUIStore()
 
   const folders = ref([])
-  const activeFolderId = ref(null)
-  const sortMode = ref(localStorage.getItem('kp_wl_sort_mode') || 'default')
-  const viewMode = ref(localStorage.getItem('kp_wl_view_mode') || 'grid')
   const isReorderFoldersMode = ref(false)
   const isReorderItemsMode = ref(false)
 
@@ -26,6 +24,54 @@ export const useWishlistStore = defineStore('wishlist', () => {
     'zap', 'flame', 'rocket', 'eye', 'ghost', 'skull', 'trash',
     'clock', 'cal', 'days', 'list', 'target', 'chart', 'help'
   ]
+
+  const activeFolderId = computed({
+    get() {
+      const f = router.currentRoute.value.query.folder
+      return f ? parseInt(f) : null
+    },
+    set(val) {
+      const query = { ...router.currentRoute.value.query }
+      if (!val) {
+        delete query.folder
+      } else {
+        query.folder = String(val)
+      }
+      router.replace({ query })
+    }
+  })
+
+  const sortMode = computed({
+    get() {
+      return router.currentRoute.value.query.sort || localStorage.getItem('kp_wl_sort_mode') || 'default'
+    },
+    set(val) {
+      localStorage.setItem('kp_wl_sort_mode', val)
+      const query = { ...router.currentRoute.value.query }
+      if (val === 'default') {
+        delete query.sort
+      } else {
+        query.sort = val
+      }
+      router.replace({ query })
+    }
+  })
+
+  const viewMode = computed({
+    get() {
+      return router.currentRoute.value.query.view || localStorage.getItem('kp_wl_view_mode') || 'grid'
+    },
+    set(val) {
+      localStorage.setItem('kp_wl_view_mode', val)
+      const query = { ...router.currentRoute.value.query }
+      if (val === 'grid') {
+        delete query.view
+      } else {
+        query.view = val
+      }
+      router.replace({ query })
+    }
+  })
 
   const activeFolder = computed(() => 
     folders.value.find(f => f.id === activeFolderId.value) || folders.value[0] || null
@@ -71,12 +117,10 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
   function setViewMode(mode) {
     viewMode.value = mode
-    localStorage.setItem('kp_wl_view_mode', mode)
   }
 
   function setSortMode(mode) {
     sortMode.value = mode
-    localStorage.setItem('kp_wl_sort_mode', mode)
   }
 
   async function createFolder(name, icon, color) {
