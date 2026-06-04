@@ -464,7 +464,7 @@ const resetToMenu = () => {
 }
 
 const close = () => {
-  uiStore.modals.casino.isOpen = false
+  uiStore.closeModal('casino')
 }
 
 const goToWinner = (showId) => {

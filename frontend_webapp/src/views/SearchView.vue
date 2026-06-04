@@ -1,7 +1,7 @@
 <template>
   <div class="view active-view" id="view-search">
     <div id="search-results">
-      <div v-if="dataStore.isSearching" class="loader-inline">
+      <div v-if="dataStore.isSearching" class="empty">
         <div class="spinner"></div>
       </div>
 
@@ -79,25 +79,30 @@ watch(() => dataStore.searchQuery, (newVal) => {
 #view-search {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
+  overflow: hidden;
+  padding-bottom: 0;
 }
 #search-results {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
-  padding-bottom: 10px;
+}
+.search-content {
+  padding-bottom: 24px;
 }
 .search-bar-fixed {
-  flex-shrink: 0;
-  padding: 12px 16px;
-  background: rgba(20, 24, 31, 0.85);
+  position: relative;
+  z-index: 90;
+  padding: 14px 16px calc(14px + 64px + env(safe-area-inset-bottom));
+  background: rgba(20, 24, 31, 0.75);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border);
-  /* Отступ снизу для навигации + безопасная зона iOS */
-  margin-bottom: calc(70px + env(safe-area-inset-bottom));
+  transition: background 0.3s ease;
 }
 .light .search-bar-fixed {
-  background: rgba(246, 248, 250, 0.85);
+  background: rgba(246, 248, 250, 0.75);
 }
 </style>

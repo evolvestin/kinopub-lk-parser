@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, watch } from 'vue'
+import { onMounted, watch, computed } from 'vue'
 import { useUIStore } from './stores/uiStore'
 import { useStatsStore } from './stores/useStatsStore'
 import { useTelegram } from './composables/useTelegram'
@@ -24,11 +24,22 @@ const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const { tg } = useTelegram()
 
+const showBackButton = computed(() => {
+  return uiStore.hasOpenLayers || Object.values(uiStore.modals).some(m => m.isOpen)
+})
+
 onMounted(async () => {
   if (tg) {
     tg.ready()
     tg.expand()
-    tg.BackButton.onClick(() => uiStore.popLayer())
+    tg.BackButton.onClick(() => {
+      const openModalKey = Object.keys(uiStore.modals).find(key => uiStore.modals[key].isOpen)
+      if (openModalKey) {
+        uiStore.closeModal(openModalKey)
+      } else {
+        uiStore.popLayer()
+      }
+    })
   }
   
   try {
@@ -41,7 +52,7 @@ onMounted(async () => {
   }
 })
 
-watch(() => uiStore.hasOpenLayers, (val) => {
+watch(showBackButton, (val) => {
   if (tg?.BackButton) val ? tg.BackButton.show() : tg.BackButton.hide()
 }, { immediate: true })
 

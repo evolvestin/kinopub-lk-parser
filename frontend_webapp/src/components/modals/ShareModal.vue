@@ -63,7 +63,9 @@ const config = ref({
     anon_group: false
 })
 
-const close = () => { uiStore.modals.share.isOpen = false }
+const close = () => {
+  uiStore.closeModal('share')
+}
 
 async function submit() {
     if (!selectedYears.value.length) return uiStore.showToast('Выберите период')

@@ -107,17 +107,21 @@ export const useUIStore = defineStore('ui', () => {
         }
       })
     }
-    router.replace({ query: currentQuery })
+    router.push({ query: currentQuery })
   }
 
   function closeModal(key) {
     const currentQuery = { ...router.currentRoute.value.query }
     if (currentQuery.modal === key) {
-      delete currentQuery.modal
-      Object.keys(currentQuery).forEach(k => {
-        if (k.startsWith('modal_')) delete currentQuery[k]
-      })
-      router.replace({ query: currentQuery })
+      if (window.history.state && window.history.state.back) {
+        router.back()
+      } else {
+        delete currentQuery.modal
+        Object.keys(currentQuery).forEach(k => {
+          if (k.startsWith('modal_')) delete currentQuery[k]
+        })
+        router.replace({ query: currentQuery })
+      }
     }
   }
 
