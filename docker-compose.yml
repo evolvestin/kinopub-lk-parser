@@ -8,6 +8,7 @@ services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
+    shm_size: '256mb'
     env_file: .env
     command: postgres -c 'max_connections=100' -c 'shared_buffers=256MB'
     volumes:
