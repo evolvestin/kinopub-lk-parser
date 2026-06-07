@@ -376,7 +376,7 @@ class TelegramSender:
                 if len(tb_content) > 3000:
                     tb_content = f'{tb_content[:1000]}\n...[cut]...\n{tb_content[-2000:]}'
 
-                text_blocks.append(code(tb_content))
+                text_blocks.append(code(html_secure(tb_content)))
 
             try:
                 # Отправляем каждую ошибку отдельным "разбиваемым" сообщением
@@ -391,7 +391,7 @@ class TelegramSender:
                     },
                 )
             except Exception as e:
-                logger.error(f'Failed to send individual log entry: {e}')
+                logger.error(f'Failed to send log entry: {e}')
 
     def send_message_to_user(self, telegram_id: int, text: str):
         payload = {'chat_id': telegram_id, 'text': text, 'parse_mode': 'HTML'}
