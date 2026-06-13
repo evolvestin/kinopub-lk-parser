@@ -103,7 +103,7 @@ class ViteHMRConsumer(AsyncWebsocketConsumer):
             self.vite_ws = await websockets.connect(
                 'ws://frontend:5173/__vite__/hmr',
                 subprotocols=requested_protocols,
-                open_timeout=1.0
+                open_timeout=1.0,
             )
 
             await self.accept(subprotocol=self.vite_ws.subprotocol)

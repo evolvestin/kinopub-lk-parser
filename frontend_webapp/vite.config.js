@@ -31,7 +31,7 @@ export default defineConfig({
   },
   build: {
     outDir: resolve(__dirname, 'dist'),
-    manifest: true,
+    manifest: 'manifest.json',
     emptyOutDir: true,
     rollupOptions: {
       input: 'src/main.js',

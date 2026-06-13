@@ -261,7 +261,15 @@ body {
     border-color: var(--border);
 }
 
-.tabs { display: flex; gap: clamp(8px, 2vw, 12px); padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.tabs { 
+    display: flex; 
+    gap: clamp(8px, 2vw, 12px); 
+    padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px) clamp(8px, 2vw, 12px); 
+    overflow-x: auto; 
+    -webkit-overflow-scrolling: touch; 
+    scrollbar-width: none; 
+    flex-shrink: 0;
+}
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
     display: flex; align-items: center; gap: clamp(6px, 1.5vw, 8px); flex-shrink: 0; padding: clamp(8px, 2.5vw, 12px) clamp(16px, 4vw, 20px); border-radius: 12px;
@@ -273,7 +281,14 @@ body {
 .tab.on { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: var(--shadow-glow); transform: translateY(-2px); }
 .tab:not(.on):active { transform: scale(0.92); }
 
-.years { display: flex; gap: clamp(6px, 1.5vw, 8px); padding: clamp(4px, 1vw, 8px) clamp(16px, 4vw, 20px) clamp(12px, 3vw, 16px); overflow-x: auto; scrollbar-width: none; }
+.years { 
+    display: flex; 
+    gap: clamp(6px, 1.5vw, 8px); 
+    padding: clamp(4px, 1vw, 8px) clamp(16px, 4vw, 20px) clamp(12px, 3vw, 16px); 
+    overflow-x: auto; 
+    scrollbar-width: none; 
+    flex-shrink: 0;
+}
 .years::-webkit-scrollbar { display: none; }
 .yr {
     flex-shrink: 0; padding: clamp(6px, 2vw, 8px) clamp(12px, 3.5vw, 16px); border-radius: 10px;

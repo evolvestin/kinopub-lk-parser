@@ -70,6 +70,7 @@ from shared.constants import (
     PROFESSIONS_PLURAL_MAP_RU,
     RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
+    SHOW_TYPE_DISPLAY_RU,
     UserRole,
 )
 from shared.formatters import format_precision_date, format_se
@@ -965,7 +966,6 @@ def webapp_index(request):
     return render(request, 'webapp/stats.html', context)
 
 
-
 def get_webapp_user(request) -> ViewUser | None:
     init_data = None
     if request.method == 'POST':
@@ -993,7 +993,7 @@ def get_webapp_user(request) -> ViewUser | None:
                     'name': tg_user.get('first_name', ''),
                     'language': tg_user.get('language_code', 'ru'),
                     'role': UserRole.GUEST,
-                }
+                },
             )
             return user
 
@@ -1525,54 +1525,61 @@ def get_metric_details(request, key):
     is_genre = False
     items, is_summary, is_country, is_person, target_task = [], False, False, False, 'details'
 
+    inverse_map = {v: k for k, v in SHOW_TYPE_DISPLAY_RU.items()}
+    db_show_type = inverse_map.get(show_type, show_type)
+
     if key == 'missing_kp':
-        items = list(get_missing_kp_list(show_type))
+        items = list(get_missing_kp_list(db_show_type))
         query_params.update(
-            {'type': show_type, 'kinopoisk_url__isnull': 'False', 'ext_rating__kp__isnull': 'True'}
+            {
+                'type': db_show_type,
+                'kinopoisk_url__isnull': 'False',
+                'ext_rating__kp__isnull': 'True',
+            }
         )
         target_task = 'priority_sync'
     elif key == 'missing_imdb':
-        items = list(get_missing_imdb_list(show_type))
+        items = list(get_missing_imdb_list(db_show_type))
         query_params.update(
-            {'type': show_type, 'imdb_url__isnull': 'False', 'ext_rating__imdb__isnull': 'True'}
+            {'type': db_show_type, 'imdb_url__isnull': 'False', 'ext_rating__imdb__isnull': 'True'}
         )
         target_task = 'priority_sync'
     elif key == 'title_collision':
-        items = list(get_title_collision_list(show_type))
-        query_params['type'] = show_type
+        items = list(get_title_collision_list(db_show_type))
+        query_params['type'] = db_show_type
     elif key == 'missing_year':
-        items = list(get_missing_year_list(show_type))
-        query_params.update({'type': show_type, 'year__isnull': 'True'})
+        items = list(get_missing_year_list(db_show_type))
+        query_params.update({'type': db_show_type, 'year__isnull': 'True'})
     elif key == 'missing_status':
-        items = list(get_missing_status_list(show_type))
-        query_params.update({'type': show_type, 'status__isnull': 'True'})
+        items = list(get_missing_status_list(db_show_type))
+        query_params.update({'type': db_show_type, 'status__isnull': 'True'})
     elif key == 'missing_plot':
-        items = list(get_missing_plot_list(show_type))
-        query_params.update({'type': show_type, 'plot__isnull': 'True'})
+        items = list(get_missing_plot_list(db_show_type))
+        query_params.update({'type': db_show_type, 'plot__isnull': 'True'})
     elif key == 'missing_durations':
-        items = list(get_missing_durations_list(show_type))
-        query_params.update({'type': show_type, 'showduration__isnull': 'True'})
+        items = list(get_missing_durations_list(db_show_type))
+        query_params.update({'type': db_show_type, 'showduration__isnull': 'True'})
         target_task = 'durations'
     elif key == 'no_genres':
-        items = list(get_no_genres_list(show_type))
-        query_params.update({'type': show_type, 'genres__isnull': 'True'})
+        items = list(get_no_genres_list(db_show_type))
+        query_params.update({'type': db_show_type, 'genres__isnull': 'True'})
     elif key == 'total_genres':
-        is_genre, items = True, list(get_total_genres_list(show_type))
+        is_genre, items = True, list(get_total_genres_list(db_show_type))
     elif key == 'unmapped_genres':
         is_genre, items = True, list(get_unmapped_genres_list())
     elif key == 'no_countries':
-        items = list(get_no_countries_list(show_type))
-        query_params.update({'type': show_type, 'countries__isnull': 'True'})
+        items = list(get_no_countries_list(db_show_type))
+        query_params.update({'type': db_show_type, 'countries__isnull': 'True'})
     elif key == 'has_kp':
         is_summary = True
-        query_params.update({'type': show_type, 'ext_rating__kp__isnull': 'False'})
+        query_params.update({'type': db_show_type, 'ext_rating__kp__isnull': 'False'})
     elif key == 'has_imdb':
         is_summary = True
-        query_params.update({'type': show_type, 'ext_rating__imdb__isnull': 'False'})
+        query_params.update({'type': db_show_type, 'ext_rating__imdb__isnull': 'False'})
     elif key == 'total_shows':
         is_summary = True
-        if show_type:
-            query_params['type'] = show_type
+        if db_show_type:
+            query_params['type'] = db_show_type
     elif key == 'missing_country_meta':
         is_country, items = True, list(get_missing_country_meta_list())
     elif key == 'total_countries':
@@ -1583,7 +1590,7 @@ def get_metric_details(request, key):
             items = list(get_active_countries_list())
     elif key == 'total_persons_by_show_type':
         is_summary = True
-        query_params['showcrew__show__type'] = show_type
+        query_params['showcrew__show__type'] = db_show_type
     elif key == 'persons_avatar_stats':
         is_summary = True
         mapping = {
@@ -1777,7 +1784,9 @@ def webapp_wishlist_data(request):
 
             name = body.get('name', '').strip()
             if len(name) > 100:
-                return JsonResponse({'error': 'Название папки не должно превышать 100 символов'}, status=400)
+                return JsonResponse(
+                    {'error': 'Название папки не должно превышать 100 символов'}, status=400
+                )
 
             icon = body.get('icon', 'folder')
             color = body.get('color', '#60a5fa')
@@ -1811,7 +1820,9 @@ def webapp_wishlist_data(request):
             folder_id = body.get('folder_id')
             name = body.get('name', '').strip()
             if len(name) > 100:
-                return JsonResponse({'error': 'Название папки не должно превышать 100 символов'}, status=400)
+                return JsonResponse(
+                    {'error': 'Название папки не должно превышать 100 символов'}, status=400
+                )
 
             icon = body.get('icon')
             color = body.get('color')
@@ -2394,7 +2405,9 @@ def vite_proxy_view(request, path=''):
     try:
         headers = {k: v for k, v in request.headers.items() if k.lower() != 'host'}
 
-        proxy_response = requests.get(upstream_url, headers=headers, stream=False, timeout=(0.5, 5.0))
+        proxy_response = requests.get(
+            upstream_url, headers=headers, stream=False, timeout=(0.5, 5.0)
+        )
 
         response = HttpResponse(
             proxy_response.content,
