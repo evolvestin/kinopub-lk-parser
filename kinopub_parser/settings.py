@@ -176,8 +176,11 @@ static_src = BASE_DIR / 'kinopub_parser' / 'static'
 if static_src.exists():
     STATICFILES_DIRS.append(static_src)
 
-DJANGO_VITE_ASSETS_PATH = BASE_DIR / 'frontend_webapp' / 'dist'
+DJANGO_VITE_ASSETS_PATH = Path('/home/app/frontend_dist_backup')
 
+if not DJANGO_VITE_ASSETS_PATH.exists():
+    DJANGO_VITE_ASSETS_PATH = BASE_DIR / 'frontend_webapp' / 'dist'
+    
 if DJANGO_VITE_ASSETS_PATH.exists():
     STATICFILES_DIRS.append(DJANGO_VITE_ASSETS_PATH)
 
