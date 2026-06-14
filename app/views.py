@@ -24,6 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from redis import Redis
 
+from app.admin_site import admin_site
 from app.models import (
     CasinoSpin,
     Country,
@@ -212,7 +213,7 @@ def index(request):
         return 'Никогда'
 
     last_parser_log = (
-        LogEntry.objects.filter(level='INFO', message__contains='Parser session finished')
+        LogEntry.objects.filter(message__contains='Parser session finished')
         .order_by('-created_at')
         .first()
     )
@@ -244,6 +245,8 @@ def index(request):
         'bot_users_total': bot_users_total,
         'metrics_json': json.dumps(metrics_history),
     }
+    if request.user.is_staff:
+        context['app_list'] = admin_site.get_app_list(request)
     return render(request, 'index.html', context)
 
 
@@ -1505,6 +1508,9 @@ def webapp_search(request):
 @staff_member_required
 @require_http_methods(['GET'])
 def get_metric_details(request, key):
+    if not request.user.is_staff:
+        return JsonResponse({'is_authenticated': False, 'error': 'Forbidden'}, status=403)
+
     show_type = request.GET.get('type')
     is_person_metric = any(
         x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo', 'unused_persons']
@@ -1690,6 +1696,7 @@ def get_metric_details(request, key):
             'is_country': is_country,
             'is_person': is_person,
             'is_genre': is_genre,
+            'is_authenticated': True,
         }
     )
 

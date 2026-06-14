@@ -249,6 +249,7 @@ services:
     environment:
       - NODE_ENV=development
       - VITE_DEV_SERVER_HOST=${VITE_DEV_SERVER_HOST:-localhost}
+      - WEBAPP_PUBLIC_URL=${WEBAPP_PUBLIC_URL}
     networks:
       kinopub-net:
         aliases:

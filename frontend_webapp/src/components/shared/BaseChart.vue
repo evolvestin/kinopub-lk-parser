@@ -14,7 +14,8 @@ const props = defineProps({
   type: { type: String, default: 'bar' },
   data: { type: Object, required: true },
   options: { type: Object, default: () => ({}) },
-  height: { type: Number, default: 180 }
+  height: { type: Number, default: 180 },
+  plugins: { type: Array, default: () => [] }
 })
 
 const canvasRef = ref(null)
@@ -27,7 +28,6 @@ const render = () => {
   const ctx = getContext()
   if (!ctx || !props.data?.datasets?.length) return
 
-  // Применяем логику градиентов для линейных графиков (Динамика)
   const dataCopy = JSON.parse(JSON.stringify(props.data))
   
   if (props.type === 'line' && dataCopy.datasets[0]) {
@@ -44,18 +44,17 @@ const render = () => {
       responsive: true,
       maintainAspectRatio: false,
       ...props.options
-    }
+    },
+    plugins: props.plugins
   })
 }
 
 onMounted(render)
 
-// Используем watch с флагом immediate: false, так как первый рендер в onMounted
 watch(() => props.data, () => {
   render()
 }, { deep: true })
 
-// Следим за темой
 watch(() => props.options, () => {
   render()
 }, { deep: true })

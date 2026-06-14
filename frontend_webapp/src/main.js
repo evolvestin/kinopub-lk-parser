@@ -1,17 +1,25 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
+import AdminDashboard from './views/AdminDashboard.vue'
 import router from './router'
 
 import '../../kinopub_parser/static/css/webapp.css'
 
-const app = createApp(App)
 const pinia = createPinia()
 
-app.use(pinia)
-app.use(router)
+if (document.getElementById('app')) {
+  const app = createApp(App)
+  app.use(pinia)
+  app.use(router)
+  app.mount('#app')
+}
 
-app.mount('#app')
+if (document.getElementById('admin-app')) {
+  const adminApp = createApp(AdminDashboard)
+  adminApp.use(pinia)
+  adminApp.mount('#admin-app')
+}
 
 let touchStartX = 0
 let touchStartY = 0

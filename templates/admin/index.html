@@ -14,7 +14,23 @@
     
     .webapp-container { max-width: 1400px; margin: 0 auto; padding-top: 20px; }
     .wa-nav-links { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
-    .wa-nav-btn { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); padding: 8px 16px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; transition: transform 0.2s, background 0.2s; }
+    .wa-nav-btn {
+        background: var(--bg-input);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        padding: 8px 16px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        transition: transform 0.2s, background 0.2s;
+        min-width: 130px;
+        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
     .wa-nav-btn:hover { background: var(--border); transform: translateY(-2px); }
     .wa-nav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
     
