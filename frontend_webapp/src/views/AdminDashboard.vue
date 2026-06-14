@@ -72,8 +72,8 @@
               type="doughnut" 
               :data="getChartData(metric)" 
               :options="getChartOptions(metric)" 
-              :plugins="[getCenterPlugin(metric)]" 
-              :height="240" 
+              :plugins="[ChartDataLabels, getCenterPlugin(metric)]" 
+              :height="280" 
             />
             <div class="legend-grid" v-if="getMetricData(metric.key).length > 1">
               <div v-for="(item, i) in getMetricData(metric.key)" :key="i" class="legend-item clickable" @click="openDetails(metric.key, item.name || item.type)">
@@ -102,7 +102,7 @@
 
     <!-- Модалка Детализации -->
     <div class="modal-overlay" :class="{ show: isModalOpen }" @click.self="closeDetails">
-      <div class="modal-content">
+      <div class="modal-content" :class="{ 'modal-wide': modalItems.length >= 5 }">
         <div class="modal-header">
           <div class="modal-title">{{ modalTitle }}</div>
           <button class="modal-close" @click="closeDetails">×</button>
@@ -155,7 +155,7 @@
                 <div class="merge-header">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-size: 11px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">Группа дубликатов</span>
-                    <a :href="item.admin_url" target="_blank" class="edit-link" style="opacity: 1; color: var(--link-fg); font-size: 10px;">[Админка]</a>
+                    <a :href="item.admin_url" target="_blank" class="edit-link" style="opacity: 1; color: var(--info); font-size: 10px;">[Админка]</a>
                   </div>
                   <button class="btn-merge-action" @click="executeMerge(item.persons[0].id, item.persons)">Объединить</button>
                 </div>
@@ -166,8 +166,14 @@
                   <div class="merge-list">
                     <label v-for="p in item.persons" :key="p.id" class="merge-row" :class="{ 'is-master': p.id === mergeSelections[item.persons[0].id] }" @click="mergeSelections[item.persons[0].id] = p.id">
                       <input type="radio" :value="p.id" v-model="mergeSelections[item.persons[0].id]">
-                      <span class="person-name">{{ p.name }}</span>
-                      <a :href="`/admin/app/person/${p.id}/change/`" target="_blank" class="edit-link" @click.stop>Edit</a>
+                      <div class="person-details-box">
+                        <div class="person-meta-row">
+                          <span class="person-name">{{ p.name }}</span>
+                          <span class="person-id-badge">#{{ p.id }}</span>
+                        </div>
+                        <div v-if="p.en_name" class="person-en-name">{{ p.en_name }}</div>
+                      </div>
+                      <a :href="`/admin/app/person/${p.id}/change/`" target="_blank" class="edit-link-btn-small" @click.stop>Правка</a>
                     </label>
                   </div>
                 </div>
@@ -223,6 +229,7 @@
 import { ref, computed, nextTick, onUnmounted, onMounted, watch } from 'vue'
 import BaseChart from '../components/shared/BaseChart.vue'
 import { icons } from '../utils/icons'
+import ChartDataLabels from 'chartjs-plugin-datalabels'
 
 const allMetrics = window.ALL_METRICS || {}
 const adminApps = window.ADMIN_APP_LIST || []
@@ -361,8 +368,8 @@ const getChartData = (metric) => {
 const getChartOptions = (metric) => {
   const total = getMetricTotal(metric.key)
   return {
-    cutout: '55%',
-    layout: { padding: 0 },
+    cutout: '50%',
+    layout: { padding: 15 },
     animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' },
     onHover: (evt, elements) => {
       if (evt.native?.target) evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'
@@ -393,7 +400,15 @@ const getChartOptions = (metric) => {
           }
         }
       },
-      datalabels: { display: false }
+      datalabels: {
+        color: '#fff',
+        font: { weight: '800', size: 10 },
+        formatter: (value) => {
+          const pct = total > 0 ? Math.round((value / total) * 100) : 0
+          return pct > 5 ? pct + '%' : ''
+        },
+        display: 'auto'
+      }
     }
   }
 }
@@ -407,28 +422,12 @@ const getCenterPlugin = (metric) => ({
     const total = getMetricTotal(metric.key)
     const centerX = left + width / 2
     const centerY = top + height / 2
-    const innerRadius = chart.innerRadius || (Math.min(width, height) / 2 * 0.55)
-    const maxTextWidth = innerRadius * 1.6
-    
-    let numFontSize = Math.max(16, Math.min(34, innerRadius * 0.6))
-    ctx.font = `900 ${numFontSize}px system-ui`
     const textStr = total.toLocaleString('ru-RU')
-    let textWidth = ctx.measureText(textStr).width
-    if (textWidth > maxTextWidth) {
-      numFontSize = numFontSize * (maxTextWidth / textWidth)
-      ctx.font = `900 ${numFontSize}px system-ui`
-    }
-    
-    let lblFontSize = Math.max(9, Math.min(11, innerRadius * 0.2))
-    ctx.font = `bold ${lblFontSize}px system-ui`
-    let lblWidth = ctx.measureText(metric.centerLabel).width
-    if (lblWidth > maxTextWidth) {
-      lblFontSize = lblFontSize * (maxTextWidth / lblWidth)
-      ctx.font = `bold ${lblFontSize}px system-ui`
-    }
     
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
+    
+    ctx.font = '900 30px system-ui'
     
     let numColor = '#e5e7eb'
     if (total > 0) {
@@ -438,12 +437,12 @@ const getCenterPlugin = (metric) => ({
     }
     
     ctx.fillStyle = numColor
-    ctx.fillText(textStr, centerX, centerY - (numFontSize * 0.2))
+    ctx.fillText(textStr, centerX, centerY - 8)
     
+    ctx.font = 'bold 10px system-ui'
     ctx.fillStyle = '#6e7681'
-    ctx.font = `bold ${lblFontSize}px system-ui`
     ctx.letterSpacing = '1px'
-    ctx.fillText(metric.centerLabel, centerX, centerY + (numFontSize * 0.4) + (lblFontSize * 0.5))
+    ctx.fillText(metric.centerLabel, centerX, centerY + 22)
     
     ctx.restore()
   }
@@ -712,7 +711,25 @@ onUnmounted(() => {
 
 .modal-overlay { align-items: center !important; z-index: 2000; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); display: flex; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .modal-overlay.show { opacity: 1; pointer-events: auto; }
-.modal-content { background: var(--bg-card); max-width: 95vw; width: 90vw; max-height: 85vh; display: flex; flex-direction: column; border-radius: 24px !important; transform: scale(0.95); opacity: 0; transition: all 0.3s ease; margin: 0 auto; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+.modal-content {
+    background: var(--bg-card);
+    width: 90vw;
+    max-width: 550px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 24px !important;
+    transform: scale(0.95);
+    opacity: 0;
+    transition: all 0.3s ease;
+    margin: 0 auto;
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.modal-content.modal-wide {
+    width: 90vw;
+    max-width: 95vw;
+}
 .modal-overlay.show .modal-content { transform: scale(1); opacity: 1; }
 .modal-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--border); }
 .modal-title { font-size: 20px; font-weight: 800; color: var(--text-primary); }
@@ -749,21 +766,65 @@ onUnmounted(() => {
     animation: slideInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both, pulseGlowRed 10s infinite;
 }
 
-.merge-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 16px; overflow: hidden; display: flex; flex-direction: column; transition: all 0.3s ease; }
+.merge-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
 .merge-card:not(:has(.merge-list)) { opacity: 0.3; filter: grayscale(1); pointer-events: none; transform: scale(0.98); }
 
-.merge-header { padding: 10px 16px; background: rgba(0, 0, 0, 0.2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-.merge-content { display: flex; padding: 12px; gap: 16px; }
+.merge-header { padding: 12px 16px; background: rgba(0, 0, 0, 0.25); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.merge-content { display: flex; padding: 14px; gap: 16px; align-items: flex-start; }
 .merge-poster-area { flex-shrink: 0; width: 100px; }
-.merge-poster-area img { width: 100px; height: 100px; border-radius: 12px; object-fit: cover; box-shadow: var(--shadow-sm); }
-.merge-list { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.merge-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; user-select: none; }
-.merge-row:hover { background: var(--bg-input); }
+.merge-poster-area img { width: 100px; height: 120px; border-radius: 12px; object-fit: cover; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+.merge-list { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.merge-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; cursor: pointer; transition: all 0.2s ease; border: 1px solid var(--border); background: rgba(0, 0, 0, 0.15); user-select: none; }
+.merge-row:hover { background: var(--bg-input); border-color: var(--text-muted); }
 .merge-row.is-master { background: var(--accent-dim); border-color: var(--accent); }
-.merge-row input[type="radio"] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; cursor: pointer; }
-.merge-row .person-name { flex: 1; font-size: 14px; font-weight: 700; color: var(--text-primary); }
-.merge-row .edit-link { font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); opacity: 0.5; text-decoration: none; }
-.merge-row .edit-link:hover { opacity: 1; color: var(--link-fg); }
+.merge-row input[type="radio"] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; cursor: pointer; flex-shrink: 0; }
+
+.person-details-box {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+.person-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.edit-link { opacity: 1; color: var(--info); font-size: 10px; }
+.person-name { font-size: 14px; font-weight: 700; color: var(--text-primary); word-break: break-word; }
+.person-id-badge { font-size: 10px; font-weight: 800; font-family: monospace; background: var(--bg-input); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; color: var(--text-muted); }
+.person-en-name { font-size: 12px; color: var(--text-secondary); font-style: italic; opacity: 0.85; text-align: left; word-break: break-word; }
+
+.edit-link-btn-small {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--info);
+    background: var(--info-dim);
+    padding: 4px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.edit-link-btn-small:hover {
+    background: var(--info);
+    color: #fff;
+    transform: translateY(-1px);
+}
 .btn-merge-action { background: var(--accent); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; transition: transform 0.2s; }
 .btn-merge-action:active { transform: scale(0.95); }
 
