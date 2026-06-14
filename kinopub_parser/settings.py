@@ -143,7 +143,7 @@ STATIC_ROOT = data_dir / 'staticfiles'
 DJANGO_VITE = {
     'default': {
         'dev_mode': DEBUG and os.getenv('VITE_DEV_MODE', 'True').lower() == 'true',
-        'manifest_path': str(STATIC_ROOT / '.vite' / 'manifest.json'),
+        'manifest_path': str(STATIC_ROOT / 'manifest.json'),
         'dev_server_host': 'dynamic-vite-host.internal' if DEBUG else None,
         'dev_server_port': 5173 if DEBUG else None,
     }
