@@ -37,7 +37,8 @@ RUN pip install --no-cache-dir setuptools && \
 
 COPY --chown=app:app . /app/
 
-# Копируем собранный фронтенд из первого этапа в директорию, ожидаемую Django
+# Копируем собранный фронтенд из первого этапа в безопасную директорию вне /app
+COPY --from=build-stage --chown=app:app /app/frontend_webapp/dist /home/app/frontend_dist_backup
 COPY --from=build-stage --chown=app:app /app/frontend_webapp/dist /app/frontend_webapp/dist
 
 RUN python manage.py collectstatic --noinput
