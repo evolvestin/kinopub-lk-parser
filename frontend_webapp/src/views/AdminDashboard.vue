@@ -54,7 +54,7 @@
           <div class="metric-desc" :class="{ visible: metric.showDesc }">{{ metric.desc }}</div>
           
           <template v-if="!hasData(metric.key)">
-            <div class="empty-overlay" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:180px;text-align:center;">
+            <div class="empty-overlay" style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex-grow:1;min-height:180px;text-align:center;">
               <template v-if="!getMetricTimestamp(metric.key)">
                 <div style="font-size:36px;margin-bottom:8px;opacity:0.5;">⏳</div>
                 <div style="color:var(--text-muted);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Нет данных</div>
@@ -700,6 +700,10 @@ onUnmounted(() => {
 .status-val { font-size: 14px; color: var(--text-primary); font-weight: 800; font-variant-numeric: tabular-nums; }
 
 .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 10px; padding: 10px 16px; }
+.metrics-grid .card {
+    display: flex;
+    flex-direction: column;
+}
 
 .metric-desc { max-height: 0; opacity: 0; overflow: hidden; margin: 0; padding: 0 12px; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); font-size: 13px; color: var(--text-muted); line-height: 1.5; background: var(--bg-main); border-radius: 10px; border-left: 3px solid var(--accent); pointer-events: none; }
 .metric-desc.visible { max-height: 300px; opacity: 1; margin: 10px 0 20px; padding: 12px; pointer-events: auto; }

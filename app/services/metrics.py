@@ -43,10 +43,11 @@ def get_missing_country_meta_list():
 def calculate_total_countries_metric():
     active_count = Country.objects.filter(show__isnull=False).distinct().count()
     unused_count = Country.objects.filter(show__isnull=True).count()
-    return [
+    data = [
         {'name': 'Активные', 'value': active_count},
         {'name': 'Неиспользуемые', 'value': unused_count},
     ]
+    return sorted(data, key=lambda x: x['value'], reverse=True)
 
 
 def get_active_countries_list():
@@ -244,7 +245,7 @@ def calculate_title_collision_metric():
             contains_orig=Count('id', filter=Q(pos__gt=0) & ~Q(low_title=F('low_orig'))),
             unique_titles=Count('id', filter=Q(pos=0)),
         )
-        .order_by('-total')
+        .order_by('-contains_orig')
     )
 
     data = [
@@ -378,7 +379,7 @@ def calculate_persons_avatar_stats_metric():
         & Q(showcrew__show__ext_rating__isnull=True)
     )
 
-    return [
+    data = [
         {'name': 'Есть фото (TMDB)', 'value': Person.objects.filter(has_tmdb).count()},
         {
             'name': 'Есть фото (KP)',
@@ -406,6 +407,7 @@ def calculate_persons_avatar_stats_metric():
             .count(),
         },
     ]
+    return sorted(data, key=lambda x: x['value'], reverse=True)
 
 
 def get_persons_avatar_stats_list(category: str):
@@ -531,10 +533,11 @@ def calculate_duplicate_photo_urls_metric():
     )
     kp_dupes = kp_qs.aggregate(total=Sum('cnt'))['total'] or 0
 
-    return [
+    data = [
         {'name': 'TMDB дубликаты', 'value': tmdb_dupes},
         {'name': 'KP дубликаты', 'value': kp_dupes},
     ]
+    return sorted(data, key=lambda x: x['value'], reverse=True)
 
 
 def get_duplicate_photo_urls_list(source_type: str):
@@ -644,10 +647,11 @@ def calculate_total_genres_metric():
     mapped_count = len(db_genres.intersection(known_keys))
     unmapped_count = len(db_genres.difference(known_keys))
 
-    return [
+    data = [
         {'name': 'Основные жанры', 'value': mapped_count},
         {'name': 'Дубликаты', 'value': unmapped_count},
     ]
+    return sorted(data, key=lambda x: x['value'], reverse=True)
 
 
 def get_total_genres_list(category: str):
@@ -740,4 +744,5 @@ def calculate_recent_errors_metric():
 def calculate_bot_users_health_metric():
     active = ViewUser.objects.filter(is_bot_active=True).count()
     inactive = ViewUser.objects.filter(is_bot_active=False).count()
-    return [{'name': 'Активны', 'value': active}, {'name': 'Отключены', 'value': inactive}]
+    data = [{'name': 'Активны', 'value': active}, {'name': 'Отключены', 'value': inactive}]
+    return sorted(data, key=lambda x: x['value'], reverse=True)
