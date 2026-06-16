@@ -24,7 +24,6 @@ let chartInstance = null
 const getContext = () => canvasRef.value?.getContext('2d')
 
 const render = () => {
-  if (chartInstance) chartInstance.destroy()
   const ctx = getContext()
   if (!ctx || !props.data?.datasets?.length) return
 
@@ -37,16 +36,29 @@ const render = () => {
     dataCopy.datasets[0].backgroundColor = fillGradient;
   }
 
-  chartInstance = new Chart(ctx, {
-    type: props.type,
-    data: dataCopy,
-    options: {
+  const isAdmin = typeof window !== 'undefined' && window.IS_ADMIN_DASHBOARD
+
+  if (chartInstance && isAdmin) {
+    chartInstance.data = dataCopy
+    chartInstance.options = {
       responsive: true,
       maintainAspectRatio: false,
       ...props.options
-    },
-    plugins: props.plugins
-  })
+    }
+    chartInstance.update('none')
+  } else {
+    if (chartInstance) chartInstance.destroy()
+    chartInstance = new Chart(ctx, {
+      type: props.type,
+      data: dataCopy,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        ...props.options
+      },
+      plugins: props.plugins
+    })
+  }
 }
 
 onMounted(render)

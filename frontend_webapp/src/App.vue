@@ -3,6 +3,7 @@ import { onMounted, watch, computed } from 'vue'
 import { useUIStore } from './stores/uiStore'
 import { useStatsStore } from './stores/useStatsStore'
 import { useTelegram } from './composables/useTelegram'
+import { logger } from './utils/logger'
 import BottomNav from './components/layout/BottomNav.vue'
 import Loader from './components/layout/Loader.vue'
 import Toast from './components/layout/Toast.vue'
@@ -29,6 +30,17 @@ const showBackButton = computed(() => {
 })
 
 onMounted(async () => {
+  if (window.IS_DEBUG || window.USER_ROLE === 'admin') {
+    const navigationStart = window.performance?.timing?.navigationStart || window.performance?.timeOrigin;
+    if (navigationStart) {
+      const latency = Date.now() - navigationStart;
+      logger.info(`Bootstrap Latency from Click to App: ${latency.toFixed(2)}ms`);
+    }
+  }
+
+  logger.time('InitialBootstrap')
+  logger.info('App.vue onMounted hook triggered')
+
   if (tg) {
     tg.ready()
     tg.expand()
@@ -45,10 +57,11 @@ onMounted(async () => {
   try {
     await statsStore.fetchStats('all', false)
   } catch (e) {
-    console.error('[App] Failed to fetch initial stats:', e)
+    logger.error('Failed to fetch initial stats during bootstrap:', e)
   } finally {
     uiStore.setLoading(false)
     uiStore.setAppReady(true)
+    logger.timeEnd('InitialBootstrap')
   }
 })
 

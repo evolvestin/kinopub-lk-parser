@@ -1,5 +1,6 @@
 import os
 import re
+import time
 
 import client
 import keyboards
@@ -502,21 +503,22 @@ async def handle_stats_command(message: Message, bot: Bot):
     )
 
     base_url = base_url.rstrip('/')
-    # Изменяем формат ссылки: переносим view в сегмент хеша для роутера
-    web_app_url = f'{base_url}/webapp/#/stats'
+    user_id = message.from_user.id
+    role = await client.check_user_role(user_id)
+
+    if role == UserRole.ADMIN:
+        now_ms = int(time.time() * 1000)
+        web_app_url = f'{base_url}/webapp/#/stats?start_ts={now_ms}'
+        debug_info = f'\n\n🔧 {italic(f"URL: {base_url}")}'
+    else:
+        web_app_url = f'{base_url}/webapp/#/stats'
+        debug_info = ''
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text='📊 Моя статистика', web_app=WebAppInfo(url=web_app_url))]
         ]
     )
-
-    user_id = message.from_user.id
-    role = await client.check_user_role(user_id)
-
-    debug_info = ''
-    if role == UserRole.ADMIN:
-        debug_info = f'\n\n🔧 {italic(f"URL: {base_url}")}'
 
     await message.answer(
         text=(

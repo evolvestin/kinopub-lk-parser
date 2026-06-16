@@ -49,12 +49,14 @@ const palette = ['#2ea043', '#388bfd', '#f85149', '#d29922', '#a371f7', '#1abc9c
 const processedGenres = computed(() => {
   if (!props.genres?.length) return []
   
-  let top = JSON.parse(JSON.stringify(props.genres)).slice(0, 10)
-  const totalMinutesSum = props.genres.reduce((acc, g) => acc + g.minutes, 0)
+  const sorted = [...props.genres].sort((a, b) => b.minutes - a.minutes)
+  
+  let top = sorted.slice(0, 10)
+  const totalMinutesSum = sorted.reduce((acc, g) => acc + g.minutes, 0)
   const topMinutes = top.reduce((acc, g) => acc + g.minutes, 0)
 
   if (totalMinutesSum > topMinutes) {
-    const others = props.genres.slice(10)
+    const others = sorted.slice(10)
     top.push({
       name: 'Другие',
       minutes: totalMinutesSum - topMinutes,

@@ -965,7 +965,12 @@ def bot_assign_group_view(request):
 
 
 def webapp_index(request):
-    context = {'is_debug': settings.ENVIRONMENT == 'DEV'}
+    view_user = get_webapp_user(request)
+    user_role = view_user.role if view_user else 'guest'
+    context = {
+        'is_debug': settings.ENVIRONMENT == 'DEV',
+        'user_role': user_role,
+    }
     return render(request, 'webapp/stats.html', context)
 
 

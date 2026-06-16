@@ -8,6 +8,7 @@
     <title>Kinopub Observer</title>
     <script>
         window.IS_DEBUG = {{ is_debug|yesno:"true,false" }};
+        window.USER_ROLE = "{{ user_role|escapejs }}";
         console.log("HTML Template loaded. Looking for Vite assets...");
         window.onerror = function(msg, url, line) {
             console.error("GLOBAL ERROR: " + msg + "\nURL: " + url + "\nLine: " + line);

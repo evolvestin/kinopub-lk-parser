@@ -1,3 +1,5 @@
+import { logger } from './logger'
+
 const brokenImages = new Set();
 
 export function isImageBroken(url) {
@@ -30,22 +32,28 @@ const preloadPool = new Set();
 export function preloadImage(url, priority = 'auto') {
   if (!url || typeof url !== 'string' || brokenImages.has(url)) return Promise.resolve(false);
   
+  const startTime = performance.now();
+  logger.info(`Asset preload queued: ${url}`);
+
   return new Promise((resolve) => {
     const img = new Image();
     
     img.onload = () => {
       preloadPool.delete(img);
       if (img.naturalWidth === 208 && img.naturalHeight === 304) {
-        brokenImages.add(url); // Заглушка Кинопоиска считается битой ссылкой
+        brokenImages.add(url);
+        logger.warn(`Asset failed validation (broken geometry 208x304): ${url} (took ${(performance.now() - startTime).toFixed(1)}ms)`);
         resolve(false);
       } else {
+        logger.info(`Asset preloaded successfully: ${url} (took ${(performance.now() - startTime).toFixed(1)}ms)`);
         resolve(true);
       }
     };
     
     img.onerror = () => {
       preloadPool.delete(img);
-      brokenImages.add(url); // Запоминаем битую ссылку
+      brokenImages.add(url);
+      logger.error(`Asset preload failed: ${url} (took ${(performance.now() - startTime).toFixed(1)}ms)`);
       resolve(false);
     };
 
@@ -60,7 +68,6 @@ export function preloadImage(url, priority = 'auto') {
 
 export function validateImageGeom(event, onPlaceholderNeeded) {
   const img = event.target;
-  // Детекция заглушки Кинопоиска (no-poster.gif)
   if (img.naturalWidth === 208 && img.naturalHeight === 304) {
     onPlaceholderNeeded();
   }
