@@ -164,7 +164,7 @@ else:
     WHITENOISE_USE_FINDERS = False
     STORAGES = {
         'staticfiles': {
-            'BACKEND': 'app.storage.SafeCompressedManifestStaticFilesStorage',
+            'BACKEND': 'kinopub_parser.storage.SafeCompressedManifestStaticFilesStorage',
         },
     }
 
