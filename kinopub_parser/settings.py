@@ -7,6 +7,7 @@ from pathlib import Path
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
+from whitenoise.storage import CompressedManifestStaticFilesStorage
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -149,6 +150,15 @@ DJANGO_VITE = {
     }
 }
 
+
+class SafeCompressedManifestStaticFilesStorage(CompressedManifestStaticFilesStorage):
+    def stored_name(self, name):
+        try:
+            return super().stored_name(name)
+        except ValueError:
+            return name
+
+
 if DEBUG:
     WHITENOISE_MAX_AGE = 0
     WHITENOISE_AUTOREFRESH = True
@@ -164,7 +174,7 @@ else:
     WHITENOISE_USE_FINDERS = False
     STORAGES = {
         'staticfiles': {
-            'BACKEND': 'kinopub_parser.storage.SafeCompressedManifestStaticFilesStorage',
+            'BACKEND': 'kinopub_parser.settings.SafeCompressedManifestStaticFilesStorage',
         },
     }
 
