@@ -164,7 +164,7 @@ else:
     WHITENOISE_USE_FINDERS = False
     STORAGES = {
         'staticfiles': {
-            'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+            'BACKEND': 'app.storage.SafeCompressedManifestStaticFilesStorage',
         },
     }
 

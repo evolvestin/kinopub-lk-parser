@@ -23,7 +23,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from redis import Redis
-
+from app.services.stats_calculator import generate_global_stats
 from app.admin_site import admin_site
 from app.models import (
     CasinoSpin,
@@ -2469,3 +2469,14 @@ def internal_set_url(request):
         return JsonResponse({'ok': True})
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@staff_member_required
+@require_http_methods(['GET'])
+def admin_get_global_stats(request):
+    year = request.GET.get('year')
+    if year == 'all' or not year:
+        year = None
+    stats = generate_global_stats(year=year)
+    return JsonResponse(stats)

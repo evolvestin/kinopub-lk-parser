@@ -7,37 +7,5 @@
 </div>
 
 <div id="view-wishlist" class="admin-wishlist-integration" style="width: {{ width }}px; height: {{ height }}px; max-width: 95%;">
-  <div id="wl-active-folder-content">
-    <div class="wl-active-header">
-        <div id="wl-active-folder-title"></div>
-        <div style="display: flex; gap: 6px; align-items: center; margin-left: auto; flex-shrink: 0;">
-            
-            <div class="sort-dropdown-container">
-                <button type="button" id="wl-sort-trigger" class="sort-trigger-btn" onclick="if(window.App && window.App.toggleSortDropdown) window.App.toggleSortDropdown(event)"></button>
-                <div id="wl-sort-menu" class="sort-dropdown-menu">
-                    <div class="sort-item" data-sort="default" onclick="if(window.App && window.App.setSortOption) window.App.setSortOption('default')">
-                        <span class="icon-box" id="si-reorder"></span>
-                        <span>Порядок</span>
-                    </div>
-                    <div class="sort-item" data-sort="added" onclick="if(window.App && window.App.setSortOption) window.App.setSortOption('added')">
-                        <span class="sort-arrow-icon" id="si-added"></span>
-                        <span>Дата</span>
-                    </div>
-                    <div class="sort-item" data-sort="year" onclick="if(window.App && window.App.setSortOption) window.App.setSortOption('year')">
-                        <span class="sort-arrow-icon" id="si-year"></span>
-                        <span>Год</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="view-toggle" style="margin: 0; padding: 2px; background: var(--bg-input);">
-                <button type="button" class="vt-btn active" id="wl-vt-grid" 
-                    onclick="if(window.App) window.App.setState('ui.wlViewMode', 'grid')"></button>
-                <button type="button" class="vt-btn" id="wl-vt-list" 
-                    onclick="if(window.App) window.App.setState('ui.wlViewMode', 'list')"></button>
-            </div>
-        </div>
-    </div>
-    <div id="wl-items-container"></div>
-  </div>
+  <div id="admin-wishlist-preview"></div>
 </div>

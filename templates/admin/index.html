@@ -1,11 +1,12 @@
 {% extends "admin/base_site.html" %}
 {% load static %}
+{% load django_vite %}
 
 {% block extrastyle %}
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'css/webapp.css' %}?v={{ APP_VERSION }}">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+{% vite_hmr_client %}
+{% vite_asset 'src/main.js' %}
 <style>
     #header { padding: 10px 40px; }
     .breadcrumbs { padding: 10px 40px; margin: 0; }
@@ -33,15 +34,13 @@
     }
     .wa-nav-btn:hover { background: var(--border); transform: translateY(-2px); }
     .wa-nav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-    
-    .admin-models-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
-    .admin-li { padding: 10px 16px; border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; }
-    .admin-li:last-child { border: none; }
 </style>
 {% endblock %}
 
 {% block content %}
-<script src="{% static 'js/webapp.js' %}?v={{ APP_VERSION }}"></script>
+<script>
+    window.GLOBAL_STATS = {{ global_stats_json|safe }};
+</script>
 <div class="webapp-container">
     <div class="wa-nav-links">
         <a href="/" class="wa-nav-btn">Метрики</a>
@@ -49,240 +48,10 @@
         <a href="/admin/tasks/" class="wa-nav-btn">Задачи</a>
     </div>
 
-    <div class="label" id="label-overview"><div class="icon" id="ic-dash"></div>Глобальная статистика</div>
-    <div class="grid" id="grid-overview">
-        <div class="stat anim-item" style="animation-delay: 0.05s">
-            <div class="stat-icon" id="ic-time"></div>
-            <div class="stat-val" id="s-time">—</div>
-            <div class="stat-lbl">Время просмотра</div>
-            <div class="stat-sub" id="s-views"></div>
-        </div>
-        <div class="stat anim-item" style="animation-delay: 0.1s">
-            <div class="stat-icon" id="ic-cal"></div>
-            <div class="stat-val" id="s-act">0</div>
-            <div class="stat-lbl">Активность</div>
-            <div class="stat-sub" id="s-daily" style="background: var(--info-dim); color: var(--info)"></div>
-        </div>
-        <div class="stat anim-item" style="animation-delay: 0.15s">
-            <div class="stat-icon" id="ic-tv"></div>
-            <div class="stat-val" id="s-ep">0</div>
-            <div class="stat-lbl">Эпизодов</div>
-            <div class="stat-sub" id="s-ser" style="background: rgba(163, 113, 247, 0.15); color: #a371f7"></div>
-        </div>
-        <div class="stat anim-item" style="animation-delay: 0.2s">
-            <div class="stat-icon" id="ic-film"></div>
-            <div class="stat-val" id="s-mov">0</div>
-            <div class="stat-lbl">Фильмов</div>
-            <div class="stat-sub" id="s-uni" style="background: rgba(210, 153, 34, 0.15); color: #d29922"></div>
-        </div>
-    </div>
-
-    <div class="grid" style="margin-bottom: 16px;">
-        <div class="card hoverable anim-item" id="card-dynamics" style="animation-delay: 0.25s; margin-bottom: 0;">
-            <div class="label"><div class="icon" style="color:var(--info)" id="ic-chart-internal"></div>Динамика</div>
-            <div class="chart-box"><canvas id="c-monthly"></canvas></div>
-        </div>
-
-        <div class="card hoverable anim-item" id="card-weekday" style="animation-delay: 0.3s; margin-bottom: 0;">
-            <div class="label more-pad"><div class="icon" style="color:#2ecc71" id="ic-weekday-internal"></div>Дни недели</div>
-            <div class="chart-box" style="height:180px"><canvas id="c-weekday"></canvas></div>
-        </div>
-    </div>
-
-    <div class="card hoverable anim-item" id="card-heatmap" style="animation-delay: 0.35s; display: none;">
-        <div class="label more-pad"><div class="icon" style="color:#f85149" id="ic-flame-internal"></div>Интенсивность</div>
-        <div id="heatmaps-wrapper"></div>
-        <div class="hm-leg">
-            <span>Меньше</span>
-            <div class="hc"></div><div class="hc h1"></div><div class="hc h2"></div><div class="hc h3"></div><div class="hc h4"></div>
-            <span>Больше</span>
-        </div>
-    </div>
-
-    <div class="card hoverable anim-item" id="card-genres" style="animation-delay: 0.1s; margin-bottom: clamp(12px, 3vw, 16px); display: none;">
-        <div class="label"><div class="icon" id="it-gen-internal"></div>Жанры</div>
-        <div class="chart-box" style="height:380px;"><canvas id="c-genre"></canvas></div>
-        <div id="legend-genre" class="legend-grid"></div>
-    </div>
-
-    <div class="grid" style="margin-top: 16px;">
-        <div class="card hoverable anim-item" style="animation-delay: 0.15s; display: none; margin-bottom: 0;" id="card-actors">
-                <div class="label" style="justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div class="icon" style="color: #d29922;" id="it-act-internal"></div>Актёры
-                    </div>
-                    <div class="view-toggle" style="margin-bottom: 0; scale: 0.8; transform-origin: right;">
-                        <button class="vt-btn active" onclick="window.App.switchPersonTab('actors', 'series')">Сериалы</button>
-                        <button class="vt-btn" onclick="window.App.switchPersonTab('actors', 'others')">Фильмы</button>
-                    </div>
-                </div>
-                <div id="actors-list"></div>
-            </div>
-
-            <div class="card hoverable anim-item" style="animation-delay: 0.18s; display: none; margin-bottom: 0;" id="card-directors">
-                <div class="label" style="justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div class="icon" style="color: #e74c3c;" id="it-dir-internal"></div>Режиссёры
-                    </div>
-                    <div class="view-toggle" style="margin-bottom: 0; scale: 0.8; transform-origin: right;">
-                        <button class="vt-btn active" onclick="window.App.switchPersonTab('directors', 'series')">Сериалы</button>
-                        <button class="vt-btn" onclick="window.App.switchPersonTab('directors', 'others')">Фильмы</button>
-                    </div>
-                </div>
-                <div id="directors-list"></div>
-            </div>
-
-            <div class="card hoverable anim-item" style="animation-delay: 0.20s; display: none; margin-bottom: 0;" id="card-writers">
-                <div class="label" style="justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <div class="icon" style="color: #3498db;" id="it-wri-internal"></div>Сценаристы
-                    </div>
-                    <div class="view-toggle" style="margin-bottom: 0; scale: 0.8; transform-origin: right;">
-                        <button class="vt-btn active" onclick="window.App.switchPersonTab('writers', 'series')">Сериалы</button>
-                        <button class="vt-btn" onclick="window.App.switchPersonTab('writers', 'others')">Фильмы</button>
-                    </div>
-                </div>
-                <div id="writers-list"></div>
-            </div>
-
-        <div class="card hoverable anim-item" style="animation-delay: 0.22s; display: none; margin-bottom: 0;" id="card-countries">
-            <div class="label"><div class="icon" style="color: #388bfd;" id="it-cou-internal"></div>Страны</div>
-            <div id="countries-list"></div>
-        </div>
-        
-        <div class="card hoverable anim-item" style="animation-delay: 0.25s; display: none; margin-bottom: 0;" id="card-binges">
-            <div class="label"><div class="icon" style="color: #a371f7;" id="it-bin-internal"></div>Топ марафонов</div>
-            <div id="binges-list"></div>
-        </div>
-
-        <div class="card hoverable anim-item" style="animation-delay: 0.3s; display: none; margin-bottom: 0;" id="ratings-box">
-            <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star-internal"></div>Оценки</div>
-            <div class="critic-header">
-                <div class="critic-title-box">
-                    <div class="critic-badge" id="cr-badge"></div>
-                    <div class="critic-avg" id="cr-avg">0.0<span>/ 10</span></div>
-                </div>
-                <div class="critic-total" id="cr-total"></div>
-            </div>
-            <div class="chart-box" style="height: 180px; margin-bottom: 16px;"><canvas id="c-ratings-dist"></canvas></div>
-        </div>
-    </div>
-
-    <div class="label" style="margin-top: 24px;"><div class="icon">📁</div> Разделы администратора</div>
-    <div class="admin-models-grid">
-        {% for app in app_list %}
-        <div class="card hoverable anim-item" style="margin-bottom: 0; padding: 0;">
-            <div class="label" style="font-size: 16px; color:var(--text-primary); padding: 16px 16px 8px; border-bottom: 1px solid var(--border);">
-                {{ app.name }}
-            </div>
-            {% for model in app.models %}
-            <div class="admin-li">
-                <a href="{{ model.admin_url }}" class="li-name" style="font-size: 15px; text-decoration:none;">{{ model.name }}</a>
-                {% if model.add_url %}
-                <a href="{{ model.add_url }}" style="color:var(--accent); font-weight:bold; text-decoration:none; font-size: 13px; background: var(--bg-input); padding: 4px 10px; border-radius: 8px;">+ Добавить</a>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        {% endfor %}
-    </div>
+    <div id="admin-stats-app"></div>
 </div>
 
 <script>
     window.IS_ADMIN_DASHBOARD = true;
-
-    function initAdminDash() {
-        const globalStats = {{ global_stats_json|safe }};
-        D = globalStats;
-        
-        document.querySelectorAll('.li-name').forEach(el => {
-            el.style.textDecoration = 'none';
-            el.addEventListener('mouseover', () => el.style.color = 'var(--link-hover-color)');
-            el.addEventListener('mouseout', () => el.style.color = 'var(--text-primary)');
-        });
-
-        window.App.initIcons();
-        
-        const s = window.App.D.summary || {};
-        const vViews = s.total_views || 0, vEp = s.total_episodes || 0, vMov = s.total_movies || 0, vSer = s.unique_series || 0;
-        
-        document.getElementById('s-time').textContent  = s.duration_display || '0м';
-        document.getElementById('s-views').textContent = vViews + ' ' + window.App.plural(vViews, ['просмотр', 'просмотра', 'просмотров']);
-        document.getElementById('s-act').textContent   = (s.activity_percent || 0) + '%';
-        document.getElementById('s-daily').textContent = '~' + (s.daily_average_min||0) + ' мин/день';
-        document.getElementById('s-ep').textContent = vEp;
-        document.getElementById('s-ep').nextElementSibling.textContent = window.App.plural(vEp, ['Эпизод', 'Эпизода', 'Эпизодов']);
-        document.getElementById('s-ser').textContent = vSer + ' ' + window.App.plural(vSer, ['сериал', 'сериала', 'сериалов']) + ' · ' + (s.series_duration || '0м');
-        document.getElementById('s-mov').textContent = vMov;
-        document.getElementById('s-mov').nextElementSibling.textContent = window.App.plural(vMov, ['Фильм', 'Фильма', 'Фильмов']);
-        document.getElementById('s-uni').textContent = s.movies_duration || '0м';
-        
-        if (window.App.D.monthly_chart?.views?.some(v => v > 0)) {
-            document.getElementById('card-dynamics').style.display = 'block';
-        } else {
-            document.getElementById('card-dynamics').style.display = 'none';
-        }
-
-        if (window.App.D.weekday_chart?.data?.some(v => v > 0)) {
-            document.getElementById('card-weekday').style.display = 'block';
-        } else {
-            document.getElementById('card-weekday').style.display = 'none';
-        }
-
-        if (window.App.D.heatmap?.length > 0) {
-            document.getElementById('card-heatmap').style.display = 'block';
-            window.App.renderHeatmap();
-        } else {
-            document.getElementById('card-heatmap').style.display = 'none';
-        }
-
-        if (window.App.D.genres?.length > 0) {
-            document.getElementById('card-genres').style.display = 'block';
-        } else {
-            document.getElementById('card-genres').style.display = 'none';
-        }
-
-        const hasActors = (window.App.D.actors?.series?.length || window.App.D.actors?.others?.length);
-        if (hasActors) { document.getElementById('card-actors').style.display = 'block'; window.App.fillList('actors-list', window.App.D.actors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'actors', 'series'); }
-        
-        const hasDirectors = (window.App.D.directors?.series?.length || window.App.D.directors?.others?.length);
-        if (hasDirectors) { document.getElementById('card-directors').style.display = 'block'; window.App.fillList('directors-list', window.App.D.directors.series, null, ['просмотр', 'просмотра', 'просмотров'], 'directors', 'series'); }
-        
-        const hasWriters = (window.App.D.writers?.series?.length || window.App.D.writers?.others?.length);
-        if (hasWriters) { document.getElementById('card-writers').style.display = 'block'; window.App.fillList('writers-list', window.App.D.writers.series, null, ['просмотр', 'просмотра', 'просмотров'], 'writers', 'series'); }
-        
-        if (window.App.D.countries?.length > 0) { document.getElementById('card-countries').style.display = 'block'; window.App.fillList('countries-list', window.App.D.countries, window.App.Icons.globe, ['просмотр', 'просмотра', 'просмотров'], 'countries'); }
-        if (window.App.D.binges?.length > 0) { document.getElementById('card-binges').style.display = 'block'; window.App.fillBinges(); }
-
-        if (window.App.D.ratings?.total > 0) {
-            const rt = window.App.D.ratings;
-            document.getElementById('ratings-box').style.display = 'block';
-            const ratingPalette = ['#f85149', '#f85149', '#e67e22', '#e67e22', '#d29922', '#d29922', '#388bfd', '#388bfd', '#2ea043', '#39d353'];
-            const colorIdx = Math.max(0, Math.min(9, Math.floor(rt.avg) - 1));
-            
-            const avgEl = document.getElementById('cr-avg');
-            avgEl.innerHTML = `${rt.avg.toFixed(1)}<span>/ 10</span>`;
-            avgEl.style.color = ratingPalette[colorIdx];
-            
-            document.getElementById('cr-total').innerHTML = `${rt.total}<br><span style="font-size: 11px; opacity: 0.7;">${window.App.plural(rt.total, ['оценка', 'оценки', 'оценок'])}</span>`;
-            
-            const badge = document.getElementById('cr-badge');
-            if (rt.avg >= 8.5) { badge.textContent = 'Восторженный зритель'; badge.style.background = 'rgba(46, 204, 113, 0.15)'; badge.style.color = '#2ecc71'; }
-            else if (rt.avg >= 7.0) { badge.textContent = 'Позитивный критик'; badge.style.background = 'rgba(56, 139, 253, 0.15)'; badge.style.color = '#60a5fa'; }
-            else if (rt.avg >= 5.5) { badge.textContent = 'Объективный судья'; badge.style.background = 'rgba(210, 153, 34, 0.15)'; badge.style.color = '#d29922'; }
-            else { badge.textContent = 'Суровый критик'; badge.style.background = 'rgba(248, 81, 73, 0.15)'; badge.style.color = '#e74c3c'; }
-            
-            window.App.renderRatingsDist();
-        } else {
-            document.getElementById('ratings-box').style.display = 'none';
-        }
-
-        window.App.openHistoryLayer = function() {};
-        window.App.renderCharts();
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        initAdminDash();
-    });
 </script>
 {% endblock %}

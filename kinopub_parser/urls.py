@@ -26,6 +26,7 @@ urlpatterns = proxy_patterns + [
         views.admin_get_folder_content,
         name='admin_get_folder_content',
     ),
+    path('api/admin/global_stats/', views.admin_get_global_stats, name='admin_get_global_stats'),
     path(
         'favicon.ico', RedirectView.as_view(url=settings.STATIC_URL + 'favicon.ico', permanent=True)
     ),

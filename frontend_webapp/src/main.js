@@ -2,6 +2,8 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import AdminDashboard from './views/AdminDashboard.vue'
+import AdminStatsDashboard from './views/AdminStatsDashboard.vue'
+import AdminWishlistPreview from './views/AdminWishlistPreview.vue'
 import router from './router'
 
 import '../../kinopub_parser/static/css/webapp.css'
@@ -19,6 +21,19 @@ if (document.getElementById('admin-app')) {
   const adminApp = createApp(AdminDashboard)
   adminApp.use(pinia)
   adminApp.mount('#admin-app')
+}
+
+if (document.getElementById('admin-stats-app')) {
+  const adminStatsApp = createApp(AdminStatsDashboard)
+  adminStatsApp.use(pinia)
+  adminStatsApp.use(router)
+  adminStatsApp.mount('#admin-stats-app')
+}
+
+if (document.getElementById('admin-wishlist-preview')) {
+  const wishlistPreview = createApp(AdminWishlistPreview)
+  wishlistPreview.use(pinia)
+  wishlistPreview.mount('#admin-wishlist-preview')
 }
 
 let touchStartX = 0

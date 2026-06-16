@@ -87,19 +87,6 @@
       </div>
     </template>
 
-    <div v-if="adminApps.length" class="label" style="margin-top: 24px; padding-left: 35px;"><div class="icon" v-html="icons.folder"></div> Разделы администратора</div>
-    <div v-if="adminApps.length" class="admin-models-grid" style="padding: 0 16px 40px;">
-      <div class="card hoverable anim-item" style="margin-bottom: 0; padding: 0;" v-for="app in adminApps" :key="app.name">
-        <div class="label" style="font-size: 16px; color:var(--text-primary); padding: 16px 16px 8px; border-bottom: 1px solid var(--border);">
-          {{ app.name }}
-        </div>
-        <div class="admin-li" style="padding: 10px 16px; border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center;" v-for="model in app.models" :key="model.name">
-          <a :href="model.admin_url" class="li-name" style="font-size: 15px; text-decoration:none; color: var(--text-primary);">{{ model.name }}</a>
-          <a v-if="model.add_url" :href="model.add_url" style="color:var(--accent); font-weight:bold; text-decoration:none; font-size: 13px; background: var(--bg-input); padding: 4px 10px; border-radius: 8px;">+ Добавить</a>
-        </div>
-      </div>
-    </div>
-
     <!-- Модалка Детализации -->
     <div class="modal-overlay" :class="{ show: isModalOpen }" @click.self="closeDetails">
       <div class="modal-content" :class="{ 'modal-wide': modalItems.length >= 5 }">
@@ -111,7 +98,15 @@
           <div class="spinner" style="width:30px; height:30px; display:inline-block;"></div>
         </div>
         <div v-else class="modal-body-list" ref="modalListRef">
-          <div v-if="!ctx.is_authenticated" class="empty" style="grid-column: 1/-1; padding: 40px 20px;">Авторизуйтесь для просмотра</div>
+          <div v-if="!ctx.is_authenticated" class="empty" style="grid-column: 1/-1; padding: 40px 20px;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🔒</div>
+            <div style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">
+              Авторизуйтесь для просмотра детализации
+            </div>
+            <a href="/admin/login/?next=/" class="add-all-btn" style="text-decoration: none; display: inline-flex; justify-content: center; align-items: center; width: auto; margin: 0 auto;">
+              Войти в систему
+            </a>
+          </div>
           <div v-else-if="modalDataContext.is_summary" class="empty" style="grid-column: 1/-1; padding: 40px 20px;">
             <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
             <div style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">
@@ -285,10 +280,10 @@ const metricGroups = ref([
   {
     title: 'Рейтинги', icon: 'star', color: 'var(--accent)',
     metrics: [
-      { key: 'missing_kp', icon: 'frown', color: 'var(--danger)', label: 'Нет рейтинга KP', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.', showDesc: false },
       { key: 'has_kp', icon: 'smile', color: 'var(--info)', label: 'Есть рейтинг KP', centerLabel: 'ЕСТЬ РЕЙТИНГ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг Кинопоиска.', showDesc: false },
+      { key: 'missing_kp', icon: 'frown', color: 'var(--danger)', label: 'Нет рейтинга KP', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.', showDesc: false },
+      { key: 'has_imdb', icon: 'smile', color: 'var(--accent)', label: 'Есть рейтинг IMDb', centerLabel: 'ЕСТЬ РЕЙТИНГ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг IMDb.', showDesc: false },
       { key: 'missing_imdb', icon: 'frown', color: '#f1c40f', label: 'Нет рейтинга IMDb', centerLabel: 'БЕЗ IMDB', valField: 'value', severity: 'critical', desc: 'Шоу, у которых указана ссылка на IMDb, но в таблице внешних рейтингов данные отсутствуют.', showDesc: false },
-      { key: 'has_imdb', icon: 'smile', color: 'var(--accent)', label: 'Есть рейтинг IMDb', centerLabel: 'ЕСТЬ РЕЙТИНГ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг IMDb.', showDesc: false }
     ]
   },
   {
@@ -709,7 +704,7 @@ onUnmounted(() => {
 .metric-desc.visible { max-height: 300px; opacity: 1; margin: 10px 0 20px; padding: 12px; pointer-events: auto; }
 .label-clickable { cursor: pointer; user-select: none; }
 
-.admin-models-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; padding: 0 16px 40px; }
+.admin-models-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
 .admin-li { padding: 10px 16px; border-bottom: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; }
 .admin-li:last-child { border: none; }
 

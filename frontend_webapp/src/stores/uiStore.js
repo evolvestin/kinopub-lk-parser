@@ -69,6 +69,7 @@ export const useUIStore = defineStore('ui', () => {
   })
 
   function openLayer(type, id, query = {}) {
+    if (window.IS_ADMIN_DASHBOARD) return
     const currentPath = router.currentRoute.value.path
     const newPath = `${currentPath}/${type}/${id}`.replace(/\/+/g, '/')
     router.push({ path: newPath, query: { ...router.currentRoute.value.query, ...query } })
@@ -80,6 +81,7 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   function switchBaseView(viewName) {
+    if (window.IS_ADMIN_DASHBOARD) return
     isHistoryEditMode.value = false
     router.push({ name: viewName, query: router.currentRoute.value.query })
   }

@@ -1,5 +1,16 @@
 {% extends "admin/change_form.html" %}
 {% load static %}
+{% load django_vite %}
+
+{% block extrahead %}
+{{ block.super }}
+{% vite_hmr_client %}
+{% vite_asset 'src/main.js' %}
+<script>
+    window.FOLDER_ID = "{{ object_id }}";
+    window.IS_ADMIN_DASHBOARD = true;
+</script>
+{% endblock %}
 
 {% block extrastyle %}
 {{ block.super }}
@@ -23,7 +34,6 @@
         background: var(--body-bg);
         border-radius: 38px;
         padding: 0;
-        /* Размеры будут установлены через inline style в preview.html или JS */
         border: 10px solid #1b1f26;
         overflow: hidden;
         display: flex;
@@ -67,48 +77,4 @@
         display: none !important;
     }
 </style>
-{% endblock %}
-
-{% block admin_change_form_document_ready %}
-{{ block.super }}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-<script>
-    window.tg = { initData: "" };
-    window.IS_ADMIN_DASHBOARD = true;
-    
-    window.App = window.App || {};
-    window.App.openShowLayer = function(id) {
-        window.open(`/admin/app/show/${id}/change/`, '_blank');
-    };
-
-    document.addEventListener('DOMContentLoaded', async function() {
-        const folderId = "{{ object_id }}";
-        if (!folderId || folderId === "None") return;
-
-        const container = document.getElementById('wl-items-container');
-        if (!container) return;
-        
-        container.innerHTML = '<div class="loader-inline"><div class="spinner"></div></div>';
-
-        try {
-            const r = await fetch(`/api/admin/wishlist/folder/${folderId}/`);
-            if (!r.ok) throw new Error();
-            const data = await r.json();
-            
-            window.App.activeWlFolderId = parseInt(folderId);
-            window.App.wishlistFolders = [data]; 
-            
-            // Ждем небольшую паузу для завершения парсинга webapp.js
-            setTimeout(() => {
-                if (typeof initIcons === 'function') window.App.initIcons();
-                if (typeof renderActiveWlFolder === 'function') window.App.renderActiveWlFolder();
-            }, 50);
-            
-        } catch (e) {
-            container.innerHTML = '<div class="empty">Ошибка загрузки содержимого</div>';
-        }
-    });
-</script>
-<script src="/static/js/webapp.js?v={{ APP_VERSION }}"></script>
-<script src="/static/js/wishlist.js?v={{ APP_VERSION }}"></script>
 {% endblock %}
