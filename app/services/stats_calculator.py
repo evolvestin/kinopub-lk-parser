@@ -201,7 +201,7 @@ def _get_favorites(base_qs, dur_qs):
                 show__showcrew__en_profession__in=dub_en
             )
 
-        canonical_qs = (
+        canonical_qs = list(
             filtered_qs.filter(role_cond)
             .annotate(
                 canonical_id=Coalesce(
@@ -214,27 +214,50 @@ def _get_favorites(base_qs, dur_qs):
             .order_by('-views')[:limit]
         )
 
+        if not canonical_qs:
+            return []
+
+        cids = [p['canonical_id'] for p in canonical_qs]
+        persons_map = Person.objects.filter(id__in=cids).select_related('master_person').in_bulk()
+
+        aliases_qs = Person.objects.filter(master_person_id__in=cids).values('id', 'master_person_id')
+        aliases_by_master = defaultdict(list)
+        for row in aliases_qs:
+            aliases_by_master[row['master_person_id']].append(row['id'])
+
+        all_target_ids = []
+        person_target_ids_map = {}
+        for p in canonical_qs:
+            cid = p['canonical_id']
+            t_ids = [cid] + aliases_by_master[cid]
+            person_target_ids_map[cid] = t_ids
+            all_target_ids.extend(t_ids)
+
+        shows_data_qs = (
+            filtered_qs.filter(
+                Q(show__showcrew__person__id__in=all_target_ids) &
+                (Q(show__showcrew__profession__in=professions) | Q(show__showcrew__en_profession__in=professions))
+            )
+            .values('show__showcrew__person__id', 'show_id', 'show__title', 'show__original_title')
+            .distinct()
+        )
+
+        shows_by_person = defaultdict(list)
+        for row in shows_data_qs:
+            pid = row['show__showcrew__person__id']
+            for cid, t_ids in person_target_ids_map.items():
+                if pid in t_ids:
+                    shows_by_person[cid].append(row)
+                    break
+
         result = []
         for p in canonical_qs:
             cid = p['canonical_id']
-            try:
-                person = Person.objects.get(id=cid)
-            except Person.DoesNotExist:
+            person = persons_map.get(cid)
+            if not person:
                 continue
 
-            target_ids = [cid] + list(person.aliases.values_list('id', flat=True))
-
-            person_role_filter = Q(show__showcrew__person__id__in=target_ids) & (
-                Q(show__showcrew__profession__in=professions)
-                | Q(show__showcrew__en_profession__in=professions)
-            )
-
-            person_shows_data = (
-                filtered_qs.filter(person_role_filter)
-                .values('show_id', 'show__title', 'show__original_title')
-                .distinct()
-            )
-
+            person_shows_data = shows_by_person.get(cid, [])
             show_ids = [row['show_id'] for row in person_shows_data]
             titles_set = {
                 row['show__original_title'] or row['show__title'] for row in person_shows_data

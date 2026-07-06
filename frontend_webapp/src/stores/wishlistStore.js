@@ -32,12 +32,15 @@ export const useWishlistStore = defineStore('wishlist', () => {
     },
     set(val) {
       const query = { ...router.currentRoute.value.query }
+      const oldVal = query.folder ? parseInt(query.folder) : null
+      if (oldVal === val) return
+
       if (!val) {
         delete query.folder
       } else {
         query.folder = String(val)
       }
-      router.replace({ query })
+      router.replace({ query }).catch(() => {})
     }
   })
 
@@ -48,12 +51,15 @@ export const useWishlistStore = defineStore('wishlist', () => {
     set(val) {
       localStorage.setItem('kp_wl_sort_mode', val)
       const query = { ...router.currentRoute.value.query }
+      const oldVal = query.sort || localStorage.getItem('kp_wl_sort_mode') || 'default'
+      if (oldVal === val) return
+
       if (val === 'default') {
         delete query.sort
       } else {
         query.sort = val
       }
-      router.replace({ query })
+      router.replace({ query }).catch(() => {})
     }
   })
 
@@ -64,12 +70,15 @@ export const useWishlistStore = defineStore('wishlist', () => {
     set(val) {
       localStorage.setItem('kp_wl_view_mode', val)
       const query = { ...router.currentRoute.value.query }
+      const oldVal = query.view || localStorage.getItem('kp_wl_view_mode') || 'grid'
+      if (oldVal === val) return
+
       if (val === 'grid') {
         delete query.view
       } else {
         query.view = val
       }
-      router.replace({ query })
+      router.replace({ query }).catch(() => {})
     }
   })
 

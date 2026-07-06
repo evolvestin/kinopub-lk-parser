@@ -21,12 +21,15 @@ export const useStatsStore = defineStore('stats', () => {
     },
     set(val) {
       const query = { ...router.currentRoute.value.query }
+      const oldVal = query.y || 'all'
+      if (oldVal === val) return
+
       if (val === 'all') {
         delete query.y
       } else {
         query.y = val
       }
-      router.replace({ query })
+      router.replace({ query }).catch(() => {})
     }
   })
 
@@ -36,12 +39,15 @@ export const useStatsStore = defineStore('stats', () => {
     },
     set(val) {
       const query = { ...router.currentRoute.value.query }
+      const oldVal = query.tab || 'personal'
+      if (oldVal === val) return
+
       if (val === 'personal') {
         delete query.tab
       } else {
         query.tab = val
       }
-      router.replace({ query })
+      router.replace({ query }).catch(() => {})
     }
   })
 

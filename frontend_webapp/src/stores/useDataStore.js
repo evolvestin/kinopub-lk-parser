@@ -19,12 +19,15 @@ export const useDataStore = defineStore('data', () => {
     },
     set(val) {
       const query = { ...router.currentRoute.value.query }
+      const oldVal = query.q || ''
+      if (oldVal === val) return
+
       if (!val) {
         delete query.q
       } else {
         query.q = val
       }
-      router.replace({ query })
+      router.replace({ query }).catch(() => {})
     }
   })
 

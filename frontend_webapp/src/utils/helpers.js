@@ -28,23 +28,29 @@ export function getUserColor(id) {
 }
 
 const preloadPool = new Set();
+const preloadedUrls = new Set();
+const preloadingPromises = new Map();
 
 export function preloadImage(url, priority = 'auto') {
   if (!url || typeof url !== 'string' || brokenImages.has(url)) return Promise.resolve(false);
+  if (preloadedUrls.has(url)) return Promise.resolve(true);
+  if (preloadingPromises.has(url)) return preloadingPromises.get(url);
   
   const startTime = performance.now();
   logger.info(`Asset preload queued: ${url}`);
 
-  return new Promise((resolve) => {
+  const promise = new Promise((resolve) => {
     const img = new Image();
     
     img.onload = () => {
       preloadPool.delete(img);
+      preloadingPromises.delete(url);
       if (img.naturalWidth === 208 && img.naturalHeight === 304) {
         brokenImages.add(url);
         logger.warn(`Asset failed validation (broken geometry 208x304): ${url} (took ${(performance.now() - startTime).toFixed(1)}ms)`);
         resolve(false);
       } else {
+        preloadedUrls.add(url);
         logger.info(`Asset preloaded successfully: ${url} (took ${(performance.now() - startTime).toFixed(1)}ms)`);
         resolve(true);
       }
@@ -52,6 +58,7 @@ export function preloadImage(url, priority = 'auto') {
     
     img.onerror = () => {
       preloadPool.delete(img);
+      preloadingPromises.delete(url);
       brokenImages.add(url);
       logger.error(`Asset preload failed: ${url} (took ${(performance.now() - startTime).toFixed(1)}ms)`);
       resolve(false);
@@ -64,6 +71,9 @@ export function preloadImage(url, priority = 'auto') {
     preloadPool.add(img);
     img.src = url;
   });
+
+  preloadingPromises.set(url, promise);
+  return promise;
 }
 
 export function validateImageGeom(event, onPlaceholderNeeded) {

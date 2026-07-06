@@ -30,11 +30,11 @@ const showBackButton = computed(() => {
 })
 
 onMounted(async () => {
-  if (window.IS_DEBUG || window.USER_ROLE === 'admin') {
+  if (window.USER_ROLE === 'admin') {
     const navigationStart = window.performance?.timing?.navigationStart || window.performance?.timeOrigin;
     if (navigationStart) {
       const latency = Date.now() - navigationStart;
-      logger.info(`Bootstrap Latency from Click to App: ${latency.toFixed(2)}ms`);
+      console.info(`[AppInfo] [${new Date().toISOString()}] Bootstrap Latency from Click to App: ${latency.toFixed(2)}ms`);
     }
   }
 
