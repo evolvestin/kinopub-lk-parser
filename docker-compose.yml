@@ -203,7 +203,7 @@ services:
   vps-tunnel:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: tunnel --url http://chisel-server:8001
+    command: tunnel --url http://chisel-server:8001 --protocol http2
     networks:
       - kinopub-net
     depends_on:
