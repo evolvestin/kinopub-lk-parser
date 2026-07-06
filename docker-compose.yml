@@ -193,13 +193,40 @@ services:
     image: jpillora/chisel:1.10.0
     restart: unless-stopped
     ports:
-      - "${CHISEL_SERVER_PORT:-8100}:8100"
-      - "${CHISEL_TUNNEL_PORT:-8001}:8001"
+      - "${CHISEL_SERVER_PORT:-8080}:8080"
     environment:
-      - CHISEL_AUTH=${CHISEL_AUTH:-devuser:secretpassword}
+      - CHISEL_AUTH=${CHISEL_AUTH:-devuser:kino_secure_tunnel_2026}
     command: server --auth ${CHISEL_AUTH} --reverse
     networks:
       - kinopub-net
+
+  vps-tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --url http://chisel-server:8001
+    networks:
+      - kinopub-net
+    depends_on:
+      chisel-server:
+        condition: service_started
+
+  vps-tunnel-monitor:
+    build:
+      context: ./tunnel_monitor
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - BOT_API_HOST=telegram-bot
+      - BOT_API_PORT=8081
+    networks:
+      - kinopub-net
+    depends_on:
+      telegram-bot:
+        condition: service_started
+      vps-tunnel:
+        condition: service_started
 
   tunnel:
     image: jpillora/chisel:1.10.0
@@ -208,8 +235,8 @@ services:
       - dev
     environment:
       - PROD_SERVER_IP=${PROD_SERVER_IP}
-      - CHISEL_SERVER_PORT=${CHISEL_SERVER_PORT:-8100}
-      - CHISEL_AUTH=${CHISEL_AUTH:-devuser:secretpassword}
+      - CHISEL_SERVER_PORT=${CHISEL_SERVER_PORT:-8080}
+      - CHISEL_AUTH=${CHISEL_AUTH:-devuser:kino_secure_tunnel_2026}
     command: client --auth ${CHISEL_AUTH} http://${PROD_SERVER_IP}:${CHISEL_SERVER_PORT} R:8001:asgi:8001
     depends_on:
       asgi:
