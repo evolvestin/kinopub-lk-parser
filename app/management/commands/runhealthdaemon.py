@@ -1,3 +1,4 @@
+import threading
 import time
 
 from django.core.management import call_command
@@ -23,10 +24,14 @@ class Command(BaseCommand):
                     self.stdout.write(
                         f'[{now.strftime("%Y-%m-%d %H:%M:%S")}] Triggering health report...'
                     )
-                    call_command('sendhealthreport')
+                    threading.Thread(
+                        target=call_command,
+                        args=('sendhealthreport',),
+                        daemon=True
+                    ).start()
                     last_run_date = now.date()
 
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'Error in health daemon loop: {e}'))
 
-            time.sleep(60)
+            time.sleep(30)

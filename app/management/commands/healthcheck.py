@@ -29,7 +29,7 @@ class Command(BaseCommand):
 
         heartbeat_file = settings.HEARTBEAT_FILE
         hostname = socket.gethostname()
-        threshold = 60
+        threshold = 180
         try:
             stat = os.stat(heartbeat_file)
             age = time.time() - stat.st_mtime
