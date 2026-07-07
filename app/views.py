@@ -23,7 +23,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from redis import Redis
-from app.services.stats_calculator import generate_global_stats
+
 from app.admin_site import admin_site
 from app.models import (
     CasinoSpin,
@@ -62,7 +62,11 @@ from app.services.metrics import (
     get_unmapped_genres_list,
     get_unused_countries_list,
 )
-from app.services.stats_calculator import generate_group_stats, generate_user_stats
+from app.services.stats_calculator import (
+    generate_global_stats,
+    generate_group_stats,
+    generate_user_stats,
+)
 from app.services.telegram_auth import validate_telegram_init_data
 from app.tasks import send_view_confirmation_task
 from app.telegram_bot import TelegramSender

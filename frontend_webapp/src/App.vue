@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, watch, computed } from 'vue'
+import { onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUIStore } from './stores/uiStore'
 import { useStatsStore } from './stores/useStatsStore'
 import { useTelegram } from './composables/useTelegram'
@@ -24,12 +25,16 @@ import WlDeleteModal from './components/modals/WlDeleteModal.vue'
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const { tg } = useTelegram()
+const router = useRouter()
 
 const showBackButton = computed(() => {
   return uiStore.hasOpenLayers || Object.values(uiStore.modals).some(m => m.isOpen)
 })
 
 onMounted(async () => {
+  document.documentElement.classList.add('is-webapp')
+  document.body.classList.add('is-webapp')
+
   if (window.USER_ROLE === 'admin') {
     const navigationStart = window.performance?.timing?.navigationStart || window.performance?.timeOrigin;
     if (navigationStart) {
@@ -53,9 +58,37 @@ onMounted(async () => {
       }
     })
   }
+
+  await router.isReady()
+
+  let startParam = tg?.initDataUnsafe?.start_param || ''
+  if (!startParam) {
+    const params = new URLSearchParams(window.location.search)
+    startParam = params.get('tgWebAppStartParam') || params.get('start_param') || ''
+  }
   
+  const lastView = localStorage.getItem('kp_last_active_view')
+  let targetPath = '/search'
+  let targetQuery = { ...router.currentRoute.value.query }
+
+  if (startParam) {
+    if (startParam.startsWith('stat_')) {
+      targetPath = '/stats'
+      targetQuery.shared_id = startParam.replace('stat_', '')
+    } else if (startParam.startsWith('show_')) {
+      targetPath = '/search'
+      nextTick(() => {
+        uiStore.openLayer('show', startParam.replace('show_', ''))
+      })
+    }
+  } else if (lastView && ['search', 'wishlist', 'stats'].includes(lastView)) {
+    targetPath = `/${lastView}`
+  }
+
+  await router.replace({ path: targetPath, query: targetQuery })
+
   try {
-    await statsStore.fetchStats('all', false)
+    await statsStore.fetchStats(statsStore.currentYear, false)
   } catch (e) {
     logger.error('Failed to fetch initial stats during bootstrap:', e)
   } finally {
@@ -63,6 +96,11 @@ onMounted(async () => {
     uiStore.setAppReady(true)
     logger.timeEnd('InitialBootstrap')
   }
+})
+
+onUnmounted(() => {
+  document.documentElement.classList.remove('is-webapp')
+  document.body.classList.remove('is-webapp')
 })
 
 watch(showBackButton, (val) => {
@@ -77,7 +115,7 @@ watch(() => uiStore.theme, (val) => {
 <template>
   <div :class="[uiStore.theme, 'is-webapp']">
     <div v-show="uiStore.isAppReady && !uiStore.hasOpenLayers" id="views-container" class="app-viewport">
-      <router-view v-slot="{ Component }">
+      <router-view v-if="uiStore.isAppReady" v-slot="{ Component }">
         <keep-alive>
           <component :is="Component" :key="uiStore.activeView" />
         </keep-alive>

@@ -185,16 +185,39 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 )
             return
 
+    keyboard = None
     if success:
+        dynamic_url = URLStore().get_url()
+        base_url = (
+            dynamic_url
+            or os.getenv('WEBAPP_PUBLIC_URL')
+            or os.getenv('BACKEND_URL')
+            or 'http://localhost:8000'
+        )
+        web_app_url = f'{base_url.rstrip("/")}/webapp/'
+
         text = (
             f'👋 {bold(f"Привет, {html_secure(user.first_name)}!")}\n\n'
             'Я бот-помощник KinoPub Observer.\n'
-            'Просто отправьте мне название фильма или сериала, и я проверю его наличие в базе.'
+            'Вы можете отправлять мне названия фильмов и сериалов для быстрого поиска по базе, '
+            'а также воспользоваться интерактивным веб-приложением.\n\n'
+            'В приложении доступны подробная статистика просмотров, наглядные графики активности, '
+            'настройка списков избранного по папкам и функция интеллектуальной рулетки для помощи '
+            'в выборе контента.'
+        )
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text='📱 Открыть веб-приложение', web_app=WebAppInfo(url=web_app_url)
+                    )
+                ]
+            ]
         )
     else:
         text = f'⚠️ {bold("Ошибка регистрации.")}\nПопробуйте позже.'
 
-    await sender.send_message(chat_id=user.id, text=text)
+    await sender.send_message(chat_id=user.id, text=text, keyboard=keyboard)
 
 
 async def handle_history_command(message: Message, bot: Bot):

@@ -83,6 +83,7 @@ export const useUIStore = defineStore('ui', () => {
   function switchBaseView(viewName) {
     if (window.IS_ADMIN_DASHBOARD) return
     isHistoryEditMode.value = false
+    localStorage.setItem('kp_last_active_view', viewName)
     router.push({ name: viewName, query: router.currentRoute.value.query })
   }
 

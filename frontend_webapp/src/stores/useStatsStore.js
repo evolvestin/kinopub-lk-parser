@@ -12,6 +12,7 @@ export const useStatsStore = defineStore('stats', () => {
   const userStore = useUserStore()
 
   const statsCache = ref({})
+  const sharedDataMap = ref({})
   const availableYears = ref([])
   const isPreloadingYears = ref(false)
 
@@ -51,8 +52,18 @@ export const useStatsStore = defineStore('stats', () => {
     }
   })
 
-  const currentStats = computed(() => statsCache.value[currentYear.value] || null)
-  const hasGroup = computed(() => !!currentStats.value?.group)
+  const isShared = computed(() => !!router.currentRoute.value.query.shared_id)
+  const sharedId = computed(() => router.currentRoute.value.query.shared_id || null)
+
+  const currentStats = computed(() => {
+    if (isShared.value && sharedId.value) {
+      const cacheKey = `shared_${sharedId.value}_${currentYear.value}`
+      return statsCache.value[cacheKey] || null
+    }
+    return statsCache.value[currentYear.value] || null
+  })
+
+  const hasGroup = computed(() => !isShared.value && !!currentStats.value?.group)
 
   async function resolveAllImages(data) {
     if (!data) return
@@ -112,7 +123,50 @@ export const useStatsStore = defineStore('stats', () => {
 
   const activeRequests = {}
 
+  async function fetchSharedStats(statId, year = 'all', isBackground = false) {
+    const cacheKey = `shared_${statId}_${year}`
+    if (statsCache.value[cacheKey]) {
+      if (!isBackground) {
+        currentYear.value = year
+        resolveAllImages(statsCache.value[cacheKey])
+      }
+      return statsCache.value[cacheKey]
+    }
+
+    if (!isBackground) uiStore.setLoading(true)
+    try {
+      if (!sharedDataMap.value[statId]) {
+        const res = await api.get(`shared_stats/${statId}/`)
+        sharedDataMap.value[statId] = res.data
+        if (res.metadata?.years) {
+          let years = res.metadata.years || []
+          if (years.length > 0 && !years.includes('all')) years = ['all', ...years]
+          availableYears.value = years
+        }
+      }
+
+      const yearData = sharedDataMap.value[statId][year]
+      if (yearData) {
+        statsCache.value[cacheKey] = markRaw(yearData)
+        if (!isBackground) {
+          currentYear.value = year
+          resolveAllImages(yearData)
+        }
+        return yearData
+      }
+    } catch (error) {
+      console.error('[StatsStore] Shared fetch error:', error)
+      if (!isBackground) uiStore.showToast('Ошибка загрузки общей статистики')
+    } finally {
+      if (!isBackground) uiStore.setLoading(false)
+    }
+  }
+
   async function fetchStats(year = 'all', isBackground = false) {
+    if (isShared.value && sharedId.value) {
+      return fetchSharedStats(sharedId.value, year, isBackground)
+    }
+
     if (statsCache.value[year]) {
       if (!isBackground) {
         currentYear.value = year
@@ -184,7 +238,7 @@ export const useStatsStore = defineStore('stats', () => {
   }
 
   async function triggerBackgroundPreload() {
-    if (isPreloadingYears.value) return
+    if (isPreloadingYears.value || isShared.value) return
     isPreloadingYears.value = true
     for (const year of availableYears.value) {
       if (!statsCache.value[year]) {
@@ -352,7 +406,7 @@ export const useStatsStore = defineStore('stats', () => {
   })
 
   return {
-    statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup,
+    statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup, isShared, sharedId,
     fetchStats, resolveAllImages, getHistoryByType, removeHistoryItem, fetchCasinoHistory,
     setActiveTab: (tab) => { activeTab.value = tab },
     setYear: (year) => { currentYear.value = year }

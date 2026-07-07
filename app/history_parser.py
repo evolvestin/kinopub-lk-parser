@@ -730,7 +730,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
 
     views_on_page = []
     item_blocks = driver.find_elements(By.CSS_SELECTOR, '.item-list .col-md-3')
-    for block in item_blocks:
+    for block in reversed(item_blocks):
         try:
             date_header = block.find_element(By.XPATH, 'preceding-sibling::h4[1]')
             year = date_header.find_element(By.TAG_NAME, 'small').text.strip()

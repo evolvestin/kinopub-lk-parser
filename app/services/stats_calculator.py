@@ -220,7 +220,9 @@ def _get_favorites(base_qs, dur_qs):
         cids = [p['canonical_id'] for p in canonical_qs]
         persons_map = Person.objects.filter(id__in=cids).select_related('master_person').in_bulk()
 
-        aliases_qs = Person.objects.filter(master_person_id__in=cids).values('id', 'master_person_id')
+        aliases_qs = Person.objects.filter(master_person_id__in=cids).values(
+            'id', 'master_person_id'
+        )
         aliases_by_master = defaultdict(list)
         for row in aliases_qs:
             aliases_by_master[row['master_person_id']].append(row['id'])
@@ -235,8 +237,11 @@ def _get_favorites(base_qs, dur_qs):
 
         shows_data_qs = (
             filtered_qs.filter(
-                Q(show__showcrew__person__id__in=all_target_ids) &
-                (Q(show__showcrew__profession__in=professions) | Q(show__showcrew__en_profession__in=professions))
+                Q(show__showcrew__person__id__in=all_target_ids)
+                & (
+                    Q(show__showcrew__profession__in=professions)
+                    | Q(show__showcrew__en_profession__in=professions)
+                )
             )
             .values('show__showcrew__person__id', 'show_id', 'show__title', 'show__original_title')
             .distinct()
