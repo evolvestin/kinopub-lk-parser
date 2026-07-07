@@ -340,7 +340,6 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
     options.add_argument('--disable-setuid-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--remote-debugging-host=127.0.0.1')
-    options.add_argument('--remote-debugging-port=0')
 
     options.add_argument('--disable-blink-features=AutomationControlled')
     options.add_argument('--disable-infobars')
@@ -372,9 +371,6 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
             'intl.accept_languages': 'ru-RU,ru,en-US,en',
         },
     )
-
-    real_version = get_chrome_major_version()
-    logging.info(f'Detected Chrome version: {real_version}')
 
     user_data_dir = os.path.join('/tmp', f'uc_browser_data_{profile_key}')
     if os.path.exists(user_data_dir):
@@ -415,7 +411,6 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
         browser_executable_path='/usr/bin/chromium',
         driver_executable_path=driver_executable_path,
         user_data_dir=user_data_dir,
-        version_main=real_version,
     )
 
     # Блокировка загрузки медиа-файлов на сетевом уровне
