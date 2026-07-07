@@ -337,7 +337,10 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
 
     options = uc.ChromeOptions()
     options.add_argument('--no-sandbox')
+    options.add_argument('--disable-setuid-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--remote-debugging-host=127.0.0.1')
+    options.add_argument('--remote-debugging-port=0')
 
     options.add_argument('--disable-blink-features=AutomationControlled')
     options.add_argument('--disable-infobars')
@@ -373,36 +376,47 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
     real_version = get_chrome_major_version()
     logging.info(f'Detected Chrome version: {real_version}')
 
+    user_data_dir = os.path.join('/tmp', f'uc_browser_data_{profile_key}')
+    if os.path.exists(user_data_dir):
+        for _ in range(3):
+            try:
+                shutil.rmtree(user_data_dir, ignore_errors=True)
+                if not os.path.exists(user_data_dir):
+                    break
+                time.sleep(1)
+            except Exception:
+                pass
+
+    source_chromedriver = None
+    if os.path.exists('/home/app/bin/chromedriver'):
+        source_chromedriver = '/home/app/bin/chromedriver'
+    elif os.path.exists('/usr/bin/chromedriver'):
+        source_chromedriver = '/usr/bin/chromedriver'
+
+    driver_executable_path = None
+    if source_chromedriver:
+        unique_driver_path = os.path.join('/tmp', f'chromedriver_{profile_key}')
+        try:
+            if os.path.exists(unique_driver_path):
+                os.remove(unique_driver_path)
+            shutil.copy(source_chromedriver, unique_driver_path)
+            os.chmod(unique_driver_path, 0o755)
+            driver_executable_path = unique_driver_path
+        except Exception as e:
+            logging.error(f'Failed to copy chromedriver for {profile_key}: {e}')
+            driver_executable_path = source_chromedriver
+
     if headless:
         options.add_argument('--headless=new')
         options.add_argument('--disable-gpu')
 
-        user_data_dir = os.path.join('/data', f'uc_browser_data_{profile_key}')
-        if os.path.exists(user_data_dir):
-            for _ in range(3):
-                try:
-                    shutil.rmtree(user_data_dir, ignore_errors=True)
-                    if not os.path.exists(user_data_dir):
-                        break
-                    time.sleep(1)
-                except Exception:
-                    pass
-
-        driver_executable_path = None
-        if os.path.exists('/home/app/bin/chromedriver'):
-            driver_executable_path = '/home/app/bin/chromedriver'
-        elif os.path.exists('/usr/bin/chromedriver'):
-            driver_executable_path = '/usr/bin/chromedriver'
-
-        driver = uc.Chrome(
-            options=options,
-            browser_executable_path='/usr/bin/chromium',
-            driver_executable_path=driver_executable_path,
-            user_data_dir=user_data_dir,
-            version_main=real_version,
-        )
-    else:
-        driver = uc.Chrome(options=options, version_main=real_version)
+    driver = uc.Chrome(
+        options=options,
+        browser_executable_path='/usr/bin/chromium',
+        driver_executable_path=driver_executable_path,
+        user_data_dir=user_data_dir,
+        version_main=real_version,
+    )
 
     # Блокировка загрузки медиа-файлов на сетевом уровне
     driver.execute_cdp_cmd('Network.enable', {})
