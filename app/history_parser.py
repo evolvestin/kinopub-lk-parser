@@ -411,11 +411,14 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
     if not os.path.exists(browser_executable_path):
         browser_executable_path = None
 
+    chrome_version = get_chrome_major_version()
+
     driver = uc.Chrome(
         options=options,
         browser_executable_path=browser_executable_path,
         driver_executable_path=driver_executable_path,
         user_data_dir=user_data_dir,
+        version_main=chrome_version,
     )
 
     # Блокировка загрузки медиа-файлов на сетевом уровне
