@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, Q
 from django.db.models.functions import Coalesce, Lower, StrIndex
 from django.db.utils import ProgrammingError
 from django.utils import timezone
@@ -521,7 +521,7 @@ def calculate_duplicate_photo_urls_metric():
         .annotate(cnt=Count('id'))
         .filter(cnt__gt=1)
     )
-    tmdb_dupes = tmdb_qs.aggregate(total=Sum('cnt'))['total'] or 0
+    tmdb_dupes = tmdb_qs.count()
 
     kp_qs = (
         Person.objects.filter(master_person__isnull=True)
@@ -531,7 +531,7 @@ def calculate_duplicate_photo_urls_metric():
         .annotate(cnt=Count('id'))
         .filter(cnt__gt=1)
     )
-    kp_dupes = kp_qs.aggregate(total=Sum('cnt'))['total'] or 0
+    kp_dupes = kp_qs.count()
 
     data = [
         {'name': 'TMDB дубликаты', 'value': tmdb_dupes},

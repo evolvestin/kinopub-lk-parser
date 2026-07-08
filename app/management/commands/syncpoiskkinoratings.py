@@ -332,9 +332,11 @@ class Command(LoggableBaseCommand):
             )
 
         if persons_to_update:
+            for p in persons_to_update.values():
+                p.auto_resolve_kp_duplicate()
             Person.objects.bulk_update(
                 persons_to_update.values(),
-                ['en_name', 'kp_photo_url'],
+                ['en_name', 'kp_photo_url', 'master_person'],
                 batch_size=500,
             )
 

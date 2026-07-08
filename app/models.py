@@ -84,6 +84,38 @@ class Person(BaseModel):
         target = self.canonical
         return target.tmdb_photo_url or target.kp_photo_url
 
+    def auto_resolve_kp_duplicate(self):
+        if not self.kp_photo_url:
+            return
+
+        def clean(s):
+            if not s:
+                return ''
+            return s.replace('\xa0', ' ').replace('  ', ' ').strip().lower()
+
+        cleaned_name = clean(self.name)
+        cleaned_en_name = clean(self.en_name)
+
+        if not cleaned_name or not cleaned_en_name:
+            return
+
+        candidates = Person.objects.filter(
+            kp_photo_url=self.kp_photo_url, master_person__isnull=True
+        ).exclude(id=self.id)
+
+        for candidate in candidates:
+            if (
+                clean(candidate.name) == cleaned_name
+                and clean(candidate.en_name) == cleaned_en_name
+            ):
+                self.master_person = candidate.canonical
+                break
+
+    def save(self, *args, **kwargs):
+        if not self.master_person_id and self.kp_photo_url:
+            self.auto_resolve_kp_duplicate()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         if self.master_person_id and self.master_person_id != self.id:
             return f'{self.name} -> [{self.master_person.name}]'
