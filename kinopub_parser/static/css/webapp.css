@@ -1063,6 +1063,9 @@ body.has-banner #app {
     align-items: center;
     justify-content: center;
     z-index: 20;
+    cursor: pointer;
+    outline: none !important;
+    transition: transform var(--transition-bounce), background var(--transition-smooth), box-shadow var(--transition-smooth) !important;
 }
 .detail-wishlist-btn svg { width: 24px !important; height: 24px !important; }
 .detail-wishlist-btn:active { transform: scale(0.85) !important; }
@@ -1672,20 +1675,47 @@ body.has-banner #app {
     justify-content: center;
     z-index: 20;
     cursor: pointer;
-    transition: transform var(--transition-bounce), background var(--transition-smooth);
+    outline: none !important;
+    transition: transform var(--transition-bounce), background var(--transition-smooth), box-shadow var(--transition-smooth) !important;
 }
+.detail-add-view-btn:active { transform: scale(0.85) !important; }
+.detail-add-view-btn svg { width: 24px !important; height: 24px !important; }
+@media (max-width: 380px) { .detail-add-view-btn { right: -10px !important; top: 44px !important; } }
 
-.detail-add-view-btn:active {
+.detail-rate-btn {
+    position: absolute !important;
+    top: 92px !important;
+    right: -18px !important;
+    left: auto !important;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 50% !important;
+    background: #f1c40f !important;
+    color: #fff !important;
+    box-shadow: 0 4px 15px rgba(241, 196, 15, 0.4) !important;
+    border: 3px solid var(--bg-main) !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    cursor: pointer;
+    outline: none !important;
+    transition: transform var(--transition-bounce), background var(--transition-smooth), box-shadow var(--transition-smooth) !important;
+}
+.detail-rate-btn:active {
     transform: scale(0.85) !important;
+    background: #f39c12 !important;
 }
-
-.detail-add-view-btn svg {
+.detail-rate-btn svg {
     width: 24px !important;
     height: 24px !important;
 }
-@media (max-width: 380px) { .detail-add-view-btn { right: -10px !important; top: 44px !important; } }
-
-
+@media (max-width: 380px) {
+    .detail-rate-btn {
+        right: -10px !important;
+        top: 96px !important;
+    }
+}
 
 /* Режим редактирования истории */
 .history-edit-mode .wl-delete-badge {

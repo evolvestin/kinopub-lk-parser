@@ -68,6 +68,11 @@ onMounted(async () => {
   }
   
   const lastView = localStorage.getItem('kp_last_active_view')
+  const currentPath = router.currentRoute.value.path
+  const hasLayer = ['/show/', '/person/', '/genre/', '/country/', '/history/'].some(keyword => 
+    currentPath.includes(keyword)
+  )
+
   let targetPath = '/search'
   let targetQuery = { ...router.currentRoute.value.query }
 
@@ -81,6 +86,8 @@ onMounted(async () => {
         uiStore.openLayer('show', startParam.replace('show_', ''))
       })
     }
+  } else if (hasLayer) {
+    targetPath = currentPath
   } else if (lastView && ['search', 'wishlist', 'stats'].includes(lastView)) {
     targetPath = `/${lastView}`
   }

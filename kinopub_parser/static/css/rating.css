@@ -1,17 +1,3 @@
-.detail-rate-btn {
-    top: 92px !important;
-    background: #f1c40f !important;
-    box-shadow: 0 4px 15px rgba(241, 196, 15, 0.4) !important;
-}
-
-.detail-rate-btn:active {
-    background: #f39c12 !important;
-}
-
-@media (max-width: 380px) { 
-    .detail-rate-btn { right: -10px !important; top: 96px !important; } 
-}
-
 .rating-grid-wa {
     display: grid;
     grid-template-columns: repeat(3, 1fr);

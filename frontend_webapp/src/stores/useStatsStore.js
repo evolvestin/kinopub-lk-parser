@@ -15,6 +15,7 @@ export const useStatsStore = defineStore('stats', () => {
   const sharedDataMap = ref({})
   const availableYears = ref([])
   const isPreloadingYears = ref(false)
+  const optimisticRatings = ref({})
 
   const currentYear = computed({
     get() {
@@ -64,6 +65,39 @@ export const useStatsStore = defineStore('stats', () => {
   })
 
   const hasGroup = computed(() => !isShared.value && !!currentStats.value?.group)
+
+  const userShowRatings = computed(() => {
+    const ratingsMap = {}
+    Object.values(statsCache.value).forEach(stats => {
+      if (stats?.ratings?.history) {
+        stats.ratings.history.forEach(r => {
+          if (r.show_id && r.rating && !r.season && !r.episode) {
+            ratingsMap[r.show_id] = r.rating
+          }
+        })
+      }
+    })
+    Object.entries(optimisticRatings.value).forEach(([showId, rating]) => {
+      if (rating === null) {
+        delete ratingsMap[showId]
+      } else {
+        ratingsMap[showId] = rating
+      }
+    })
+    return ratingsMap
+  })
+
+  function setOptimisticRating(showId, rating) {
+    if (rating === null) {
+      optimisticRatings.value[showId] = null
+    } else {
+      optimisticRatings.value[showId] = rating
+    }
+  }
+
+  function clearOptimisticRatings() {
+    optimisticRatings.value = {}
+  }
 
   async function resolveAllImages(data) {
     if (!data) return
@@ -151,6 +185,7 @@ export const useStatsStore = defineStore('stats', () => {
         if (!isBackground) {
           currentYear.value = year
           resolveAllImages(yearData)
+          clearOptimisticRatings()
         }
         return yearData
       }
@@ -223,6 +258,7 @@ export const useStatsStore = defineStore('stats', () => {
       if (!isBackground) {
         currentYear.value = year
         resolveAllImages(data)
+        clearOptimisticRatings()
       }
       if (!isBackground && !isPreloadingYears.value) {
         triggerBackgroundPreload()
@@ -407,6 +443,7 @@ export const useStatsStore = defineStore('stats', () => {
 
   return {
     statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup, isShared, sharedId,
+    userShowRatings, setOptimisticRating, clearOptimisticRatings,
     fetchStats, resolveAllImages, getHistoryByType, removeHistoryItem, fetchCasinoHistory,
     setActiveTab: (tab) => { activeTab.value = tab },
     setYear: (year) => { currentYear.value = year }

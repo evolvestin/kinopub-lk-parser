@@ -1,31 +1,93 @@
 <template>
-  <div class="modal-overlay show" @click.self="emit('close')">
-    <div class="modal-content" :class="scoreColorClass">
+  <div class="modal-overlay show" @click.self="close">
+    <div class="modal-content" :class="scoreColorClass" style="padding: 24px; min-height: 520px; display: flex; flex-direction: column;">
       <div id="rate-nav-bar">
-        <div id="rate-breadcrumb">Оценка контента</div>
+        <button v-if="level !== 'show' && level !== 'seasons'" class="vt-btn" style="padding: 4px 8px; margin-right: 8px;" @click="goBack">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div id="rate-breadcrumb">{{ breadcrumbText }}</div>
       </div>
 
-      <div class="show-title" style="margin: 12px 0; font-size: 20px;">{{ title }}</div>
+      <div class="show-title" style="margin: 12px 0; font-size: 20px; font-weight: 900; color: var(--text-primary); text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ title }}</div>
       
-      <div class="rate-container">
-        <div class="rate-score-display">
-          <div class="rate-score-huge">{{ displayValue }}<span>/ 10</span></div>
+      <div v-if="isSeries && (level === 'show' || level === 'seasons')" class="view-toggle" id="rate-mode-toggle" style="margin-bottom: 20px; flex-shrink: 0;">
+        <button class="vt-btn" :class="{ active: level === 'show' }" style="flex: 1;" @click="level = 'show'">Весь сериал</button>
+        <button class="vt-btn" :class="{ active: level === 'seasons' }" style="flex: 1;" @click="goToSeasons">По сериям</button>
+      </div>
+
+      <div id="rate-content-area" style="flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0;">
+        <div v-if="loading" class="loader-inline">
+          <div class="spinner"></div>
         </div>
-        
-        <div class="rate-slider-wrap" ref="sliderRef" @pointerdown="startDrag">
-          <div class="rate-slider-track">
-            <div class="rate-slider-fill" :style="{ width: percent + '%' }"></div>
-            <div class="rate-slider-handle" :style="{ left: percent + '%' }"></div>
+
+        <div v-else-if="level === 'show' || level === 'score'" class="rate-container">
+          <div class="rate-score-display">
+            <div class="rate-score-huge">{{ displayValue }}<span>/ 10</span></div>
           </div>
-          <div class="rate-scale-labels">
-            <span v-for="n in 10" :key="n">{{ n }}</span>
+          
+          <div class="rate-slider-wrap" ref="sliderRef" @pointerdown="startDrag">
+            <div class="rate-slider-track">
+              <div class="rate-slider-fill" :style="{ width: percent + '%' }"></div>
+              <div class="rate-slider-handle" :style="{ left: percent + '%' }"></div>
+            </div>
+            <div class="rate-scale-labels">
+              <span v-for="n in 10" :key="n">{{ n }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="level === 'seasons'" id="rate-episodes-nav">
+          <div class="rating-grid-wa">
+            <button 
+              v-for="s in episodesData" 
+              :key="s.season_number" 
+              class="rating-grid-btn" 
+              :class="getSeasonClass(s)"
+              @click="selectSeason(s)"
+            >
+              Сезон {{ s.season_number }}
+              <span v-if="getRatedEpisodesCount(s) > 0" style="font-size:10px; display:block; font-weight:800;">
+                ★ {{ getSeasonAverage(s).toFixed(1) }} ({{ getRatedEpisodesCount(s) }}/{{ s.episodes.length }})
+              </span>
+              <span v-else style="opacity:0.5; font-size:10px; display:block;">
+                0/{{ s.episodes.length }}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div v-else-if="level === 'episodes' && selectedSeason" id="rate-episodes-nav">
+          <div class="rating-grid-wa" style="grid-template-columns: repeat(4, 1fr);">
+            <button 
+              v-for="e in selectedSeason.episodes" 
+              :key="e.episode_number" 
+              class="rating-grid-btn" 
+              :class="getEpisodeClass(e)"
+              @click="selectEpisode(e)"
+            >
+              <span v-if="e.rating" style="font-weight:900;">★ {{ e.rating }}</span>
+              <span v-else>E{{ e.episode_number }}</span>
+            </button>
           </div>
         </div>
       </div>
 
-      <div style="display: flex; gap: 12px; margin-top: 20px;">
-        <button class="btn-primary" style="background: var(--bg-input); color: var(--danger); flex: 1;" @click="deleteRating">Удалить</button>
-        <button class="btn-primary" style="flex: 2;" :disabled="isSaving" @click="saveRating">
+      <div style="display: flex; gap: 12px; margin-top: 20px; flex-shrink: 0;">
+        <button 
+          v-if="showDeleteButton" 
+          class="btn-primary" 
+          style="margin: 0; background: var(--bg-input); color: var(--danger); flex: 1; box-shadow: none;" 
+          @click="deleteRating"
+        >
+          Удалить
+        </button>
+        <button 
+          v-if="level === 'show' || level === 'score'" 
+          class="btn-primary" 
+          style="margin: 0; flex: 2;" 
+          :disabled="isSaving" 
+          @click="saveRating"
+        >
           <div v-if="isSaving" class="spinner" style="width:16px;height:16px;"></div>
           <span v-else>Сохранить</span>
         </button>
@@ -35,30 +97,117 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
+import { useStatsStore } from '../../stores/useStatsStore'
 
 const props = defineProps(['showId', 'title', 'initialValue', 'type'])
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close'])
+
 const api = useApi()
 const uiStore = useUIStore()
+const statsStore = useStatsStore()
 
-const val = ref(parseFloat(props.initialValue) || 5.0)
+const level = ref('show')
+const val = ref(5.0)
+const season = ref(null)
+const episode = ref(null)
+const episodesData = ref([])
+
+const loading = ref(false)
 const isSaving = ref(false)
+const needsRefresh = ref(false)
 const sliderRef = ref(null)
+
+const hasExistingRating = computed(() => {
+  const iv = props.initialValue
+  if (iv === undefined || iv === null || iv === 'null' || iv === 'undefined' || iv === '') {
+    return false
+  }
+  const parsed = parseFloat(iv)
+  return !isNaN(parsed) && parsed > 0
+})
+
+const isSeries = computed(() => {
+  const seriesTypes = ['Series', 'Documentary Series', 'TV Show']
+  return props.type && seriesTypes.includes(props.type)
+})
 
 const percent = computed(() => ((val.value - 1) / 9) * 100)
 const displayValue = computed(() => val.value.toFixed(val.value % 1 === 0 ? 0 : 1))
 
+const getSeasonAverage = (s) => {
+  if (!s || !s.episodes) return 0
+  const rated = s.episodes.filter(e => e.rating)
+  if (!rated.length) return 0
+  const sum = rated.reduce((acc, e) => acc + parseFloat(e.rating), 0)
+  return sum / rated.length
+}
+
+const getSeasonClass = (s) => {
+  const avg = getSeasonAverage(s)
+  if (avg === 0) return ''
+  let cls = 'active '
+  if (avg < 5) cls += 'score-low'
+  else if (avg < 8) cls += 'score-mid'
+  else cls += 'score-high'
+  return cls
+}
+
 const scoreColorClass = computed(() => {
-  if (val.value < 5) return 'score-low'
-  if (val.value < 8) return 'score-mid'
+  let scoreVal = val.value
+  if (level.value === 'episodes' && selectedSeason.value) {
+    const avg = getSeasonAverage(selectedSeason.value)
+    if (avg === 0) return ''
+    scoreVal = avg
+  } else if (level.value === 'seasons') {
+    return ''
+  }
+  if (scoreVal < 5) return 'score-low'
+  if (scoreVal < 8) return 'score-mid'
   return 'score-high'
+})
+
+const breadcrumbText = computed(() => {
+  if (level.value === 'show') return 'Общая оценка'
+  if (level.value === 'seasons') return 'Выбор сезона'
+  if (level.value === 'episodes' && season.value) return `Сезон ${season.value}`
+  if (level.value === 'score' && season.value && episode.value) return `S${season.value} E${episode.value}`
+  return 'Оценка контента'
+})
+
+const selectedSeason = computed(() => {
+  if (!season.value) return null
+  return episodesData.value.find(s => s.season_number === season.value) || null
+})
+
+const currentEpisodeData = computed(() => {
+  if (!selectedSeason.value || !episode.value) return null
+  return selectedSeason.value.episodes.find(e => e.episode_number === episode.value) || null
+})
+
+const showDeleteButton = computed(() => {
+  if (level.value === 'show') {
+    return hasExistingRating.value
+  }
+  if (level.value === 'score') {
+    return !!(currentEpisodeData.value && currentEpisodeData.value.rating)
+  }
+  return false
+})
+
+onMounted(() => {
+  if (hasExistingRating.value) {
+    val.value = parseFloat(props.initialValue)
+  } else {
+    val.value = 5.0
+  }
 })
 
 const startDrag = (e) => {
   const move = (event) => {
+    if (!sliderRef.value) return
     const rect = sliderRef.value.getBoundingClientRect()
     const clientX = event.clientX || (event.touches ? event.touches[0].clientX : 0)
     let p = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
@@ -77,24 +226,117 @@ const startDrag = (e) => {
   move(e)
 }
 
-async function saveRating() {
-  isSaving.value = true
-  try {
-    await api.post('rate/', { show_id: props.showId, rating: val.value })
-    uiStore.showToast('Оценка сохранена')
-    emit('saved')
-    emit('close')
-  } catch (e) { uiStore.showToast('Ошибка API') }
-  finally { isSaving.value = false }
+const goToSeasons = async () => {
+  level.value = 'seasons'
+  if (!episodesData.value.length) {
+    await fetchEpisodes()
+  }
 }
 
-async function deleteRating() {
-  if (!confirm('Удалить оценку?')) return
+const fetchEpisodes = async () => {
+  loading.value = true
   try {
-    await api.post('delete_rating/', { show_id: props.showId })
-    emit('saved')
-    emit('close')
-  } catch (e) { uiStore.showToast('Ошибка удаления') }
+    const data = await api.post('get_episodes/', { show_id: props.showId })
+    episodesData.value = data.seasons || []
+  } catch (e) {
+    uiStore.showToast('Ошибка загрузки серий')
+  } finally {
+    loading.value = false
+  }
+}
+
+const selectSeason = (s) => {
+  season.value = s.season_number
+  level.value = 'episodes'
+}
+
+const getRatedEpisodesCount = (s) => {
+  return s.episodes.filter(e => e.rating).length
+}
+
+const getEpisodeClass = (e) => {
+  if (!e.rating) return ''
+  let cls = 'active '
+  if (e.rating < 5) cls += 'score-low'
+  else if (e.rating < 8) cls += 'score-mid'
+  else cls += 'score-high'
+  return cls
+}
+
+const selectEpisode = (e) => {
+  episode.value = e.episode_number
+  val.value = e.rating ? parseFloat(e.rating) : 5.0
+  level.value = 'score'
+}
+
+const goBack = () => {
+  if (level.value === 'score') {
+    level.value = 'episodes'
+  } else if (level.value === 'episodes') {
+    level.value = 'seasons'
+  }
+}
+
+const close = () => {
+  if (needsRefresh.value) {
+    statsStore.statsCache = {}
+    statsStore.fetchStats(statsStore.currentYear)
+  }
+  emit('close')
+}
+
+const saveRating = async () => {
+  isSaving.value = true
+  try {
+    await api.post('rate/', {
+      show_id: props.showId,
+      rating: val.value,
+      season: season.value,
+      episode: episode.value
+    })
+    if (!season.value && !episode.value) {
+      statsStore.setOptimisticRating(props.showId, val.value)
+    }
+    uiStore.showToast('Оценка сохранена')
+    needsRefresh.value = true
+    if (level.value === 'score') {
+      await fetchEpisodes()
+      level.value = 'episodes'
+    } else {
+      close()
+    }
+  } catch (e) {
+    uiStore.showToast('Ошибка сохранения')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const deleteRating = async () => {
+  if (!confirm('Удалить оценку?')) return
+  isSaving.value = true
+  try {
+    await api.post('delete_rating/', {
+      show_id: props.showId,
+      season: season.value,
+      episode: episode.value
+    })
+    if (!season.value && !episode.value) {
+      statsStore.setOptimisticRating(props.showId, null)
+    }
+    uiStore.showToast('Оценка удалена')
+    needsRefresh.value = true
+    if (level.value === 'score') {
+      await fetchEpisodes()
+      level.value = 'episodes'
+    } else {
+      close()
+    }
+  } catch (e) {
+    uiStore.showToast('Ошибка удаления')
+  } finally {
+    isSaving.value = false
+  }
 }
 </script>
 

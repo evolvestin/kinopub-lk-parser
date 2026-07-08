@@ -112,7 +112,12 @@ const itemYear = computed(() => props.show.show__year || props.show.year)
 const displayDate = computed(() => props.show.view_date || props.show.date || props.show.added_at)
 const season = computed(() => props.show.season_number ?? props.show.season)
 const episode = computed(() => props.show.episode_number ?? props.show.episode)
-const rating = computed(() => props.show.user_rating || props.show.rating || props.show.user_show_rating)
+const rating = computed(() => {
+  const showId = props.show.show_id || props.show.id
+  const local = statsStore.userShowRatings[showId]
+  if (local !== undefined) return local
+  return props.show.user_rating || props.show.rating || props.show.user_show_rating
+})
 
 const currentPosterUrl = computed(() => {
   const url = props.show.poster_url || ''
