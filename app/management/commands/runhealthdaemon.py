@@ -25,9 +25,7 @@ class Command(BaseCommand):
                         f'[{now.strftime("%Y-%m-%d %H:%M:%S")}] Triggering health report...'
                     )
                     threading.Thread(
-                        target=call_command,
-                        args=('sendhealthreport',),
-                        daemon=True
+                        target=call_command, args=('sendhealthreport',), daemon=True
                     ).start()
                     last_run_date = now.date()
 

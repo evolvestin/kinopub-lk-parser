@@ -60,6 +60,11 @@ class Command(BaseCommand):
             dest='type',
             help='Filter shows by type (e.g. serial, movie).',
         )
+        parser.add_argument(
+            '--headless',
+            action='store_true',
+            help='Run Chrome in headless mode.',
+        )
 
     def _get_live_ids(self, driver, base_url, account, url_type='serial', limit=5):
         if account == 'aux':
@@ -201,6 +206,7 @@ class Command(BaseCommand):
 
         account = options['account']
         task = options['task'] or ('history' if account == 'main' else 'details')
+        headless = options.get('headless', False)
 
         show_type_arg = options.get('type')
         url_type = 'serial'
@@ -217,7 +223,11 @@ class Command(BaseCommand):
         show_type_display = SHOW_TYPE_MAPPING.get(url_type, 'Series')
         base_url = settings.SITE_AUX_URL if account == 'aux' else settings.SITE_URL
 
-        print(f'--- Starting local script (Account: {account}, Task: {task}) ---', flush=True)
+        print(
+            f'--- Starting local script (Account: {account}, '
+            f'Task: {task}, Headless: {headless}) ---',
+            flush=True,
+        )
         print('--- Note: Database is MOCKED. No data will be saved. ---', flush=True)
 
         (
@@ -241,14 +251,14 @@ class Command(BaseCommand):
         ):
             driver = None
             try:
-                driver = initialize_driver_session(headless=False, session_type=account)
+                driver = initialize_driver_session(headless=headless, session_type=account)
                 if driver is None:
                     logging.error('Failed to initialize driver.')
                     return
 
                 if task == 'history':
                     logging.info('Running History Parser (Mock Mode)...')
-                    history_parser.run_parser_session(headless=False, driver_instance=driver)
+                    history_parser.run_parser_session(headless=headless, driver_instance=driver)
 
                 elif task == 'details':
                     logging.info('Running Details Updater (Mock Mode)...')

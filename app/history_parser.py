@@ -5,6 +5,7 @@ import random
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -372,7 +373,7 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
         },
     )
 
-    user_data_dir = os.path.join('/tmp', f'uc_browser_data_{profile_key}')
+    user_data_dir = os.path.join(tempfile.gettempdir(), f'uc_browser_data_{profile_key}')
     if os.path.exists(user_data_dir):
         for _ in range(3):
             try:
@@ -391,7 +392,7 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
 
     driver_executable_path = None
     if source_chromedriver:
-        unique_driver_path = os.path.join('/tmp', f'chromedriver_{profile_key}')
+        unique_driver_path = os.path.join(tempfile.gettempdir(), f'chromedriver_{profile_key}')
         try:
             if os.path.exists(unique_driver_path):
                 os.remove(unique_driver_path)
@@ -406,9 +407,13 @@ def setup_driver(headless=True, profile_key='main', randomize=False):
         options.add_argument('--headless=new')
         options.add_argument('--disable-gpu')
 
+    browser_executable_path = '/usr/bin/chromium'
+    if not os.path.exists(browser_executable_path):
+        browser_executable_path = None
+
     driver = uc.Chrome(
         options=options,
-        browser_executable_path='/usr/bin/chromium',
+        browser_executable_path=browser_executable_path,
         driver_executable_path=driver_executable_path,
         user_data_dir=user_data_dir,
     )
