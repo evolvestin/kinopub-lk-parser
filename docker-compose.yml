@@ -116,6 +116,8 @@ services:
 
   celery:
     build: .
+    security_opt:
+      - seccomp:unconfined
     command: celery -A kinopub_parser worker -l INFO --concurrency=4
     restart: unless-stopped
     env_file: .env
