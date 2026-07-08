@@ -13,18 +13,19 @@ FROM python:3.12-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tini \
-    chromium \
-    chromium-driver \
     tzdata \
     procps \
     postgresql-client \
     curl \
+    ca-certificates \
+    && curl -sS -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && apt-get install -y --no-install-recommends /tmp/chrome.deb \
+    && rm /tmp/chrome.deb \
     && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --gid 1000 app && adduser --uid 1000 --ingroup app --disabled-password --gecos "" app
 
 RUN mkdir -p /home/app/bin && \
-    cp /usr/bin/chromedriver /home/app/bin/chromedriver && \
     chown -R app:app /home/app
 
 WORKDIR /app
