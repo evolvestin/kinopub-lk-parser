@@ -30,31 +30,36 @@ def get_tmdb_session():
 
 
 def _is_valid_tmdb_match(query: str, tmdb_result: dict) -> bool:
+    """
+    Проверяет, соответствует ли найденный профиль TMDB запрошенному человеку.
+    Использует строгое сравнение имен, чтобы исключить ложные срабатывания (дубликаты).
+    """
     q_lower = query.lower().strip()
 
-    # Собираем все возможные варианты имен и метаданных из ответа
-    # Поле known_for_department — строка, поэтому кладем её в список, а не итерируем
-    possible_matches = {
-        (tmdb_result.get('name') or '').lower().strip(),
-        (tmdb_result.get('original_name') or '').lower().strip(),
-        (tmdb_result.get('known_for_department') or '').lower().strip(),
-    }
-
-    # Удаляем пустые значения из сета
-    possible_matches.discard('')
-
-    if q_lower in possible_matches:
-        return True
-
-    if len(q_lower) <= 4:
-        return False
-
-    # Частичное совпадение по основным полям имен
     name = (tmdb_result.get('name') or '').lower().strip()
     orig_name = (tmdb_result.get('original_name') or '').lower().strip()
 
-    if q_lower in name or q_lower in orig_name:
+    # Точное совпадение имени или оригинального имени
+    possible_exact = {name, orig_name}
+    possible_exact.discard('')
+
+    if q_lower in possible_exact:
         return True
+
+    # Имена короче 4 символов слишком неоднозначны для частичного поиска
+    if len(q_lower) <= 4:
+        return False
+
+    # Разбиваем запрос и имена на слова для проверки полноты совпадения
+    q_words = set(re.findall(r'\w+', q_lower))
+    name_words = set(re.findall(r'\w+', name))
+    orig_name_words = set(re.findall(r'\w+', orig_name))
+
+    # Если запрос состоит из 2+ слов (Имя + Фамилия), требуем полного вхождения 
+    # всех слов запроса в одно из полей имени (устраняет проблему Вуд vs Вудсон)
+    if len(q_words) >= 2:
+        if q_words.issubset(name_words) or q_words.issubset(orig_name_words):
+            return True
 
     return False
 
