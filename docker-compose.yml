@@ -56,10 +56,6 @@ services:
   web:
     build: .
     restart: unless-stopped
-    security_opt:
-      - seccomp:unconfined
-      - apparmor:unconfined
-    privileged: true
     env_file: .env
     ports:
       - "${WEB_PORT:-8012}:8000"
@@ -120,10 +116,6 @@ services:
 
   celery:
     build: .
-    privileged: true
-    security_opt:
-      - seccomp:unconfined
-      - apparmor:unconfined
     command: celery -A kinopub_parser worker -l INFO --concurrency=4
     restart: unless-stopped
     env_file: .env
