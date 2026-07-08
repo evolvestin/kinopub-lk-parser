@@ -9,7 +9,7 @@ COPY kinopub_parser/static/css/ /app/kinopub_parser/static/css/
 RUN npm run build
 
 # Этап 2: Основной образ Python
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tini \
