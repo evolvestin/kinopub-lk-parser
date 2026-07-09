@@ -79,7 +79,7 @@
               <div v-for="(item, i) in getMetricData(metric.key)" :key="i" class="legend-item clickable" @click="openDetails(metric.key, item.name || item.type)">
                 <div class="legend-dot" :style="{ background: getPaletteColor(metric.severity, i) }"></div>
                 <div class="legend-name">{{ item.name || item.type }}</div>
-                <div class="legend-val">{{ item[metric.valField].toLocaleString('ru-RU') }} ({{ getPercent(item[metric.valField], getMetricTotal(metric.key)) }}%)</div>
+                <div class="legend-val">{{ item[metric.valField].toLocaleString('ru-RU') }} ({{ formatPercentage(metric.key, item.name || item.type, item[metric.valField]) }})</div>
               </div>
             </div>
           </template>
@@ -265,8 +265,8 @@ const metricGroups = ref([
       { key: 'missing_year', icon: 'cal', color: '#e67e22', label: 'Год не указан', centerLabel: 'БЕЗ ГОДА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе не заполнен год выхода.', showDesc: false },
       { key: 'missing_status', icon: 'target', color: '#ef1960', label: 'Статус не указан', centerLabel: 'БЕЗ СТАТУСА', valField: 'value', severity: 'critical', desc: 'Сериалы и ТВ-шоу, у которых в базе отсутствует статус (Завершен/В эфире).', showDesc: false },
       { key: 'title_collision', icon: 'edit', color: 'var(--info)', label: 'Коллизии названий', centerLabel: 'КОЛЛИЗИЙ', valField: 'collisions', severity: 'critical', desc: 'Случаи, когда основное название шоу содержит в себе оригинальное (например, "Интерстеллар Interstellar").', showDesc: false },
-      { key: 'missing_durations', icon: 'time', color: '#6887ff', label: 'Длительность не указана', centerLabel: 'БЕЗ ВРЕМЕНИ', valField: 'value', severity: 'critical', desc: 'Шоу, для которых в базе нет данных о времени (секундах) эпизодов или фильма.', showDesc: false },
-      { key: 'missing_plot', icon: 'list', color: '#1abc9c', label: 'Нет описания', centerLabel: 'БЕЗ СЮЖЕТА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в базе отсутствует или пустое текстовое описание.', showDesc: false }
+      { key: 'missing_durations', icon: 'time', color: '#6887ff', label: 'Без хронометража', centerLabel: 'БЕЗ ХРОНОМ.', valField: 'value', severity: 'critical', desc: 'Шоу, для которых в базе нет данных о времени (секундах) эпизодов или фильма.', showDesc: false },
+      { key: 'missing_plot', icon: 'list', color: '#1abc9c', label: 'Нет описания', centerLabel: 'БЕЗ ОПИС.', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в базе отсутствует или пустое текстовое описание.', showDesc: false }
     ]
   },
   {
@@ -280,9 +280,9 @@ const metricGroups = ref([
   {
     title: 'Рейтинги', icon: 'star', color: 'var(--accent)',
     metrics: [
-      { key: 'has_kp', icon: 'smile', color: 'var(--info)', label: 'Есть рейтинг KP', centerLabel: 'ЕСТЬ РЕЙТИНГ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг Кинопоиска.', showDesc: false },
+      { key: 'has_kp', icon: 'smile', color: 'var(--info)', label: 'Есть рейтинг KP', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг Кинопоиска.', showDesc: false },
       { key: 'missing_kp', icon: 'frown', color: 'var(--danger)', label: 'Нет рейтинга KP', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.', showDesc: false },
-      { key: 'has_imdb', icon: 'smile', color: 'var(--accent)', label: 'Есть рейтинг IMDb', centerLabel: 'ЕСТЬ РЕЙТИНГ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг IMDb.', showDesc: false },
+      { key: 'has_imdb', icon: 'smile', color: 'var(--accent)', label: 'Есть рейтинг IMDb', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг IMDb.', showDesc: false },
       { key: 'missing_imdb', icon: 'frown', color: '#f1c40f', label: 'Нет рейтинга IMDb', centerLabel: 'БЕЗ IMDB', valField: 'value', severity: 'critical', desc: 'Шоу, у которых указана ссылка на IMDb, но в таблице внешних рейтингов данные отсутствуют.', showDesc: false },
     ]
   },
@@ -291,18 +291,18 @@ const metricGroups = ref([
     metrics: [
       { key: 'total_countries', icon: 'globe', color: '#388bfd', label: 'Всего стран', centerLabel: 'СТРАН', valField: 'value', severity: 'info', desc: 'Статистика базы стран.', showDesc: false },
       { key: 'no_countries', icon: 'minus', color: '#2ea043', label: 'Нет страны', centerLabel: 'БЕЗ СТРАНЫ', valField: 'value', severity: 'critical', desc: 'Шоу, к которым не привязана ни одна страна производства.', showDesc: false },
-      { key: 'missing_country_meta', icon: 'target', color: 'var(--danger)', label: 'Страны без ISO кода', centerLabel: 'СТРАН', valField: 'value', severity: 'critical', desc: 'Страны, для которых не заполнен ISO код или отсутствует флаг Эмодзи.', showDesc: false }
+      { key: 'missing_country_meta', icon: 'target', color: 'var(--danger)', label: 'Страны без ISO кода', centerLabel: 'БЕЗ ISO', valField: 'value', severity: 'critical', desc: 'Страны, для которых не заполнен ISO код или отсутствует флаг Эмодзи.', showDesc: false }
     ]
   },
   {
     title: 'Люди и роли', icon: 'users', color: '#9b59b6',
     metrics: [
-      { key: 'duplicate_photo_urls', icon: 'users', color: '#ef1960', label: 'Дубликаты людей', centerLabel: 'ДУБЛЕЙ URL', valField: 'value', severity: 'critical', desc: 'Разные записи людей с совпадающими аватарками.', showDesc: false },
-      { key: 'total_persons_by_show_type', icon: 'user', color: '#388bfd', label: 'Уникальные люди', centerLabel: 'ЧЕЛОВЕК', valField: 'value', severity: 'info', desc: 'Количество уникальных людей в различных типах шоу.', showDesc: false },
-      { key: 'persons_avatar_stats', icon: 'eye', color: '#e67e22', label: 'Фото людей', centerLabel: 'ФОТО', valField: 'value', severity: 'warning', desc: 'Соотношение загруженных фото для людей.', showDesc: false },
-      { key: 'professions_stats', icon: 'rocket', color: '#1abc9c', label: 'Роли в кино', centerLabel: 'ЗАНЯТОСТЕЙ', valField: 'value', severity: 'info', desc: 'Топ уникальных профессий.', showDesc: false },
+      { key: 'duplicate_photo_urls', icon: 'users', color: '#ef1960', label: 'Дубликаты людей', centerLabel: 'ДУБЛИКАТОВ', valField: 'value', severity: 'critical', desc: 'Разные записи людей с совпадающими аватарками.', showDesc: false },
+      { key: 'total_persons_by_show_type', icon: 'user', color: '#388bfd', label: 'Персоны в базе', centerLabel: 'ПЕРСОН', valField: 'value', severity: 'info', desc: 'Количество уникальных людей в различных типах шоу.', showDesc: false },
+      { key: 'persons_avatar_stats', icon: 'eye', color: '#e67e22', label: 'Наличие фотографий', centerLabel: 'С ФОТО', valField: 'value', severity: 'warning', desc: 'Соотношение загруженных фото для людей.', showDesc: false },
+      { key: 'professions_stats', icon: 'rocket', color: '#1abc9c', label: 'Роли в кино', centerLabel: 'РОЛЕЙ', valField: 'value', severity: 'info', desc: 'Топ уникальных профессий.', showDesc: false },
       { key: 'en_professions_stats', icon: 'gear', color: '#a371f7', label: 'Роли в кино (EN)', centerLabel: 'ROLES', valField: 'value', severity: 'info', desc: 'Топ профессий на английском языке.', showDesc: false },
-      { key: 'unused_persons', icon: 'trash', color: 'var(--danger)', label: 'Балласт', centerLabel: 'ЧЕЛОВЕК', valField: 'value', severity: 'critical', desc: 'Люди, не привязанные ни к одному шоу.', showDesc: false }
+      { key: 'unused_persons', icon: 'trash', color: 'var(--danger)', label: 'Балласт', centerLabel: 'ПЕРСОН', valField: 'value', severity: 'critical', desc: 'Люди, не привязанные ни к одному шоу.', showDesc: false }
     ]
   }
 ])
@@ -331,7 +331,18 @@ const getMetricField = (key) => {
 
 const getMetricTotal = (key) => {
   const field = getMetricField(key)
-  return getMetricData(key).reduce((acc, item) => acc + item[field], 0)
+  const data = getMetricData(key)
+  if (key === 'persons_avatar_stats') {
+    return data
+      .filter(item => item.name === 'Есть фото (TMDB)' || item.name === 'Есть фото (KP)')
+      .reduce((acc, item) => acc + item[field], 0)
+  }
+  return data.reduce((acc, item) => acc + item[field], 0)
+}
+
+const formatPercentage = (metricKey, itemName, val) => {
+  const total = getMetricTotal(metricKey)
+  return total > 0 ? `${Math.round((val / total) * 100)}%` : '0%'
 }
 
 const getPercent = (val, total) => {
@@ -361,7 +372,6 @@ const getChartData = (metric) => {
 }
 
 const getChartOptions = (metric) => {
-  const total = getMetricTotal(metric.key)
   return {
     cutout: '50%',
     layout: { padding: 15 },
@@ -390,6 +400,7 @@ const getChartOptions = (metric) => {
         callbacks: {
           label: (context) => {
             const val = context.parsed
+            const total = getMetricTotal(metric.key)
             const pct = total > 0 ? Math.round((val / total) * 100) : 0
             return ` ${val.toLocaleString('ru-RU')} шт. (${pct}%)`
           }
@@ -398,7 +409,8 @@ const getChartOptions = (metric) => {
       datalabels: {
         color: '#fff',
         font: { weight: '800', size: 10 },
-        formatter: (value) => {
+        formatter: (value, context) => {
+          const total = getMetricTotal(metric.key)
           const pct = total > 0 ? Math.round((value / total) * 100) : 0
           return pct > 5 ? pct + '%' : ''
         },

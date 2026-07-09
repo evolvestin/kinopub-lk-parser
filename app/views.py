@@ -2129,11 +2129,11 @@ def webapp_add_view(request):
 
         view_date = None
         if date_mode == 'exact' and date_val:
-            view_date = datetime.strptime(date_val, '%Y-%m-%d').date()
+            view_date = datetime.strptime(str(date_val), '%Y-%m-%d').date()
         elif date_mode == 'month' and date_val:
-            view_date = datetime.strptime(date_val, '%Y-%m').date()
+            view_date = datetime.strptime(str(date_val), '%Y-%m').date()
         elif date_mode == 'year' and date_val:
-            view_date = datetime.strptime(date_val, '%Y').date()
+            view_date = datetime.strptime(str(date_val), '%Y').date()
 
         vh = ViewHistory.objects.filter(
             show_id=show_id,
@@ -2195,11 +2195,11 @@ def webapp_remove_view(request):
 
             view_date = None
             if date_mode == 'exact' and date_val:
-                view_date = datetime.strptime(date_val, '%Y-%m-%d').date()
+                view_date = datetime.strptime(str(date_val), '%Y-%m-%d').date()
             elif date_mode == 'month' and date_val:
-                view_date = datetime.strptime(date_val, '%Y-%m').date()
+                view_date = datetime.strptime(str(date_val), '%Y-%m').date()
             elif date_mode == 'year' and date_val:
-                view_date = datetime.strptime(date_val, '%Y').date()
+                view_date = datetime.strptime(str(date_val), '%Y').date()
 
             vh = ViewHistory.objects.filter(
                 show_id=show_id,

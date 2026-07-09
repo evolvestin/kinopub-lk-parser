@@ -120,10 +120,40 @@ const centerTextPlugin = {
 }
 
 const renderChart = () => {
-  if (chartInstance) chartInstance.destroy()
-  if (!canvasRef.value || !processedGenres.value.length) return
+  if (!canvasRef.value || !processedGenres.value.length) {
+    if (chartInstance) {
+      chartInstance.destroy()
+      chartInstance = null
+    }
+    return
+  }
 
   const data = processedGenres.value
+
+  if (chartInstance) {
+    chartInstance.data.labels = data.map(g => g.name)
+    chartInstance.data.datasets[0].data = data.map(g => g.minutes)
+    chartInstance.data.datasets[0].backgroundColor = data.map((_, i) => palette[i % palette.length])
+    chartInstance.data.datasets[0].spacing = data.length === 1 ? 0 : 3
+    chartInstance.options.onClick = (event, elements) => {
+      if (elements.length > 0) {
+        const index = elements[0].index
+        handleGenreClick(data[index], index)
+      }
+    }
+    chartInstance.options.plugins.tooltip.callbacks.label = (ctx) => {
+      const val = ctx.parsed
+      const h = Math.floor(val / 60)
+      const m = val % 60
+      return ` ${h}ч ${m}м (${data[ctx.dataIndex].percent}%)`
+    }
+    chartInstance.options.plugins.datalabels.formatter = (value, ctx) => {
+      const pct = data[ctx.dataIndex].percent
+      return pct > 5 ? pct + '%' : ''
+    }
+    chartInstance.update()
+    return
+  }
 
   chartInstance = new Chart(canvasRef.value, {
     type: 'doughnut',
@@ -144,6 +174,7 @@ const renderChart = () => {
       maintainAspectRatio: false,
       cutout: '50%',
       layout: { padding: 15 },
+      animation: { animateRotate: true, duration: 1200, easing: 'easeOutQuart' },
       onHover: (event, elements) => {
         event.native.target.style.cursor = elements.length ? 'pointer' : 'default'
       },
