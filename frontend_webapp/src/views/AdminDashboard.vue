@@ -20,10 +20,14 @@
       </div>
     </div>
 
-    <div v-show="activePeriod === 'now'" id="system-status-container">
+    <div id="system-status-container">
       <div style="padding-left: 35px; margin-bottom: 4px; margin-top: 10px; display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;">
         <div class="icon" style="width:16px; height:16px; display: flex; align-items: center;" v-html="icons.time"></div>
         Системный статус
+        <span v-if="activePeriod !== 'now'" class="live-indicator-badge">
+          <span class="live-dot"></span>
+          актуально сейчас
+        </span>
       </div>
       <div class="status-grid">
         <div class="status-card" v-for="(stat, i) in systemStats" :key="i">
@@ -290,7 +294,7 @@ const metricGroups = ref([
     title: 'География', icon: 'globe', color: '#388bfd',
     metrics: [
       { key: 'total_countries', icon: 'globe', color: '#388bfd', label: 'Всего стран', centerLabel: 'СТРАН', valField: 'value', severity: 'info', desc: 'Статистика базы стран.', showDesc: false },
-      { key: 'no_countries', icon: 'minus', color: '#2ea043', label: 'Нет страны', centerLabel: 'БЕЗ СТРАНЫ', valField: 'value', severity: 'critical', desc: 'Шоу, к которым не привязана ни одна страна производства.', showDesc: false },
+      { key: 'no_countries', icon: 'minus', color: '#2ea043', label: 'Нет страны', centerLabel: 'БЕЗ СТРАНЫ', valField: 'value', severity: 'critical', desc: 'Шоу, к которым не привязна ни одна страна производства.', showDesc: false },
       { key: 'missing_country_meta', icon: 'target', color: 'var(--danger)', label: 'Страны без ISO кода', centerLabel: 'БЕЗ ISO', valField: 'value', severity: 'critical', desc: 'Страны, для которых не заполнен ISO код или отсутствует флаг Эмодзи.', showDesc: false }
     ]
   },
@@ -849,4 +853,34 @@ onUnmounted(() => {
 .empty-overlay { display:flex; flex-direction:column; align-items:center; justify-content:center; height:180px; text-align:center; }
 .empty-title { color:var(--text-muted); font-weight:800; font-size:16px; text-transform:uppercase; letter-spacing:0.5px; }
 .empty-sub { font-size:12px; color:var(--text-muted); margin-top:4px; opacity:0.7; }
+
+.live-indicator-badge {
+  margin-left: 6px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--accent-dim);
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-live 2s infinite;
+}
+
+@keyframes pulse-live {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(46, 204, 113, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+}
 </style>
