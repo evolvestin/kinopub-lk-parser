@@ -24,7 +24,7 @@
       <div style="padding-left: 35px; margin-bottom: 4px; margin-top: 10px; display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;">
         <div class="icon" style="width:16px; height:16px; display: flex; align-items: center;" v-html="icons.time"></div>
         Системный статус
-        <span v-if="activePeriod !== 'now'" class="live-indicator-badge">
+        <span class="live-indicator-badge">
           <span class="live-dot"></span>
           актуально сейчас
         </span>

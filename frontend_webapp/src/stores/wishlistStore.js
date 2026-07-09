@@ -49,11 +49,11 @@ export const useWishlistStore = defineStore('wishlist', () => {
       return router.currentRoute.value.query.sort || localStorage.getItem('kp_wl_sort_mode') || 'default'
     },
     set(val) {
-      localStorage.setItem('kp_wl_sort_mode', val)
       const query = { ...router.currentRoute.value.query }
       const oldVal = query.sort || localStorage.getItem('kp_wl_sort_mode') || 'default'
       if (oldVal === val) return
 
+      localStorage.setItem('kp_wl_sort_mode', val)
       if (val === 'default') {
         delete query.sort
       } else {
@@ -68,11 +68,11 @@ export const useWishlistStore = defineStore('wishlist', () => {
       return router.currentRoute.value.query.view || localStorage.getItem('kp_wl_view_mode') || 'grid'
     },
     set(val) {
-      localStorage.setItem('kp_wl_view_mode', val)
       const query = { ...router.currentRoute.value.query }
       const oldVal = query.view || localStorage.getItem('kp_wl_view_mode') || 'grid'
       if (oldVal === val) return
 
+      localStorage.setItem('kp_wl_view_mode', val)
       if (val === 'grid') {
         delete query.view
       } else {

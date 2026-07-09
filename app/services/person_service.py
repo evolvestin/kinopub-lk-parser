@@ -55,7 +55,7 @@ def _is_valid_tmdb_match(query: str, tmdb_result: dict) -> bool:
     name_words = set(re.findall(r'\w+', name))
     orig_name_words = set(re.findall(r'\w+', orig_name))
 
-    # Если запрос состоит из 2+ слов (Имя + Фамилия), требуем полного вхождения 
+    # Если запрос состоит из 2+ слов (Имя + Фамилия), требуем полного вхождения
     # всех слов запроса в одно из полей имени (устраняет проблему Вуд vs Вудсон)
     if len(q_words) >= 2:
         if q_words.issubset(name_words) or q_words.issubset(orig_name_words):
