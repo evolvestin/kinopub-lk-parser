@@ -190,7 +190,7 @@ class BackupManager:
                         'Dev environment or local run detected. Skipping upload to Google Drive.'
                     )
                 else:
-                    self._upload_file(drive, settings.DB_BACKUP_FILENAME)
+                    self._upload_file(drive, backup_file_path, settings.DB_BACKUP_FILENAME)
 
                 if max_updated_at:
                     with open(last_timestamp_file, 'w') as timestamp_file:
