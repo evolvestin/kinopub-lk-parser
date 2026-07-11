@@ -77,3 +77,12 @@ Any code generating new database records must follow this "Save-As-Is" architect
     *   Do NOT use `localStorage` or `sessionStorage` for storing transient UI state like year, active tab, folder, or modal contexts.
     *   Stores (Pinia) must initialize their states by reading from the current route's query parameters on boot or on route changes.
     *   When store state changes, the query parameters must be updated reactively via `router.replace` (to avoid polluting the browser back button history with minor state changes).
+
+
+## Local Safety & Backup Policy
+
+**RULE**: Local and development environments are permitted to synchronize session cookies to maintain shared authentication, but must never overwrite the production database backup on Google Drive.
+
+1. **Implementation**:
+    * In `perform_backup`, database upload to Google Drive must be skipped if `settings.ENVIRONMENT` is `'DEV'` or if `settings.LOCAL_RUN` is `True`.
+    * Cookie backups and restores (`perform_cookies_backup` and `restore_from_backup`) remain fully functional across environments to ensure unified session states.

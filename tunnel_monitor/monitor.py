@@ -21,7 +21,10 @@ SYNC_INTERVAL = 30
 def extract_url(log_data):
     if not log_data:
         return None
-    matches = re.findall(r'(https://[a-zA-Z0-9-]+\.lhr\.life)', log_data)
+    matches = re.findall(
+        r'(https://[a-zA-Z0-9-]+\.(?:lhr\.life|tuns\.sh|trycloudflare\.com|tunnelmole\.net))',
+        log_data,
+    )
     return matches[-1] if matches else None
 
 

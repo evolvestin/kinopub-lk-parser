@@ -490,49 +490,72 @@ def do_login(driver, login, password, cookie_path, base_url):
         time.sleep(1)
         submit_btn.click()
 
-        code_input = WebDriverWait(driver, 15).until(
-            expected_conditions.presence_of_element_located((By.ID, 'login-form-formcode'))
-        )
-        logging.info('2FA code is required. Waiting for code from email processor...')
+        is_logged_in = False
+        has_2fa = False
 
-        timeout = 120
-        start_time = time.time()
-        used_code_ids = set()
-        expiration_threshold = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
-
-        while time.time() - start_time < timeout:
+        for _ in range(10):
             if login_url not in driver.current_url:
+                is_logged_in = True
                 break
+            try:
+                code_inputs = driver.find_elements(By.ID, 'login-form-formcode')
+                if code_inputs and code_inputs[0].is_displayed():
+                    has_2fa = True
+                    break
+            except Exception:
+                pass
+            time.sleep(1)
 
-            code_obj = (
-                Code.objects.filter(received_at__gte=expiration_threshold)
-                .order_by('-received_at')
-                .first()
+        if not is_logged_in and has_2fa:
+            code_input = driver.find_element(By.ID, 'login-form-formcode')
+            logging.info('2FA code is required. Waiting for code from email processor...')
+
+            timeout = 120
+            start_time = time.time()
+            used_code_ids = set()
+            expiration_threshold = timezone.now() - timedelta(
+                minutes=settings.CODE_LIFETIME_MINUTES
             )
-            if code_obj and code_obj.id not in used_code_ids:
-                code_id, code = code_obj.id, code_obj.code
-                logging.info('Found 2FA code %s in database. Attempting to use it.', code)
-                try:
-                    code_input.clear()
-                    code_input.send_keys(code)
-                    used_code_ids.add(code_id)
-                    time.sleep(1)
-                    driver.find_element(
-                        By.CSS_SELECTOR, '#login-form button[type="submit"]'
-                    ).click()
-                    time.sleep(3)
 
-                    if login_url not in driver.current_url:
-                        logging.info('Code %s was accepted.', code)
-                        break
-                    else:
-                        logging.warning('Code %s was not accepted. Waiting for a new one.', code)
-                except Exception as e:
-                    logging.warning('Could not use code %s. It might be stale. Error: %s', code, e)
-            time.sleep(2)
+            while time.time() - start_time < timeout:
+                if login_url not in driver.current_url:
+                    break
+
+                code_obj = (
+                    Code.objects.filter(received_at__gte=expiration_threshold)
+                    .order_by('-received_at')
+                    .first()
+                )
+                if code_obj and code_obj.id not in used_code_ids:
+                    code_id, code = code_obj.id, code_obj.code
+                    logging.info('Found 2FA code %s in database. Attempting to use it.', code)
+                    try:
+                        code_input.clear()
+                        code_input.send_keys(code)
+                        used_code_ids.add(code_id)
+                        time.sleep(1)
+                        driver.find_element(
+                            By.CSS_SELECTOR, '#login-form button[type="submit"]'
+                        ).click()
+                        time.sleep(3)
+
+                        if login_url not in driver.current_url:
+                            logging.info('Code %s was accepted.', code)
+                            break
+                        else:
+                            logging.warning(
+                                'Code %s was not accepted. Waiting for a new one.', code
+                            )
+                    except Exception as e:
+                        logging.warning(
+                            'Could not use code %s. It might be stale. Error: %s', code, e
+                        )
+                time.sleep(2)
 
         if login_url in driver.current_url:
-            raise TimeoutException('Timeout expired while waiting for 2FA code.')
+            raise TimeoutException(
+                'Timeout expired while waiting for 2FA code or login confirmation.'
+            )
 
         logging.info('Authorization successful.')
         save_cookies(driver, cookie_path)

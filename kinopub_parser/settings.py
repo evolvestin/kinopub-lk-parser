@@ -40,7 +40,16 @@ CSRF_TRUSTED_ORIGINS = [
     f'http://localhost:{_web_port}',
     f'http://127.0.0.1:{_web_port}',
     'https://*.trycloudflare.com',
+    'https://*.lhr.life',
+    'https://*.tuns.sh',
+    'https://*.tunnelmole.net',
+    'https://*.serveousercontent.com',
 ]
+
+if WEBAPP_PUBLIC_URL := os.getenv('WEBAPP_PUBLIC_URL'):
+    clean_url = WEBAPP_PUBLIC_URL.rstrip('/')
+    if clean_url not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(clean_url)
 
 if WEBAPP_PUBLIC_URL := os.getenv('WEBAPP_PUBLIC_URL'):
     clean_url = WEBAPP_PUBLIC_URL.rstrip('/')
