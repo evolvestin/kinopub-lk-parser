@@ -136,5 +136,5 @@ const openRating = () => {
   })
 }
 
-const openAddView = () => uiStore.openModal('addView', { showId: show.value.id, title: show.value.title })
+const openAddView = () => uiStore.openModal('addView', { showId: show.value.id, title: show.value.title, type: show.value.type })
 </script>

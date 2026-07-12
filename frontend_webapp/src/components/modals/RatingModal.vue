@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay show" @click.self="close">
-    <div class="modal-content" :class="scoreColorClass" style="padding: 24px; min-height: 520px; display: flex; flex-direction: column;">
+    <div class="modal-content" :class="scoreColorClass" :style="{ padding: '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column', transition: 'height 0.3s ease, min-height 0.3s ease' }">
       <div id="rate-nav-bar">
         <button v-if="level !== 'show' && level !== 'seasons'" class="vt-btn" style="padding: 4px 8px; margin-right: 8px;" @click="goBack">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><path d="M15 18l-6-6 6-6"/></svg>
@@ -10,7 +10,7 @@
 
       <div class="show-title" style="margin: 12px 0; font-size: 20px; font-weight: 900; color: var(--text-primary); text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ title }}</div>
       
-      <div v-if="isSeries && (level === 'show' || level === 'seasons')" class="view-toggle" id="rate-mode-toggle" style="margin-bottom: 20px; flex-shrink: 0;">
+      <div v-if="isSeries" class="view-toggle" id="rate-mode-toggle" style="margin-bottom: 20px; flex-shrink: 0;">
         <button class="vt-btn" :class="{ active: level === 'show' }" style="flex: 1;" @click="level = 'show'">Весь сериал</button>
         <button class="vt-btn" :class="{ active: level === 'seasons' }" style="flex: 1;" @click="goToSeasons">По сериям</button>
       </div>
@@ -36,7 +36,7 @@
           </div>
         </div>
 
-        <div v-else-if="level === 'seasons'" id="rate-episodes-nav">
+        <div v-else-if="level === 'seasons'" id="rate-episodes-nav" style="flex: 1; overflow-y: auto; min-height: 0; padding: 4px;">
           <div class="rating-grid-wa">
             <button 
               v-for="s in episodesData" 
@@ -56,7 +56,7 @@
           </div>
         </div>
 
-        <div v-else-if="level === 'episodes' && selectedSeason" id="rate-episodes-nav">
+        <div v-else-if="level === 'episodes' && selectedSeason" id="rate-episodes-nav" style="flex: 1; overflow-y: auto; min-height: 0; padding: 4px;">
           <div class="rating-grid-wa" style="grid-template-columns: repeat(4, 1fr);">
             <button 
               v-for="e in selectedSeason.episodes" 
@@ -119,6 +119,7 @@ const loading = ref(false)
 const isSaving = ref(false)
 const needsRefresh = ref(false)
 const sliderRef = ref(null)
+const modalHeight = ref('520px')
 
 const hasExistingRating = computed(() => {
   const iv = props.initialValue
@@ -197,11 +198,43 @@ const showDeleteButton = computed(() => {
   return false
 })
 
-onMounted(() => {
+const calculateStableHeight = () => {
+  if (!isSeries.value || !episodesData.value.length) {
+    modalHeight.value = '520px'
+    return
+  }
+
+  const seasonsCount = episodesData.value.length
+  const seasonsRows = Math.ceil(seasonsCount / 3)
+  const seasonsHeight = 280 + (seasonsRows * 64)
+
+  let maxEpisodesCount = 0
+  episodesData.value.forEach(s => {
+    if (s.episodes && s.episodes.length > maxEpisodesCount) {
+      maxEpisodesCount = s.episodes.length
+    }
+  })
+  const episodesRows = Math.ceil(maxEpisodesCount / 4)
+  const episodesHeight = 230 + (episodesRows * 64)
+
+  const maxCalculated = Math.max(seasonsHeight, episodesHeight, 520)
+  const maxHeightLimit = Math.floor(window.innerHeight * 0.8)
+  const finalHeight = Math.min(maxCalculated, maxHeightLimit)
+  
+  modalHeight.value = `${finalHeight}px`
+}
+
+onMounted(async () => {
   if (hasExistingRating.value) {
     val.value = parseFloat(props.initialValue)
   } else {
     val.value = 5.0
+  }
+  if (isSeries.value) {
+    await fetchEpisodes(true)
+    calculateStableHeight()
+  } else {
+    modalHeight.value = '420px'
   }
 })
 
@@ -230,18 +263,19 @@ const goToSeasons = async () => {
   level.value = 'seasons'
   if (!episodesData.value.length) {
     await fetchEpisodes()
+    calculateStableHeight()
   }
 }
 
-const fetchEpisodes = async () => {
-  loading.value = true
+const fetchEpisodes = async (silent = false) => {
+  if (!silent) loading.value = true
   try {
     const data = await api.post('get_episodes/', { show_id: props.showId })
     episodesData.value = data.seasons || []
   } catch (e) {
     uiStore.showToast('Ошибка загрузки серий')
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 

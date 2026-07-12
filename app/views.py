@@ -2272,12 +2272,20 @@ def webapp_get_episodes(request):
 
         ratings_map = {(r['season_number'], r['episode_number']): r['rating'] for r in ratings}
 
+        views = ViewHistory.objects.filter(
+            show_id=show_id, users=view_user, season_number__gt=0, episode_number__gt=0
+        ).values('id', 'season_number', 'episode_number')
+
+        views_map = {(v['season_number'], v['episode_number']): v['id'] for v in views}
+
         seasons_dict = defaultdict(list)
         for d in durations:
             seasons_dict[d.season_number].append(
                 {
                     'episode_number': d.episode_number,
                     'rating': ratings_map.get((d.season_number, d.episode_number)),
+                    'watched': (d.season_number, d.episode_number) in views_map,
+                    'view_history_id': views_map.get((d.season_number, d.episode_number)),
                 }
             )
 
