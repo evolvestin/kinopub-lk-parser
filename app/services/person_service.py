@@ -92,6 +92,19 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
         if ru_candidate:
             search_scenarios.append(ru_candidate)
 
+    db_shows_meta = []
+    try:
+        for s in person_instance.shows_as_crew.all():
+            db_shows_meta.append(
+                {
+                    'title': s.title.lower().strip() if s.title else '',
+                    'original_title': s.original_title.lower().strip() if s.original_title else '',
+                    'year': s.year,
+                }
+            )
+    except Exception as e:
+        logger.error(f'Error fetching shows meta for {person_instance.name}: {e}')
+
     base_url = 'https://api.themoviedb.org/3/search/person'
     found_path = None
     session = get_tmdb_session()
@@ -119,13 +132,56 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
             if resp.status_code == 200:
                 data = resp.json()
                 results = data.get('results', [])
+
+                valid_candidates = []
                 for res in results:
-                    path = res.get('profile_path')
-                    if path and _is_valid_tmdb_match(query, res):
-                        found_path = path
+                    if _is_valid_tmdb_match(query, res):
+                        score = 0
+                        known_for_list = res.get('known_for', [])
+                        for work in known_for_list:
+                            work_titles = []
+                            for title_field in ['title', 'original_title', 'name', 'original_name']:
+                                if t := work.get(title_field):
+                                    work_titles.append(t.lower().strip())
+
+                            work_date = work.get('release_date') or work.get('first_air_date') or ''
+                            work_year = None
+                            if len(work_date) >= 4 and work_date[:4].isdigit():
+                                work_year = int(work_date[:4])
+
+                            for db_show in db_shows_meta:
+                                if (
+                                    db_show['title'] in work_titles
+                                    or db_show['original_title'] in work_titles
+                                ):
+                                    if (
+                                        work_year
+                                        and db_show['year']
+                                        and abs(work_year - db_show['year']) <= 1
+                                    ):
+                                        score += 100
+                                    else:
+                                        score += 10
+
+                        valid_candidates.append(
+                            {'data': res, 'score': score, 'popularity': res.get('popularity', 0.0)}
+                        )
+
+                if valid_candidates:
+                    valid_candidates.sort(key=lambda x: (x['score'], x['popularity']), reverse=True)
+                    best_candidate = valid_candidates[0]
+
+                    if best_candidate['score'] > 0:
+                        found_path = best_candidate['data'].get('profile_path')
                         break
-                if found_path:
-                    break
+                    elif len(valid_candidates) == 1:
+                        found_path = best_candidate['data'].get('profile_path')
+                        break
+                    else:
+                        logger.info(
+                            f'Ambiguous match for {person_instance.name} (query: {query}) '
+                            f'with no filmography match. Skipping.'
+                        )
 
         person_instance.tmdb_photo_url = (
             f'https://image.tmdb.org/t/p/w200{found_path}' if found_path else None
