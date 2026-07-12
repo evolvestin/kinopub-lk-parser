@@ -381,7 +381,6 @@ const getChartOptions = (metric) => {
     layout: { padding: 15 },
     animation: {
       animateRotate: false,
-      animateScale: true,
       duration: 1200,
       easing: 'easeOutQuart'
     },
