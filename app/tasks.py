@@ -13,6 +13,7 @@ from datetime import timedelta
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
+from django.core.cache import cache
 from django.core.management import call_command
 from django.db.models import Q
 from django.utils import timezone
@@ -522,6 +523,7 @@ def sync_poiskkino_ratings_task():
 def update_site_metrics_task():
     data = generate_global_metrics_snapshot()
     SiteMetric.objects.create(key='global_snapshot', data=data)
+    cache.delete('lock:queuing_global_snapshot')
     logging.info('Global site metrics snapshot updated successfully.')
 
 

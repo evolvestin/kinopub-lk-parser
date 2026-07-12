@@ -298,10 +298,10 @@ def _get_favorites(base_qs, dur_qs):
         }
 
     raw_countries_qs = base_qs.values(
+        'show_id',
         tid=F('show__countries__id'),
         name=F('show__countries__name'),
         emoji=F('show__countries__emoji_flag'),
-        show_id=F('show_id'),
     ).filter(tid__isnull=False)
 
     country_groups = defaultdict(lambda: {'show_ids': set(), 'emoji': '', 'id': None})

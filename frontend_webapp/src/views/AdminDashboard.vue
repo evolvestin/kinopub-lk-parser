@@ -379,7 +379,12 @@ const getChartOptions = (metric) => {
   return {
     cutout: '50%',
     layout: { padding: 15 },
-    animation: false,
+    animation: {
+      animateRotate: false,
+      animateScale: true,
+      duration: 1200,
+      easing: 'easeOutQuart'
+    },
     onHover: (evt, elements) => {
       if (evt.native?.target) evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'
     },

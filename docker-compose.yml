@@ -116,7 +116,7 @@ services:
 
   celery:
     build: .
-    command: celery -A kinopub_parser worker -l INFO --concurrency=4
+    command: celery -A kinopub_parser worker -l INFO --concurrency=4 -Q celery,metrics
     restart: unless-stopped
     env_file: .env
     volumes:

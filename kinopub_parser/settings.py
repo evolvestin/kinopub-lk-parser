@@ -372,6 +372,10 @@ class MultiSchedule:
         return ' | '.join(repr(s) for s in self.schedules)
 
 
+CELERY_TASK_ROUTES = {
+    'app.tasks.update_site_metrics_task': {'queue': 'metrics'},
+}
+
 CELERY_BEAT_SCHEDULE = {
     'expire_codes': {
         'task': 'app.tasks.expire_codes_task',
@@ -392,6 +396,7 @@ CELERY_BEAT_SCHEDULE = {
     'update_site_metrics': {
         'task': 'app.tasks.update_site_metrics_task',
         'schedule': crontab(minute=0, hour=0),  # every 24 hours
+        'options': {'queue': 'metrics'},
     },
     'auto_enqueue_missing_metadata': {
         'task': 'app.tasks.auto_enqueue_missing_metadata_task',
