@@ -10,8 +10,43 @@ export const useWishlistStore = defineStore('wishlist', () => {
   const uiStore = useUIStore()
 
   const folders = ref([])
+  const isLoaded = ref(false)
   const isReorderFoldersMode = ref(false)
   const isReorderItemsMode = ref(false)
+  let fetchPromise = null
+
+  async function fetchWishlist(force = false) {
+    if (isLoaded.value && !force) return
+    if (fetchPromise) return fetchPromise
+
+    fetchPromise = (async () => {
+      try {
+        const data = await api.post('wishlist/', { action: 'get' })
+        folders.value = data.folders || []
+        
+        if (folders.value.length > 0) {
+          if (!activeFolderId.value || !folders.value.some(f => f.id === activeFolderId.value)) {
+            activeFolderId.value = folders.value[0].id
+          }
+        } else {
+          activeFolderId.value = null
+        }
+
+        folders.value.forEach(f => {
+          f.items.forEach(item => {
+            if (item.poster_url) preloadImage(item.poster_url)
+          })
+        })
+        isLoaded.value = true
+      } catch (error) {
+        uiStore.showToast('Ошибка загрузки избранного')
+      } finally {
+        fetchPromise = null
+      }
+    })()
+
+    return fetchPromise
+  }
 
   const FOLDER_COLORS = [
     '#388bfd', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#95a5a6', '#fd79a8'
@@ -140,7 +175,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
     }
     try {
       const data = await api.post('wishlist/', { action: 'create_folder', name: trimmedName, icon, color })
-      await fetchWishlist()
+      await fetchWishlist(true)
       if (data.id) activeFolderId.value = data.id
       uiStore.showToast('Папка создана')
     } catch (error) {
@@ -156,7 +191,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
     }
     try {
       await api.post('wishlist/', { action: 'edit_folder', folder_id: folderId, name: trimmedName, icon, color })
-      await fetchWishlist()
+      await fetchWishlist(true)
       uiStore.showToast('Папка изменена')
     } catch (error) {
       uiStore.showToast(error.message || 'Ошибка изменения папки')
@@ -169,7 +204,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
       if (activeFolderId.value === folderId) {
         activeFolderId.value = null
       }
-      await fetchWishlist()
+      await fetchWishlist(true)
       uiStore.showToast('Папка удалена')
     } catch (e) {
       uiStore.showToast('Ошибка удаления папки')
@@ -179,7 +214,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
   async function removeItem(itemId, keepStats) {
     try {
       await api.post('wishlist/', { action: 'remove_item', item_id: itemId, keep_stats: keepStats })
-      await fetchWishlist()
+      await fetchWishlist(true)
       uiStore.showToast('Шоу удалено из папки')
     } catch (e) {
       uiStore.showToast('Ошибка удаления')
@@ -189,7 +224,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
   async function addItemToFolder(folderId, showId) {
     try {
       await api.post('wishlist/', { action: 'add_item', folder_id: folderId, show_id: showId })
-      await fetchWishlist()
+      await fetchWishlist(true)
       uiStore.showToast('Успешно добавлено')
     } catch (e) {
       uiStore.showToast('Ошибка при добавлении')
@@ -231,6 +266,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
   return {
     folders,
+    isLoaded,
     activeFolderId,
     activeFolder,
     sortedItems,

@@ -10,7 +10,7 @@ import Sortable from 'sortablejs'
 const wishlistStore = useWishlistStore()
 const uiStore = useUIStore()
 
-const isInitialLoading = ref(true)
+const isInitialLoading = ref(!wishlistStore.isLoaded)
 const isSortMenuOpen = ref(false)
 const headersReady = ref(false)
 const themeIcon = computed(() => uiStore.theme === 'dark' ? icons.moon : icons.sun)
@@ -99,7 +99,9 @@ const initSortable = () => {
 }
 
 onMounted(async () => {
-  isInitialLoading.value = true
+  if (!wishlistStore.isLoaded) {
+    isInitialLoading.value = true
+  }
   await wishlistStore.fetchWishlist()
   isInitialLoading.value = false
   initSortable()

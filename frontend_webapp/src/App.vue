@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUIStore } from './stores/uiStore'
 import { useStatsStore } from './stores/useStatsStore'
+import { useWishlistStore } from './stores/wishlistStore'
 import { useTelegram } from './composables/useTelegram'
 import { logger } from './utils/logger'
 import BottomNav from './components/layout/BottomNav.vue'
@@ -24,6 +25,7 @@ import WlDeleteModal from './components/modals/WlDeleteModal.vue'
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
+const wishlistStore = useWishlistStore()
 const { tg } = useTelegram()
 const router = useRouter()
 
@@ -95,9 +97,12 @@ onMounted(async () => {
   await router.replace({ path: targetPath, query: targetQuery })
 
   try {
-    await statsStore.fetchStats(statsStore.currentYear, false)
+    await Promise.allSettled([
+      statsStore.fetchStats(statsStore.currentYear, false),
+      wishlistStore.fetchWishlist()
+    ])
   } catch (e) {
-    logger.error('Failed to fetch initial stats during bootstrap:', e)
+    logger.error('Failed to fetch initial data during bootstrap:', e)
   } finally {
     uiStore.setLoading(false)
     uiStore.setAppReady(true)
