@@ -41,6 +41,7 @@ from shared.constants import (
     DIRECTOR_ROLES,
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
+    RAW_TO_NORMALIZED_COUNTRY,
     RAW_TO_NORMALIZED_GENRE,
     SERIES_TYPES,
     WRITER_ROLES,
@@ -296,30 +297,35 @@ def _get_favorites(base_qs, dur_qs):
             'others': get_person_top(professions, mode='others'),
         }
 
-    countries_qs = (
-        base_qs.values(
-            tid=F('show__countries__id'),
-            name=F('show__countries__name'),
-            emoji=F('show__countries__emoji_flag'),
-        )
-        .filter(tid__isnull=False)
-        .annotate(count=Count('id', distinct=True))
-        .order_by('-count')[:5]
-    )
+    raw_countries_qs = base_qs.values(
+        tid=F('show__countries__id'),
+        name=F('show__countries__name'),
+        emoji=F('show__countries__emoji_flag'),
+        show_id=F('show_id'),
+    ).filter(tid__isnull=False)
+
+    country_groups = defaultdict(lambda: {'show_ids': set(), 'emoji': '', 'id': None})
+
+    for row in raw_countries_qs:
+        raw_name = row['name']
+        norm_name = RAW_TO_NORMALIZED_COUNTRY.get(raw_name, raw_name)
+        group = country_groups[norm_name]
+        group['show_ids'].add(row['show_id'])
+        if row['emoji'] and not group['emoji']:
+            group['emoji'] = row['emoji']
+        if not group['id'] or raw_name == norm_name:
+            group['id'] = row['tid']
 
     countries = []
-    for c in countries_qs:
-        show_ids = list(
-            base_qs.filter(show__countries__id=c['tid'])
-            .values_list('show_id', flat=True)
-            .distinct()
-        )
+    for name, group in sorted(
+        country_groups.items(), key=lambda x: len(x[1]['show_ids']), reverse=True
+    )[:5]:
         countries.append(
             {
-                'name': c['name'],
-                'emoji': c['emoji'] or '',
-                'count': c['count'],
-                'show_ids': show_ids,
+                'name': name,
+                'emoji': group['emoji'] or '',
+                'count': len(group['show_ids']),
+                'show_ids': list(group['show_ids']),
             }
         )
 

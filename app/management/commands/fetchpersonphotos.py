@@ -1,6 +1,7 @@
 import logging
 
 import requests
+from celery.exceptions import SoftTimeLimitExceeded
 from django import db
 from django.db import DatabaseError
 from django.db.models import Count
@@ -63,55 +64,60 @@ class Command(LoggableBaseCommand):
         error_threshold = 5
         batch_size = 100
 
-        # Мы используем исключение обработанных ID, чтобы не зацикливаться на ошибках сети
+        # WARNING: Track failed IDs to avoid infinite loops over transient network or API failures
+        # in the same session
         failed_ids = []
 
         logging.info(f'Starting photo fetch. Target limit: {limit}')
 
-        while processed_count < limit:
-            current_batch_limit = min(batch_size, limit - processed_count)
+        try:
+            while processed_count < limit:
+                current_batch_limit = min(batch_size, limit - processed_count)
 
-            # Выбираем только тех, кого еще не трогали в этом запуске
-            batch = list(
-                Person.objects.filter(is_photo_fetched=False)
-                .exclude(id__in=failed_ids)
-                .order_by('id')[:current_batch_limit]
-            )
+                batch = list(
+                    Person.objects.filter(is_photo_fetched=False)
+                    .exclude(id__in=failed_ids)
+                    .order_by('id')[:current_batch_limit]
+                )
 
-            if not batch:
-                break
+                if not batch:
+                    break
 
-            for person in batch:
-                try:
-                    if fetch_person_photo_from_tmdb(person):
-                        processed_count += 1
-                        consecutive_errors = 0
-                    else:
-                        # Если метод вернул False без исключения,
-                        # значит он сам пометил person как обработанный (is_photo_fetched=True)
-                        processed_count += 1
+                for person in batch:
+                    try:
+                        if fetch_person_photo_from_tmdb(person):
+                            processed_count += 1
+                            consecutive_errors = 0
+                        else:
+                            processed_count += 1
 
-                except DatabaseError as e:
-                    logging.critical(f'Fatal database error on person {person.name}: {e}')
-                    return
-                except requests.RequestException as e:
-                    consecutive_errors += 1
-                    failed_ids.append(person.id)
-                    logging.warning(
-                        f'TMDB request failed for {person.name} '
-                        f'({consecutive_errors}/{error_threshold}): {e}'
-                    )
-                    if consecutive_errors >= error_threshold:
-                        logging.error('Aborting: TMDB API is unreachable.')
+                    except DatabaseError as e:
+                        logging.critical(f'Fatal database error on person {person.name}: {e}')
                         return
-                except Exception as e:
-                    failed_ids.append(person.id)
-                    logging.error(f'Skipping {person.name} due to unexpected error: {e}')
+                    except requests.RequestException as e:
+                        consecutive_errors += 1
+                        failed_ids.append(person.id)
+                        logging.warning(
+                            f'TMDB request failed for {person.name} '
+                            f'({consecutive_errors}/{error_threshold}): {e}'
+                        )
+                        if consecutive_errors >= error_threshold:
+                            logging.error('Aborting: TMDB API is unreachable.')
+                            return
+                    except Exception as e:
+                        failed_ids.append(person.id)
+                        logging.error(f'Skipping {person.name} due to unexpected error: {e}')
 
-                if processed_count % 50 == 0:
-                    logging.info(f'Progress: {processed_count} processed...')
+                    if processed_count % 50 == 0:
+                        logging.info(f'Progress: {processed_count} processed...')
 
-            # Критически важно для предотвращения утечки памяти в Django
-            db.reset_queries()
+                # WARNING: db.reset_queries() is required here to prevent memory leaks
+                db.reset_queries()
+
+        except SoftTimeLimitExceeded:
+            # WARNING: Celery SoftTimeLimitExceeded is caught here
+            # to allow the long-running loop to terminate cleanly,
+            # preserving database integrity before the hard limit kills the process
+            logging.warning('Soft time limit reached. Exiting gracefully to save progress.')
 
         logging.info(f'Successfully processed {processed_count} persons.')

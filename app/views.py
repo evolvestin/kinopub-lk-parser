@@ -73,6 +73,7 @@ from app.telegram_bot import TelegramSender
 from shared.constants import (
     GENRES_MAPPING,
     PROFESSIONS_PLURAL_MAP_RU,
+    RAW_TO_NORMALIZED_COUNTRY,
     RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
     SHOW_TYPE_DISPLAY_RU,
@@ -185,6 +186,17 @@ def _serialize_show_details(show, user=None):
             }
         )
 
+    normalized_countries = []
+    for country in show.countries.all():
+        norm_name = RAW_TO_NORMALIZED_COUNTRY.get(country.name, country.name)
+        if norm_name != country.name:
+            target = Country.objects.filter(name=norm_name).first()
+            if target:
+                normalized_countries.append(str(target))
+                continue
+        normalized_countries.append(str(country))
+    normalized_countries = sorted(list(set(normalized_countries)))
+
     return {
         'id': show.id,
         'title': show.title,
@@ -194,7 +206,7 @@ def _serialize_show_details(show, user=None):
         'status': show.status,
         'kinopoisk_rating': show.kinopoisk_rating,
         'imdb_rating': show.imdb_rating,
-        'countries': [str(country) for country in show.countries.all()],
+        'countries': normalized_countries,
         'genres': show.display_genres,
         'kinopoisk_url': show.kinopoisk_url,
         'imdb_url': show.imdb_url,
@@ -1345,6 +1357,22 @@ def webapp_get_show_full(request, show_id):
 
         genres_list = [{'id': gid, 'name': name} for name, gid in sorted(genre_map.items())]
 
+        countries_data = []
+        seen_names = set()
+        for c in show.countries.all():
+            norm_name = RAW_TO_NORMALIZED_COUNTRY.get(c.name, c.name)
+            if norm_name in seen_names:
+                continue
+            seen_names.add(norm_name)
+            if norm_name != c.name:
+                target = Country.objects.filter(name=norm_name).first()
+                if target:
+                    countries_data.append(
+                        {'id': target.id, 'name': target.name, 'emoji': target.emoji_flag}
+                    )
+                    continue
+            countries_data.append({'id': c.id, 'name': c.name, 'emoji': c.emoji_flag})
+
         data = {
             'id': show.id,
             'title': show.title,
@@ -1362,9 +1390,7 @@ def webapp_get_show_full(request, show_id):
             'personal_episodes_count': personal_episodes_count,
             'last_view': last_view,
             'view_history': user_show_history,
-            'countries': [
-                {'id': c.id, 'name': c.name, 'emoji': c.emoji_flag} for c in show.countries.all()
-            ],
+            'countries': countries_data,
             'genres': genres_list,
             'crew': ordered_crew,
         }

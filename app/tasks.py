@@ -495,7 +495,7 @@ def run_gap_scanner_task():
 @shared_task(time_limit=3600, soft_time_limit=3300)
 @single_instance_task(lock_name='fetch_person_photos_lock', timeout=3600)
 @safe_execution
-def fetch_person_photos_task(limit=500):
+def fetch_person_photos_task(limit=2000):
     call_command('fetchpersonphotos', limit=limit)
 
 

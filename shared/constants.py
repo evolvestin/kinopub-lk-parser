@@ -180,6 +180,11 @@ GENRES_MAPPING = {
 
 RAW_TO_NORMALIZED_GENRE = {raw: norm for norm, raws in GENRES_MAPPING.items() for raw in raws}
 
+RAW_TO_NORMALIZED_COUNTRY = {
+    'Доминика': 'Доминикана',
+    'Доминиканская Республика': 'Доминикана',
+}
+
 
 class UserRole(StrEnum):
     GUEST = 'guest'

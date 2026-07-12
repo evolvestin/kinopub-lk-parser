@@ -418,7 +418,7 @@ if ENVIRONMENT == 'PROD':
             },
             'fetch_person_photos': {
                 'task': 'app.tasks.fetch_person_photos_task',
-                'schedule': crontab(minute=0, hour='*/3'),
+                'schedule': crontab(minute=15),
             },
             'sync_poiskkino_ratings': {
                 'task': 'app.tasks.sync_poiskkino_ratings_task',

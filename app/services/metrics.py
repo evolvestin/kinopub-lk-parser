@@ -23,6 +23,7 @@ from shared.constants import (
     PROFESSION_TRANS_MAP,
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
+    RAW_TO_NORMALIZED_COUNTRY,
     RAW_TO_NORMALIZED_EN,
     RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
@@ -32,12 +33,35 @@ from shared.constants import (
 
 
 def calculate_missing_country_meta_metric():
-    count = Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code='')).count()
+    raw_missing = Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code=''))
+    count = 0
+    for c in raw_missing:
+        norm_name = RAW_TO_NORMALIZED_COUNTRY.get(c.name, c.name)
+        if norm_name != c.name:
+            if (
+                Country.objects.filter(name=norm_name)
+                .exclude(Q(iso_code__isnull=True) | Q(iso_code=''))
+                .exists()
+            ):
+                continue
+        count += 1
     return [{'name': 'Страны', 'value': count}]
 
 
 def get_missing_country_meta_list():
-    return Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code='')).values('id', 'name')
+    raw_missing = Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code=''))
+    valid_missing = []
+    for c in raw_missing:
+        norm_name = RAW_TO_NORMALIZED_COUNTRY.get(c.name, c.name)
+        if norm_name != c.name:
+            if (
+                Country.objects.filter(name=norm_name)
+                .exclude(Q(iso_code__isnull=True) | Q(iso_code=''))
+                .exists()
+            ):
+                continue
+        valid_missing.append({'id': c.id, 'name': c.name})
+    return valid_missing
 
 
 def calculate_total_countries_metric():
