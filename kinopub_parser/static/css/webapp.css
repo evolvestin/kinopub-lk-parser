@@ -808,8 +808,8 @@ body.has-banner #app {
 .hero-container { 
     position: relative; 
     width: 100%; 
-    height: 50vh; 
-    min-height: 350px; 
+    height: 55vh; 
+    min-height: 380px; 
     overflow: hidden; 
     display: flex; 
     align-items: flex-end; 
@@ -849,10 +849,9 @@ body.has-banner #app {
 .hero-poster { 
     position: relative; 
     z-index: 3; 
-    width: auto; 
-    max-width: 65%; 
-    height: 85%; 
-    object-fit: contain; 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; 
     border-radius: 12px; 
     box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
     border: 1px solid rgba(255,255,255,0.1); 

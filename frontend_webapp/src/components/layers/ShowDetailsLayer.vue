@@ -11,9 +11,9 @@
       <div class="hero-bg" :style="{ backgroundImage: `url(${show.poster_large})` }"></div>
       <div class="hero-gradient"></div>
       
-      <div style="position: relative; z-index: 3; height: 85%; max-width: 65%; display: flex; align-items: flex-end;">
-        <div style="position: relative; height: 100%; display: flex; align-items: flex-end;">
-          <img :src="show.poster_large" class="hero-poster" style="max-width: 100%; height: 100%; margin: 0; box-shadow: none;" alt="poster">
+      <div style="position: relative; z-index: 3; height: 95%; max-width: 75%; aspect-ratio: 2/3; display: flex; align-items: flex-end;">
+        <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: flex-end;">
+          <img :src="show.poster_large" class="hero-poster" style="margin: 0; box-shadow: none;" alt="poster">
           
           <div class="grid-badges" style="position: absolute; top: 12px; left: 12px; right: auto; align-items: flex-start; z-index: 10;">
             <span v-if="currentPersonalRating" class="rating-badge" style="background: rgba(0, 0, 0, 0.6); color: var(--accent); border: 1px solid rgba(255, 255, 255, 0.1); font-size: 20px; padding: 4px 10px; border-radius: 10px; gap: 5px; display: inline-flex; align-items: center; font-weight: 800; text-shadow: none;">
@@ -89,7 +89,10 @@ const props = defineProps(['showId'])
 const api = useApi()
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
+
 const show = ref(null)
+const activePoster = ref('')
+const activeBg = ref('')
 
 const currentPersonalRating = computed(() => {
   if (!show.value) return null
@@ -108,6 +111,18 @@ const loadShowData = async () => {
   try {
     const data = await api.get(`show/${props.showId}/`)
     show.value = data
+
+    activePoster.value = data.poster_medium || ''
+    activeBg.value = data.poster_medium || ''
+
+    if (data.poster_large) {
+      const img = new Image()
+      img.src = data.poster_large
+      img.onload = () => {
+        activePoster.value = data.poster_large
+        activeBg.value = data.poster_large
+      }
+    }
   } catch (e) {
     console.error('[ShowDetailsLayer] Failed to load show:', e)
     uiStore.showToast('Ошибка загрузки')
