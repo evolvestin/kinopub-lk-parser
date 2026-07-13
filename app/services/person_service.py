@@ -3,6 +3,7 @@ import re
 from time import sleep
 
 import requests
+from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.db import DatabaseError
 from requests.adapters import HTTPAdapter
@@ -200,6 +201,8 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
         logger.warning(f'TMDB connectivity issue for {person_instance.name}: {e}')
         raise
     except DatabaseError:
+        raise
+    except SoftTimeLimitExceeded:
         raise
     except Exception as e:
         logger.error(f'Unexpected error on {person_instance.name}: {e}')

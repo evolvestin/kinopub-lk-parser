@@ -374,6 +374,7 @@ class MultiSchedule:
 
 CELERY_TASK_ROUTES = {
     'app.tasks.update_site_metrics_task': {'queue': 'metrics'},
+    'app.tasks.fetch_person_photos_task': {'queue': 'metrics'},
 }
 
 CELERY_BEAT_SCHEDULE = {
