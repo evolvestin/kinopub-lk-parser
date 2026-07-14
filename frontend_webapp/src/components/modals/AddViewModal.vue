@@ -2,19 +2,19 @@
   <div class="modal-overlay show" @click.self="close">
     <div class="modal-content" :style="{ padding: '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column' }">
       
-      <div v-if="level !== 'main'" id="rate-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
-        <button class="vt-btn" style="padding: 4px 8px; display: flex; align-items: center; justify-content: center;" @click="goBack">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <div id="rate-breadcrumb" style="font-size: 12px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">
-          {{ level === 'seasons' ? 'Выбор сезона' : `Сезон ${selectedSeasonNumber}: Выбор серии` }}
+      <div class="modal-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+          <button v-if="level !== 'main'" class="modal-back-btn clickable" @click="goBack">
+            <span v-html="icons.chevron_left"></span>
+          </button>
+          <div style="font-size: 12px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            {{ level === 'main' ? 'Отметить просмотр' : (level === 'seasons' ? 'Выбор сезона' : `Сезон ${selectedSeasonNumber}: Выбор серии`) }}
+          </div>
         </div>
+        <button class="modal-close" @click="close" style="margin-left: auto;">×</button>
       </div>
 
       <div v-if="level === 'main'" style="display: flex; flex-direction: column; height: 100%; min-height: 0; flex-grow: 1;">
-        <div class="modal-title" style="font-size: 14px; opacity: 0.7; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; margin-bottom: 8px;">
-          Отметить просмотр
-        </div>
         <div style="font-size: clamp(18px, 5vw, 22px); font-weight: 900; color: var(--accent); margin-bottom: 24px; line-height: 1.2; text-align: center; letter-spacing: -0.5px;">
           {{ context.title }}
         </div>

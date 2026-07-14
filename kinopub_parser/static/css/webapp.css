@@ -2033,3 +2033,30 @@ img {
 .modal-leave-to .modal-content {
     transform: translateY(100%) !important;
 }
+
+.modal-back-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: transform var(--transition-bounce), background var(--transition-smooth);
+    box-shadow: var(--shadow-sm);
+    flex-shrink: 0;
+}
+
+.modal-back-btn:active {
+    transform: scale(0.85);
+    background: var(--border);
+}
+
+.modal-back-btn svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}

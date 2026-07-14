@@ -1,12 +1,12 @@
 <template>
   <div class="modal-overlay show" @click.self="close">
-    <div class="modal-content">
-      <div class="modal-header">
-        <div class="modal-title">Поделиться статистикой</div>
+    <div class="modal-content" style="padding: 24px;">
+      <div class="modal-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; width: 100%;">
+        <div class="modal-title" style="font-size: 20px; font-weight: 800; color: var(--text-primary);">Поделиться статистикой</div>
         <button class="modal-close" @click="close">×</button>
       </div>
       
-      <div class="share-section-title">Годы для экспорта</div>
+      <div class="share-section-title" style="margin-top: 0;">Годы для экспорта</div>
       <div class="years-grid">
         <label v-for="y in statsStore.availableYears" :key="y">
             <input type="checkbox" v-model="selectedYears" :value="y" class="yr-chk-input">

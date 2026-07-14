@@ -1,18 +1,24 @@
 <template>
   <div class="modal-overlay show" @click.self="close">
     <div class="modal-content" :class="scoreColorClass" :style="{ padding: '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column' }">
-      <div id="rate-nav-bar">
-        <button v-if="level !== 'show' && level !== 'seasons'" class="vt-btn" style="padding: 4px 8px; margin-right: 8px;" @click="goBack">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <div id="rate-breadcrumb">{{ breadcrumbText }}</div>
+      
+      <div class="modal-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+          <button v-if="level !== 'show' && level !== 'seasons'" class="modal-back-btn clickable" @click="goBack">
+            <span v-html="icons.chevron_left"></span>
+          </button>
+          <div style="font-size: 12px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            {{ breadcrumbText }}
+          </div>
+        </div>
+        <button class="modal-close" @click="close" style="margin-left: auto;">×</button>
       </div>
 
       <div class="show-title" style="margin: 12px 0; font-size: 20px; font-weight: 900; color: var(--text-primary); text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ title }}</div>
       
       <div v-if="isSeries" class="view-toggle" id="rate-mode-toggle" style="margin-bottom: 20px; flex-shrink: 0;">
         <button class="vt-btn" :class="{ active: level === 'show' }" style="flex: 1;" @click="level = 'show'">Весь сериал</button>
-        <button class="vt-btn" :class="{ active: level === 'seasons' }" style="flex: 1;" @click="goToSeasons">По сериям</button>
+        <button class="vt-btn" :class="{ active: level !== 'show' }" style="flex: 1;" @click="goToSeasons">По сериям</button>
       </div>
 
       <div id="rate-content-area" style="flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0;">
@@ -101,6 +107,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
+import { icons } from '../../utils/icons'
 
 const props = defineProps(['showId', 'title', 'initialValue', 'type'])
 const emit = defineEmits(['close'])

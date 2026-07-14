@@ -1,7 +1,7 @@
 <template>
   <div class="modal-overlay show" @click.self="close">
-    <div class="modal-content">
-      <div class="modal-header" style="margin-bottom: 8px;">
+    <div class="modal-content" style="padding: 24px;">
+      <div class="modal-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; width: 100%;">
         <div class="modal-title" style="font-size: 12px; opacity: 0.5; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
           Добавить в список
         </div>

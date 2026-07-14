@@ -1,8 +1,8 @@
 <template>
   <div class="modal-overlay show" @click.self="close">
-    <div class="modal-content">
-      <div class="modal-header">
-        <div class="modal-title">{{ isEdit ? 'Настройки папки' : 'Новая папка' }}</div>
+    <div class="modal-content" style="padding: 24px;">
+      <div class="modal-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; width: 100%;">
+        <div class="modal-title" style="font-size: 20px; font-weight: 800; color: var(--text-primary);">{{ isEdit ? 'Настройки папки' : 'Новая папка' }}</div>
         <button class="modal-close" @click="close">×</button>
       </div>
       

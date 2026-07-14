@@ -133,16 +133,17 @@ Object.assign(window.App, {
             modalContent.classList.remove('score-low', 'score-mid', 'score-high');
         }
 
+        if (modeToggle) {
+            modeToggle.querySelector('#rate-mode-main').classList.toggle('active', level === 'show');
+            modeToggle.querySelector('#rate-mode-ep').classList.toggle('active', level !== 'show');
+        }
+
         if (level === 'show') {
             ctx.season = null;
             ctx.episode = null;
             if (breadcrumb) breadcrumb.textContent = 'Общая оценка';
             if (slider) slider.style.display = 'flex';
             if (submitBtn) submitBtn.style.display = 'block';
-            if (modeToggle) {
-                modeToggle.querySelector('#rate-mode-main').classList.add('active');
-                modeToggle.querySelector('#rate-mode-ep').classList.remove('active');
-            }
             window.App.State.setState('modals.rateShow.context', ctx);
             window.App.updateSliderUI();
         } 
@@ -151,10 +152,6 @@ Object.assign(window.App, {
             ctx.episode = null;
             if (breadcrumb) breadcrumb.textContent = 'Выбор сезона';
             if (epNav) epNav.style.display = 'block';
-            if (modeToggle) {
-                modeToggle.querySelector('#rate-mode-main').classList.remove('active');
-                modeToggle.querySelector('#rate-mode-ep').classList.add('active');
-            }
             window.App.State.setState('modals.rateShow.context', ctx);
             window.App.loadAndRenderSeasons();
         }
