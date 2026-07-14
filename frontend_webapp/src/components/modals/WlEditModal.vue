@@ -48,49 +48,34 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUIStore } from '../../stores/uiStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { icons } from '../../utils/icons'
 
 const uiStore = useUIStore()
 const wishlistStore = useWishlistStore()
+const router = useRouter()
 
-const context = computed(() => uiStore.modals.wlEdit.context || {})
-const isEdit = computed(() => !!context.value?.isEdit)
+const context = computed(() => uiStore.modals.wlDelete.context || {})
+const showInformer = ref(false)
 
-const name = ref('')
-const selectedColor = ref(wishlistStore.FOLDER_COLORS[0])
-const selectedIcon = ref(wishlistStore.FOLDER_ICONS[0])
-
-onMounted(() => {
-  if (isEdit.value) {
-    const folder = wishlistStore.folders.find(f => f.id === wishlistStore.activeFolderId)
-    if (folder) {
-      name.value = folder.name
-      selectedColor.value = folder.color
-      selectedIcon.value = folder.icon
-    }
+const keepStats = computed({
+  get: () => router.currentRoute.value.query.modal_keepStats !== 'false',
+  set: (val) => {
+    const query = { ...router.currentRoute.value.query }
+    query.modal_keepStats = String(val)
+    router.replace({ query }).catch(() => {})
   }
 })
 
 const close = () => {
-  uiStore.closeModal('wlEdit')
+  uiStore.closeModal('wlDelete')
 }
 
-const save = async () => {
-  if (isEdit.value) {
-    await wishlistStore.editFolder(wishlistStore.activeFolderId, name.value, selectedIcon.value, selectedColor.value)
-  } else {
-    await wishlistStore.createFolder(name.value, selectedIcon.value, selectedColor.value)
-  }
+const confirmDelete = async () => {
+  await wishlistStore.removeItem(context.value.id, keepStats.value)
   close()
-}
-
-const deleteFolder = async () => {
-  if (confirm('Удалить папку и всё её содержимое?')) {
-    await wishlistStore.deleteFolder(wishlistStore.activeFolderId)
-    close()
-  }
 }
 </script>

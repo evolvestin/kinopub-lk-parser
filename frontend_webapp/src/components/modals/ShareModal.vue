@@ -45,7 +45,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useApi } from '../../composables/useApi'
@@ -54,13 +55,41 @@ import { icons } from '../../utils/icons'
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const api = useApi()
+const router = useRouter()
 
 const isBaking = ref(false)
-const selectedYears = ref(['all'])
-const config = ref({
-    anon_user: false,
-    include_group: true,
-    anon_group: false
+
+const updateQueryParams = (params) => {
+  const query = { ...router.currentRoute.value.query }
+  Object.keys(params).forEach(key => {
+    const val = params[key]
+    if (val === null || val === undefined || val === '') {
+      delete query[`modal_${key}`]
+    } else {
+      query[`modal_${key}`] = String(val)
+    }
+  })
+  router.replace({ query }).catch(() => {})
+}
+
+const selectedYears = computed({
+  get: () => {
+    const y = router.currentRoute.value.query.modal_years
+    return y ? y.split(',') : ['all']
+  },
+  set: (val) => updateQueryParams({ years: val.join(',') })
+})
+
+const config = computed(() => {
+  const query = router.currentRoute.value.query
+  return {
+    get anon_user() { return query.modal_anon_user === 'true' },
+    set anon_user(val) { updateQueryParams({ anon_user: val }) },
+    get include_group() { return query.modal_include_group !== 'false' },
+    set include_group(val) { updateQueryParams({ include_group: val }) },
+    get anon_group() { return query.modal_anon_group === 'true' },
+    set anon_group(val) { updateQueryParams({ anon_group: val }) }
+  }
 })
 
 const close = () => {
@@ -68,22 +97,24 @@ const close = () => {
 }
 
 async function submit() {
-    if (!selectedYears.value.length) return uiStore.showToast('Выберите период')
-    isBaking.value = true
-    try {
-        const res = await api.post('bake_stats/', {
-            config: {
-                years: selectedYears.value,
-                ...config.value
-            }
-        })
-        close()
-        const tg = window.Telegram?.WebApp
-        if (tg) {
-            tg.switchInlineQuery("share_" + res.id, ["users", "groups", "channels"])
-        }
-    } catch (e) {
-        uiStore.showToast('Ошибка создания слепка')
-    } finally { isBaking.value = false }
+  if (!selectedYears.value.length) return uiStore.showToast('Выберите период')
+  isBaking.value = true
+  try {
+    const res = await api.post('bake_stats/', {
+      config: {
+        years: selectedYears.value,
+        ...config.value
+      }
+    })
+    close()
+    const tg = window.Telegram?.WebApp
+    if (tg) {
+      tg.switchInlineQuery('share_' + res.id, ['users', 'groups', 'channels'])
+    }
+  } catch (e) {
+    uiStore.showToast('Ошибка создания слепка')
+  } finally {
+    isBaking.value = false
+  }
 }
 </script>

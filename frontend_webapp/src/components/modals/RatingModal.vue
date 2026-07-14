@@ -103,7 +103,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
@@ -115,18 +116,96 @@ const emit = defineEmits(['close'])
 const api = useApi()
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
+const router = useRouter()
 
-const level = ref('show')
-const val = ref(5.0)
-const season = ref(null)
-const episode = ref(null)
 const episodesData = ref([])
-
 const loading = ref(false)
 const isSaving = ref(false)
 const needsRefresh = ref(false)
 const sliderRef = ref(null)
 const modalHeight = ref('520px')
+
+const localVal = ref(5.0)
+
+const updateQueryParams = (params) => {
+  const query = { ...router.currentRoute.value.query }
+  Object.keys(params).forEach(key => {
+    const val = params[key]
+    if (val === null || val === undefined || val === '') {
+      delete query[`modal_${key}`]
+    } else {
+      query[`modal_${key}`] = String(val)
+    }
+  })
+  router.replace({ query }).catch(() => {})
+}
+
+const level = computed({
+  get: () => router.currentRoute.value.query.modal_level || 'show',
+  set: (v) => updateQueryParams({ level: v })
+})
+
+const val = computed({
+  get: () => localVal.value,
+  set: (v) => {
+    localVal.value = v
+  }
+})
+
+const season = computed({
+  get: () => {
+    const v = router.currentRoute.value.query.modal_season
+    return v ? parseInt(v) : null
+  },
+  set: (v) => updateQueryParams({ season: v })
+})
+
+const episode = computed({
+  get: () => {
+    const v = router.currentRoute.value.query.modal_episode
+    return v ? parseInt(v) : null
+  },
+  set: (v) => updateQueryParams({ episode: v })
+})
+
+const debounce = (fn, delay) => {
+  let timeout
+  return (...args) => {
+    clearTimeout(timeout)
+    timeout = setTimeout(() => fn(...args), delay)
+  }
+}
+
+const debouncedUpdateVal = debounce((v) => {
+  updateQueryParams({ val: v })
+}, 150)
+
+watch(localVal, (newVal) => {
+  debouncedUpdateVal(newVal)
+})
+
+watch(() => router.currentRoute.value.query.modal_val, (newVal) => {
+  if (newVal !== undefined && newVal !== null) {
+    const parsed = parseFloat(newVal)
+    if (parsed !== localVal.value) {
+      localVal.value = parsed
+    }
+  }
+}, { immediate: true })
+
+watch(() => router.currentRoute.value.query.modal_initialValue, (newVal) => {
+  if (router.currentRoute.value.query.modal_val === undefined) {
+    if (newVal !== undefined && newVal !== null && newVal !== 'null' && newVal !== 'undefined' && newVal !== '') {
+      localVal.value = parseFloat(newVal)
+    }
+  }
+}, { immediate: true })
+
+const currentPersonalRating = computed(() => {
+  if (!showId) return null
+  const local = statsStore.userShowRatings[props.showId]
+  return local !== undefined ? local : parseFloat(props.initialValue)
+})
 
 const hasExistingRating = computed(() => {
   const iv = props.initialValue
@@ -249,11 +328,15 @@ const fetchEpisodes = async (silent = false) => {
 }
 
 onMounted(async () => {
-  if (hasExistingRating.value) {
-    val.value = parseFloat(props.initialValue)
+  const queryVal = router.currentRoute.value.query.modal_val
+  if (queryVal !== undefined && queryVal !== null) {
+    localVal.value = parseFloat(queryVal)
+  } else if (hasExistingRating.value) {
+    localVal.value = parseFloat(props.initialValue)
   } else {
-    val.value = 5.0
+    localVal.value = 5.0
   }
+
   if (isSeries.value) {
     if (uiStore.episodesCache[props.showId]) {
       episodesData.value = uiStore.episodesCache[props.showId]
@@ -297,8 +380,10 @@ const goToSeasons = async () => {
 }
 
 const selectSeason = (s) => {
-  season.value = s.season_number
-  level.value = 'episodes'
+  updateQueryParams({
+    season: s.season_number,
+    level: 'episodes'
+  })
 }
 
 const getRatedEpisodesCount = (s) => {
@@ -315,16 +400,24 @@ const getEpisodeClass = (e) => {
 }
 
 const selectEpisode = (e) => {
-  episode.value = e.episode_number
-  val.value = e.rating ? parseFloat(e.rating) : 5.0
-  level.value = 'score'
+  updateQueryParams({
+    episode: e.episode_number,
+    val: e.rating ? parseFloat(e.rating) : 5.0,
+    level: 'score'
+  })
 }
 
 const goBack = () => {
   if (level.value === 'score') {
-    level.value = 'episodes'
+    updateQueryParams({
+      level: 'episodes',
+      episode: null
+    })
   } else if (level.value === 'episodes') {
-    level.value = 'seasons'
+    updateQueryParams({
+      level: 'seasons',
+      season: null
+    })
   }
 }
 
@@ -352,7 +445,10 @@ const saveRating = async () => {
     needsRefresh.value = true
     if (level.value === 'score') {
       await fetchEpisodes()
-      level.value = 'episodes'
+      updateQueryParams({
+        level: 'episodes',
+        episode: null
+      })
     } else {
       close()
     }
@@ -379,7 +475,10 @@ const deleteRating = async () => {
     needsRefresh.value = true
     if (level.value === 'score') {
       await fetchEpisodes()
-      level.value = 'episodes'
+      updateQueryParams({
+        level: 'episodes',
+        episode: null
+      })
     } else {
       close()
     }

@@ -99,30 +99,79 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUIStore } from '../../stores/uiStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
 
 const uiStore = useUIStore()
 const api = useApi()
+const router = useRouter()
 
 const context = computed(() => uiStore.modals.addView.context || {})
 const isSeries = computed(() => ['Series', 'Documentary Series', 'TV Show'].includes(context.value.type))
 
-const level = ref('main')
-const season = ref(1)
-const episode = ref(1)
-const selectedSeasonNumber = ref(null)
 const episodesData = ref([])
 const loading = ref(false)
-
-const exactDate = ref(new Date().toISOString().split('T')[0])
-const monthDate = ref(new Date().toISOString().substring(0, 7))
-const yearDate = ref(new Date().getFullYear())
 const isSaving = ref(false)
-const dateMode = ref('exact')
 const modalHeight = ref('520px')
+
+const updateQueryParams = (params) => {
+  const query = { ...router.currentRoute.value.query }
+  Object.keys(params).forEach(key => {
+    const val = params[key]
+    if (val === null || val === undefined || val === '') {
+      delete query[`modal_${key}`]
+    } else {
+      query[`modal_${key}`] = String(val)
+    }
+  })
+  router.replace({ query }).catch(() => {})
+}
+
+const level = computed({
+  get: () => router.currentRoute.value.query.modal_level || 'main',
+  set: (val) => updateQueryParams({ level: val })
+})
+
+const season = computed({
+  get: () => parseInt(router.currentRoute.value.query.modal_season) || 1,
+  set: (val) => updateQueryParams({ season: val })
+})
+
+const episode = computed({
+  get: () => parseInt(router.currentRoute.value.query.modal_episode) || 1,
+  set: (val) => updateQueryParams({ episode: val })
+})
+
+const selectedSeasonNumber = computed({
+  get: () => {
+    const val = router.currentRoute.value.query.modal_selectedSeasonNumber
+    return val ? parseInt(val) : null
+  },
+  set: (val) => updateQueryParams({ selectedSeasonNumber: val })
+})
+
+const exactDate = computed({
+  get: () => router.currentRoute.value.query.modal_exactDate || new Date().toISOString().split('T')[0],
+  set: (val) => updateQueryParams({ exactDate: val })
+})
+
+const monthDate = computed({
+  get: () => router.currentRoute.value.query.modal_monthDate || new Date().toISOString().substring(0, 7),
+  set: (val) => updateQueryParams({ monthDate: val })
+})
+
+const yearDate = computed({
+  get: () => parseInt(router.currentRoute.value.query.modal_yearDate) || new Date().getFullYear(),
+  set: (val) => updateQueryParams({ yearDate: val })
+})
+
+const dateMode = computed({
+  get: () => router.currentRoute.value.query.modal_dateMode || 'exact',
+  set: (val) => updateQueryParams({ dateMode: val })
+})
 
 const selectedSeason = computed(() => {
   if (!selectedSeasonNumber.value) return null
@@ -198,21 +247,30 @@ const openEpisodeSelector = async () => {
 }
 
 const selectSeason = (s) => {
-  selectedSeasonNumber.value = s.season_number
-  level.value = 'episodes'
+  updateQueryParams({
+    selectedSeasonNumber: s.season_number,
+    level: 'episodes'
+  })
 }
 
 const selectEpisode = (e) => {
-  season.value = selectedSeasonNumber.value
-  episode.value = e.episode_number
-  level.value = 'main'
+  updateQueryParams({
+    season: selectedSeasonNumber.value,
+    episode: e.episode_number,
+    level: 'main'
+  })
 }
 
 const goBack = () => {
   if (level.value === 'episodes') {
-    level.value = 'seasons'
+    updateQueryParams({
+      level: 'seasons',
+      selectedSeasonNumber: null
+    })
   } else if (level.value === 'seasons') {
-    level.value = 'main'
+    updateQueryParams({
+      level: 'main'
+    })
   }
 }
 

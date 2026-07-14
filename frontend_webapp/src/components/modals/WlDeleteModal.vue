@@ -37,17 +37,27 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUIStore } from '../../stores/uiStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { icons } from '../../utils/icons'
 
 const uiStore = useUIStore()
 const wishlistStore = useWishlistStore()
+const router = useRouter()
 
 const context = computed(() => uiStore.modals.wlDelete.context || {})
-const keepStats = ref(true)
 const showInformer = ref(false)
+
+const keepStats = computed({
+  get: () => router.currentRoute.value.query.modal_keepStats !== 'false',
+  set: (val) => {
+    const query = { ...router.currentRoute.value.query }
+    query.modal_keepStats = String(val)
+    router.replace({ query }).catch(() => {})
+  }
+})
 
 const close = () => {
   uiStore.closeModal('wlDelete')
