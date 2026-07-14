@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useDataStore } from '../stores/useDataStore'
 import { useUIStore } from '../stores/uiStore'
 import { icons } from '../utils/icons'
@@ -32,11 +32,45 @@ watch(() => dataStore.searchQuery, (newVal) => {
     query.value = newVal
   }
 })
+
+const resultsContainerEl = ref(null)
+const sentinelEl = ref(null)
+let observer = null
+
+onMounted(() => {
+  observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && dataStore.hasMoreShows) {
+      dataStore.loadMore()
+    }
+  }, {
+    root: resultsContainerEl.value,
+    rootMargin: '400px'
+  })
+
+  if (sentinelEl.value) {
+    observer.observe(sentinelEl.value)
+  }
+})
+
+watch(sentinelEl, (newEl, oldEl) => {
+  if (oldEl && observer) {
+    observer.unobserve(oldEl)
+  }
+  if (newEl && observer) {
+    observer.observe(newEl)
+  }
+})
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect()
+  }
+})
 </script>
 
 <template>
   <div class="view active-view" id="view-search">
-    <div id="search-results">
+    <div id="search-results" ref="resultsContainerEl">
       <div v-if="dataStore.isSearching && isEmpty" class="empty">
         <div class="spinner"></div>
       </div>
@@ -61,6 +95,8 @@ watch(() => dataStore.searchQuery, (newVal) => {
           </div>
         </div>
       </template>
+
+      <div v-if="dataStore.hasSearched && !isEmpty" ref="sentinelEl" style="height: 100px; width: 100%; margin-top: -50px; pointer-events: none;"></div>
     </div>
 
     <div class="search-bar-fixed">

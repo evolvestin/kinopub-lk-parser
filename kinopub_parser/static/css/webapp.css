@@ -845,13 +845,13 @@ body.has-banner #app {
 .hero-container { 
     position: relative; 
     width: 100%; 
-    height: 55vh; 
-    min-height: 380px; 
+    height: 66vh; 
+    min-height: 520px; 
     overflow: hidden; 
     display: flex; 
     align-items: flex-end; 
     justify-content: center; 
-    padding: 20px; 
+    padding: 40px; 
     animation: zoomIn 0.6s ease-out;
     mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
     -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);

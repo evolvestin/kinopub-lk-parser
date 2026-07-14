@@ -1482,21 +1482,26 @@ def webapp_search(request):
 
         body = json.loads(request.body)
         query = body.get('query', '').strip()
+        offset = int(body.get('offset', 0))
+        limit = int(body.get('limit', 30))
 
         if len(query) < 2:
             return JsonResponse({'shows': [], 'persons': []})
 
-        shows = Show.objects.filter(
+        shows_qs = Show.objects.filter(
             Q(title__icontains=query) | Q(original_title__icontains=query)
-        ).order_by('-year', '-id')[:15]
+        ).order_by('-year', '-id')
 
+        shows = shows_qs[offset:offset + limit]
         user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])
 
-        persons = (
-            Person.objects.filter(Q(name__icontains=query) | Q(en_name__icontains=query))
-            .select_related('master_person')
-            .order_by('-updated_at')[:20]
-        )
+        persons = []
+        if offset == 0:
+            persons = (
+                Person.objects.filter(Q(name__icontains=query) | Q(en_name__icontains=query))
+                .select_related('master_person')
+                .order_by('-updated_at')[:20]
+            )
 
         show_results = []
         for s in shows:
@@ -1533,7 +1538,11 @@ def webapp_search(request):
             if len(person_results) >= 10:
                 break
 
-        return JsonResponse({'shows': show_results, 'persons': person_results})
+        return JsonResponse({
+            'shows': show_results,
+            'persons': person_results,
+            'has_more': len(show_results) == limit
+        })
     except Exception as e:
         logger.error(f'WebApp Search Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)

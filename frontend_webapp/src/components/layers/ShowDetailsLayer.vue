@@ -8,12 +8,12 @@
     </div>
 
     <div class="hero-container">
-      <div class="hero-bg" :style="{ backgroundImage: `url(${show.poster_large})` }"></div>
+      <div class="hero-bg" :style="{ backgroundImage: activeBg ? `url(${activeBg})` : 'none' }"></div>
       <div class="hero-gradient"></div>
       
-      <div style="position: relative; z-index: 3; height: 95%; max-width: 75%; aspect-ratio: 2/3; display: flex; align-items: flex-end;">
+      <div style="position: relative; z-index: 3; height: 95%; max-width: 85%; aspect-ratio: 2/3; display: flex; align-items: flex-end;">
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: flex-end;">
-          <img :src="show.poster_large" class="hero-poster" style="margin: 0; box-shadow: none;" alt="poster">
+          <img :src="activePoster" class="hero-poster" style="margin: 0; box-shadow: none;" alt="poster">
           
           <div class="grid-badges" style="position: absolute; top: 12px; left: 12px; right: auto; align-items: flex-start; z-index: 10;">
             <span v-if="currentPersonalRating" class="rating-badge" style="background: rgba(0, 0, 0, 0.6); color: var(--accent); border: 1px solid rgba(255, 255, 255, 0.1); font-size: 20px; padding: 4px 10px; border-radius: 10px; gap: 5px; display: inline-flex; align-items: center; font-weight: 800; text-shadow: none;">
@@ -46,8 +46,8 @@
 
       <div class="show-meta-tags">
         <div class="sm-tag">{{ show.year || '?' }}</div>
-        <div class="sm-tag" style="color:var(--info)">{{ show.type }}</div>
-        <div class="sm-tag" v-if="show.status">{{ show.status }}</div>
+        <div class="sm-tag" style="color:var(--info)">{{ showTypeRu }}</div>
+        <div class="sm-tag" v-if="show.status">{{ showStatusRu }}</div>
       </div>
 
       <div class="show-meta-tags">
@@ -100,12 +100,31 @@ const currentPersonalRating = computed(() => {
   return local !== undefined ? local : show.value.personal_rating
 })
 
-const getRatingClass = (val) => {
-  if (!val) return ''
-  if (val >= 8) return 'rating-high'
-  if (val >= 6) return 'rating-mid'
-  return 'rating-low'
-}
+const showTypeRu = computed(() => {
+  if (!show.value) return ''
+  const mapping = {
+    'Series': 'Сериал',
+    'Movie': 'Фильм',
+    'Concert': 'Концерт',
+    'Documentary Movie': 'Док. фильм',
+    'Documentary Series': 'Док. сериал',
+    'TV Show': 'ТВ-шоу',
+    '3D Movie': '3D фильм'
+  }
+  return mapping[show.value.type] || show.value.type || ''
+})
+
+const showStatusRu = computed(() => {
+  if (!show.value) return ''
+  const mapping = {
+    'Finished': 'Завершен',
+    'Ongoing': 'В эфире',
+    'Filming': 'Съемки',
+    'Post Production': 'Постпродакшен',
+    'Pre Production': 'Препродакшен'
+  }
+  return mapping[show.value.status] || show.value.status || ''
+})
 
 const loadShowData = async () => {
   try {

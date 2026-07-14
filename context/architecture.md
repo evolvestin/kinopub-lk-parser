@@ -28,6 +28,16 @@ Any code generating new database records must follow this "Save-As-Is" architect
 3.  **Metrics Consistency**: Any metric displayed on the dashboard that counts "Unique" items must apply these normalization functions to avoid reporting duplicates caused by casing differences.
 
 
+## Display-Level Translation Policy
+
+**RULE**: All user-facing metadata fields, specifically `type` (e.g., "Series", "Movie", "3D Movie") and `status` (e.g., "Finished", "Ongoing"), MUST be translated to Russian at the display layer before rendering in the UI.
+
+1.  **Rationale**: The database stores raw strings from the source (e.g., "Series", "Finished") to preserve data integrity and prevent breaking any internal English-based backend or frontend conditional logic.
+2.  **Implementation**:
+    *   On the Python/Backend side (for bot cards, notifications, reports), translation maps `SHOW_TYPE_DISPLAY_RU` and `SHOW_STATUS_DISPLAY_RU` from `shared/constants.py` must be used.
+    *   On the Frontend side (Vue/JS), raw English strings from the API must be dynamically translated using helper functions or computed properties before rendering to avoid layout-shifts or displaying raw values.
+
+
 ## Manual User Actions Policy
 
 **RULE**: Actions initiated manually by the user via the WebApp (e.g., adding a view, rating, wishlist changes) MUST NOT trigger automated broadcasts to public or shared Telegram channels.
