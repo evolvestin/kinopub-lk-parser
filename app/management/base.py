@@ -1,5 +1,6 @@
 import logging
 
+from celery.exceptions import SoftTimeLimitExceeded
 from django.core.management.base import BaseCommand
 
 
@@ -12,6 +13,8 @@ class LoggableBaseCommand(BaseCommand):
     def execute(self, *args, **options):
         try:
             return super().execute(*args, **options)
+        except SoftTimeLimitExceeded:
+            raise
         except Exception as e:
             # Записываем ошибку в БД с полным трейсбеком
             logging.error(f'Command failed: {e}', exc_info=True)

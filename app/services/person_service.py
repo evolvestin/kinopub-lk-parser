@@ -103,6 +103,8 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
                     'year': s.year,
                 }
             )
+    except SoftTimeLimitExceeded:
+        raise
     except Exception as e:
         logger.error(f'Error fetching shows meta for {person_instance.name}: {e}')
 
@@ -197,12 +199,12 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
 
         return True
 
+    except SoftTimeLimitExceeded:
+        raise
     except requests.RequestException as e:
         logger.warning(f'TMDB connectivity issue for {person_instance.name}: {e}')
         raise
     except DatabaseError:
-        raise
-    except SoftTimeLimitExceeded:
         raise
     except Exception as e:
         logger.error(f'Unexpected error on {person_instance.name}: {e}')

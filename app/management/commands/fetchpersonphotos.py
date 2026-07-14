@@ -91,6 +91,8 @@ class Command(LoggableBaseCommand):
                         else:
                             processed_count += 1
 
+                    except SoftTimeLimitExceeded:
+                        raise
                     except DatabaseError as e:
                         logging.critical(f'Fatal database error on person {person.name}: {e}')
                         return
@@ -104,8 +106,6 @@ class Command(LoggableBaseCommand):
                         if consecutive_errors >= error_threshold:
                             logging.error('Aborting: TMDB API is unreachable.')
                             return
-                    except SoftTimeLimitExceeded:
-                        raise
                     except Exception as e:
                         failed_ids.append(person.id)
                         logging.error(f'Skipping {person.name} due to unexpected error: {e}')

@@ -3,6 +3,7 @@ import logging
 import traceback
 
 from asgiref.sync import async_to_sync
+from celery.exceptions import SoftTimeLimitExceeded
 from channels.layers import get_channel_layer
 from django.apps import apps
 from django.conf import settings
@@ -82,6 +83,8 @@ class DatabaseLogHandler(logging.Handler):
                                 'message': msg,
                             }
                             async_to_sync(channel_layer.group_send)('logs', event_data)
+                    except SoftTimeLimitExceeded:
+                        raise
                     except Exception:
                         pass
 
@@ -89,6 +92,8 @@ class DatabaseLogHandler(logging.Handler):
                         TelegramSender().send_dev_log(
                             record.levelname, record.module, msg, traceback_str=tb_str
                         )
+                except SoftTimeLimitExceeded:
+                    raise
                 except Exception:
                     pass
 
@@ -102,6 +107,8 @@ class DatabaseLogHandler(logging.Handler):
             else:
                 _save_and_send()
 
+        except SoftTimeLimitExceeded:
+            raise
         except Exception:
             self.handleError(record)
         finally:
