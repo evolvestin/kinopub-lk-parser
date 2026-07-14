@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay show" @click.self="close">
-    <div class="modal-content" :style="{ padding: '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column', transition: 'height 0.3s ease, min-height 0.3s ease' }">
+    <div class="modal-content" :style="{ padding: '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column' }">
       
       <div v-if="level !== 'main'" id="rate-nav-bar" style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;">
         <button class="vt-btn" style="padding: 4px 8px; display: flex; align-items: center; justify-content: center;" @click="goBack">
@@ -59,7 +59,7 @@
         <div v-if="loading" class="loader-inline">
           <div class="spinner"></div>
         </div>
-        <div v-else style="flex: 1; overflow-y: auto; padding: 4px;">
+        <div v-else class="custom-scrollbar" style="flex: 1; overflow-y: auto; padding: 4px; padding-right: 8px;">
           <div class="rating-grid-wa">
             <button 
               v-for="s in episodesData" 
@@ -78,7 +78,7 @@
       </div>
 
       <div v-else-if="level === 'episodes'" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
-        <div style="flex: 1; overflow-y: auto; padding: 4px;">
+        <div class="custom-scrollbar" style="flex: 1; overflow-y: auto; padding: 4px; padding-right: 8px;">
           <div class="rating-grid-wa" style="grid-template-columns: repeat(4, 1fr);">
             <button 
               v-for="e in selectedSeason?.episodes" 
@@ -153,15 +153,21 @@ const calculateStableHeight = () => {
   const episodesHeight = 170 + (episodesRows * 64)
 
   const maxCalculated = Math.max(seasonsHeight, episodesHeight, 520)
-  const maxHeightLimit = Math.floor(window.innerHeight * 0.8)
+  const maxHeightLimit = Math.min(620, Math.floor(window.innerHeight * 0.8))
+  
   modalHeight.value = `${Math.min(maxCalculated, maxHeightLimit)}px`
 }
 
 const fetchEpisodes = async (silent = false) => {
   if (!silent) loading.value = true
   try {
-    const data = await api.post('get_episodes/', { show_id: context.value.showId })
-    episodesData.value = data.seasons || []
+    if (uiStore.episodesCache[context.value.showId]) {
+      episodesData.value = uiStore.episodesCache[context.value.showId]
+    } else {
+      const data = await api.post('get_episodes/', { show_id: context.value.showId })
+      episodesData.value = data.seasons || []
+      uiStore.episodesCache[context.value.showId] = episodesData.value
+    }
   } catch (e) {
     uiStore.showToast('Ошибка загрузки серий')
   } finally {
@@ -171,8 +177,13 @@ const fetchEpisodes = async (silent = false) => {
 
 onMounted(async () => {
   if (isSeries.value) {
-    await fetchEpisodes(true)
-    calculateStableHeight()
+    if (uiStore.episodesCache[context.value.showId]) {
+      episodesData.value = uiStore.episodesCache[context.value.showId]
+      calculateStableHeight()
+    } else {
+      await fetchEpisodes(true)
+      calculateStableHeight()
+    }
   } else {
     modalHeight.value = '420px'
   }

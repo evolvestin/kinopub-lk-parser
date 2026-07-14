@@ -12,7 +12,8 @@ const uiStore = useUIStore()
 
 const isInitialLoading = ref(!wishlistStore.isLoaded)
 const isSortMenuOpen = ref(false)
-const headersReady = ref(false)
+const mainHeaderReady = ref(false)
+const activeFolderTitleReady = ref(false)
 const themeIcon = computed(() => uiStore.theme === 'dark' ? icons.moon : icons.sun)
 
 const foldersGridRef = ref(null)
@@ -54,19 +55,33 @@ const setSort = (mode) => {
   isSortMenuOpen.value = false
 }
 
-const adjustHeaderFonts = () => {
-  headersReady.value = false
+const adjustMainHeaderFont = () => {
+  mainHeaderReady.value = false
   nextTick(() => {
     setTimeout(() => {
       if (mainHeaderRef.value) {
         uiStore.fitText(mainHeaderRef.value)
       }
+      mainHeaderReady.value = true
+    }, 50)
+  })
+}
+
+const adjustActiveFolderFont = () => {
+  activeFolderTitleReady.value = false
+  nextTick(() => {
+    setTimeout(() => {
       if (activeFolderTitleRef.value) {
         uiStore.fitText(activeFolderTitleRef.value)
       }
-      headersReady.value = true
+      activeFolderTitleReady.value = true
     }, 50)
   })
+}
+
+const adjustHeaderFonts = () => {
+  adjustMainHeaderFont()
+  adjustActiveFolderFont()
 }
 
 const initSortable = () => {
@@ -129,15 +144,23 @@ watch(() => wishlistStore.activeFolderId, () => {
     itemsSortable = null
   }
   setTimeout(initSortable, 50)
+  if (wishlistStore.folders.length > 1) {
+    adjustActiveFolderFont()
+  } else {
+    adjustMainHeaderFont()
+  }
+})
+
+watch(() => wishlistStore.folders.length, () => {
   adjustHeaderFonts()
 })
 
-watch(() => wishlistStore.folders, () => {
-  adjustHeaderFonts()
-}, { deep: true })
-
 watch(() => wishlistStore.activeFolder?.name, () => {
-  adjustHeaderFonts()
+  if (wishlistStore.folders.length === 1) {
+    adjustMainHeaderFont()
+  } else {
+    adjustActiveFolderFont()
+  }
 })
 
 const handleEditFolder = (folderId) => {
@@ -164,7 +187,7 @@ const handleCreateFolder = () => {
     <div class="header" style="padding-bottom: 8px;">
       <div class="header-name glow-text" 
            :class="{ 'single-folder': wishlistStore.folders.length === 1 && wishlistStore.activeFolder }" 
-           :style="{ opacity: headersReady ? 1 : 0, transition: 'opacity 0.15s ease' }"
+           :style="{ opacity: mainHeaderReady ? 1 : 0, transition: 'opacity 0.15s ease' }"
            id="wl-main-header" 
            ref="mainHeaderRef">
         <template v-if="wishlistStore.folders.length === 1 && wishlistStore.activeFolder">
@@ -220,7 +243,7 @@ const handleCreateFolder = () => {
         <div class="wl-active-header">
           <div id="wl-active-folder-title" 
                v-if="wishlistStore.folders.length > 1" 
-               :style="{ opacity: headersReady ? 1 : 0, transition: 'opacity 0.15s ease' }"
+               :style="{ opacity: activeFolderTitleReady ? 1 : 0, transition: 'opacity 0.15s ease' }"
                ref="activeFolderTitleRef">
             <span :style="{ color: wishlistStore.activeFolder.color, marginRight: '8px' }" v-html="icons[wishlistStore.activeFolder.icon] || icons.folder" style="display: inline-flex; align-items: center;"></span>
             <span class="wl-active-folder-name-text">{{ wishlistStore.activeFolder.name }}</span>

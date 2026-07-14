@@ -62,7 +62,7 @@
     <div class="label" v-if="show.genres?.length">
       <div class="icon" style="color:var(--info)" v-html="icons.star"></div> Жанры
     </div>
-    <div class="h-scroll-container" v-if="show.genres?.length" style="padding-bottom: 30px;">
+    <div class="h-scroll-container anim-active" v-if="show.genres?.length" style="padding-bottom: 30px;">
       <div v-for="g in show.genres" :key="g.id" class="genre-pill" @click="uiStore.openLayer('genre', g.id)">
         {{ g.name }}
       </div>
@@ -70,7 +70,7 @@
     
     <template v-for="group in show.crew" :key="group.profession">
       <div class="label">{{ group.profession }}</div>
-      <div class="h-scroll-container">
+      <div class="h-scroll-container anim-active">
          <PersonPill v-for="person in group.persons" :key="person.id" :person="person" />
       </div>
     </template>
@@ -111,6 +111,14 @@ const loadShowData = async () => {
   try {
     const data = await api.get(`show/${props.showId}/`)
     show.value = data
+
+    if (['Series', 'Documentary Series', 'TV Show'].includes(data.type)) {
+      if (!uiStore.episodesCache[props.showId]) {
+        api.post('get_episodes/', { show_id: props.showId }).then(res => {
+          uiStore.episodesCache[props.showId] = res.seasons || []
+        }).catch(() => {})
+      }
+    }
 
     activePoster.value = data.poster_medium || ''
     activeBg.value = data.poster_medium || ''

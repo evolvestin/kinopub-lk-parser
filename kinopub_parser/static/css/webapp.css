@@ -548,11 +548,48 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 }
 .modal-overlay.show { opacity: 1; pointer-events: auto; }
 .modal-content {
-    background: var(--bg-card); width: 100%; max-width: 500px;
-    border-radius: 24px 24px 0 0; padding: 24px;
-    transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    border-top: 1px solid var(--border); box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
-    max-height: 90vh; overflow-y: auto;
+    background: var(--bg-card);
+    width: 90vw;
+    max-width: 550px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 24px !important;
+    transform: scale(0.95);
+    opacity: 0;
+    transition: all 0.3s ease;
+    margin: 0 auto;
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.modal-content.modal-wide {
+    width: 90vw;
+    max-width: 95vw;
+}
+.modal-overlay.show .modal-content { transform: scale(1); opacity: 1; }
+.modal-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--border); }
+.modal-title { font-size: 20px; font-weight: 800; color: var(--text-primary); }
+.modal-close { background: var(--bg-input); border: none; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
+.modal-close:hover { background: var(--border); color: var(--text-primary); }
+
+/* Custom Scrollbar for inner modal contents */
+.custom-scrollbar {
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--border) transparent !important;
+    -webkit-overflow-scrolling: touch;
+}
+.custom-scrollbar::-webkit-scrollbar {
+    display: block !important;
+    width: 4px !important;
+    height: 4px !important;
+    background-color: transparent !important;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--border) !important;
+    border-radius: 4px !important;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background-color: transparent !important;
 }
 .modal-overlay.show .modal-content { transform: translateY(0); }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -897,10 +934,12 @@ body.has-banner #app {
     padding: 0 20px 20px; 
     scrollbar-width: none; 
     -webkit-overflow-scrolling: touch; 
-    animation: slideInRight 0.5s ease-out 0.5s both; 
     flex-shrink: 0;
 }
-.h-scroll-container::-webkit-scrollbar { display: none; }
+
+.h-scroll-container.anim-active {
+    animation: slideInRight 0.5s ease-out 0.5s both;
+}
 
 .person-pill { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 70px; flex-shrink: 0; cursor: pointer; transition: transform var(--transition-bounce); }
 .person-pill:active { transform: scale(0.9); }

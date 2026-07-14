@@ -1,7 +1,43 @@
+<script setup>
+import { ref, computed, watch } from 'vue'
+import { useDataStore } from '../stores/useDataStore'
+import { useUIStore } from '../stores/uiStore'
+import { icons } from '../utils/icons'
+import EmptyState from '../components/shared/EmptyState.vue'
+import PersonPill from '../components/shared/PersonPill.vue'
+import ShowCard from '../components/shared/ShowCard.vue'
+
+const dataStore = useDataStore()
+const uiStore = useUIStore()
+const query = ref(dataStore.searchQuery)
+const isAnimated = ref(true)
+let timer = null
+
+const isEmpty = computed(() => !dataStore.searchResults.shows?.length && !dataStore.searchResults.persons?.length)
+const themeIcon = computed(() => uiStore.theme === 'dark' ? icons.moon : icons.sun)
+
+const handleInput = () => {
+  clearTimeout(timer)
+  timer = setTimeout(() => {
+    dataStore.searchQuery = query.value
+  }, 500)
+}
+
+watch(() => dataStore.searchResults.persons, () => {
+  isAnimated.value = true
+})
+
+watch(() => dataStore.searchQuery, (newVal) => {
+  if (query.value !== newVal) {
+    query.value = newVal
+  }
+})
+</script>
+
 <template>
   <div class="view active-view" id="view-search">
     <div id="search-results">
-      <div v-if="dataStore.isSearching" class="empty">
+      <div v-if="dataStore.isSearching && isEmpty" class="empty">
         <div class="spinner"></div>
       </div>
 
@@ -12,7 +48,7 @@
         <div v-else class="search-content">
           <div v-if="dataStore.searchResults.persons?.length">
             <div class="label"><div class="icon" style="color:#d29922" v-html="icons.users"></div>Люди</div>
-            <div class="h-scroll-container">
+            <div class="h-scroll-container" :class="{ 'anim-active': isAnimated }" @animationend="isAnimated = false">
               <PersonPill v-for="p in dataStore.searchResults.persons" :key="p.id" :person="p" />
             </div>
           </div>
@@ -29,51 +65,20 @@
 
     <div class="search-bar-fixed">
       <div style="display: flex; gap: 12px; align-items: center; width: 100%;">
-        <input type="text" 
-               v-model="query" 
-               class="search-input" 
-               style="flex: 1;"
-               placeholder="Фильмы, сериалы, актеры..."
-               @input="handleInput">
+        <div style="position: relative; flex: 1;">
+            <input type="text" 
+                   v-model="query" 
+                   class="search-input" 
+                   style="width: 100%; padding-right: 40px;"
+                   placeholder="Фильмы, сериалы, актеры..."
+                   @input="handleInput">
+            <div v-if="dataStore.isSearching && !isEmpty" class="spinner" style="position: absolute; right: 12px; top: 50%; margin-top: -10px; width: 20px; height: 20px; border-width: 2px;"></div>
+        </div>
         <button class="theme-btn js-theme-toggle" @click="uiStore.toggleTheme" v-html="themeIcon"></button>
       </div>
     </div>
   </div>
 </template>
-
-<script setup>
-import { ref, computed, watch } from 'vue'
-import { useDataStore } from '../stores/useDataStore'
-import { useUIStore } from '../stores/uiStore'
-import { icons } from '../utils/icons'
-import EmptyState from '../components/shared/EmptyState.vue'
-import PersonPill from '../components/shared/PersonPill.vue'
-import ShowCard from '../components/shared/ShowCard.vue'
-
-const dataStore = useDataStore()
-const uiStore = useUIStore()
-const query = ref(dataStore.searchQuery)
-let timer = null
-
-const isEmpty = computed(() => !dataStore.searchResults.shows?.length && !dataStore.searchResults.persons?.length)
-const themeIcon = computed(() => uiStore.theme === 'dark' ? icons.moon : icons.sun)
-
-const handleInput = () => {
-  clearTimeout(timer)
-  dataStore.searchQuery = query.value
-  if (query.value.length < 2) {
-    dataStore.clearSearch()
-    return
-  }
-  timer = setTimeout(() => {
-    dataStore.performSearch(query.value)
-  }, 500)
-}
-
-watch(() => dataStore.searchQuery, (newVal) => {
-  query.value = newVal
-})
-</script>
 
 <style scoped>
 #view-search {

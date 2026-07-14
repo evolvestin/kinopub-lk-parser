@@ -734,7 +734,7 @@ onUnmounted(() => {
     background: var(--bg-card);
     width: 90vw;
     max-width: 550px;
-    max-height: 85vh;
+    max-height: 92vh;
     display: flex;
     flex-direction: column;
     border-radius: 24px !important;

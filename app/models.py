@@ -94,22 +94,36 @@ class Person(BaseModel):
             return ' '.join(s.replace('\xa0', ' ').split()).lower().replace('ё', 'е')
 
         cleaned_name = clean(self.name)
-        cleaned_en_name = clean(self.en_name)
-
-        if not cleaned_name or not cleaned_en_name:
+        if not cleaned_name:
             return
+
+        cleaned_en_name = clean(self.en_name)
 
         candidates = Person.objects.filter(
             kp_photo_url=self.kp_photo_url, master_person__isnull=True
         ).exclude(id=self.id)
 
         for candidate in candidates:
-            if (
-                clean(candidate.name) == cleaned_name
-                and clean(candidate.en_name) == cleaned_en_name
-            ):
-                self.master_person = candidate.canonical
-                break
+            cand_name = clean(candidate.name)
+
+            if cand_name == cleaned_name:
+                cand_en_name = clean(candidate.en_name)
+
+                is_exact_match = bool(
+                    cleaned_en_name and cand_en_name and cleaned_en_name == cand_en_name
+                )
+
+                is_special_match = (
+                    (cleaned_en_name == cleaned_name and not cand_en_name) or
+                    (cand_en_name == cleaned_name and not cleaned_en_name)
+                )
+
+                # Допускаем слияние:
+                # 1. Точное совпадение RU и EN имен.
+                # 2. EN отсутствует у одной записи, а у другой есть и дублирует RU.
+                if is_exact_match or is_special_match:
+                    self.master_person = candidate.canonical
+                    break
 
     def save(self, *args, **kwargs):
         if not self.master_person_id and self.kp_photo_url:
