@@ -1224,22 +1224,21 @@ def webapp_get_shared_stats(request, stat_id):
 
 
 @csrf_exempt
-@require_http_methods(['GET'])
+@require_http_methods(['POST', 'GET'])
 def webapp_get_show_full(request, show_id):
     try:
-        show = Show.objects.prefetch_related(
+        show = Show.objects.select_related('ext_rating').prefetch_related(
             'countries', 'genres', 'showcrew_set__person__master_person'
         ).get(id=show_id)
 
         view_user = get_webapp_user(request)
 
-        internal_rating, _ = show.get_internal_rating_data()
-
-        visible_ids = set()
-        is_guest = True
+        internal_rating, user_ratings = show.get_internal_rating_data()
         personal_rating = None
         personal_episodes_count = 0
 
+        visible_ids = set()
+        is_guest = True
         if view_user:
             is_guest = view_user.role == UserRole.GUEST
             visible_ids.add(view_user.id)
@@ -1373,6 +1372,49 @@ def webapp_get_show_full(request, show_id):
                     continue
             countries_data.append({'id': c.id, 'name': c.name, 'emoji': c.emoji_flag})
 
+        ext_rating_data = None
+        try:
+            if hasattr(show, 'ext_rating') and show.ext_rating:
+                ext_rating_data = {
+                    'kp': show.ext_rating.kp,
+                    'imdb': show.ext_rating.imdb,
+                    'tmdb': show.ext_rating.tmdb,
+                    'film_critics': show.ext_rating.film_critics,
+                    'russian_film_critics': show.ext_rating.russian_film_critics,
+                    'await_rating': show.ext_rating.await_rating,
+                    'updated_at': show.ext_rating.updated_at.strftime('%Y-%m-%d %H:%M:%S') if show.ext_rating.updated_at else None,
+                }
+        except Exception:
+            pass
+
+        ratings_qs = UserRating.objects.filter(show=show).select_related('user')
+        total_ratings_count = ratings_qs.count()
+
+        grouped_ratings = {}
+        for r in ratings_qs:
+            uid = r.user.id
+            if uid not in grouped_ratings:
+                user_label = r.user.username if r.user.username else r.user.name
+                user_display = f'@{user_label}' if r.user.username else user_label
+                grouped_ratings[uid] = {
+                    'user': user_display,
+                    'show_rating': None,
+                    'episodes': [],
+                }
+            if r.season_number is None and r.episode_number is None:
+                grouped_ratings[uid]['show_rating'] = r.rating
+            else:
+                grouped_ratings[uid]['episodes'].append({
+                    'season': r.season_number,
+                    'episode': r.episode_number,
+                    'rating': r.rating,
+                })
+
+        for uid in grouped_ratings:
+            grouped_ratings[uid]['episodes'].sort(key=lambda x: (x['season'], x['episode']))
+
+        user_ratings_details = list(grouped_ratings.values())
+
         data = {
             'id': show.id,
             'title': show.title,
@@ -1384,8 +1426,15 @@ def webapp_get_show_full(request, show_id):
             'poster_large': get_poster_url(show.id, 'big'),
             'poster_medium': get_poster_url(show.id, 'medium'),
             'kinopoisk_rating': show.kinopoisk_rating,
+            'kinopoisk_votes': show.kinopoisk_votes,
+            'kinopoisk_url': show.kinopoisk_url,
             'imdb_rating': show.imdb_rating,
+            'imdb_votes': show.imdb_votes,
+            'imdb_url': show.imdb_url,
             'internal_rating': internal_rating,
+            'user_ratings': user_ratings,
+            'user_ratings_details': user_ratings_details,
+            'total_ratings_count': total_ratings_count,
             'personal_rating': personal_rating,
             'personal_episodes_count': personal_episodes_count,
             'last_view': last_view,
@@ -1393,6 +1442,8 @@ def webapp_get_show_full(request, show_id):
             'countries': countries_data,
             'genres': genres_list,
             'crew': ordered_crew,
+            'ext_rating': ext_rating_data,
+            'updated_at': show.updated_at.strftime('%Y-%m-%d %H:%M:%S') if show.updated_at else None,
         }
         return JsonResponse(data)
     except Show.DoesNotExist:

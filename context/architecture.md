@@ -99,3 +99,15 @@ Any code generating new database records must follow this "Save-As-Is" architect
 1. **Implementation**:
     * In `perform_backup`, database upload to Google Drive must be skipped if `settings.ENVIRONMENT` is `'DEV'` or if `settings.LOCAL_RUN` is `True`.
     * Cookie backups and restores (`perform_cookies_backup` and `restore_from_backup`) remain fully functional across environments to ensure unified session states.
+
+
+## Internal Rating Calculation Policy
+
+**RULE**: The overall internal rating (LocalRating / LR) of a show must be computed exclusively in a single, centralized place: the `get_internal_rating_data` method of the `Show` model in `app/models.py`.
+
+1.  **Centralization**:
+    *   No view, task, bot handler, or external module is permitted to compute the average or median of internal ratings directly using inline aggregation or custom Python loops. They must always invoke `show.get_internal_rating_data()`.
+2.  **Algorithm Selection (Hybrid Mean-Median)**:
+    *   The rating calculation utilizes a two-step hybrid approach: first, averaging multiple ratings from the same user (e.g., episode-level ratings) to obtain a per-user score.
+    *   Second, it computes a weighted combination of the arithmetic mean and the median of these per-user scores. 
+    *   At 1 vote, the rating is 100% arithmetic mean. It smoothly transitions to 100% median over 20 votes. This ensures high sensitivity/responsiveness for small groups (to prevent rating "sticking") while automatically providing robust resistance against outliers/troll votes as the community grows.

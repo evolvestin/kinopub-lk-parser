@@ -51,9 +51,9 @@
       </div>
 
       <div class="show-meta-tags">
-        <div v-if="show.kinopoisk_rating" class="sm-tag" style="background:rgba(241, 90, 36, 0.15); color:#f15a24; border:none">KP {{ show.kinopoisk_rating }}</div>
-        <div v-if="show.imdb_rating" class="sm-tag" style="background:rgba(245, 197, 24, 0.15); color:#f5c518; border:none">IMDb {{ show.imdb_rating }}</div>
-        <div v-if="show.internal_rating" class="sm-tag" style="background:var(--accent-dim); color:var(--accent); border:none">★ {{ show.internal_rating.toFixed(1) }}</div>
+        <div v-if="show.kinopoisk_rating" class="sm-tag clickable" style="background:rgba(241, 90, 36, 0.15); color:#f15a24; border:none" @click="openRatingsDetails('kp')">KP {{ show.kinopoisk_rating }}</div>
+        <div v-if="show.imdb_rating" class="sm-tag clickable" style="background:rgba(245, 197, 24, 0.15); color:#f5c518; border:none" @click="openRatingsDetails('imdb')">IMDb {{ show.imdb_rating }}</div>
+        <div v-if="show.internal_rating" class="sm-tag clickable" style="background:var(--accent-dim); color:var(--accent); border:none" @click="openRatingsDetails('lr')">★ {{ show.internal_rating.toFixed(1) }}</div>
       </div>
     </div>
 
@@ -179,4 +179,8 @@ const openRating = () => {
 }
 
 const openAddView = () => uiStore.openModal('addView', { showId: show.value.id, title: show.value.title, type: show.value.type })
+
+const openRatingsDetails = (ratingType) => {
+  uiStore.openModal('details', { showId: props.showId, ratingType })
+}
 </script>

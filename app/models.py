@@ -1,3 +1,4 @@
+import statistics
 import uuid
 
 from django.contrib.auth.models import User
@@ -322,8 +323,6 @@ class Show(BaseModel):
             user_ratings_count[user_id] += 1
 
         user_results = []
-        total_average_sum = 0.0
-
         for user_id, total_rating in user_ratings_sum.items():
             user_average = total_rating / user_ratings_count[user_id]
             if username := user_objects[user_id].username:
@@ -331,9 +330,17 @@ class Show(BaseModel):
             else:
                 user_label = user_objects[user_id].name
             user_results.append({'label': user_label, 'rating': user_average})
-            total_average_sum += user_average
 
-        overall_rating = total_average_sum / len(user_results)
+        user_averages = [item['rating'] for item in user_results]
+        mean_rating = sum(user_averages) / len(user_averages)
+        median_rating = statistics.median(user_averages)
+
+        if len(user_averages) <= 1:
+            overall_rating = mean_rating
+        else:
+            weight = min(1.0, (len(user_averages) - 1) / 19)
+            overall_rating = (1 - weight) * mean_rating + weight * median_rating
+
         user_results.sort(key=lambda x: x['rating'], reverse=True)
 
         return overall_rating, user_results

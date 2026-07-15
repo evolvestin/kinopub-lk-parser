@@ -22,6 +22,7 @@ import WlFolderModal from './components/modals/WlFolderModal.vue'
 import WlEditModal from './components/modals/WlEditModal.vue'
 import WlLimitModal from './components/modals/WlLimitModal.vue'
 import WlDeleteModal from './components/modals/WlDeleteModal.vue'
+import RatingsDetailsModal from './components/modals/RatingsDetailsModal.vue'
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -176,6 +177,9 @@ watch(() => uiStore.theme, (val) => {
     </Transition>
     <Transition name="modal">
       <WlDeleteModal v-if="uiStore.modals.wlDelete.isOpen" />
+    </Transition>
+    <Transition name="modal">
+      <RatingsDetailsModal v-if="uiStore.modals.details.isOpen" />
     </Transition>
   </div>
 </template>
