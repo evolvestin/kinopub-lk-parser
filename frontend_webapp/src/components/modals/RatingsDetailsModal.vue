@@ -256,10 +256,18 @@ const close = () => {
 
 const loadShowData = async () => {
   if (!showId.value) return
+  
+  if (uiStore.showsCache[showId.value]) {
+    showData.value = uiStore.showsCache[showId.value]
+    loading.value = false
+    return
+  }
+
   loading.value = true
   try {
     const data = await api.get(`show/${showId.value}/`)
     showData.value = data
+    uiStore.showsCache[showId.value] = data
   } catch (e) {
     uiStore.showToast('Ошибка загрузки данных рейтингов')
     close()

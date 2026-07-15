@@ -85,32 +85,34 @@ const adjustHeaderFonts = () => {
 }
 
 const initSortable = () => {
-  if (foldersGridRef.value && !foldersSortable) {
-    foldersSortable = new Sortable(foldersGridRef.value, {
-      animation: 350,
-      disabled: !wishlistStore.isReorderFoldersMode,
-      forceFallback: true,
-      onEnd: (evt) => {
-        const order = Array.from(foldersGridRef.value.children).map(el => parseInt(el.dataset.id))
-        wishlistStore.reorderFolders(order)
-      }
-    })
-  }
-
-  if (itemsGridRef.value && !itemsSortable) {
-    const el = itemsGridRef.value.querySelector('.hist-grid, .card')
-    if (el) {
-      itemsSortable = new Sortable(el, {
+  nextTick(() => {
+    if (foldersGridRef.value && !foldersSortable) {
+      foldersSortable = new Sortable(foldersGridRef.value, {
         animation: 350,
-        disabled: !wishlistStore.isReorderItemsMode,
+        disabled: !wishlistStore.isReorderFoldersMode,
         forceFallback: true,
         onEnd: (evt) => {
-          const order = Array.from(el.children).map(el => parseInt(el.dataset.id))
-          wishlistStore.reorderItems(wishlistStore.activeFolderId, order)
+          const order = Array.from(foldersGridRef.value.children).map(el => parseInt(el.dataset.id))
+          wishlistStore.reorderFolders(order)
         }
       })
     }
-  }
+
+    if (itemsGridRef.value && !itemsSortable) {
+      const el = itemsGridRef.value.querySelector('.hist-grid, .card')
+      if (el) {
+        itemsSortable = new Sortable(el, {
+          animation: 350,
+          disabled: !wishlistStore.isReorderItemsMode,
+          forceFallback: true,
+          onEnd: (evt) => {
+            const order = Array.from(el.children).map(el => parseInt(el.dataset.id))
+            wishlistStore.reorderItems(wishlistStore.activeFolderId, order)
+          }
+        })
+      }
+    }
+  })
 }
 
 onMounted(async () => {
@@ -138,12 +140,30 @@ watch(() => wishlistStore.isReorderItemsMode, (val) => {
   }
 })
 
+watch(foldersGridRef, (newVal) => {
+  if (newVal) {
+    initSortable()
+  } else if (foldersSortable) {
+    foldersSortable.destroy()
+    foldersSortable = null
+  }
+})
+
+watch(itemsGridRef, (newVal) => {
+  if (newVal) {
+    initSortable()
+  } else if (itemsSortable) {
+    itemsSortable.destroy()
+    itemsSortable = null
+  }
+})
+
 watch(() => wishlistStore.activeFolderId, () => {
   if (itemsSortable) {
     itemsSortable.destroy()
     itemsSortable = null
   }
-  setTimeout(initSortable, 50)
+  initSortable()
   if (wishlistStore.folders.length > 1) {
     adjustActiveFolderFont()
   } else {

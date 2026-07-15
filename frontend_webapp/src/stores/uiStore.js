@@ -9,6 +9,7 @@ export const useUIStore = defineStore('ui', () => {
   const toast = ref({ text: '', visible: false })
   const isHistoryEditMode = ref(false)
   const episodesCache = ref({})
+  const showsCache = ref({})
 
   const modals = computed(() => {
     const active = router.currentRoute.value.query.modal || null
@@ -183,7 +184,7 @@ export const useUIStore = defineStore('ui', () => {
 
   return {
     isLoading, isAppReady, theme, toast, layerStack, hasOpenLayers, activeView, modals,
-    isHistoryEditMode, episodesCache,
+    isHistoryEditMode, episodesCache, showsCache,
     openLayer, popLayer, switchBaseView, showToast, toggleTheme, fitText, fitAll,
     openModal, closeModal,
     setLoading: (v) => { isLoading.value = v },

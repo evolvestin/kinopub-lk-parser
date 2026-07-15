@@ -197,12 +197,12 @@ export const useStatsStore = defineStore('stats', () => {
     }
   }
 
-  async function fetchStats(year = 'all', isBackground = false) {
+  async function fetchStats(year = 'all', isBackground = false, force = false) {
     if (isShared.value && sharedId.value) {
       return fetchSharedStats(sharedId.value, year, isBackground)
     }
 
-    if (statsCache.value[year]) {
+    if (statsCache.value[year] && !force) {
       if (!isBackground) {
         currentYear.value = year
         resolveAllImages(statsCache.value[year])
@@ -258,8 +258,8 @@ export const useStatsStore = defineStore('stats', () => {
       if (!isBackground) {
         currentYear.value = year
         resolveAllImages(data)
-        clearOptimisticRatings()
       }
+      clearOptimisticRatings()
       if (!isBackground && !isPreloadingYears.value) {
         triggerBackgroundPreload()
       }

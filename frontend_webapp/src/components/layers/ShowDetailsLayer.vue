@@ -83,6 +83,7 @@ import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { icons } from '../../utils/icons'
+import { preloadImage } from '../../utils/helpers'
 import PersonPill from '../shared/PersonPill.vue'
 
 const props = defineProps(['showId'])
@@ -127,9 +128,39 @@ const showStatusRu = computed(() => {
 })
 
 const loadShowData = async () => {
+  if (uiStore.showsCache[props.showId]) {
+    const cachedData = uiStore.showsCache[props.showId]
+    show.value = cachedData
+    activePoster.value = cachedData.poster_medium || ''
+    activeBg.value = cachedData.poster_medium || ''
+    if (cachedData.poster_large) {
+      activePoster.value = cachedData.poster_large
+      activeBg.value = cachedData.poster_large
+    }
+  }
+
   try {
     const data = await api.get(`show/${props.showId}/`)
     show.value = data
+    uiStore.showsCache[props.showId] = data
+
+    if (data.crew) {
+      data.crew.forEach(group => {
+        if (group.persons) {
+          group.persons.forEach(person => {
+            if (person.photo_url) {
+              preloadImage(person.photo_url, 'low').then(success => {
+                if (!success && person.fallback_photo_url) {
+                  preloadImage(person.fallback_photo_url, 'low')
+                }
+              })
+            } else if (person.fallback_photo_url) {
+              preloadImage(person.fallback_photo_url, 'low')
+            }
+          })
+        }
+      })
+    }
 
     if (['Series', 'Documentary Series', 'TV Show'].includes(data.type)) {
       if (!uiStore.episodesCache[props.showId]) {
@@ -151,9 +182,11 @@ const loadShowData = async () => {
       }
     }
   } catch (e) {
-    console.error('[ShowDetailsLayer] Failed to load show:', e)
-    uiStore.showToast('Ошибка загрузки')
-    uiStore.popLayer()
+    if (!show.value) {
+      console.error('[ShowDetailsLayer] Failed to load show:', e)
+      uiStore.showToast('Ошибка загрузки')
+      uiStore.popLayer()
+    }
   }
 }
 

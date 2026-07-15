@@ -136,29 +136,6 @@ export const useWishlistStore = defineStore('wishlist', () => {
     return itemsCopy
   })
 
-  async function fetchWishlist() {
-    try {
-      const data = await api.post('wishlist/', { action: 'get' })
-      folders.value = data.folders || []
-      
-      if (folders.value.length > 0) {
-        if (!activeFolderId.value || !folders.value.some(f => f.id === activeFolderId.value)) {
-          activeFolderId.value = folders.value[0].id
-        }
-      } else {
-        activeFolderId.value = null
-      }
-
-      folders.value.forEach(f => {
-        f.items.forEach(item => {
-          if (item.poster_url) preloadImage(item.poster_url)
-        })
-      })
-    } catch (error) {
-      uiStore.showToast('Ошибка загрузки избранного')
-    }
-  }
-
   function setViewMode(mode) {
     viewMode.value = mode
   }

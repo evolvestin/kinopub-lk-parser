@@ -62,9 +62,9 @@ Any code generating new database records must follow this "Save-As-Is" architect
     *   Implementation: Every image load event from a Kinopoisk source MUST check `naturalWidth` and `naturalHeight`. If they match 208x304, the image must be treated as a failure and replaced by the internal SVG placeholder.
 
 3.  **Proactive Background Preloading**:
-    *   Data and assets are not the same. When a JSON response with statistics or search results is received, the application must immediately start downloading the associated images in the background.
-    *   This applies to hidden tabs (e.g., "Movies" tab in Actors leaderboards), items below the fold, and secondary scroll areas.
-    *   Goal: By the time the user interacts (scrolls or switches tabs), the assets must already be in the browser cache.
+    *   Data and assets are not the same. When a JSON response with statistics, search results, or show details is received, the application must immediately start downloading the associated images in the background.
+    *   This applies to hidden tabs (e.g., "Movies" tab in Actors leaderboards), items below the fold, secondary scroll areas, and the actors/crew horizontal scroll inside the show details view.
+    *   Goal: By the time the user interacts (scrolls, switches tabs, or opens a list), the assets must already be in the browser cache.
 
 ## State Persistence & Routing Policy
 
@@ -111,3 +111,16 @@ Any code generating new database records must follow this "Save-As-Is" architect
     *   The rating calculation utilizes a two-step hybrid approach: first, averaging multiple ratings from the same user (e.g., episode-level ratings) to obtain a per-user score.
     *   Second, it computes a weighted combination of the arithmetic mean and the median of these per-user scores. 
     *   At 1 vote, the rating is 100% arithmetic mean. It smoothly transitions to 100% median over 20 votes. This ensures high sensitivity/responsiveness for small groups (to prevent rating "sticking") while automatically providing robust resistance against outliers/troll votes as the community grows.
+
+
+## Data Preloading Policy
+
+**RULE**: To guarantee an instantaneous and fluid user experience, the application MUST proactively prefetch core business data in the background during the initial application bootstrap, rather than waiting for the user to navigate to specific views.
+
+1.  **Global Wishlist Prefetching**:
+    *   The global wishlist dataset (`wishlistStore.fetchWishlist()`) MUST be initiated inside the root application component (`App.vue` on mounted) parallel to the initial statistics.
+    *   This ensures that when the user switches to the "Wishlist" tab, all folders and their corresponding items are already cached in the Pinia store, eliminating any visual layout shifts or loading spinners.
+
+2.  **Stat Cache Maintenance**:
+    *   Prefetched data must be kept in memory/Pinia state to act as a local cache.
+    *   Subsequent view transitions must rely on this cache first, triggering background updates (`force` refresh) only when explicitly required by user interactions (e.g., modifying folders or rating changes).

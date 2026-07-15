@@ -159,7 +159,7 @@ const shouldShowDivider = (item, idx) => {
 
 const cacheDividerOffsets = () => {
   const container = containerEl.value
-  if (!container) return
+  if (!container || container.offsetParent === null) return
   
   requestAnimationFrame(() => {
     const dividers = container.querySelectorAll('.js-group-divider')
@@ -177,7 +177,7 @@ const cacheDividerOffsets = () => {
 
 const updateStickyState = () => {
   const container = containerEl.value
-  if (!container) return
+  if (!container || container.offsetParent === null) return
 
   const scrollTop = container.scrollTop
   const headerHeight = 64 
@@ -259,4 +259,10 @@ watch(
   },
   { immediate: true }
 )
+
+watch(() => uiStore.layerStack.length, () => {
+  nextTick(() => {
+    cacheDividerOffsets()
+  })
+})
 </script>

@@ -91,7 +91,7 @@
           v-if="level === 'show' || level === 'score'" 
           class="btn-primary" 
           style="margin: 0; flex: 2;" 
-          :disabled="isSaving" 
+          :disabled="isSaving || isRatingUnchanged" 
           @click="saveRating"
         >
           <div v-if="isSaving" class="spinner" style="width:16px;height:16px;"></div>
@@ -158,6 +158,24 @@ const season = computed({
     return v ? parseInt(v) : null
   },
   set: (v) => updateQueryParams({ season: v })
+})
+
+const isRatingUnchanged = computed(() => {
+  if (level.value === 'show') {
+    const current = currentPersonalRating.value
+    if (current === null || current === undefined || isNaN(current)) {
+      return false
+    }
+    return val.value === current
+  }
+  if (level.value === 'score') {
+    const current = currentEpisodeData.value ? currentEpisodeData.value.rating : null
+    if (current === null || current === undefined || isNaN(current)) {
+      return false
+    }
+    return val.value === current
+  }
+  return false
 })
 
 const episode = computed({
@@ -423,8 +441,8 @@ const goBack = () => {
 
 const close = () => {
   if (needsRefresh.value) {
-    statsStore.statsCache = {}
-    statsStore.fetchStats(statsStore.currentYear)
+    statsStore.fetchStats(statsStore.currentYear, true, true)
+    statsStore.fetchStats('all', true, true)
   }
   emit('close')
 }
@@ -442,6 +460,7 @@ const saveRating = async () => {
       statsStore.setOptimisticRating(props.showId, val.value)
     }
     uiStore.showToast('Оценка сохранена')
+    delete uiStore.showsCache[props.showId]
     needsRefresh.value = true
     if (level.value === 'score') {
       await fetchEpisodes()
@@ -472,6 +491,7 @@ const deleteRating = async () => {
       statsStore.setOptimisticRating(props.showId, null)
     }
     uiStore.showToast('Оценка удалена')
+    delete uiStore.showsCache[props.showId]
     needsRefresh.value = true
     if (level.value === 'score') {
       await fetchEpisodes()
