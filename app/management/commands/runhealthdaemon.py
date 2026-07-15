@@ -1,14 +1,17 @@
+import logging
 import threading
 import time
 
 from django.core.management import call_command
-from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from app.management.base import LoggableBaseCommand
 from app.utils import update_heartbeat
 
+logger = logging.getLogger(__name__)
 
-class Command(BaseCommand):
+
+class Command(LoggableBaseCommand):
     help = 'Runs a lightweight background loop to send health reports at a specific time.'
 
     def handle(self, *args, **options):
@@ -31,5 +34,6 @@ class Command(BaseCommand):
 
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'Error in health daemon loop: {e}'))
+                logger.error(f'Error in health daemon loop: {e}', exc_info=True)
 
             time.sleep(30)

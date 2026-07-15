@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import time
@@ -5,11 +6,11 @@ from datetime import datetime, timedelta
 
 import requests
 from django.conf import settings
-from django.core.management.base import BaseCommand
 from django.db import connection
 from django.utils import timezone
 from redis import Redis
 
+from app.management.base import LoggableBaseCommand
 from app.models import (
     ExternalRating,
     LogEntry,
@@ -29,9 +30,12 @@ from app.services.metrics import (
     calculate_unused_persons_metric,
 )
 from kinopub_parser import celery_app
+from shared.html_helper import html_secure
+
+logger = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(LoggableBaseCommand):
     help = 'Gathers live critical metrics and container statuses, and sends a report to Telegram.'
 
     def handle(self, *args, **options):
@@ -133,7 +137,7 @@ class Command(BaseCommand):
                     metrics_lines.append(f'• {label}: <b>{total}</b>')
                     has_warnings = True
         except Exception as e:
-            metrics_lines.append(f'⚠️ Ошибка сбора метрик: {e}')
+            metrics_lines.append(f'⚠️ Ошибка сбора метрик: {html_secure(e)}')
 
         components_lines = ['\n<b>Статусы:</b>']
         try:
@@ -146,7 +150,7 @@ class Command(BaseCommand):
             components_lines.append(f'✅ Database: <b>OK</b> ({db_size}, {conn_count} conn)')
         except Exception as e:
             is_critical = True
-            components_lines.append(f'❌ Database: <b>Error</b> ({str(e)[:30]})')
+            components_lines.append(f'❌ Database: <b>Error</b> ({html_secure(str(e)[:30])})')
 
         r = None
         try:
@@ -157,7 +161,7 @@ class Command(BaseCommand):
             components_lines.append(f'✅ Redis/Queue: <b>OK</b> (Q: {q_det}/{q_dur}/{q_def})')
         except Exception as e:
             is_critical = True
-            components_lines.append(f'❌ Redis/Queue: <b>Error</b> ({str(e)[:30]})')
+            components_lines.append(f'❌ Redis/Queue: <b>Error</b> ({html_secure(str(e)[:30])})')
 
         try:
             inspect = celery_app.control.inspect(timeout=5)
@@ -214,7 +218,9 @@ class Command(BaseCommand):
                         msg += f' <small>(cleaned {deleted_count} ghost files)</small>'
                     components_lines.append(msg)
         except Exception as e:
-            components_lines.append(f'⚠️ Heartbeat: <b>Error scanning dir</b> ({str(e)[:20]})')
+            components_lines.append(
+                f'⚠️ Heartbeat: <b>Error scanning dir</b> ({html_secure(str(e)[:20])})'
+            )
 
         try:
             total, used, free = shutil.disk_usage('/data')
@@ -254,3 +260,4 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS('Health report sent successfully.'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'Failed to send report: {e}'))
+            logger.error(f'Failed to send health report to Telegram: {e}')
