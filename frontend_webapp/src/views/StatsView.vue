@@ -13,7 +13,7 @@
           </div>
         </div>
         <div class="top-controls">
-          <button class="share-btn" @click="uiStore.openModal('share')">
+          <button v-if="!statsStore.isShared" class="share-btn" @click="uiStore.openModal('share')">
             <span v-html="icons.share"></span>
           </button>
           <button class="theme-btn" @click="uiStore.toggleTheme">

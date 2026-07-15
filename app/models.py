@@ -114,9 +114,8 @@ class Person(BaseModel):
                     cleaned_en_name and cand_en_name and cleaned_en_name == cand_en_name
                 )
 
-                is_special_match = (
-                    (cleaned_en_name == cleaned_name and not cand_en_name) or
-                    (cand_en_name == cleaned_name and not cleaned_en_name)
+                is_special_match = (cleaned_en_name == cleaned_name and not cand_en_name) or (
+                    cand_en_name == cleaned_name and not cleaned_en_name
                 )
 
                 # Допускаем слияние:

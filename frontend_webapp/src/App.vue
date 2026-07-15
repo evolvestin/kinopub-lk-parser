@@ -34,6 +34,14 @@ const showBackButton = computed(() => {
   return uiStore.hasOpenLayers || Object.values(uiStore.modals).some(m => m.isOpen)
 })
 
+watch(() => statsStore.isShared, (val) => {
+  if (val) {
+    document.body.classList.add('has-banner')
+  } else {
+    document.body.classList.remove('has-banner')
+  }
+}, { immediate: true })
+
 onMounted(async () => {
   document.documentElement.classList.add('is-webapp')
   document.body.classList.add('is-webapp')
@@ -79,6 +87,14 @@ onMounted(async () => {
   let targetPath = '/search'
   let targetQuery = { ...router.currentRoute.value.query }
 
+  if (!targetQuery.shared_id) {
+    const params = new URLSearchParams(window.location.search)
+    const sId = params.get('shared_id')
+    if (sId) {
+      targetQuery.shared_id = sId
+    }
+  }
+
   if (startParam) {
     if (startParam.startsWith('stat_')) {
       targetPath = '/stats'
@@ -89,6 +105,8 @@ onMounted(async () => {
         uiStore.openLayer('show', startParam.replace('show_', ''))
       })
     }
+  } else if (targetQuery.shared_id) {
+    targetPath = '/stats'
   } else if (hasLayer) {
     targetPath = currentPath
   } else if (lastView && ['search', 'wishlist', 'stats'].includes(lastView)) {
@@ -127,6 +145,9 @@ watch(() => uiStore.theme, (val) => {
 
 <template>
   <div :class="[uiStore.theme, 'is-webapp']">
+    <div v-if="statsStore.isShared" class="shared-banner">
+      Вы просматриваете чужую статистику
+    </div>
     <div v-show="uiStore.isAppReady && !uiStore.hasOpenLayers" id="views-container" class="app-viewport">
       <router-view v-if="uiStore.isAppReady" v-slot="{ Component }">
         <keep-alive>
@@ -150,7 +171,7 @@ watch(() => uiStore.theme, (val) => {
       </div>
     </div>
     
-    <BottomNav v-show="!uiStore.hasOpenLayers && uiStore.isAppReady" />
+    <BottomNav v-show="!uiStore.hasOpenLayers && uiStore.isAppReady && !statsStore.isShared" />
     <Loader />
     <Toast />
 

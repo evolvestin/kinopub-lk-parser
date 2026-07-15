@@ -1152,7 +1152,7 @@ def webapp_bake_stats(request):
 
             if view_user.id not in user_info_map:
                 if anon_user:
-                    name = 'Участник 1' if group_exists else 'Пользователь'
+                    name = 'Аноним'
                     uid = 1 if group_exists else 0
                 else:
                     name = view_user.name or view_user.username
@@ -1186,7 +1186,7 @@ def webapp_bake_stats(request):
                         item['user_photos'] = [u['photo'] for u in mapped_users]
 
             if anon_user:
-                stat['meta']['name'] = 'Участник 1' if group_exists else 'Пользователь'
+                stat['meta']['name'] = 'Аноним'
                 stat['meta']['is_anonymous'] = True
                 stat['meta']['photo_url'] = None
                 stat['meta']['id'] = 1 if group_exists else 0
@@ -1227,9 +1227,11 @@ def webapp_get_shared_stats(request, stat_id):
 @require_http_methods(['POST', 'GET'])
 def webapp_get_show_full(request, show_id):
     try:
-        show = Show.objects.select_related('ext_rating').prefetch_related(
-            'countries', 'genres', 'showcrew_set__person__master_person'
-        ).get(id=show_id)
+        show = (
+            Show.objects.select_related('ext_rating')
+            .prefetch_related('countries', 'genres', 'showcrew_set__person__master_person')
+            .get(id=show_id)
+        )
 
         view_user = get_webapp_user(request)
 
@@ -1382,7 +1384,9 @@ def webapp_get_show_full(request, show_id):
                     'film_critics': show.ext_rating.film_critics,
                     'russian_film_critics': show.ext_rating.russian_film_critics,
                     'await_rating': show.ext_rating.await_rating,
-                    'updated_at': show.ext_rating.updated_at.strftime('%Y-%m-%d %H:%M:%S') if show.ext_rating.updated_at else None,
+                    'updated_at': show.ext_rating.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+                    if show.ext_rating.updated_at
+                    else None,
                 }
         except Exception:
             pass
@@ -1404,11 +1408,13 @@ def webapp_get_show_full(request, show_id):
             if r.season_number is None and r.episode_number is None:
                 grouped_ratings[uid]['show_rating'] = r.rating
             else:
-                grouped_ratings[uid]['episodes'].append({
-                    'season': r.season_number,
-                    'episode': r.episode_number,
-                    'rating': r.rating,
-                })
+                grouped_ratings[uid]['episodes'].append(
+                    {
+                        'season': r.season_number,
+                        'episode': r.episode_number,
+                        'rating': r.rating,
+                    }
+                )
 
         for uid in grouped_ratings:
             grouped_ratings[uid]['episodes'].sort(key=lambda x: (x['season'], x['episode']))
@@ -1443,7 +1449,9 @@ def webapp_get_show_full(request, show_id):
             'genres': genres_list,
             'crew': ordered_crew,
             'ext_rating': ext_rating_data,
-            'updated_at': show.updated_at.strftime('%Y-%m-%d %H:%M:%S') if show.updated_at else None,
+            'updated_at': show.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+            if show.updated_at
+            else None,
         }
         return JsonResponse(data)
     except Show.DoesNotExist:
@@ -1543,7 +1551,7 @@ def webapp_search(request):
             Q(title__icontains=query) | Q(original_title__icontains=query)
         ).order_by('-year', '-id')
 
-        shows = shows_qs[offset:offset + limit]
+        shows = shows_qs[offset : offset + limit]
         user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])
 
         persons = []
@@ -1589,11 +1597,13 @@ def webapp_search(request):
             if len(person_results) >= 10:
                 break
 
-        return JsonResponse({
-            'shows': show_results,
-            'persons': person_results,
-            'has_more': len(show_results) == limit
-        })
+        return JsonResponse(
+            {
+                'shows': show_results,
+                'persons': person_results,
+                'has_more': len(show_results) == limit,
+            }
+        )
     except Exception as e:
         logger.error(f'WebApp Search Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
