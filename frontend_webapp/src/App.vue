@@ -34,6 +34,10 @@ const showBackButton = computed(() => {
   return uiStore.hasOpenLayers || Object.values(uiStore.modals).some(m => m.isOpen)
 })
 
+const sharedUser = computed(() => {
+  return statsStore.currentStats?.meta || null
+})
+
 watch(() => statsStore.isShared, (val) => {
   if (val) {
     document.body.classList.add('has-banner')
@@ -146,7 +150,24 @@ watch(() => uiStore.theme, (val) => {
 <template>
   <div :class="[uiStore.theme, 'is-webapp']">
     <div v-if="statsStore.isShared" class="shared-banner">
-      Вы просматриваете чужую статистику
+      <span class="shared-banner-icon">📊</span>
+      <span class="shared-banner-text">
+        Вы просматриваете статистику
+        <template v-if="sharedUser">
+          <template v-if="!sharedUser.is_anonymous && sharedUser.name !== 'Аноним'">
+            пользователя <strong class="shared-banner-name">{{ sharedUser.name }}</strong>
+            <template v-if="sharedUser.username">
+              (<a :href="'https://t.me/' + sharedUser.username" target="_blank" class="shared-banner-link">@{{ sharedUser.username }}</a>)
+            </template>
+          </template>
+          <template v-else>
+            анонимного пользователя
+          </template>
+        </template>
+        <template v-else>
+          другого пользователя
+        </template>
+      </span>
     </div>
     <div v-show="uiStore.isAppReady && !uiStore.hasOpenLayers" id="views-container" class="app-viewport">
       <router-view v-if="uiStore.isAppReady" v-slot="{ Component }">

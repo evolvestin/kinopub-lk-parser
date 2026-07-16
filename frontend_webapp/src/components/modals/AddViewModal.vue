@@ -19,6 +19,10 @@
           {{ context.title }}
         </div>
 
+        <div v-if="statsStore.isShared" style="margin-bottom: 16px; padding: 10px; background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.2); border-radius: 10px; font-size: 11px; color: var(--text-secondary); line-height: 1.3; text-align: center;">
+          ⚠️ Вы отмечаете просмотр для своего <strong style="color: var(--text-primary);">личного профиля</strong>.
+        </div>
+
         <div v-if="isSeries" style="margin-bottom: 20px; flex-shrink: 0;">
           <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; text-transform: uppercase;">Серия</div>
           <button class="search-input" style="width: 100%; text-align: left; display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); cursor: pointer;" @click="openEpisodeSelector">
@@ -27,7 +31,7 @@
           </button>
         </div>
 
-        <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 8px; text-transform: uppercase;">Когда смотрели?</div>
+        <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:8px; text-transform:uppercase;">Когда смотрели?</div>
         <div class="view-toggle" style="margin-bottom: 16px; padding: 3px; background: var(--bg-input); flex-shrink: 0;">
           <button class="vt-btn" :class="{ active: dateMode === 'exact' }" @click="dateMode = 'exact'">Точная дата</button>
           <button class="vt-btn" :class="{ active: dateMode === 'month' }" @click="dateMode = 'month'">Месяц</button>
@@ -102,10 +106,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUIStore } from '../../stores/uiStore'
+import { useStatsStore } from '../../stores/useStatsStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
 
 const uiStore = useUIStore()
+const statsStore = useStatsStore()
 const api = useApi()
 const router = useRouter()
 

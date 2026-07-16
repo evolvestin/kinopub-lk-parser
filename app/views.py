@@ -1190,6 +1190,7 @@ def webapp_bake_stats(request):
                 stat['meta']['is_anonymous'] = True
                 stat['meta']['photo_url'] = None
                 stat['meta']['id'] = 1 if group_exists else 0
+                stat['meta']['username'] = None
             else:
                 stat['meta']['id'] = user_info_map[view_user.id]['id']
                 if view_user.photo_url:

@@ -220,7 +220,7 @@ watch(() => router.currentRoute.value.query.modal_initialValue, (newVal) => {
 }, { immediate: true })
 
 const currentPersonalRating = computed(() => {
-  if (!showId) return null
+  if (!props.showId) return null
   const local = statsStore.userShowRatings[props.showId]
   return local !== undefined ? local : parseFloat(props.initialValue)
 })

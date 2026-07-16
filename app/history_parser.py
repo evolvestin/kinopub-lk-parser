@@ -305,19 +305,17 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
 
 
 def get_chrome_major_version():
-    """Определяет мажорную версию установленного Chromium."""
-    try:
-        executable = '/usr/bin/chromium'
-        if not os.path.exists(executable):
-            executable = 'chromium'
-
-        output = subprocess.check_output([executable, '--version'], text=True)
-        match = re.search(r'(\d+)\.', output)
-        if match:
-            return int(match.group(1))
-    except Exception as e:
-        logging.warning(f'Could not detect Chrome version automatically: {e}')
-
+    for executable in ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']:
+        path = shutil.which(executable)
+        if path:
+            try:
+                output = subprocess.check_output([path, '--version'], text=True)
+                match = re.search(r'(\d+)\.', output)
+                if match:
+                    return int(match.group(1))
+            except Exception:
+                continue
+    logging.warning('Could not detect Chrome version automatically')
     return None
 
 

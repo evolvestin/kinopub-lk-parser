@@ -10,6 +10,11 @@
       <div style="font-size: 22px; font-weight: 900; color: var(--text-primary); margin-bottom: 24px; line-height: 1.1; letter-spacing: -0.5px; padding-right: 20px;">
         {{ context.title }}
       </div>
+
+      <div v-if="statsStore.isShared" style="margin-bottom: 16px; padding: 10px; background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.2); border-radius: 10px; font-size: 11px; color: var(--text-secondary); line-height: 1.3; text-align: center;">
+        ⚠️ Добавление произойдет в ваши <strong style="color: var(--text-primary);">личные папки</strong> избранного.
+      </div>
+
       <div style="font-size: 13px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
         Выберите папку
       </div>
@@ -37,11 +42,13 @@
 import { computed } from 'vue'
 import { useUIStore } from '../../stores/uiStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
+import { useStatsStore } from '../../stores/useStatsStore'
 import { icons } from '../../utils/icons'
 import { plural } from '../../utils/helpers'
 
 const uiStore = useUIStore()
 const wishlistStore = useWishlistStore()
+const statsStore = useStatsStore()
 
 const context = computed(() => uiStore.modals.wlFolder.context || {})
 

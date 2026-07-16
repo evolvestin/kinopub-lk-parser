@@ -7,3 +7,4 @@ __pycache__/
 /kinopub_parser/static/logo.png
 celerybeat-schedule
 /frontend_webapp/node_modules/
+telegram_bot/services/url_store.py

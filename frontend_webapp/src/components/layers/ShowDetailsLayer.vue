@@ -37,6 +37,13 @@
     <div class="show-info">
       <div class="show-title">{{ show.title }}</div>
       <div class="show-orig" v-if="show.original_title !== show.title">{{ show.original_title }}</div>
+
+      <div v-if="statsStore.isShared" class="card anim-item" style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.2); margin: 12px 0; padding: 12px; border-radius: 12px; text-align: center; box-shadow: none;">
+        <span style="color: var(--danger); font-weight: 800; font-size: 13px; display: block; margin-bottom: 4px;">⚠️ Личные действия</span>
+        <span style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; display: block;">
+          Вы просматриваете чужую статистику. Оценки, вишлисты и отметки просмотров будут изменены в <strong>вашем личном профиле</strong>.
+        </span>
+      </div>
       
       <div class="show-meta-tags">
         <div v-for="c in show.countries" :key="c.id" class="sm-tag clickable" @click="uiStore.openLayer('country', c.id)">

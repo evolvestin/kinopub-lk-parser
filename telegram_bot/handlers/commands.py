@@ -50,10 +50,25 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 ]
             )
 
+            meta = await client.get_shared_stats_meta(stat_id)
+            owner_name = meta.get('name') if meta else None
+            username = meta.get('username') if meta else None
+            is_anon = meta.get('is_anonymous', False) if meta else True
+
+            if is_anon or not owner_name or owner_name == 'Аноним':
+                header_text = 'анонимного пользователя'
+            else:
+                if username:
+                    header_text = (
+                        f'пользователя {html_secure(owner_name)} (@{html_secure(username)})'
+                    )
+                else:
+                    header_text = f'пользователя {html_secure(owner_name)}'
+
             await sender.send_message(
                 chat_id=user.id,
                 text=(
-                    f'📂 {bold("Получен доступ к общей статистике")}\n\n'
+                    f'📂 {bold(f"Получен доступ к общей статистике {header_text}")}\n\n'
                     f'Нажмите на кнопку ниже для просмотра.'
                 ),
                 keyboard=keyboard,

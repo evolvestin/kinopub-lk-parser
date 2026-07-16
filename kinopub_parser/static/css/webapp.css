@@ -634,23 +634,54 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
     left: 0;
     right: 0;
     z-index: 1000;
-    background: var(--bg-card);
-    background-image: linear-gradient(var(--info-dim), var(--info-dim));
-    color: var(--info);
+    background: rgba(20, 24, 31, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
     padding: 12px 16px;
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    border-bottom: 1px solid var(--border);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    height: 44px;
+}
+
+.light .shared-banner {
+    background: rgba(246, 248, 250, 0.85);
+}
+
+.shared-banner-icon {
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+}
+
+.shared-banner-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.shared-banner-name {
+    color: var(--text-primary);
+    font-weight: 800;
+}
+
+.shared-banner-link {
+    color: var(--accent);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.shared-banner-link:hover {
+    text-decoration: underline;
 }
 
 body.has-banner #app {
-    margin-top: 50px;
+    margin-top: 44px;
 }
 
 .view-toggle { display: flex; background: var(--bg-input); border-radius: 10px; padding: 3px; border: 1px solid var(--border); margin-bottom: clamp(12px, 3.5vw, 16px); }

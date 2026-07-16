@@ -1,6 +1,9 @@
 import asyncio
 import logging
+import os
 import sys
+import time
+from threading import Thread
 
 import client
 from aiogram import Dispatcher, F, Router
@@ -183,7 +186,44 @@ async def main():
     await dispatcher.start_polling(bot, allowed_updates=allowed_updates)
 
 
+def start_reloader():
+    def watch_files():
+        watch_dir = '/app'
+        mtimes = {}
+        for root, _, files in os.walk(watch_dir):
+            for file in files:
+                if file.endswith('.py'):
+                    path = os.path.join(root, file)
+                    try:
+                        mtimes[path] = os.path.getmtime(path)
+                    except OSError:
+                        pass
+        while True:
+            time.sleep(1)
+            changed = False
+            for root, _, files in os.walk(watch_dir):
+                for file in files:
+                    if file.endswith('.py'):
+                        path = os.path.join(root, file)
+                        try:
+                            mtime = os.path.getmtime(path)
+                            if path not in mtimes:
+                                mtimes[path] = mtime
+                                changed = True
+                            elif mtimes[path] != mtime:
+                                mtimes[path] = mtime
+                                changed = True
+                        except OSError:
+                            pass
+            if changed:
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    Thread(target=watch_files, daemon=True).start()
+
+
 if __name__ == '__main__':
+    if os.getenv('ENVIRONMENT') == 'DEV':
+        start_reloader()
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

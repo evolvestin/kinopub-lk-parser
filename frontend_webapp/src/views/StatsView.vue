@@ -86,7 +86,7 @@
             :value="summary.wishlist_added || 0"
             label="Добавлено в избранное"
             :clickable="true"
-            @click="uiStore.switchBaseView('wishlist')"
+            @click="handleWishlistClick"
           />
           <StatCard
             :icon="icons.check"
@@ -98,7 +98,7 @@
         </div>
 
         <div class="card hoverable anim-item" v-if="statsStore.currentStats.ratings?.total">
-          <div class="label"><div class="icon" style="color: #f1c40f;" v-html="icons.star"></div> Оценки</div>
+          <div class="label"><div class="icon" style="color: #f1c40f;" id="it-star-label"></div> Оценки</div>
           <div class="critic-header">
               <div class="critic-title-box">
                   <div class="critic-badge" :style="ratingBadgeStyle">{{ ratingBadgeText }}</div>
@@ -226,10 +226,10 @@
           <template v-else>
               <div class="card hoverable anim-item">
                   <div style="display:flex;align-items:center;gap:16px">
-                      <div class="icon" style="font-size:36px;color:var(--info);" v-html="icons.users"></div>
+                      <div class="icon" style="font-size:clamp(28px, 8vw, 36px);line-height:1;color:var(--info);filter:drop-shadow(0 4px 8px rgba(56, 139, 253, 0.3))" v-html="icons.users"></div>
                       <div>
-                          <div style="font-size:20px;font-weight:800;color:var(--text-primary)">{{ statsStore.currentStats.group.group_name }}</div>
-                          <div style="font-size:14px;color:var(--text-muted);font-weight:600;">
+                          <div style="font-size:clamp(16px, 4.5vw, 20px);font-weight:800;color:var(--text-primary)">{{ statsStore.currentStats.group.group_name }}</div>
+                          <div style="font-size:clamp(12px, 3.2vw, 14px);color:var(--text-muted);font-weight:600;margin-top:2px;">
                             {{ statsStore.currentStats.group.members_count }} {{ plural(statsStore.currentStats.group.members_count || 0, ['участник', 'участника', 'участников']) }} · {{ statsStore.currentStats.group.duration_display }}
                           </div>
                       </div>
@@ -239,8 +239,8 @@
               <div class="card hoverable anim-item">
                   <div class="label more-pad"><div class="icon" v-html="icons.chart"></div> {{ statsStore.currentStats.meta.name }} vs Группа</div>
                   <div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-                      <span style="font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;">👤 Вы</span>
-                      <span style="font-size:12px;font-weight:800;color:var(--info);text-transform:uppercase;">👥 Группа</span>
+                      <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;">👤 {{ statsStore.currentStats.meta.name }}</span>
+                      <span style="font-size:clamp(12px, 3.2vw, 14px);font-weight:800;color:var(--info);letter-spacing:0.5px;text-transform:uppercase;">👥 Группа</span>
                   </div>
                   <div v-for="row in groupCompareRows" :key="row.lb" class="cmp">
                       <span class="cmp-lb"><div class="icon" v-html="row.i"></div>{{ row.lb }}</span>
@@ -265,8 +265,6 @@
           </template>
       </div>
     </template>
-
-    <ShareModal v-if="uiStore.modals.share.isOpen" />
   </div>
 </template>
 
@@ -281,13 +279,14 @@ import StatCard from '../components/stats/StatCard.vue'
 import ActivityHeatmap from '../components/stats/ActivityHeatmap.vue'
 import GenreDonut from '../components/stats/GenreDonut.vue'
 import LeaderList from '../components/stats/LeaderList.vue'
-import ShareModal from '../components/modals/ShareModal.vue'
 import BaseChart from '../components/shared/BaseChart.vue'
 import BouncyBarChart from '../components/shared/BouncyBarChart.vue'
+import { useTelegram } from '../composables/useTelegram'
 
 const statsStore = useStatsStore()
 const uiStore = useUIStore()
 const userStore = useUserStore()
+const { showConfirm } = useTelegram()
 
 const summary = computed(() => statsStore.currentStats?.summary || {})
 const userName = computed(() => statsStore.currentStats?.meta?.name || userStore.firstName || '...')
@@ -499,9 +498,9 @@ const monthlyChartOptions = computed(() => {
         type: 'linear',
         display: true,
         position: 'right',
-        beginAtZero: true,
         ticks: { color: '#60a5fa', font: { size: fSize } },
-        grid: { drawOnChartArea: false }
+        grid: { drawOnChartArea: false },
+        beginAtZero:true
       }
     }
   }
@@ -601,6 +600,18 @@ const groupCompareRows = computed(() => {
     ]
 })
 const groupMaxViews = computed(() => Math.max(...(statsStore.currentStats?.group?.members || []).map(m => m.views), 1))
+
+const handleWishlistClick = () => {
+  if (statsStore.isShared) {
+    showConfirm('Вы хотите перейти в свое личное Избранное и покинуть статистику другого пользователя?', (ok) => {
+      if (ok) {
+        uiStore.switchBaseView('wishlist')
+      }
+    })
+  } else {
+    uiStore.switchBaseView('wishlist')
+  }
+}
 
 const openHistory = (type, props = {}) => {
   uiStore.openLayer('history', type, props)

@@ -710,6 +710,7 @@ def generate_user_stats(user, year=None):
             'meta': {
                 'id': user.id,
                 'name': user.name or user.username,
+                'username': user.username,
                 'year': year,
                 'years': all_years,
                 'role': user_role,
@@ -812,6 +813,7 @@ def generate_user_stats(user, year=None):
         'meta': {
             'id': user.id,
             'name': user.name or user.username,
+            'username': user.username,
             'year': year,
             'years': all_years,
             'role': user_role,
