@@ -114,14 +114,17 @@ class Person(BaseModel):
                     cleaned_en_name and cand_en_name and cleaned_en_name == cand_en_name
                 )
 
+                is_both_empty = not cleaned_en_name and not cand_en_name
+
                 is_special_match = (cleaned_en_name == cleaned_name and not cand_en_name) or (
                     cand_en_name == cleaned_name and not cleaned_en_name
                 )
 
-                # Допускаем слияние:
-                # 1. Точное совпадение RU и EN имен.
-                # 2. EN отсутствует у одной записи, а у другой есть и дублирует RU.
-                if is_exact_match or is_special_match:
+                # Допускаем слияние при совпадении RU-имен:
+                # 1. Точное совпадение EN-имен.
+                # 2. EN отсутствует у обеих записей.
+                # 3. EN отсутствует у одной записи, а у другой дублирует RU-имя.
+                if is_exact_match or is_both_empty or is_special_match:
                     self.master_person = candidate.canonical
                     break
 

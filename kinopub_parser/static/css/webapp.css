@@ -633,7 +633,7 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
     top: 0;
     left: 0;
     right: 0;
-    z-index: 1000;
+    z-index: 1100;
     background: rgba(20, 24, 31, 0.85);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -682,6 +682,10 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 
 body.has-banner #app {
     margin-top: 44px;
+}
+
+body.has-banner .layer {
+    top: 44px;
 }
 
 .view-toggle { display: flex; background: var(--bg-input); border-radius: 10px; padding: 3px; border: 1px solid var(--border); margin-bottom: clamp(12px, 3.5vw, 16px); }
