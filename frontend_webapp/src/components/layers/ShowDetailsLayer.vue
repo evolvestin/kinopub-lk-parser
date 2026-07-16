@@ -97,6 +97,16 @@ const activeBg = ref('')
 
 const currentPersonalRating = computed(() => {
   if (!show.value) return null
+  if (statsStore.isShared) {
+    const sharedRating = statsStore.sharedShowRatings[show.value.id]
+    return sharedRating !== undefined ? sharedRating : null
+  }
+  const local = statsStore.userShowRatings[show.value.id]
+  return local !== undefined ? local : show.value.personal_rating
+})
+
+const viewerRating = computed(() => {
+  if (!show.value) return null
   const local = statsStore.userShowRatings[show.value.id]
   return local !== undefined ? local : show.value.personal_rating
 })
@@ -206,7 +216,7 @@ const openRating = () => {
   uiStore.openModal('rateShow', {
     showId: show.value.id,
     title: show.value.title,
-    initialValue: currentPersonalRating.value,
+    initialValue: viewerRating.value,
     type: show.value.type
   })
 }

@@ -68,7 +68,9 @@ export const useStatsStore = defineStore('stats', () => {
 
   const userShowRatings = computed(() => {
     const ratingsMap = {}
-    Object.values(statsCache.value).forEach(stats => {
+    Object.keys(statsCache.value).forEach(key => {
+      if (key.startsWith('shared_')) return
+      const stats = statsCache.value[key]
       if (stats?.ratings?.history) {
         stats.ratings.history.forEach(r => {
           if (r.show_id && r.rating && !r.season && !r.episode) {
@@ -84,6 +86,25 @@ export const useStatsStore = defineStore('stats', () => {
         ratingsMap[showId] = rating
       }
     })
+    return ratingsMap
+  })
+
+  const sharedShowRatings = computed(() => {
+    const ratingsMap = {}
+    if (isShared.value && sharedId.value) {
+      Object.keys(statsCache.value).forEach(key => {
+        if (key.startsWith(`shared_${sharedId.value}_`)) {
+          const stats = statsCache.value[key]
+          if (stats?.ratings?.history) {
+            stats.ratings.history.forEach(r => {
+              if (r.show_id && r.rating && !r.season && !r.episode) {
+                ratingsMap[r.show_id] = r.rating
+              }
+            })
+          }
+        }
+      })
+    }
     return ratingsMap
   })
 
@@ -443,7 +464,7 @@ export const useStatsStore = defineStore('stats', () => {
 
   return {
     statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup, isShared, sharedId,
-    userShowRatings, setOptimisticRating, clearOptimisticRatings,
+    userShowRatings, sharedShowRatings, setOptimisticRating, clearOptimisticRatings,
     fetchStats, resolveAllImages, getHistoryByType, removeHistoryItem, fetchCasinoHistory,
     setActiveTab: (tab) => { activeTab.value = tab },
     setYear: (year) => { currentYear.value = year }

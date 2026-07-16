@@ -85,7 +85,7 @@
             :icon="icons.bookmark"
             :value="summary.wishlist_added || 0"
             label="Добавлено в избранное"
-            :clickable="true"
+            :clickable="!statsStore.isShared"
             @click="handleWishlistClick"
           />
           <StatCard
@@ -602,15 +602,8 @@ const groupCompareRows = computed(() => {
 const groupMaxViews = computed(() => Math.max(...(statsStore.currentStats?.group?.members || []).map(m => m.views), 1))
 
 const handleWishlistClick = () => {
-  if (statsStore.isShared) {
-    showConfirm('Вы хотите перейти в свое личное Избранное и покинуть статистику другого пользователя?', (ok) => {
-      if (ok) {
-        uiStore.switchBaseView('wishlist')
-      }
-    })
-  } else {
-    uiStore.switchBaseView('wishlist')
-  }
+  if (statsStore.isShared) return
+  uiStore.switchBaseView('wishlist')
 }
 
 const openHistory = (type, props = {}) => {

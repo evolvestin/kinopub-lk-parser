@@ -114,6 +114,9 @@ const season = computed(() => props.show.season_number ?? props.show.season)
 const episode = computed(() => props.show.episode_number ?? props.show.episode)
 const rating = computed(() => {
   const showId = props.show.show_id || props.show.id
+  if (statsStore.isShared) {
+    return props.show.user_rating || props.show.rating || props.show.user_show_rating
+  }
   const local = statsStore.userShowRatings[showId]
   if (local !== undefined) return local
   return props.show.user_rating || props.show.rating || props.show.user_show_rating
