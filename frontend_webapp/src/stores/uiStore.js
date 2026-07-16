@@ -86,7 +86,11 @@ export const useUIStore = defineStore('ui', () => {
     if (window.IS_ADMIN_DASHBOARD) return
     isHistoryEditMode.value = false
     localStorage.setItem('kp_last_active_view', viewName)
-    router.push({ name: viewName, query: router.currentRoute.value.query })
+    const query = { ...router.currentRoute.value.query }
+    if (viewName !== 'stats') {
+      delete query.shared_id
+    }
+    router.push({ name: viewName, query })
   }
 
   function showToast(text) {

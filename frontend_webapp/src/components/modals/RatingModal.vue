@@ -16,6 +16,10 @@
 
       <div class="show-title" style="margin: 12px 0; font-size: 20px; font-weight: 900; color: var(--text-primary); text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ title }}</div>
       
+      <div v-if="statsStore.isShared" style="margin-bottom: 16px; padding: 10px; background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.2); border-radius: 10px; font-size: 11px; color: var(--text-secondary); line-height: 1.3; text-align: center; flex-shrink: 0;">
+        ⚠️ Оценка сохранится в вашем <strong style="color: var(--text-primary);">личном профиле</strong>.
+      </div>
+
       <div v-if="isSeries" class="view-toggle" id="rate-mode-toggle" style="margin-bottom: 20px; flex-shrink: 0;">
         <button class="vt-btn" :class="{ active: level === 'show' }" style="flex: 1;" @click="level = 'show'">Весь сериал</button>
         <button class="vt-btn" :class="{ active: level !== 'show' }" style="flex: 1;" @click="goToSeasons">По сериям</button>
