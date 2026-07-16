@@ -143,7 +143,7 @@ watch(showBackButton, (val) => {
 }, { immediate: true })
 
 watch(() => uiStore.theme, (val) => {
-  document.body.className = val === 'light' ? 'light' : ''
+  document.body.classList.toggle('light', val === 'light')
 }, { immediate: true })
 </script>
 
