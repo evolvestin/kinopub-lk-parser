@@ -64,7 +64,7 @@ export const useStatsStore = defineStore('stats', () => {
     return statsCache.value[currentYear.value] || null
   })
 
-  const hasGroup = computed(() => !isShared.value && !!currentStats.value?.group)
+  const hasGroup = computed(() => !!currentStats.value?.group)
 
   const userShowRatings = computed(() => {
     const ratingsMap = {}
