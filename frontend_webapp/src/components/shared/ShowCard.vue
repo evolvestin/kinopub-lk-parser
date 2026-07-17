@@ -84,7 +84,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useTelegram } from '../../composables/useTelegram'
 import { icons } from '../../utils/icons'
-import { getUserColor } from '../../utils/helpers'
+import { getUserColor, getRatingClass } from '../../utils/helpers'
 
 const props = defineProps({
   show: { type: Object, required: true },
@@ -149,13 +149,6 @@ const validateImage = (e) => {
 
 const handleError = () => {
   isBroken.value = true
-}
-
-const getRatingClass = (val) => {
-  if (!val) return ''
-  if (val >= 8) return 'rating-high'
-  if (val >= 6) return 'rating-mid'
-  return 'rating-low'
 }
 
 const handleClick = () => {

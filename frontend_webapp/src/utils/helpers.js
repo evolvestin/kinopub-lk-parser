@@ -27,6 +27,13 @@ export function getUserColor(id) {
   return colors[Math.abs(id - 1) % colors.length];
 }
 
+export function getRatingClass(val) {
+  if (!val) return ''
+  if (val >= 8) return 'rating-high'
+  if (val >= 5) return 'rating-mid'
+  return 'rating-low'
+}
+
 const preloadPool = new Set();
 const preloadedUrls = new Set();
 const preloadingPromises = new Map();

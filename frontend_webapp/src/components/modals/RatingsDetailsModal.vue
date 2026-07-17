@@ -13,10 +13,10 @@
         {{ showData?.title || 'Загрузка...' }}
       </div>
 
-      <div class="view-toggle" style="margin-bottom: 20px; flex-shrink: 0; padding: 3px; background: var(--bg-input);">
-        <button class="vt-btn" :class="{ active: ratingType === 'kp' }" style="flex: 1;" @click="ratingType = 'kp'">Кинопоиск</button>
-        <button class="vt-btn" :class="{ active: ratingType === 'imdb' }" style="flex: 1;" @click="ratingType = 'imdb'">IMDb</button>
-        <button class="vt-btn" :class="{ active: ratingType === 'lr' }" style="flex: 1;" @click="ratingType = 'lr'">LocalRating (LR)</button>
+      <div v-if="showData && availableTabsCount > 1" class="view-toggle" style="margin-bottom: 20px; flex-shrink: 0; padding: 3px; background: var(--bg-input);">
+        <button v-if="hasKp" class="vt-btn" :class="{ active: ratingType === 'kp' }" style="flex: 1;" @click="ratingType = 'kp'">Кинопоиск</button>
+        <button v-if="hasImdb" class="vt-btn" :class="{ active: ratingType === 'imdb' }" style="flex: 1;" @click="ratingType = 'imdb'">IMDb</button>
+        <button v-if="hasLr" class="vt-btn" :class="{ active: ratingType === 'lr' }" style="flex: 1;" @click="ratingType = 'lr'">LocalRating (LR)</button>
       </div>
 
       <div style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto;" class="custom-scrollbar">
@@ -54,7 +54,7 @@
               <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; font-weight: 600;">
                 <div v-if="showData.ext_rating.film_critics !== null" style="display: flex; justify-content: space-between;">
                   <span style="color: var(--text-secondary);">Критики мира:</span>
-                  <span style="color: var(--text-primary); font-weight: 800;">{{ showData.ext_rating.film_critics.toFixed(1) }}%</span>
+                  <span style="color: var(--text-primary); font-weight: 800;">{{ showData.ext_rating.film_critics.toFixed(1) }} / 10</span>
                 </div>
                 <div v-if="showData.ext_rating.russian_film_critics !== null" style="display: flex; justify-content: space-between;">
                   <span style="color: var(--text-secondary);">Критики РФ:</span>
@@ -177,6 +177,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
+import { getRatingClass } from '../../utils/helpers'
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -254,6 +255,41 @@ const close = () => {
   uiStore.closeModal('details')
 }
 
+const hasKp = computed(() => {
+  return showData.value && (showData.value.kinopoisk_rating !== null || !!showData.value.kinopoisk_url)
+})
+
+const hasImdb = computed(() => {
+  return showData.value && (showData.value.imdb_rating !== null || !!showData.value.imdb_url)
+})
+
+const hasLr = computed(() => {
+  return showData.value && (showData.value.internal_rating !== null || showData.value.user_ratings?.length > 0)
+})
+
+const availableTabsCount = computed(() => {
+  let count = 0
+  if (hasKp.value) count++
+  if (hasImdb.value) count++
+  if (hasLr.value) count++
+  return count
+})
+
+const selectDefaultTab = () => {
+  if (!showData.value) return
+  
+  if (ratingType.value === 'kp' && !hasKp.value) {
+    if (hasImdb.value) ratingType.value = 'imdb'
+    else if (hasLr.value) ratingType.value = 'lr'
+  } else if (ratingType.value === 'imdb' && !hasImdb.value) {
+    if (hasKp.value) ratingType.value = 'kp'
+    else if (hasLr.value) ratingType.value = 'lr'
+  } else if (ratingType.value === 'lr' && !hasLr.value) {
+    if (hasKp.value) ratingType.value = 'kp'
+    else if (hasImdb.value) ratingType.value = 'imdb'
+  }
+}
+
 const loadShowData = async () => {
   if (!showId.value) return
   
@@ -286,19 +322,16 @@ const openRating = () => {
   })
 }
 
-const getRatingClass = (val) => {
-  if (!val) return ''
-  if (val >= 8) return 'rating-high'
-  if (val >= 6) return 'rating-mid'
-  return 'rating-low'
-}
-
 watch(showId, (newId) => {
   if (newId) {
     showData.value = null
     loadShowData()
   }
 }, { immediate: true })
+
+watch(showData, () => {
+  selectDefaultTab()
+})
 </script>
 
 <style scoped>

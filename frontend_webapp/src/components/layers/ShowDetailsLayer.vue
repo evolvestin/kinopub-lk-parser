@@ -16,7 +16,7 @@
           <img :src="activePoster" class="hero-poster" style="margin: 0; box-shadow: none;" alt="poster">
           
           <div class="grid-badges" style="position: absolute; top: 12px; left: 12px; right: auto; align-items: flex-start; z-index: 10;">
-            <span v-if="currentPersonalRating" class="rating-badge" style="background: rgba(0, 0, 0, 0.6); color: var(--accent); border: 1px solid rgba(255, 255, 255, 0.1); font-size: 20px; padding: 4px 10px; border-radius: 10px; gap: 5px; display: inline-flex; align-items: center; font-weight: 800; text-shadow: none;">
+            <span v-if="currentPersonalRating" class="rating-badge" :class="getRatingClass(currentPersonalRating)" style="font-size: 20px; padding: 4px 10px; border-radius: 10px; gap: 5px; display: inline-flex; align-items: center; font-weight: 800; text-shadow: none;">
               <span v-html="icons.star" style="font-size: 20px; display: inline-flex; align-items: center;"></span>{{ currentPersonalRating }}
             </span>
           </div>
@@ -86,7 +86,7 @@ import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { icons } from '../../utils/icons'
-import { preloadImage } from '../../utils/helpers'
+import { preloadImage, getRatingClass } from '../../utils/helpers'
 import PersonPill from '../shared/PersonPill.vue'
 
 const props = defineProps(['showId'])

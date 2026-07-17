@@ -48,7 +48,7 @@
           <div class="casino-slot-window">
             <img :src="activeSpin.show.poster_url" alt="" @error="handleImgFallback" />
             <div v-if="activeSpin.show.user_rating" class="grid-badges">
-              <span class="rating-badge" style="background:rgba(0,0,0,0.6); border:none;">
+              <span class="rating-badge" :class="getRatingClass(activeSpin.show.user_rating)">
                 <span v-html="icons.star"></span>{{ activeSpin.show.user_rating }}
               </span>
             </div>
@@ -78,7 +78,7 @@
             <img v-if="state !== 'mystery' && currentPoster" :src="currentPoster" alt="" />
             <div v-else-if="state === 'mystery'" style="display:flex; align-items:center; justify-content:center; height:100%; font-size:100px; font-weight:900; color:var(--accent);">?</div>
             <div v-if="state === 'reveal' && winner?.user_rating" class="grid-badges">
-              <span class="rating-badge" style="background:rgba(0,0,0,0.6); border:none;">
+              <span class="rating-badge" :class="getRatingClass(winner.user_rating)">
                 <span v-html="icons.star"></span>{{ winner.user_rating }}
               </span>
             </div>
@@ -117,6 +117,7 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
+import { getRatingClass } from '../../utils/helpers'
 
 const uiStore = useUIStore()
 const wishlistStore = useWishlistStore()

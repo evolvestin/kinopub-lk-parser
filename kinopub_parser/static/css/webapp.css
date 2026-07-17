@@ -523,9 +523,9 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
     font-size: 14px;
 }
 
-.rating-high { background: rgba(46, 204, 113, 0.85); border-color: rgba(46, 204, 113, 0.3); }
-.rating-mid { background: rgba(241, 196, 15, 0.85); border-color: rgba(241, 196, 15, 0.3); }
-.rating-low { background: rgba(231, 76, 60, 0.85); border-color: rgba(231, 76, 60, 0.3); }
+.rating-badge.rating-high { color: #2ecc71 !important; background: rgba(0, 0, 0, 0.75) !important; border-color: rgba(46, 204, 113, 0.3) !important; }
+.rating-badge.rating-mid { color: #f1c40f !important; background: rgba(0, 0, 0, 0.75) !important; border-color: rgba(241, 196, 15, 0.3) !important; }
+.rating-badge.rating-low { color: #e74c3c !important; background: rgba(0, 0, 0, 0.75) !important; border-color: rgba(231, 76, 60, 0.3) !important; }
 
 .big-rating-badge { display: flex; align-items: center; justify-content: center; width: clamp(40px, 11vw, 48px); height: clamp(40px, 11vw, 48px); border-radius: 12px; font-size: clamp(16px, 4.5vw, 18px); font-weight: 900; color: #fff; flex-shrink: 0; box-shadow: var(--shadow-sm); }
 .glow-text { text-shadow: 0 0 12px rgba(255,255,255,0.2); }
@@ -864,7 +864,7 @@ body.has-banner .layer {
 }
 
 .grid-item .big-rating-badge { width: 32px; height: 32px; font-size: 14px; position: absolute; bottom: 8px; left: 8px; z-index: 5; }
-.grid-item .rating-badge { background: rgba(0,0,0,0.6); color: var(--accent); border: 1px solid rgba(255,255,255,0.1); }
+.grid-item .rating-badge { background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); }
 .grid-item .hist-badge { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
 
 /* DYNAMIC LAYERS (SPA NAVIGATION) */
