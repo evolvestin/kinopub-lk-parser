@@ -133,7 +133,6 @@ const loading = ref(false)
 const isSaving = ref(false)
 const needsRefresh = ref(false)
 const sliderRef = ref(null)
-const modalHeight = ref('520px')
 
 const localVal = ref(5.0)
 
@@ -312,13 +311,21 @@ const showDeleteButton = computed(() => {
   return false
 })
 
-const calculateStableHeight = () => {
-  const isShared = statsStore.isShared
-  const baseHeight = isShared ? 580 : 520
+const showHint = computed(() => {
+  return statsStore.currentStats?.ratings?.total === 0 && !uiStore.dismissedHints['rate_modal']
+})
 
-  if (!isSeries.value || !episodesData.value.length) {
-    modalHeight.value = `${baseHeight}px`
-    return
+const modalHeight = computed(() => {
+  const hintHeight = showHint.value ? 100 : 0
+  const isShared = statsStore.isShared
+  const baseHeight = (isShared ? 580 : 520) + hintHeight
+
+  if (!isSeries.value) {
+    return `${420 + hintHeight}px`
+  }
+
+  if (!episodesData.value.length) {
+    return `${baseHeight}px`
   }
 
   const seasonsCount = episodesData.value.length
@@ -343,8 +350,8 @@ const calculateStableHeight = () => {
   const maxHeightLimit = Math.min(620, Math.floor(window.innerHeight * 0.8))
   const finalHeight = Math.min(maxCalculated, maxHeightLimit)
   
-  modalHeight.value = `${finalHeight}px`
-}
+  return `${finalHeight}px`
+})
 
 const fetchEpisodes = async (silent = false) => {
   if (!silent) loading.value = true
@@ -364,6 +371,7 @@ const fetchEpisodes = async (silent = false) => {
 }
 
 onMounted(async () => {
+  uiStore.dismissHint('rate_modal')
   const queryVal = router.currentRoute.value.query.modal_val
   if (queryVal !== undefined && queryVal !== null) {
     localVal.value = parseFloat(queryVal)
@@ -373,16 +381,10 @@ onMounted(async () => {
     localVal.value = 5.0
   }
 
-  if (isSeries.value) {
-    if (uiStore.episodesCache[props.showId]) {
-      episodesData.value = uiStore.episodesCache[props.showId]
-      calculateStableHeight()
-    } else {
-      await fetchEpisodes(true)
-      calculateStableHeight()
-    }
-  } else {
-    modalHeight.value = '420px'
+  if (isSeries.value && !uiStore.episodesCache[props.showId]) {
+    await fetchEpisodes(true)
+  } else if (isSeries.value) {
+    episodesData.value = uiStore.episodesCache[props.showId]
   }
 })
 
@@ -411,7 +413,6 @@ const goToSeasons = async () => {
   level.value = 'seasons'
   if (!episodesData.value.length) {
     await fetchEpisodes()
-    calculateStableHeight()
   }
 }
 

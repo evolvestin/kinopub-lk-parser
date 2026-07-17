@@ -126,7 +126,6 @@ const isSeries = computed(() => ['Series', 'Documentary Series', 'TV Show'].incl
 const episodesData = ref([])
 const loading = ref(false)
 const isSaving = ref(false)
-const modalHeight = ref('520px')
 
 const updateQueryParams = (params) => {
   const query = { ...router.currentRoute.value.query }
@@ -193,10 +192,19 @@ const getWatchedCount = (s) => {
   return s.episodes.filter(e => e.watched).length
 }
 
-const calculateStableHeight = () => {
-  if (!isSeries.value || !episodesData.value.length) {
-    modalHeight.value = '520px'
-    return
+const showHint = computed(() => {
+  return statsStore.currentStats?.summary?.total_views === 0 && !uiStore.dismissedHints['add_view_modal']
+})
+
+const modalHeight = computed(() => {
+  const hintHeight = showHint.value ? 100 : 0
+  
+  if (!isSeries.value) {
+    return `${420 + hintHeight}px`
+  }
+
+  if (!episodesData.value.length) {
+    return `${520 + hintHeight}px`
   }
 
   const seasonsCount = episodesData.value.length
@@ -212,11 +220,11 @@ const calculateStableHeight = () => {
   const episodesRows = Math.ceil(maxEpisodesCount / 4)
   const episodesHeight = 170 + (episodesRows * 64)
 
-  const maxCalculated = Math.max(seasonsHeight, episodesHeight, 520)
+  const maxCalculated = Math.max(seasonsHeight, episodesHeight, 520 + hintHeight)
   const maxHeightLimit = Math.min(620, Math.floor(window.innerHeight * 0.8))
   
-  modalHeight.value = `${Math.min(maxCalculated, maxHeightLimit)}px`
-}
+  return `${Math.min(maxCalculated, maxHeightLimit)}px`
+})
 
 const fetchEpisodes = async (silent = false) => {
   if (!silent) loading.value = true
@@ -236,16 +244,13 @@ const fetchEpisodes = async (silent = false) => {
 }
 
 onMounted(async () => {
+  uiStore.dismissHint('add_view_modal')
   if (isSeries.value) {
     if (uiStore.episodesCache[context.value.showId]) {
       episodesData.value = uiStore.episodesCache[context.value.showId]
-      calculateStableHeight()
     } else {
       await fetchEpisodes(true)
-      calculateStableHeight()
     }
-  } else {
-    modalHeight.value = '420px'
   }
 })
 
@@ -253,7 +258,6 @@ const openEpisodeSelector = async () => {
   level.value = 'seasons'
   if (!episodesData.value.length) {
     await fetchEpisodes()
-    calculateStableHeight()
   }
 }
 

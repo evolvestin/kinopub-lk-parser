@@ -1,3 +1,5 @@
+File: context/architecture.md
+Scope: Top of file
 # Architectural Rules for AI/LLM
 
 ## Data Integrity Principle: Raw-First Approach
@@ -124,3 +126,12 @@ Any code generating new database records must follow this "Save-As-Is" architect
 2.  **Stat Cache Maintenance**:
     *   Prefetched data must be kept in memory/Pinia state to act as a local cache.
     *   Subsequent view transitions must rely on this cache first, triggering background updates (`force` refresh) only when explicitly required by user interactions (e.g., modifying folders or rating changes).
+
+
+## Wishlist Folder Name Policy
+
+**RULE**: Wishlist folders MUST allow empty (blank) names to support minimalistic, icon-based folder structures.
+
+1.  **Backend Model**: The `WishlistFolder` model's `name` field must have `blank=True` to allow saving empty strings `""` in the database.
+2.  **Validation**: Frontend and backend validators must not enforce a minimum length of 1 or require non-empty values for folder names. The maximum length constraint of 100 characters still applies.
+3.  **Display**: If a folder has an empty name, the UI must render its icon with an empty text container or handle spacing gracefully without breaking the layout.

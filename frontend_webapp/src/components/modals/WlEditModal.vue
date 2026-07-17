@@ -116,10 +116,6 @@ const close = () => {
 
 const save = async () => {
   const trimmedName = name.value?.trim() || ''
-  if (!trimmedName) {
-    uiStore.showToast('Введите название папки')
-    return
-  }
   if (trimmedName.length > 100) {
     uiStore.showToast('Название папки не должно превышать 100 символов')
     return

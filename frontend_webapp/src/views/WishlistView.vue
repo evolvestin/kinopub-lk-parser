@@ -32,8 +32,12 @@ const showCasinoHint = computed(() => {
   return totalWishlistItems.value >= 10 && !uiStore.dismissedHints['casino_roulette']
 })
 
-const showFolderGuide = computed(() => {
-  return totalWishlistItems.value > 0 && totalWishlistItems.value < 5 && !uiStore.dismissedHints['wishlist_basics']
+const showSingleFolderGuide = computed(() => {
+  return wishlistStore.folders.length === 1 && totalWishlistItems.value > 0 && totalWishlistItems.value < 5 && !uiStore.dismissedHints['wishlist_single_folder']
+})
+
+const showMultiFolderGuide = computed(() => {
+  return wishlistStore.folders.length > 1 && totalWishlistItems.value > 0 && totalWishlistItems.value < 5 && !uiStore.dismissedHints['wishlist_basics']
 })
 
 const handleCasinoClick = () => {
@@ -59,7 +63,7 @@ const arrowClass = computed(() => {
 
 const isFakeMode = computed(() => {
   return wishlistStore.folders.length === 0 || wishlistStore.folders.every(f => f.items.length === 0);
-});
+})
 
 const FAKE_FOLDERS = [
   {
@@ -81,27 +85,27 @@ const FAKE_FOLDERS = [
       { id: -3, show_id: 3, title: 'Тайна Коко', original_title: 'Coco', year: 2017, type: 'Movie', poster_url: 'https://image.tmdb.org/t/p/w200/gGEsBPAijhVUFoiNptSWfKbFeDr.jpg', added_at: '2023-01-03' }
     ]
   }
-];
+]
 
 const displayFolders = computed(() => {
   if (isFakeMode.value) return FAKE_FOLDERS;
   return wishlistStore.folders;
-});
+})
 
 const displayActiveFolderId = computed(() => {
   if (isFakeMode.value) return FAKE_FOLDERS[0].id;
   return wishlistStore.activeFolderId;
-});
+})
 
 const displayActiveFolder = computed(() => {
   if (isFakeMode.value) return FAKE_FOLDERS[0];
   return wishlistStore.activeFolder;
-});
+})
 
 const displaySortedItems = computed(() => {
   if (isFakeMode.value) return FAKE_FOLDERS[0].items;
   return wishlistStore.sortedItems;
-});
+})
 
 const toggleSortDropdown = () => {
   isSortMenuOpen.value = !isSortMenuOpen.value
@@ -269,7 +273,7 @@ const handleCreateFolder = () => {
   <div class="view active-view" id="view-wishlist" style="position: relative;">
     <div v-if="isFakeMode" class="onboarding-overlay-fixed">
       <div class="onboarding-card">
-        <div class="onboarding-icon">🔖</div>
+        <div class="onboarding-icon">🍿</div>
         <div class="onboarding-title">Ваше избранное</div>
         <div class="onboarding-text">Сюда можно добавлять фильмы и сериалы, которые вы хотите посмотреть в будущем. Создавайте свои подборки!</div>
         <button class="btn-primary" style="margin-top: 0;" @click="uiStore.switchBaseView('search')">Найти кино</button>
@@ -320,11 +324,20 @@ const handleCreateFolder = () => {
       </div>
 
       <template v-else>
-        <div v-if="showFolderGuide && !isFakeMode" class="onboarding-inline-banner">
+        <div v-if="showSingleFolderGuide && !isFakeMode" class="onboarding-inline-banner">
+          <div class="o-icon">💡</div>
+          <div class="o-content">
+            <div class="o-title">Создавайте свои списки</div>
+            <div class="o-text">Вы можете создать новые папки для группировки избранного. Используйте кнопку + в правом верхнем углу.</div>
+          </div>
+          <button class="o-close" @click="uiStore.dismissHint('wishlist_single_folder')">×</button>
+        </div>
+
+        <div v-if="showMultiFolderGuide && !isFakeMode" class="onboarding-inline-banner">
           <div class="o-icon">💡</div>
           <div class="o-content">
             <div class="o-title">Управляйте списками</div>
-            <div class="o-text">Нажмите и удерживайте папку для редактирования. Используйте кнопки ⚙️ или ☰ в панели выше для изменения порядка элементов.</div>
+            <div class="o-text">Нажмите и удерживайте папку для редактирования. Порядок папок можно изменить в режиме сортировки.</div>
           </div>
           <button class="o-close" @click="uiStore.dismissHint('wishlist_basics')">×</button>
         </div>

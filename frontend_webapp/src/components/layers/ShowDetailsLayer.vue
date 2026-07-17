@@ -99,9 +99,9 @@ const activePoster = ref('')
 const activeBg = ref('')
 
 // Умные контекстные подсказки
-const showWishlistGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.wishlist_added === 0)
-const showViewGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.total_views === 0)
-const showRateGuide = computed(() => statsStore.currentStats && statsStore.currentStats.ratings?.total === 0)
+const showWishlistGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.wishlist_added === 0 && !uiStore.dismissedHints['wishlist_guide'])
+const showViewGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.total_views === 0 && !uiStore.dismissedHints['view_guide'])
+const showRateGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.ratings?.total === 0 && !uiStore.dismissedHints['rate_guide'])
 
 const currentPersonalRating = computed(() => {
   if (!show.value) return null
@@ -217,10 +217,12 @@ watch(() => uiStore.modals.rateShow.isOpen, async (newVal, oldVal) => {
 })
 
 const openWishlistModal = () => {
+  uiStore.dismissHint('wishlist_guide')
   uiStore.openModal('wlFolder', { showId: show.value.id, title: show.value.title })
 }
 
 const openRating = () => {
+  uiStore.dismissHint('rate_guide')
   uiStore.openModal('rateShow', {
     showId: show.value.id,
     title: show.value.title,
@@ -229,7 +231,10 @@ const openRating = () => {
   })
 }
 
-const openAddView = () => uiStore.openModal('addView', { showId: show.value.id, title: show.value.title, type: show.value.type })
+const openAddView = () => {
+  uiStore.dismissHint('view_guide')
+  uiStore.openModal('addView', { showId: show.value.id, title: show.value.title, type: show.value.type })
+}
 
 const openRatingsDetails = (ratingType) => {
   uiStore.openModal('details', { showId: props.showId, ratingType })
