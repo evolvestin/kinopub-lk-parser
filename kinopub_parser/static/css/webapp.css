@@ -639,14 +639,14 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border);
     color: var(--text-secondary);
-    padding: 12px 16px;
+    padding: 8px 16px;
     font-size: 13px;
     font-weight: 600;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    height: 44px;
+    min-height: 44px;
 }
 
 .light .shared-banner {
@@ -660,9 +660,9 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 }
 
 .shared-banner-text {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
+    text-align: center;
 }
 
 .shared-banner-name {
@@ -681,11 +681,12 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 }
 
 body.has-banner #app {
-    margin-top: 44px;
+    margin-top: var(--banner-height, 44px);
+    height: calc(100dvh - var(--banner-height, 44px)) !important;
 }
 
 body.has-banner .layer {
-    top: 44px;
+    top: var(--banner-height, 44px);
 }
 
 .view-toggle { display: flex; background: var(--bg-input); border-radius: 10px; padding: 3px; border: 1px solid var(--border); margin-bottom: clamp(12px, 3.5vw, 16px); }

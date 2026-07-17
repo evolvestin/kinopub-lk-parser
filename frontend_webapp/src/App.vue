@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUIStore } from './stores/uiStore'
 import { useStatsStore } from './stores/useStatsStore'
@@ -27,8 +27,19 @@ import RatingsDetailsModal from './components/modals/RatingsDetailsModal.vue'
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const wishlistStore = useWishlistStore()
-const { tg } = useTelegram()
+const { tg, showConfirm } = useTelegram()
 const router = useRouter()
+
+const bannerRef = ref(null)
+let bannerObserver = null
+
+const updateBannerHeight = () => {
+  if (bannerRef.value) {
+    document.documentElement.style.setProperty('--banner-height', `${bannerRef.value.offsetHeight}px`)
+  } else {
+    document.documentElement.style.setProperty('--banner-height', '0px')
+  }
+}
 
 const showBackButton = computed(() => {
   return uiStore.hasOpenLayers || Object.values(uiStore.modals).some(m => m.isOpen)
@@ -38,11 +49,39 @@ const sharedUser = computed(() => {
   return statsStore.currentStats?.meta || null
 })
 
+const openTelegramLink = (url) => {
+  showConfirm('Переход в профиль Telegram может свернуть текущее мини-приложение. Продолжить?', (ok) => {
+    if (ok) {
+      if (tg && typeof tg.openTelegramLink === 'function') {
+        tg.openTelegramLink(url)
+      } else {
+        window.open(url, '_blank')
+      }
+    }
+  })
+}
+
 watch(() => statsStore.isShared, (val) => {
   if (val) {
     document.body.classList.add('has-banner')
+    nextTick(() => {
+      if (bannerRef.value) {
+        updateBannerHeight()
+        if (typeof ResizeObserver !== 'undefined') {
+          bannerObserver = new ResizeObserver(() => {
+            updateBannerHeight()
+          })
+          bannerObserver.observe(bannerRef.value)
+        }
+      }
+    })
   } else {
     document.body.classList.remove('has-banner')
+    document.documentElement.style.setProperty('--banner-height', '0px')
+    if (bannerObserver) {
+      bannerObserver.disconnect()
+      bannerObserver = null
+    }
   }
 }, { immediate: true })
 
@@ -136,6 +175,9 @@ onMounted(async () => {
 onUnmounted(() => {
   document.documentElement.classList.remove('is-webapp')
   document.body.classList.remove('is-webapp')
+  if (bannerObserver) {
+    bannerObserver.disconnect()
+  }
 })
 
 watch(showBackButton, (val) => {
@@ -149,7 +191,7 @@ watch(() => uiStore.theme, (val) => {
 
 <template>
   <div :class="[uiStore.theme, 'is-webapp']">
-    <div v-if="statsStore.isShared" class="shared-banner">
+    <div v-if="statsStore.isShared" ref="bannerRef" class="shared-banner">
       <span class="shared-banner-icon">📊</span>
       <span class="shared-banner-text">
         Вы просматриваете статистику
@@ -157,7 +199,7 @@ watch(() => uiStore.theme, (val) => {
           <template v-if="!sharedUser.is_anonymous && sharedUser.name !== 'Аноним'">
             пользователя <strong class="shared-banner-name">{{ sharedUser.name }}</strong>
             <template v-if="sharedUser.username">
-              (<a :href="'https://t.me/' + sharedUser.username" target="_blank" class="shared-banner-link">@{{ sharedUser.username }}</a>)
+              (<a href="#" @click.prevent="openTelegramLink('https://t.me/' + sharedUser.username)" class="shared-banner-link">@{{ sharedUser.username }}</a>)
             </template>
           </template>
           <template v-else>
