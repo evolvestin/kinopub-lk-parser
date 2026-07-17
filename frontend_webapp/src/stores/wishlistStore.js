@@ -11,9 +11,37 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
   const folders = ref([])
   const isLoaded = ref(false)
-  const isReorderFoldersMode = ref(false)
-  const isReorderItemsMode = ref(false)
   let fetchPromise = null
+
+  const isReorderFoldersMode = computed({
+    get() {
+      return router.currentRoute.value.query.reorder_folders === 'true'
+    },
+    set(val) {
+      const query = { ...router.currentRoute.value.query }
+      if (val) {
+        query.reorder_folders = 'true'
+      } else {
+        delete query.reorder_folders
+      }
+      router.replace({ query }).catch(() => {})
+    }
+  })
+
+  const isReorderItemsMode = computed({
+    get() {
+      return router.currentRoute.value.query.reorder_items === 'true'
+    },
+    set(val) {
+      const query = { ...router.currentRoute.value.query }
+      if (val) {
+        query.reorder_items = 'true'
+      } else {
+        delete query.reorder_items
+      }
+      router.replace({ query }).catch(() => {})
+    }
+  })
 
   async function fetchWishlist(force = false) {
     if (isLoaded.value && !force) return
@@ -199,11 +227,19 @@ export const useWishlistStore = defineStore('wishlist', () => {
   }
 
   async function addItemToFolder(folderId, showId) {
+    const folder = folders.value.find(f => f.id === folderId)
+    const alreadyExists = folder && folder.items.some(item => item.show_id === showId)
+
+    if (alreadyExists) {
+      uiStore.showToast('Уже в этой папке')
+      return
+    }
+
     try {
       await api.post('wishlist/', { action: 'add_item', folder_id: folderId, show_id: showId })
       await fetchWishlist(true)
       uiStore.showToast('Успешно добавлено')
-    } catch (e) {
+    } catch (error) {
       uiStore.showToast('Ошибка при добавлении')
     }
   }

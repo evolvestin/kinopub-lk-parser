@@ -22,15 +22,19 @@
         <div v-for="f in wishlistStore.folders" 
              :key="f.id" 
              class="wl-folder-card" 
+             :style="hasShow(f) ? { borderColor: 'var(--accent)', background: 'var(--accent-dim)' } : {}"
              @click="addToFolder(f.id)">
           <div class="wl-folder-icon" :style="{ color: f.color }">
             <span v-html="icons[f.icon] || icons.folder"></span>
           </div>
-          <div class="wl-folder-info">
-            <div class="wl-folder-name">{{ f.name }}</div>
-            <div class="wl-folder-count">
-              {{ f.items.length }} {{ plural(f.items.length, ['элемент', 'элемента', 'элементов']) }}
+          <div class="wl-folder-info" style="display: flex; align-items: center; justify-content: space-between; width: 100%; min-width: 0; gap: 8px;">
+            <div style="min-width: 0; flex: 1;">
+              <div class="wl-folder-name">{{ f.name }}</div>
+              <div class="wl-folder-count">
+                {{ f.items.length }} {{ plural(f.items.length, ['элемент', 'элемента', 'элементов']) }}
+              </div>
             </div>
+            <div v-if="hasShow(f)" style="color: var(--accent); display: flex; align-items: center; flex-shrink: 0;" v-html="icons.check"></div>
           </div>
         </div>
       </div>
@@ -51,6 +55,10 @@ const wishlistStore = useWishlistStore()
 const statsStore = useStatsStore()
 
 const context = computed(() => uiStore.modals.wlFolder.context || {})
+
+const hasShow = (folder) => {
+  return folder.items && folder.items.some(item => item.show_id === context.value.showId)
+}
 
 const close = () => {
   uiStore.closeModal('wlFolder')

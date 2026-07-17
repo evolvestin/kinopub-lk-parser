@@ -342,7 +342,7 @@ const handleCreateFolder = () => {
           <button class="o-close" @click="uiStore.dismissHint('wishlist_basics')">×</button>
         </div>
 
-        <div v-if="displayFolders.length > 1" style="padding: 10px 16px;" id="wl-folders-wrapper">
+        <div v-if="displayFolders.length > 1" id="wl-folders-wrapper">
           <div ref="foldersGridRef" class="wl-folders-grid" :class="{ 'reorder-mode': wishlistStore.isReorderFoldersMode }">
             <FolderCard 
               v-for="folder in displayFolders" 
@@ -394,7 +394,7 @@ const handleCreateFolder = () => {
             </div>
           </div>
 
-          <div ref="itemsGridRef" id="wl-items-container" :class="{ 'reorder-items-mode': wishlistStore.isReorderItemsMode }" style="padding: 0 16px 24px;">
+          <div ref="itemsGridRef" id="wl-items-container" :class="{ 'reorder-items-mode': wishlistStore.isReorderItemsMode }">
             <div v-if="!displayActiveFolder.items.length" class="empty">
               <div class="icon" v-html="icons.film"></div> Папка пуста
             </div>

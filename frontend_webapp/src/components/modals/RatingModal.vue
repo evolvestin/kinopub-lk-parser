@@ -371,7 +371,6 @@ const fetchEpisodes = async (silent = false) => {
 }
 
 onMounted(async () => {
-  uiStore.dismissHint('rate_modal')
   const queryVal = router.currentRoute.value.query.modal_val
   if (queryVal !== undefined && queryVal !== null) {
     localVal.value = parseFloat(queryVal)

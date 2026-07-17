@@ -34,11 +34,11 @@
 
         <div v-if="isGamificationMode" class="gamification-progress-card">
           <div class="gamification-title">Начало положено! 🚀</div>
-          <div class="gamification-text">Вы отметили {{ statsStore.currentStats.summary.total_views }} {{ plural(statsStore.currentStats.summary.total_views, ['фильм', 'фильма', 'фильмов']) }}. Добавьте еще {{ 10 - statsStore.currentStats.summary.total_views }}, чтобы разблокировать красивые графики, топы актеров и тепловую карту активности.</div>
+          <div class="gamification-text">Вы отметили {{ totalViewsAllTime }} {{ plural(totalViewsAllTime, ['фильм', 'фильма', 'фильмов']) }}. Добавьте еще {{ 10 - totalViewsAllTime }}, чтобы разблокировать красивые графики, топы актеров и тепловую карту активности.</div>
           <div class="gamification-bar-wrap">
-            <div class="gamification-bar-fill" :style="{ width: (statsStore.currentStats.summary.total_views / 10 * 100) + '%' }"></div>
+            <div class="gamification-bar-fill" :style="{ width: (totalViewsAllTime / 10 * 100) + '%' }"></div>
           </div>
-          <div style="font-size: 11px; color: var(--accent); font-weight: 800;">ПРОГРЕСС {{ statsStore.currentStats.summary.total_views }} / 10</div>
+          <div style="font-size: 11px; color: var(--accent); font-weight: 800;">ПРОГРЕСС {{ totalViewsAllTime }} / 10</div>
         </div>
 
         <div class="tabs" v-if="statsStore.hasGroup">
@@ -357,8 +357,16 @@ const isFakeMode = computed(() => {
   return statsStore.currentStats && statsStore.currentStats.summary?.total_views === 0;
 });
 
+const totalViewsAllTime = computed(() => {
+  const allStats = statsStore.statsCache['all'];
+  if (allStats) {
+    return allStats.summary?.total_views || 0;
+  }
+  return statsStore.currentStats?.summary?.total_views || 0;
+});
+
 const isGamificationMode = computed(() => {
-  const views = statsStore.currentStats?.summary?.total_views || 0;
+  const views = totalViewsAllTime.value;
   return views > 0 && views < 10 && !statsStore.isShared;
 });
 

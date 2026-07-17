@@ -244,7 +244,6 @@ const fetchEpisodes = async (silent = false) => {
 }
 
 onMounted(async () => {
-  uiStore.dismissHint('add_view_modal')
   if (isSeries.value) {
     if (uiStore.episodesCache[context.value.showId]) {
       episodesData.value = uiStore.episodesCache[context.value.showId]
