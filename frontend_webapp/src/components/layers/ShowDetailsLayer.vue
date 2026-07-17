@@ -22,14 +22,17 @@
           </div>
         </div>
 
-        <button class="detail-wishlist-btn anim-item" @click="openWishlistModal">
+        <button class="detail-wishlist-btn anim-item" style="position: relative; animation-delay: 0s;" @click="openWishlistModal">
           <span v-html="icons.bookmark_plus"></span>
+          <div v-if="showWishlistGuide" class="guide-tooltip-left">В избранное</div>
         </button>
-        <button class="detail-add-view-btn anim-item" @click="openAddView">
+        <button class="detail-add-view-btn anim-item" style="position: relative; animation-delay: 0.1s;" @click="openAddView">
           <span v-html="icons.eye"></span>
+          <div v-if="showViewGuide" class="guide-tooltip-left">Отметить просмотр</div>
         </button>
-        <button class="detail-rate-btn anim-item" @click="openRating">
+        <button class="detail-rate-btn anim-item" style="position: relative; animation-delay: 0.2s;" @click="openRating">
           <span v-html="icons.star"></span>
+          <div v-if="showRateGuide" class="guide-tooltip-left">Поставить оценку</div>
         </button>
       </div>
     </div>
@@ -94,6 +97,11 @@ const statsStore = useStatsStore()
 const show = ref(null)
 const activePoster = ref('')
 const activeBg = ref('')
+
+// Умные контекстные подсказки
+const showWishlistGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.wishlist_added === 0)
+const showViewGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.total_views === 0)
+const showRateGuide = computed(() => statsStore.currentStats && statsStore.currentStats.ratings?.total === 0)
 
 const currentPersonalRating = computed(() => {
   if (!show.value) return null

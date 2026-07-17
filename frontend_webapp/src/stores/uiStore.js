@@ -10,6 +10,12 @@ export const useUIStore = defineStore('ui', () => {
   const isHistoryEditMode = ref(false)
   const episodesCache = ref({})
   const showsCache = ref({})
+  const dismissedHints = ref(JSON.parse(localStorage.getItem('kp_hints') || '{}'))
+
+  function dismissHint(key) {
+    dismissedHints.value[key] = true
+    localStorage.setItem('kp_hints', JSON.stringify(dismissedHints.value))
+  }
 
   const modals = computed(() => {
     const active = router.currentRoute.value.query.modal || null
@@ -188,9 +194,9 @@ export const useUIStore = defineStore('ui', () => {
 
   return {
     isLoading, isAppReady, theme, toast, layerStack, hasOpenLayers, activeView, modals,
-    isHistoryEditMode, episodesCache, showsCache,
+    isHistoryEditMode, episodesCache, showsCache, dismissedHints,
     openLayer, popLayer, switchBaseView, showToast, toggleTheme, fitText, fitAll,
-    openModal, closeModal,
+    openModal, closeModal, dismissHint,
     setLoading: (v) => { isLoading.value = v },
     setAppReady: (v) => { isAppReady.value = v }
   }

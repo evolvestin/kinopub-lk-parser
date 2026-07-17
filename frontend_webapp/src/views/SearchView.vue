@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useDataStore } from '../stores/useDataStore'
 import { useUIStore } from '../stores/uiStore'
+import { useStatsStore } from '../stores/useStatsStore'
 import { icons } from '../utils/icons'
 import EmptyState from '../components/shared/EmptyState.vue'
 import PersonPill from '../components/shared/PersonPill.vue'
@@ -9,6 +10,7 @@ import ShowCard from '../components/shared/ShowCard.vue'
 
 const dataStore = useDataStore()
 const uiStore = useUIStore()
+const statsStore = useStatsStore()
 const query = ref(dataStore.searchQuery)
 const isAnimated = ref(true)
 let timer = null
@@ -21,6 +23,11 @@ const handleInput = () => {
   timer = setTimeout(() => {
     dataStore.searchQuery = query.value
   }, 500)
+}
+
+const setQuery = (q) => {
+  query.value = q
+  dataStore.searchQuery = q
 }
 
 watch(() => dataStore.searchResults.persons, () => {
@@ -76,10 +83,33 @@ onUnmounted(() => {
       </div>
 
       <template v-else>
-        <EmptyState v-if="!dataStore.hasSearched" icon="search" text="Введите название для поиска" />
+        <div v-if="!dataStore.hasSearched" class="welcome-container">
+          <div class="icon-wrap">🍿</div>
+          <h2>Что будем смотреть?</h2>
+          <p>Начните вводить название фильма, сериала или <b>имя актёра и режиссёра</b>, чтобы найти их и добавить в свою статистику.</p>
+          
+          <div class="qs-label">Попробуйте найти:</div>
+          <div class="qs-chips">
+            <button class="qs-chip" @click="setQuery('Во все тяжкие')">Во все тяжкие</button>
+            <button class="qs-chip" @click="setQuery('Интерстеллар')">Интерстеллар</button>
+            <button class="qs-chip" @click="setQuery('Кристофер Нолан')">Кристофер Нолан</button>
+            <button class="qs-chip" @click="setQuery('Леонардо ДиКаприо')">ДиКаприо</button>
+            <button class="qs-chip" @click="setQuery('Симпсоны')">Симпсоны</button>
+          </div>
+        </div>
+
         <EmptyState v-else-if="isEmpty" icon="dash" text="Ничего не найдено" />
 
         <div v-else class="search-content">
+          <div v-if="dataStore.hasSearched && !uiStore.dismissedHints['search_results'] && (statsStore.currentStats?.summary?.total_views === 0)" class="onboarding-inline-banner" style="margin-top: 16px;">
+            <div class="o-icon">👇</div>
+            <div class="o-content">
+              <div class="o-title">Отлично, мы нашли контент!</div>
+              <div class="o-text">Нажмите на карточку фильма или персоны, чтобы открыть подробную информацию и начать собирать статистику.</div>
+            </div>
+            <button class="o-close" @click="uiStore.dismissHint('search_results')">×</button>
+          </div>
+
           <div v-if="dataStore.searchResults.persons?.length">
             <div class="label"><div class="icon" style="color:#d29922" v-html="icons.users"></div>Люди</div>
             <div class="h-scroll-container" :class="{ 'anim-active': isAnimated }" @animationend="isAnimated = false">

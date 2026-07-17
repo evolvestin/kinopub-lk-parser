@@ -32,6 +32,11 @@
         </div>
 
         <div v-else-if="level === 'show' || level === 'score'" class="rate-container">
+          <div v-if="statsStore.currentStats?.ratings?.total === 0 && !uiStore.dismissedHints['rate_modal']" class="modal-hint-box" style="position: relative; width: 100%; text-align: left; margin-bottom: 0;">
+            Потяните ползунок вправо или влево, чтобы выбрать нужную оценку для этого тайтла.
+            <button @click="uiStore.dismissHint('rate_modal')" style="position: absolute; right: 8px; top: 8px; background: none; border: none; color: var(--text-muted); cursor: pointer;">×</button>
+          </div>
+
           <div class="rate-score-display">
             <div class="rate-score-huge">{{ displayValue }}<span>/ 10</span></div>
           </div>

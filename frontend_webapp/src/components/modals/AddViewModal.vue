@@ -19,6 +19,11 @@
           {{ context.title }}
         </div>
 
+        <div v-if="statsStore.currentStats?.summary?.total_views === 0 && !uiStore.dismissedHints['add_view_modal']" class="modal-hint-box" style="position: relative;">
+          Выберите точную дату или месяц для построения графиков активности. Если точная дата неизвестна — используйте <b>"Не помню"</b>.
+          <button @click="uiStore.dismissHint('add_view_modal')" style="position: absolute; right: 8px; top: 8px; background: none; border: none; color: var(--text-muted); cursor: pointer;">×</button>
+        </div>
+
         <div v-if="statsStore.isShared" style="margin-bottom: 16px; padding: 10px; background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.2); border-radius: 10px; font-size: 11px; color: var(--text-secondary); line-height: 1.3; text-align: center;">
           ⚠️ Вы отмечаете просмотр для своего <strong style="color: var(--text-primary);">личного профиля</strong>.
         </div>

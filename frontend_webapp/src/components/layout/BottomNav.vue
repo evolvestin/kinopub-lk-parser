@@ -6,7 +6,7 @@
     <button class="bn-btn" :class="{ active: uiStore.activeView === 'wishlist' }" @click="uiStore.switchBaseView('wishlist')">
       <div class="icon" v-html="icons.bookmark"></div> Избранное
     </button>
-    <button v-if="!userStore.isGuest" class="bn-btn" :class="{ active: uiStore.activeView === 'stats' }" @click="uiStore.switchBaseView('stats')">
+    <button class="bn-btn" :class="{ active: uiStore.activeView === 'stats' }" @click="uiStore.switchBaseView('stats')">
       <div class="icon" v-html="icons.nav_stats"></div> Статистика
     </button>
   </div>
