@@ -300,7 +300,7 @@ Object.assign(window.App, {
             
             stack.forEach(ctx => {
                 if (ctx.type === 'show') path += `/show/${ctx.showId}`;
-                else if (ctx.type === 'collection') path += `/${ctx.ctype}/${ctx.itemId}`;
+                else if (['person', 'genre', 'country', 'show_type', 'year', 'status'].includes(ctx.type)) path += `/${ctx.ctype}/${ctx.itemId}`;
                 else if (ctx.type === 'history') path += `/history/${ctx.htype || 'all'}`;
             });
 
@@ -368,7 +368,7 @@ Object.assign(window.App, {
                         await window.App.openShowLayer(id, true);
                     } else if (type === 'history') {
                         window.App.openHistoryLayer(id, savedCtx.title || 'История', savedCtx.extraId, savedCtx.extraDate, savedCtx.extraKey, savedCtx.extraIndex, true);
-                    } else if (['person', 'genre', 'country'].includes(type)) {
+                    } else if (['person', 'genre', 'country', 'show_type', 'year', 'status'].includes(type)) {
                         const fallbackTitle = savedCtx.titleFallback || savedCtx.title || 'Загрузка...';
                         await window.App.openCollectionLayer(type, id, fallbackTitle, true);
                     }

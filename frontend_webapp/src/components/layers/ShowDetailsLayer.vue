@@ -48,9 +48,10 @@
       </div>
 
       <div class="show-meta-tags">
-        <div class="sm-tag">{{ show.year || '?' }}</div>
-        <div class="sm-tag" style="color:var(--info)">{{ showTypeRu }}</div>
-        <div class="sm-tag" v-if="show.status">{{ showStatusRu }}</div>
+        <div v-if="show.year" class="sm-tag clickable" @click="uiStore.openLayer('year', show.year)">{{ show.year }}</div>
+        <div v-else class="sm-tag">{{ '?' }}</div>
+        <div v-if="show.type" class="sm-tag clickable" style="color:var(--info)" @click="uiStore.openLayer('show_type', show.type)">{{ showTypeRu }}</div>
+        <div v-if="show.status" class="sm-tag clickable" @click="uiStore.openLayer('status', show.status)">{{ showStatusRu }}</div>
       </div>
 
       <div class="show-meta-tags">

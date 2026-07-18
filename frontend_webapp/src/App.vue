@@ -123,7 +123,7 @@ onMounted(async () => {
   
   const lastView = localStorage.getItem('kp_last_active_view')
   const currentPath = router.currentRoute.value.path
-  const hasLayer = ['/show/', '/person/', '/genre/', '/country/', '/history/'].some(keyword => 
+  const hasLayer = ['/show/', '/person/', '/genre/', '/country/', '/history/', '/show_type/', '/year/', '/status/'].some(keyword => 
     currentPath.includes(keyword)
   )
 
@@ -228,7 +228,7 @@ watch(() => uiStore.theme, (val) => {
              display: index === uiStore.layerStack.length - 1 ? 'block' : 'none' 
            }">
         <ShowDetailsLayer v-if="layer.type === 'show'" :showId="layer.props.showId" />
-        <CollectionLayer v-if="['person', 'genre', 'country'].includes(layer.type)" 
+        <CollectionLayer v-if="['person', 'genre', 'country', 'show_type', 'year', 'status'].includes(layer.type)" 
                         :type="layer.type" :itemId="layer.props.itemId" />
         <HistoryLayer v-if="layer.type === 'history'" v-bind="layer.props" />
       </div>
@@ -249,6 +249,9 @@ watch(() => uiStore.theme, (val) => {
     </Transition>
     <Transition name="modal">
       <AddViewModal v-if="uiStore.modals.addView.isOpen" v-bind="uiStore.modals.addView.context" />
+    </Transition>
+    <Transition name="modal">
+      <WlFolderModal v-if="uiStore.modals.wlFolder.isOpen" />
     </Transition>
     <Transition name="modal">
       <WlFolderModal v-if="uiStore.modals.wlFolder.isOpen" />

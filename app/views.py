@@ -76,6 +76,7 @@ from shared.constants import (
     RAW_TO_NORMALIZED_COUNTRY,
     RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
+    SHOW_STATUS_DISPLAY_RU,
     SHOW_TYPE_DISPLAY_RU,
     UserRole,
 )
@@ -1462,15 +1463,28 @@ def webapp_get_show_full(request, show_id):
 
 
 @csrf_exempt
-@require_http_methods(['GET'])
+@require_http_methods(['POST', 'GET'])
 def webapp_get_collection(request, collection_type, item_id):
     try:
+        offset = 0
+        limit = 50
+        if request.method == 'POST':
+            try:
+                body = json.loads(request.body)
+                offset = int(body.get('offset', 0))
+                limit = int(body.get('limit', 50))
+            except Exception:
+                pass
+        else:
+            offset = int(request.GET.get('offset', 0))
+            limit = int(request.GET.get('limit', 50))
+
         shows = Show.objects.all()
         title = 'Коллекция'
         person_info = None
 
         if collection_type == 'person':
-            base_person = Person.objects.get(id=item_id)
+            base_person = Person.objects.get(id=int(item_id))
             person = base_person.canonical
 
             target_ids = [person.id] + list(person.aliases.values_list('id', flat=True))
@@ -1491,28 +1505,40 @@ def webapp_get_collection(request, collection_type, item_id):
                 'professions': norm_profs,
             }
         elif collection_type == 'genre':
-            genre = Genre.objects.get(id=item_id)
+            genre = Genre.objects.get(id=int(item_id))
             norm_name = RAW_TO_NORMALIZED_GENRE.get(genre.name, genre.name)
             search_list = GENRES_MAPPING.get(norm_name, [genre.name])
             shows = shows.filter(genres__name__in=search_list)
             title = f'Жанр: {norm_name}'
         elif collection_type == 'country':
-            country = Country.objects.get(id=item_id)
+            country = Country.objects.get(id=int(item_id))
             shows = shows.filter(countries=country)
             title = country.name
             if country.emoji_flag:
                 title = f'{country.emoji_flag} {title}'
+        elif collection_type == 'show_type':
+            shows = shows.filter(type=item_id)
+            title = f'Тип: {SHOW_TYPE_DISPLAY_RU.get(item_id, item_id)}'
+        elif collection_type == 'year':
+            shows = shows.filter(year=int(item_id))
+            title = f'Год: {item_id}'
+        elif collection_type == 'status':
+            shows = shows.filter(status=item_id)
+            title = f'Статус: {SHOW_STATUS_DISPLAY_RU.get(item_id, item_id)}'
         else:
             return JsonResponse({'error': 'Invalid collection type'}, status=400)
 
-        shows = shows.order_by('-year', '-id').distinct()[:50]
+        shows = shows.order_by('-year', '-id').distinct()
+
+        sliced_shows = list(shows[offset : offset + limit + 1])
+        has_more = len(sliced_shows) > limit
+        shows_to_return = sliced_shows[:limit]
 
         view_user = get_webapp_user(request)
-
-        user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])
+        user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows_to_return])
 
         results = []
-        for show in shows:
+        for show in shows_to_return:
             results.append(
                 {
                     'id': show.id,
@@ -1525,8 +1551,10 @@ def webapp_get_collection(request, collection_type, item_id):
                 }
             )
 
-        return JsonResponse({'title': title, 'items': results, 'person_info': person_info})
-    except (Person.DoesNotExist, Genre.DoesNotExist, Country.DoesNotExist):
+        return JsonResponse(
+            {'title': title, 'items': results, 'person_info': person_info, 'has_more': has_more}
+        )
+    except (Person.DoesNotExist, Genre.DoesNotExist, Country.DoesNotExist, ValueError):
         return JsonResponse({'error': 'Item not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

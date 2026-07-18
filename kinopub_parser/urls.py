@@ -36,7 +36,7 @@ urlpatterns = proxy_patterns + [
     # WebApp Endpoints
     path('webapp/', views.webapp_index, name='webapp_index'),
     path(
-        'api/webapp/collection/<str:collection_type>/<int:item_id>/',
+        'api/webapp/collection/<str:collection_type>/<str:item_id>/',
         views.webapp_get_collection,
         name='webapp_get_collection',
     ),

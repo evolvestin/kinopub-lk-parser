@@ -1,5 +1,5 @@
 <template>
-  <div class="layer-content">
+  <div class="layer-content" ref="containerEl">
     <div class="layer-header">
       <div style="flex-shrink: 0;">
         <button class="tab clickable" @click="uiStore.popLayer">
@@ -12,7 +12,7 @@
       <div style="flex-shrink: 0; width: 80px;"></div>
     </div>
 
-    <div v-if="loading" class="loader-inline">
+    <div v-if="loading && items.length === 0" class="loader-inline">
       <div class="spinner"></div>
     </div>
 
@@ -39,12 +39,18 @@
         <ShowCard v-for="item in items" :key="item.id" :show="item" />
         <div v-if="!items.length" class="empty">Пусто</div>
       </div>
+
+      <div v-if="loadingMore" class="loader-inline" style="padding: 20px;">
+        <div class="spinner" style="width: 24px; height: 24px;"></div>
+      </div>
+
+      <div ref="sentinelEl" style="height: 40px; width: 100%; pointer-events: none;"></div>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useUIStore } from '../../stores/uiStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
@@ -60,17 +66,40 @@ const title = ref('Загрузка...')
 const items = ref([])
 const personInfo = ref(null)
 const loading = ref(true)
+const loadingMore = ref(false)
+const hasMore = ref(true)
+const offset = ref(0)
+const limit = 50
 
-const loadData = async () => {
-  loading.value = true
+const containerEl = ref(null)
+const sentinelEl = ref(null)
+let observer = null
+
+const loadData = async (isLoadMore = false) => {
+  if (isLoadMore) {
+    loadingMore.value = true
+  } else {
+    loading.value = true
+    offset.value = 0
+    items.value = []
+    hasMore.value = true
+  }
+
   try {
-    const data = await api.get(`collection/${props.type}/${props.itemId}/`)
+    const data = await api.get(`collection/${props.type}/${props.itemId}/?offset=${offset.value}&limit=${limit}`)
     title.value = data.title
-    items.value = data.items
     personInfo.value = data.person_info
+    hasMore.value = data.has_more
 
-    if (data.items) {
-      data.items.forEach(item => {
+    const newItems = data.items || []
+    if (isLoadMore) {
+      items.value.push(...newItems)
+    } else {
+      items.value = newItems
+    }
+
+    if (newItems.length) {
+      newItems.forEach(item => {
         if (item.poster_url) preloadImage(item.poster_url)
       })
     }
@@ -79,9 +108,43 @@ const loadData = async () => {
     uiStore.showToast('Ошибка загрузки коллекции')
   } finally {
     loading.value = false
+    loadingMore.value = false
   }
 }
 
-onMounted(loadData)
-watch(() => props.itemId, loadData)
+const loadMore = async () => {
+  if (loading.value || loadingMore.value || !hasMore.value) return
+  offset.value += limit
+  await loadData(true)
+}
+
+const setupObserver = () => {
+  if (observer) observer.disconnect()
+  observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && hasMore.value && !loading.value && !loadingMore.value) {
+      loadMore()
+    }
+  }, {
+    root: containerEl.value,
+    rootMargin: '400px'
+  })
+
+  if (sentinelEl.value) {
+    observer.observe(sentinelEl.value)
+  }
+}
+
+onMounted(async () => {
+  await loadData()
+  nextTick(setupObserver)
+})
+
+onUnmounted(() => {
+  if (observer) observer.disconnect()
+})
+
+watch(() => props.itemId, async () => {
+  await loadData()
+  nextTick(setupObserver)
+})
 </script>
