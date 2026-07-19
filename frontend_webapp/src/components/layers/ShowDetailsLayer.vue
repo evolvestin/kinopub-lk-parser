@@ -69,15 +69,14 @@
 
     <div class="plot-box" v-if="show.plot">{{ show.plot }}</div>
 
-    <!-- Блок информации для фильмов (остается без изменений) -->
-    <div v-if="!isSeries && (show.total_duration || lastViewDisplay)" style="margin-bottom: 24px;">
+    <div v-if="!isSeries && (show.total_duration || lastViewDisplay)" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
       <div class="label">
         <div class="icon" style="color:var(--info)" v-html="icons.film"></div> Информация
       </div>
       
       <div style="padding: 0 20px;">
         <div class="ep-badge clickable" 
-             :class="{ 'watched': !!lastViewDisplay }"
+             :class="{ 'watched': isAllEpisodesWatched }"
              @click="openAddView()"
              style="display: flex; flex-direction: row; justify-content: space-between; padding: 12px 16px; align-items: center; min-height: 54px; width: 100%; cursor: pointer;">
           <div style="display: flex; align-items: center; gap: 12px;">
@@ -89,7 +88,7 @@
             </div>
           </div>
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-             <div v-if="lastViewDisplay" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 4px; background: var(--accent-dim); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(46, 204, 113, 0.2);">
+             <div v-if="isAllEpisodesWatched" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 4px; background: var(--accent-dim); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(46, 204, 113, 0.2);">
                 <span v-html="icons.check" style="width: 14px; height: 14px; margin-top: -1px;"></span> Просмотрено
              </div>
              <div v-else style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; gap: 4px; background: var(--bg-card); padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border);">
@@ -104,35 +103,67 @@
       </div>
     </div>
 
-    <!-- Раздел Эпизоды с интегрированной информацией о сериале целиком -->
-    <div v-if="seasonsData.length > 0" style="margin-bottom: 24px;">
-      <div class="label" style="justify-content: space-between; align-items: center; gap: 12px;">
-        <div style="display:flex; align-items:center; gap:8px; flex-shrink: 0;">
+    <div v-if="isSeries && (show.total_duration || lastViewDisplay)" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
+      <div class="label">
+        <div class="icon" style="color:var(--info)" v-html="icons.tv"></div> Информация
+      </div>
+      
+      <div style="padding: 0 20px;">
+        <div class="ep-badge clickable" 
+             :class="{ 'watched': isAllEpisodesWatched }"
+             @click="openAddView()"
+             style="display: flex; flex-direction: row; justify-content: space-between; padding: 12px 16px; align-items: center; min-height: 54px; width: 100%; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+              <div class="ep-num" style="margin: 0; font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Сериал целиком</div>
+              <div v-if="show.total_duration" class="ep-dur" style="font-size: 14px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 4px;">
+                <span v-html="icons.time" style="width: 16px; height: 16px; color: var(--info);"></span>{{ formatEpisodeDuration(show.total_duration) }}
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+             <div v-if="isAllEpisodesWatched" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 4px; background: var(--accent-dim); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(46, 204, 113, 0.2);">
+                <span v-html="icons.check" style="width: 14px; height: 14px; margin-top: -1px;"></span> Просмотрено
+             </div>
+             <div v-else style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; gap: 4px; background: var(--bg-card); padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border);">
+                <span v-html="icons.eye" style="width: 14px; height: 14px; margin-top: -1px; opacity: 0.5;"></span> Не смотрел
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="seasonsData.length > 0" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
+      <div class="label" style="justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items:center; gap:8px;">
             <div class="icon" style="color:var(--info)" v-html="icons.list"></div> Эпизоды
         </div>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap: wrap; justify-content: flex-end;">
+        <div style="display:flex; align-items:center; gap:8px;">
           <div v-if="show.total_duration" 
-               class="sm-tag" 
-               :style="lastViewDisplay ? { borderColor: 'var(--accent)', background: 'var(--accent-dim)', color: 'var(--accent)' } : { borderColor: 'var(--border)', background: 'var(--bg-input)', color: 'var(--text-muted)' }"
-               style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; padding:4px 10px; border-radius:12px; text-transform: uppercase;">
-            <span v-html="lastViewDisplay ? icons.check : icons.eye" style="width:14px; height:14px;"></span>
-            <span>Всего: {{ formatEpisodeDuration(show.total_duration) }}</span>
+               :style="isAllEpisodesWatched ? 'color:var(--accent); background:var(--accent-dim); border-color:var(--accent);' : 'color:var(--text-muted); background:var(--bg-input); border-color:var(--border);'"
+               style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; padding:4px 10px; border-radius:12px; border: 1px solid; text-transform: uppercase;">
+            <span v-html="isAllEpisodesWatched ? icons.check : icons.time" style="width:14px; height:14px; opacity:0.7; display:flex; align-items:center;"></span>
+            Всего: {{ formatEpisodeDuration(show.total_duration) }}
           </div>
-          <div v-if="activeSeasonTotalDuration" style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; color:var(--text-muted); background:var(--bg-input); padding:4px 10px; border-radius:12px; border: 1px solid var(--border); text-transform: uppercase; white-space: nowrap;">
-            <span v-html="icons.time" style="width:14px; height:14px; opacity:0.7;"></span> Сезон: {{ activeSeasonTotalDuration }}
+          <div v-if="activeSeasonTotalDuration" 
+               :style="isActiveSeasonFullyWatched ? 'color:var(--accent); background:var(--accent-dim); border-color:var(--accent);' : 'color:var(--text-muted); background:var(--bg-input); border-color:var(--border);'"
+               style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; padding:4px 10px; border-radius:12px; border: 1px solid; text-transform: uppercase;">
+            <span v-html="isActiveSeasonFullyWatched ? icons.check : icons.time" style="width:14px; height:14px; opacity:0.7; display:flex; align-items:center;"></span>
+            Сезон: {{ activeSeasonTotalDuration }}
           </div>
         </div>
       </div>
       
-      <div class="h-scroll-container anim-active" style="padding-bottom: 16px; gap: 8px;">
+      <div class="h-scroll-container" style="padding-bottom: 16px; gap: 8px;">
         <button 
           v-for="s in seasonsData" 
           :key="s.season_number"
           class="sm-tag clickable"
-          :style="activeSeasonStr === s.season_number ? 'background: var(--accent); color: white; border-color: var(--accent);' : ''"
+          :style="getSeasonButtonStyle(s)"
           @click="activeSeasonStr = s.season_number"
-          style="border-radius: 12px; font-size: 14px; padding: 6px 14px; white-space: nowrap; outline: none;"
+          style="border-radius: 12px; font-size: 14px; padding: 6px 14px; white-space: nowrap; outline: none; display: flex; align-items: center; gap: 4px;"
         >
+          <span v-if="isSeasonFullyWatched(s)" v-html="icons.check" style="width: 14px; height: 14px; display: flex; align-items: center;"></span>
           Сезон {{ s.season_number }}
         </button>
       </div>
@@ -149,19 +180,23 @@
       </div>
     </div>
 
-    <div class="label" v-if="show.genres?.length">
-      <div class="icon" style="color:var(--info)" v-html="icons.star"></div> Жанры
-    </div>
-    <div class="h-scroll-container anim-active" v-if="show.genres?.length" style="padding-bottom: 30px;">
-      <div v-for="g in show.genres" :key="g.id" class="genre-pill" @click="uiStore.openLayer('genre', g.id)">
-        {{ g.name }}
+    <div v-if="show.genres?.length" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.6s both;">
+      <div class="label">
+        <div class="icon" style="color:var(--info)" v-html="icons.star"></div> Жанры
+      </div>
+      <div class="h-scroll-container" style="padding-bottom: 30px;">
+        <div v-for="g in show.genres" :key="g.id" class="genre-pill" @click="uiStore.openLayer('genre', g.id)">
+          {{ g.name }}
+        </div>
       </div>
     </div>
     
-    <template v-for="group in show.crew" :key="group.profession">
-      <div class="label">{{ group.profession }}</div>
-      <div class="h-scroll-container anim-active">
-         <PersonPill v-for="person in group.persons" :key="person.id" :person="person" />
+    <template v-for="(group, idx) in show.crew" :key="group.profession">
+      <div :style="{ animation: `fadeInUp 0.5s ease-out ${0.7 + idx * 0.1}s both` }">
+        <div class="label">{{ group.profession }}</div>
+        <div class="h-scroll-container">
+           <PersonPill v-for="person in group.persons" :key="person.id" :person="person" />
+        </div>
       </div>
     </template>
   </div>
@@ -243,6 +278,36 @@ const viewerRating = computed(() => {
 
 const isSeries = computed(() => {
   return show.value && ['Series', 'Documentary Series', 'TV Show'].includes(show.value.type)
+})
+
+const isSeasonFullyWatched = (s) => {
+  return s.episodes && s.episodes.length > 0 && s.episodes.every(e => e.watched)
+}
+
+const getSeasonButtonStyle = (s) => {
+  const isActive = activeSeasonStr.value === s.season_number
+  const isWatched = isSeasonFullyWatched(s)
+
+  if (isActive) {
+    return 'background: var(--accent); color: white; border-color: var(--accent);'
+  }
+  if (isWatched) {
+    return 'background: var(--accent-dim); color: var(--accent); border-color: var(--accent);'
+  }
+  return 'background: var(--bg-input); color: var(--text-secondary); border-color: var(--border);'
+}
+
+const isAllEpisodesWatched = computed(() => {
+  if (!show.value) return false
+  if (!isSeries.value) return !!lastViewDisplay.value
+  if (!seasonsData.value || seasonsData.value.length === 0) return false
+  return seasonsData.value.every(s => s.episodes && s.episodes.length > 0 && s.episodes.every(e => e.watched))
+})
+
+const isActiveSeasonFullyWatched = computed(() => {
+  if (!activeSeasonStr.value || !seasonsData.value) return false
+  const activeS = seasonsData.value.find(x => x.season_number === activeSeasonStr.value)
+  return activeS ? isSeasonFullyWatched(activeS) : false
 })
 
 const showTypeRu = computed(() => {
