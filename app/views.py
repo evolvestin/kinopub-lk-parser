@@ -23,6 +23,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from redis import Redis
+from django.db.models import Sum
 
 from app.admin_site import admin_site
 from app.models import (
@@ -1238,6 +1239,10 @@ def webapp_get_show_full(request, show_id):
         view_user = get_webapp_user(request)
 
         internal_rating, user_ratings = show.get_internal_rating_data()
+        
+        duration_qs = ShowDuration.objects.filter(show=show).aggregate(total=Sum('duration_seconds'))
+        total_duration = duration_qs['total'] or 0
+
         personal_rating = None
         personal_episodes_count = 0
 
@@ -1441,6 +1446,7 @@ def webapp_get_show_full(request, show_id):
             'imdb_url': show.imdb_url,
             'internal_rating': internal_rating,
             'user_ratings': user_ratings,
+            'total_duration': total_duration,
             'user_ratings_details': user_ratings_details,
             'total_ratings_count': total_ratings_count,
             'personal_rating': personal_rating,
@@ -2385,6 +2391,7 @@ def webapp_get_episodes(request):
                     'rating': ratings_map.get((d.season_number, d.episode_number)),
                     'watched': (d.season_number, d.episode_number) in views_map,
                     'view_history_id': views_map.get((d.season_number, d.episode_number)),
+                    'duration': d.duration_seconds,
                 }
             )
 

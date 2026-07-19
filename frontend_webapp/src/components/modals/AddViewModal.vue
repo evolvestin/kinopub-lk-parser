@@ -313,6 +313,7 @@ const save = async () => {
       date_val: dateVal
     })
     uiStore.showToast('Просмотр добавлен!')
+    delete uiStore.showsCache[context.value.showId]
     close()
   } catch (e) {
     uiStore.showToast('Ошибка сохранения')

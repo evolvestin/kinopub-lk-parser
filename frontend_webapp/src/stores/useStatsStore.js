@@ -362,6 +362,27 @@ export const useStatsStore = defineStore('stats', () => {
       }
     })
 
+    Object.keys(uiStore.showsCache).forEach(showId => {
+      const show = uiStore.showsCache[showId]
+      if (show && Array.isArray(show.view_history)) {
+        const filtered = show.view_history.filter(item => item.id !== historyId)
+        if (filtered.length !== show.view_history.length) {
+          show.view_history = filtered
+          if (filtered.length > 0) {
+            const myLast = filtered[0]
+            let se_suffix = ''
+            if (myLast.season_number > 0) {
+              const epStr = myLast.episode_number < 10 ? `0${myLast.episode_number}` : myLast.episode_number
+              se_suffix = ` (s${myLast.season_number}e${epStr})`
+            }
+            show.last_view = { display: `${myLast.view_date}${se_suffix}` }
+          } else {
+            show.last_view = null
+          }
+        }
+      }
+    })
+
     uiStore.showToast('Просмотр удален')
 
     try {
@@ -431,6 +452,17 @@ export const useStatsStore = defineStore('stats', () => {
         return [...(D.group?.history_movies || []), ...(D.group?.history_episodes || [])]
           .filter(item => item.user_ids?.includes(member?.id))
           .sort((a, b) => b.view_date.localeCompare(a.view_date))
+      case 'show_history': {
+        if (isShared.value) {
+            const D_show = currentStats.value
+            if (!D_show) return []
+            const pool_show = [...(D_show.history_movies || []), ...(D_show.history_episodes || [])]
+            return pool_show.filter(i => i.show_id === showId)
+              .sort((a, b) => b.view_date.localeCompare(a.view_date))
+        } else {
+            return uiStore.showsCache[showId]?.view_history || []
+        }
+      }
       case 'filter':
         const isGroup = key?.startsWith('group_')
         const poolKey = key?.replace('group_', '')
