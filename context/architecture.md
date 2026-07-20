@@ -135,3 +135,8 @@ Any code generating new database records must follow this "Save-As-Is" architect
 1.  **Backend Model**: The `WishlistFolder` model's `name` field must have `blank=True` to allow saving empty strings `""` in the database.
 2.  **Validation**: Frontend and backend validators must not enforce a minimum length of 1 or require non-empty values for folder names. The maximum length constraint of 100 characters still applies.
 3.  **Display**: If a folder has an empty name, the UI must render its icon with an empty text container or handle spacing gracefully without breaking the layout.
+
+
+## Debug Elements Policy
+
+**RULE**: Any debug or development-only UI elements (such as "DEBUG: RESET" button) must be positioned absolutely or out of the standard layout flow so they never take up physical space or shift production elements, and they must never overlap with critical UI elements like titles or close buttons.

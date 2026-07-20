@@ -29,7 +29,7 @@
             </div>
             <div class="sort-item" :class="{ active: sortMode.startsWith('added') }" @click="setSort('added')">
               <span class="sort-arrow-icon" :class="{ 'rotate-180': sortMode === 'added_asc' }" v-html="icons.sort_arrow"></span>
-              <span>Дата</span>
+              <span>Добавлен</span>
             </div>
             <div class="sort-item" :class="{ active: sortMode.startsWith('year') }" @click="setSort('year')">
               <span class="sort-arrow-icon" :class="{ 'rotate-180': sortMode === 'year_asc' }" v-html="icons.sort_arrow"></span>

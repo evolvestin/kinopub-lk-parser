@@ -16,37 +16,60 @@
 
       <div id="casino-body" style="padding:10px 0 20px; text-align:center; position:relative; z-index:10; flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
         
-        <!-- Загрузка -->
         <div v-if="state === 'loading'" class="loader-inline">
           <div class="spinner"></div>
         </div>
 
-        <!-- Выбор папки / Главное меню -->
-        <div v-else-if="state === 'menu'" class="casino-slot-container active">
-          <div style="color:var(--accent); font-weight:800; font-size:14px; margin-bottom:15px; text-transform:uppercase; letter-spacing:0.5px;">
-            ✅ Рулетка готова
+        <div v-else-if="state === 'menu'" class="casino-slot-container active" style="padding: 0 16px; display: flex; flex-direction: column; height: 100%;">
+          <div v-if="totalItemsCount === 0" style="text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 20px 0;">
+            <div style="font-size: 56px; margin-bottom: 16px; line-height: 1;">🎰</div>
+            <div style="font-size: 20px; font-weight: 900; color: var(--text-primary); margin-bottom: 12px; letter-spacing: -0.5px;">Рулетка пуста</div>
+            <div style="font-size: 14px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 24px; font-weight: 500;">
+              Добавьте фильмы или сериалы в избранное. Рулетка выберет случайное шоу для просмотра из ваших списков, когда вы не можете определиться с выбором.
+            </div>
+            <button class="btn-primary" style="margin-top: 0;" @click="goToSearch">Найти фильмы</button>
           </div>
-          <button class="btn-primary" style="margin-bottom:15px;" @click="selectFolder('all')">
-            Весь каталог
-          </button>
-          
-          <div v-if="validFolders.length > 1" class="folders-choice-list" style="max-height: 240px; overflow-y: auto; padding: 4px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
-            <button v-for="f in validFolders" :key="f.id" class="btn-primary casino-btn-choice" @click="selectFolder(f.id)">
-              <span :style="{ color: f.color, marginRight: '10px' }" v-html="icons[f.icon] || icons.folder"></span>
-              <span style="flex:1; color: var(--text-primary); text-align: left;">{{ f.name }}</span>
-              <span style="opacity:0.6; font-size:12px; color: var(--text-muted);">{{ f.items.length }}</span>
-            </button>
-          </div>
+          <template v-else>
+            <div style="font-size: 22px; font-weight: 900; color: var(--text-primary); margin-bottom: 20px; line-height: 1.2; letter-spacing: -0.5px;">Что будем смотреть?</div>
 
-          <button class="btn-primary" style="background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border);" @click="loadHistory">
-            История
-          </button>
+            <div v-if="showHint" class="modal-hint-box" style="position: relative; text-align: left; margin-bottom: 20px;">
+              Рулетка выберет случайное шоу из выбранной папки избранного. Если у вас несколько папок, вы сможете выбрать конкретную ниже или запустить поиск по всему каталогу.
+              <button @click="uiStore.dismissHint('casino_modal')" style="position: absolute; right: 8px; top: 8px; background: none; border: none; color: var(--text-muted); cursor: pointer;">×</button>
+            </div>
+
+            <div class="casino-all-btn" @click="selectFolder('all')">
+               <div class="cab-icon">🍿</div>
+               <div class="cab-text">
+                  <div class="cab-title">Весь каталог</div>
+                  <div class="cab-sub">Случайное шоу из всех списков</div>
+               </div>
+               <div class="cab-arrow" v-html="icons.chevron_left"></div>
+            </div>
+
+            <div v-if="validFolders.length > 1" style="display: flex; flex-direction: column; min-height: 0; flex-grow: 1;">
+              <div style="text-align: left; margin: 16px 0 8px 4px; font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Или из конкретной папки:</div>
+              
+              <div class="casino-folders-grid custom-scrollbar">
+                <div v-for="f in validFolders" :key="f.id" class="casino-folder-card" @click="selectFolder(f.id)">
+                  <div class="cfc-icon" :style="{ color: f.color, background: f.color + '20' }" v-html="icons[f.icon] || icons.folder"></div>
+                  <div class="cfc-info">
+                    <div class="cfc-name">{{ f.name }}</div>
+                    <div class="cfc-count">{{ f.items.length }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button class="casino-history-btn" @click="loadHistory" :style="{ marginTop: validFolders.length > 1 ? '16px' : 'auto' }">
+              <span v-html="icons.clock" style="width: 16px; height: 16px;"></span> История рулетки
+            </button>
+          </template>
         </div>
 
         <!-- Кулдаун (активный результат) -->
         <div v-else-if="state === 'cooldown' && activeSpin" class="casino-slot-container active">
           <div class="casino-slot-window">
-            <img :src="activeSpin.show.poster_url" alt="" @error="handleImgFallback" />
+            <img :src="activeSpin.show.poster_url?.replace('/small/', '/medium/')" alt="" @error="handleImgFallback" />
             <div v-if="activeSpin.show.user_rating" class="grid-badges">
               <span class="rating-badge" :class="getRatingClass(activeSpin.show.user_rating)">
                 <span v-html="icons.star"></span>{{ activeSpin.show.user_rating }}
@@ -58,21 +81,22 @@
             <div class="casino-meta-info">
               {{ activeSpin.show.year }} · {{ showTypeRu(activeSpin.show.type) }}
             </div>
-            <div class="casino-controls-reveal active" style="width: 100%;">
-              <div style="display: flex; gap: 10px; width: 100%;">
-                <button class="btn-primary" style="margin-top:0; flex: 1;" @click="goToWinner(activeSpin.show.show_id)">Подробнее</button>
-                <button class="btn-primary" style="margin-top:0; flex: 1; background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border);" @click="loadHistory">История</button>
-              </div>
-              <div class="casino-timer-wrap" style="width: 100%;">
-                <div style="font-size:10px; color:var(--accent); font-weight:800; margin-bottom:4px;" v-html="isExpired ? '✅ РУЛЕТКА ГОТОВА' : 'СЛЕДУЮЩИЙ ШАНС'"></div>
+            
+            <div class="casino-controls-reveal active" style="width: 100%; padding: 0 20px;">
+              <div class="casino-timer-wrap" style="width: 100%; margin-top: 0; margin-bottom: 16px;">
+                <div style="font-size:10px; color:var(--text-muted); font-weight:800; margin-bottom:4px; text-transform: uppercase; letter-spacing: 0.5px;" v-html="isExpired ? '✅ Рулетка готова' : 'Следующий шанс через'"></div>
                 <div v-if="!isExpired" class="casino-timer-clock">{{ formattedCountdown }}</div>
-                <button v-else class="btn-primary" style="margin-top: 10px; padding: 10px; font-size: 14px; width: 100%;" @click="resetToMenu">Крутить снова</button>
+                <button v-else class="btn-primary" style="margin-top: 8px; width: 100%;" @click="resetToMenu">Крутить снова</button>
+              </div>
+
+              <div style="display: flex; gap: 10px; width: 100%;">
+                <button class="btn-primary" style="margin-top:0; flex: 2;" @click="goToWinner(activeSpin.show.show_id)">Смотреть</button>
+                <button class="btn-primary" style="margin-top:0; flex: 1; background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border); box-shadow: none;" @click="loadHistory">История</button>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Анимация вращения / Фаза интриги / Результат вращения -->
         <div v-else-if="['spinning', 'mystery', 'reveal'].includes(state)" class="casino-slot-container active">
           <div class="casino-slot-window" :class="{ 'casino-win-glow': state === 'reveal' }">
             <img v-if="state !== 'mystery' && currentPoster" :src="currentPoster" alt="" />
@@ -89,14 +113,15 @@
               {{ winner.year }} · {{ showTypeRu(winner.type) }}
             </div>
             
-            <div class="casino-controls-reveal" :class="{ active: state === 'reveal' }" style="width: 100%;">
-              <div style="display: flex; gap: 10px; width: 100%;">
-                <button class="btn-primary" style="margin-top:0; flex: 1;" @click="goToWinner(winner.show_id)">Подробнее</button>
-                <button class="btn-primary" style="margin-top:0; flex: 1; background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border);" @click="loadHistory">История</button>
-              </div>
-              <div class="casino-timer-wrap" style="width: 100%;">
-                <div style="font-size:10px; color:var(--accent); font-weight:800; margin-bottom:4px;">СЛЕДУЮЩИЙ ШАНС</div>
+            <div class="casino-controls-reveal" :class="{ active: state === 'reveal' }" style="width: 100%; padding: 0 20px;">
+              <div class="casino-timer-wrap" style="width: 100%; margin-top: 0; margin-bottom: 16px;">
+                <div style="font-size:10px; color:var(--text-muted); font-weight:800; margin-bottom:4px; text-transform: uppercase; letter-spacing: 0.5px;">Следующий шанс через</div>
                 <div class="casino-timer-clock">{{ formattedCountdown }}</div>
+              </div>
+
+              <div style="display: flex; gap: 10px; width: 100%;">
+                <button class="btn-primary" style="margin-top:0; flex: 2;" @click="goToWinner(winner.show_id)">Смотреть</button>
+                <button class="btn-primary" style="margin-top:0; flex: 1; background:var(--bg-input); color:var(--text-primary); border:1px solid var(--border); box-shadow: none;" @click="loadHistory">История</button>
               </div>
             </div>
           </div>
@@ -105,7 +130,6 @@
       </div>
     </div>
     
-    <!-- Глобальное затемнение для эффекта саспенса -->
     <div class="casino-dimmed" :class="{ active: state === 'spinning' || state === 'mystery' }" :style="{ opacity: dimOpacity }"></div>
   </div>
 </template>
@@ -140,10 +164,33 @@ const particles = []
 const canvasActive = ref(false)
 let countdownInterval = null
 
+const hasHistory = ref(false)
+const now = ref(Date.now())
+let timerInterval = null
+
 const isDebug = computed(() => window.IS_DEBUG)
 const validFolders = computed(() => wishlistStore.folders.filter(f => f.items && f.items.length > 0))
 
+const totalItemsCount = computed(() => {
+  return wishlistStore.folders.reduce((sum, f) => sum + (f.items?.length || 0), 0)
+})
+
 const isExpired = computed(() => countdownLeft.value <= 0)
+
+const showHint = computed(() => {
+  if (hasHistory.value) {
+    return false
+  }
+  const dismissedAt = uiStore.dismissedHints['casino_modal']
+  if (!dismissedAt) {
+    return true
+  }
+  if (dismissedAt === true) {
+    return true
+  }
+  const fiveMinutes = 5 * 60 * 1000
+  return now.value - dismissedAt > fiveMinutes
+})
 
 const formattedCountdown = computed(() => {
   if (countdownLeft.value <= 0) return '00:00:00'
@@ -326,6 +373,7 @@ const checkStatus = async () => {
   state.value = 'loading'
   try {
     const data = await api.post('casino/', { action: 'status' })
+    hasHistory.value = !!data.has_history
     if (data.active_spin) {
       activeSpin.value = data.active_spin
       state.value = 'cooldown'
@@ -361,6 +409,7 @@ const selectFolder = async (folderId) => {
     }
 
     winner.value = data.show
+    hasHistory.value = true
     if (!pool.length) pool = [data.show]
 
     let elapsed = 0
@@ -417,6 +466,9 @@ const runMysteryPhase = (expiresMs) => {
 }
 
 const runReveal = (expiresMs) => {
+  if (winner.value) {
+    currentPoster.value = winner.value.poster_url?.replace('/small/', '/medium/') || ''
+  }
   state.value = 'reveal'
   dimOpacity.value = 0
   isShaking.value = true
@@ -473,6 +525,11 @@ const goToWinner = (showId) => {
   uiStore.openLayer('show', showId)
 }
 
+const goToSearch = () => {
+  close()
+  uiStore.switchBaseView('search')
+}
+
 const handleImgFallback = (e) => {
   e.target.style.display = 'none'
 }
@@ -489,12 +546,16 @@ const showTypeRu = (type) => {
 onMounted(() => {
   checkStatus()
   window.addEventListener('resize', initCanvas)
+  timerInterval = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', initCanvas)
   if (animationId) cancelAnimationFrame(animationId)
   if (countdownInterval) clearInterval(countdownInterval)
+  if (timerInterval) clearInterval(timerInterval)
 })
 </script>
 

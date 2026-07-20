@@ -13,7 +13,7 @@ export const useUIStore = defineStore('ui', () => {
   const dismissedHints = ref(JSON.parse(localStorage.getItem('kp_hints') || '{}'))
 
   function dismissHint(key) {
-    dismissedHints.value[key] = true
+    dismissedHints.value[key] = key === 'casino_modal' ? Date.now() : true
     localStorage.setItem('kp_hints', JSON.stringify(dismissedHints.value))
   }
 

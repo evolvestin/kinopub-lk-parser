@@ -59,7 +59,7 @@
         <div v-if="show.internal_rating" class="sm-tag clickable" style="background:var(--accent-dim); color:var(--accent); border:none" @click="openRatingsDetails('lr')">★ {{ show.internal_rating.toFixed(1) }}</div>
       </div>
 
-      <div v-if="lastViewDisplay" style="display: flex; justify-content: center; margin-top: 12px; margin-bottom: 4px;">
+      <div v-if="lastViewDisplay" style="display: flex; justify-content: center; margin-top: 12px; margin-bottom: 4px; animation: fadeInUp 0.5s ease-out 0.35s both;">
         <div class="clickable" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); background: var(--bg-input); padding: 6px 16px; border-radius: 100px; transition: all 0.2s;" @click="openShowHistory">
           <span v-html="icons.clock" style="display: flex; width: 14px; height: 14px; opacity: 0.8;"></span> 
           Последний просмотр: <span style="color: var(--text-primary); font-weight: 800;">{{ lastViewDisplay }}</span>

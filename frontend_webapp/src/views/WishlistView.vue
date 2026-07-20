@@ -29,7 +29,7 @@ const totalWishlistItems = computed(() => {
 })
 
 const showCasinoHint = computed(() => {
-  return totalWishlistItems.value >= 10 && !uiStore.dismissedHints['casino_roulette']
+  return totalWishlistItems.value >= 5 && !uiStore.dismissedHints['casino_roulette']
 })
 
 const showSingleFolderGuide = computed(() => {
@@ -324,13 +324,22 @@ const handleCreateFolder = () => {
       </div>
 
       <template v-else>
+        <div v-if="showCasinoHint && !isFakeMode" class="onboarding-inline-banner">
+          <div class="o-icon">🎰</div>
+          <div class="o-content">
+            <div class="o-title">Не знаете, что посмотреть?</div>
+            <div class="o-text">Запустите рулетку! Она выберет случайный фильм или сериал из ваших папок избранного. Нажмите на значок рулетки вверху.</div>
+          </div>
+          <button class="o-close" @click="uiStore.dismissHint('casino_roulette')"></button>
+        </div>
+
         <div v-if="showSingleFolderGuide && !isFakeMode" class="onboarding-inline-banner">
           <div class="o-icon">💡</div>
           <div class="o-content">
             <div class="o-title">Создавайте свои списки</div>
             <div class="o-text">Вы можете создать новые папки для группировки избранного. Используйте кнопку + в правом верхнем углу.</div>
           </div>
-          <button class="o-close" @click="uiStore.dismissHint('wishlist_single_folder')">×</button>
+          <button class="o-close" @click="uiStore.dismissHint('wishlist_single_folder')"></button>
         </div>
 
         <div v-if="showMultiFolderGuide && !isFakeMode" class="onboarding-inline-banner">
@@ -339,7 +348,7 @@ const handleCreateFolder = () => {
             <div class="o-title">Управляйте списками</div>
             <div class="o-text">Нажмите и удерживайте папку для редактирования. Порядок папок можно изменить в режиме сортировки.</div>
           </div>
-          <button class="o-close" @click="uiStore.dismissHint('wishlist_basics')">×</button>
+          <button class="o-close" @click="uiStore.dismissHint('wishlist_basics')"></button>
         </div>
 
         <div v-if="displayFolders.length > 1" id="wl-folders-wrapper">

@@ -2078,6 +2078,7 @@ def webapp_casino(request):
         action = body.get('action')
 
         if action == 'status':
+            has_history = CasinoSpin.objects.filter(user=view_user, is_deleted=False).exists()
             latest_spin = CasinoSpin.objects.filter(user=view_user).order_by('-created_at').first()
             if latest_spin:
                 time_passed = (timezone.now() - latest_spin.created_at).total_seconds()
@@ -2104,10 +2105,11 @@ def webapp_casino(request):
                                     'user_rating': user_rating.rating if user_rating else None,
                                 },
                                 'expires': expires_ms,
-                            }
+                            },
+                            'has_history': has_history
                         }
                     )
-            return JsonResponse({'active_spin': None})
+            return JsonResponse({'active_spin': None, 'has_history': has_history})
 
         elif action == 'spin':
             latest_spin = CasinoSpin.objects.filter(user=view_user).order_by('-created_at').first()
@@ -2124,8 +2126,8 @@ def webapp_casino(request):
                     folder__user=view_user, folder__id=folder_id
                 ).select_related('show')
 
-                if not items.exists():
-                    return JsonResponse({'error': 'Empty folder'}, status=400)
+            if not items.exists():
+                return JsonResponse({'error': 'Empty folder'}, status=400)
 
             winner_item = random.choice(list(items))
             winner_show = winner_item.show

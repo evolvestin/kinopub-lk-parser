@@ -52,7 +52,8 @@
 
 .casino-info-container {
     margin-top: 20px;
-    height: 200px;
+    min-height: 200px;
+    height: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -158,8 +159,9 @@
 
 .casino-debug-reset {
     position: absolute;
-    top: 12px;
-    left: 12px;
+    top: 16px;
+    right: 56px;
+    left: auto;
     z-index: 1005;
     background: rgba(231, 76, 60, 0.2);
     border: 1px solid var(--danger);
@@ -182,4 +184,128 @@
 #wl-casino-btn {
     font-size: clamp(15px, 6.5vw, 18px);
     line-height: 1;
+}
+
+/* --- CASINO REDESIGN --- */
+
+.casino-all-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, var(--accent-dim), rgba(46, 204, 113, 0.05));
+    border: 1px solid var(--accent);
+    padding: 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+    box-shadow: var(--shadow-glow);
+    text-align: left;
+    user-select: none;
+}
+.casino-all-btn:active {
+    transform: scale(0.96);
+}
+.cab-icon {
+    font-size: 42px;
+    line-height: 1;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+.cab-text {
+    flex: 1;
+    min-width: 0;
+}
+.cab-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+.cab-sub {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+}
+.cab-arrow {
+    color: var(--accent);
+    transform: rotate(180deg);
+    display: flex;
+    align-items: center;
+    opacity: 0.8;
+}
+
+.casino-folders-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 2px;
+}
+
+.casino-folder-card {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+}
+.casino-folder-card:active {
+    transform: scale(0.95);
+    background: var(--bg-card);
+    border-color: var(--text-muted);
+}
+.cfc-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.cfc-info {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+}
+.cfc-name {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+.cfc-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.casino-history-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 800;
+    padding: 12px;
+    width: 100%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+    border-radius: 12px;
+}
+.casino-history-btn:active {
+    background: var(--bg-input);
+    color: var(--text-primary);
 }
