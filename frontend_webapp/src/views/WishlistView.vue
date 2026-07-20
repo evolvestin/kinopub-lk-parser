@@ -29,7 +29,8 @@ const totalWishlistItems = computed(() => {
 })
 
 const showCasinoHint = computed(() => {
-  return totalWishlistItems.value >= 5 && !uiStore.dismissedHints['casino_roulette']
+  const hasHistory = statsStore.currentStats?.summary?.has_casino_history
+  return totalWishlistItems.value >= 5 && !hasHistory && !uiStore.dismissedHints['casino_roulette']
 })
 
 const showSingleFolderGuide = computed(() => {

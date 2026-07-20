@@ -314,6 +314,7 @@ const save = async () => {
     })
     uiStore.showToast('Просмотр добавлен!')
     delete uiStore.showsCache[context.value.showId]
+    delete uiStore.episodesCache[context.value.showId]
     close()
   } catch (e) {
     uiStore.showToast('Ошибка сохранения')

@@ -368,6 +368,7 @@ export const useStatsStore = defineStore('stats', () => {
         const filtered = show.view_history.filter(item => item.id !== historyId)
         if (filtered.length !== show.view_history.length) {
           show.view_history = filtered
+          delete uiStore.episodesCache[showId]
           if (filtered.length > 0) {
             const myLast = filtered[0]
             let se_suffix = ''

@@ -77,56 +77,28 @@
       <div style="padding: 0 20px;">
         <div class="ep-badge clickable" 
              :class="{ 'watched': isAllEpisodesWatched }"
-             @click="openAddView()"
-             style="display: flex; flex-direction: row; justify-content: space-between; padding: 12px 16px; align-items: center; min-height: 54px; width: 100%; cursor: pointer;">
+             @click="handleMovieBlockClick"
+             style="display: flex; flex-direction: row; justify-content: space-between; padding: 14px 18px; align-items: center; min-height: 58px; width: 100%; cursor: pointer; border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow-sm); transition: all 0.2s ease;">
           <div style="display: flex; align-items: center; gap: 12px;">
             <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-              <div class="ep-num" style="margin: 0; font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Фильм</div>
-              <div v-if="show.total_duration" class="ep-dur" style="font-size: 14px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 4px;">
-                <span v-html="icons.time" style="width: 16px; height: 16px; color: var(--info);"></span>{{ formatEpisodeDuration(show.total_duration) }}
+              <div v-if="show.total_duration" class="ep-dur" style="font-size: 15px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                <span v-html="icons.time" style="width: 18px; height: 18px; color: var(--info); display: flex; align-items: center;"></span>
+                {{ formatEpisodeDuration(show.total_duration) }}
               </div>
+              <div v-else style="font-size: 14px; font-weight: 700; color: var(--text-secondary);">Информация о фильме</div>
             </div>
           </div>
-          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
-             <div v-if="isAllEpisodesWatched" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 4px; background: var(--accent-dim); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(46, 204, 113, 0.2);">
-                <span v-html="icons.check" style="width: 14px; height: 14px; margin-top: -1px;"></span> Просмотрено
-             </div>
-             <div v-else style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; gap: 4px; background: var(--bg-card); padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border);">
-                <span v-html="icons.eye" style="width: 14px; height: 14px; margin-top: -1px; opacity: 0.5;"></span> Не смотрел
-             </div>
-
-             <div v-if="viewerRating" class="ep-rating clickable" style="font-size: 12px; padding: 4px 8px; border-radius: 8px; cursor: pointer;" @click.stop="openRating">
-                <span v-html="icons.star"></span>{{ viewerRating }}
-             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="isSeries && (show.total_duration || lastViewDisplay)" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
-      <div class="label">
-        <div class="icon" style="color:var(--info)" v-html="icons.tv"></div> Информация
-      </div>
-      
-      <div style="padding: 0 20px;">
-        <div class="ep-badge clickable" 
-             :class="{ 'watched': isAllEpisodesWatched }"
-             @click="openAddView()"
-             style="display: flex; flex-direction: row; justify-content: space-between; padding: 12px 16px; align-items: center; min-height: 54px; width: 100%; cursor: pointer;">
           <div style="display: flex; align-items: center; gap: 12px;">
-            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-              <div class="ep-num" style="margin: 0; font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Сериал целиком</div>
-              <div v-if="show.total_duration" class="ep-dur" style="font-size: 14px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 4px;">
-                <span v-html="icons.time" style="width: 16px; height: 16px; color: var(--info);"></span>{{ formatEpisodeDuration(show.total_duration) }}
-              </div>
-            </div>
-          </div>
-          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
              <div v-if="isAllEpisodesWatched" style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--accent); display: flex; align-items: center; gap: 4px; background: var(--accent-dim); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(46, 204, 113, 0.2);">
-                <span v-html="icons.check" style="width: 14px; height: 14px; margin-top: -1px;"></span> Просмотрено
+                <span v-html="icons.check" style="width: 14px; height: 14px; display: flex; align-items: center;"></span> Просмотрено
              </div>
-             <div v-else style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; gap: 4px; background: var(--bg-card); padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border);">
-                <span v-html="icons.eye" style="width: 14px; height: 14px; margin-top: -1px; opacity: 0.5;"></span> Не смотрел
+             <div v-else style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; gap: 4px; background: var(--bg-input); padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border);">
+                <span v-html="icons.eye" style="width: 14px; height: 14px; display: flex; align-items: center; opacity: 0.5;"></span> Просмотрено?
+             </div>
+
+             <div v-if="viewerRating" class="ep-rating clickable" style="font-size: 12px; padding: 4px 8px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.2);" @click.stop="openRating">
+                <span v-html="icons.star" style="color: #f1c40f; width: 12px; height: 12px; display: flex; align-items: center;"></span>
+                {{ viewerRating }}
              </div>
           </div>
         </div>
@@ -154,7 +126,7 @@
         </div>
       </div>
       
-      <div class="h-scroll-container" style="padding-bottom: 16px; gap: 8px;">
+      <div v-if="seasonsData.length > 1" class="h-scroll-container" style="padding-bottom: 16px; gap: 8px;">
         <button 
           v-for="s in seasonsData" 
           :key="s.season_number"
@@ -174,8 +146,8 @@
              :class="{ 'watched': ep.watched }"
              @click="ep.watched ? openEpisodeModal(ep) : openAddView(activeSeasonStr, ep.episode_number)">
           <div class="ep-num">E{{ ep.episode_number }}</div>
+          <div v-if="ep.duration" class="ep-dur">{{ Math.round(ep.duration / 60) }}м</div>
           <div v-if="ep.rating" class="ep-rating"><span v-html="icons.star"></span>{{ ep.rating }}</div>
-          <div v-else-if="ep.duration" class="ep-dur">{{ Math.round(ep.duration / 60) }}м</div>
         </div>
       </div>
     </div>
@@ -434,6 +406,18 @@ watch(() => uiStore.modals.rateShow.isOpen, async (newVal, oldVal) => {
   }
 })
 
+watch(() => uiStore.modals.addView.isOpen, async (newVal, oldVal) => {
+  if (oldVal === true && newVal === false) {
+    await loadShowData()
+    if (isSeries.value) {
+        const res = await api.post('get_episodes/', { show_id: props.showId })
+        uiStore.episodesCache[props.showId] = res.seasons || []
+    }
+    statsStore.fetchStats(statsStore.currentYear, true, true)
+    statsStore.fetchStats('all', true, true)
+  }
+})
+
 const openEpisodeModal = (ep) => {
   uiStore.openModal('rateShow', {
       showId: show.value.id,
@@ -444,6 +428,14 @@ const openEpisodeModal = (ep) => {
       season: activeSeasonStr.value,
       episode: ep.episode_number
   })
+}
+
+const handleMovieBlockClick = () => {
+  if (isAllEpisodesWatched.value) {
+    openRating()
+  } else {
+    openAddView()
+  }
 }
 
 const openWishlistModal = () => {
@@ -538,7 +530,8 @@ const openRatingsDetails = (ratingType) => {
     width: 10px; height: 10px;
 }
 .ep-grid-btn {
-    height: 54px;
+    min-height: 58px;
+    height: auto;
     padding: 4px !important;
 }
 </style>

@@ -11,7 +11,7 @@ from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import Signal, receiver
 from django.utils import timezone
 
-from app.models import TaskRun, ViewHistory, ViewUser
+from app.models import TaskRun, UserRating, ViewHistory, ViewUser
 from app.telegram_bot import TelegramSender
 from shared.constants import DATETIME_FORMAT
 
@@ -178,3 +178,37 @@ def invalidate_stats_on_history_delete(sender, instance, **kwargs):
             cache.delete(f'group_stats_v6:{user.id}:all')
     except Exception as e:
         logging.error(f'Error in invalidate_stats_on_history_delete signal: {e}')
+
+
+@receiver(post_save, sender=UserRating)
+def invalidate_stats_on_rating_save(sender, instance, created, **kwargs):
+    _invalidate_rating_cache(instance)
+
+
+@receiver(post_delete, sender=UserRating)
+def invalidate_stats_on_rating_delete(sender, instance, **kwargs):
+    _invalidate_rating_cache(instance)
+
+
+def _invalidate_rating_cache(instance):
+    try:
+        user_id = instance.user_id
+        show_id = instance.show_id
+
+        years = set(
+            ViewHistory.objects.filter(show_id=show_id, users__id=user_id)
+            .exclude(view_date__isnull=True)
+            .values_list('view_date__year', flat=True)
+        )
+        years.add(timezone.now().year)
+        if instance.updated_at:
+            years.add(instance.updated_at.year)
+
+        for y in years:
+            cache.delete(f'user_stats_v6:{user_id}:{y}')
+            cache.delete(f'group_stats_v6:{user_id}:{y}')
+
+        cache.delete(f'user_stats_v6:{user_id}:all')
+        cache.delete(f'group_stats_v6:{user_id}:all')
+    except Exception as e:
+        logging.error(f'Error invalidating rating cache: {e}')

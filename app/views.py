@@ -2133,6 +2133,9 @@ def webapp_casino(request):
             winner_show = winner_item.show
 
             new_spin = CasinoSpin.objects.create(user=view_user, show=winner_show)
+            cache.delete(f'user_stats_v6:{view_user.id}:all')
+            if new_spin.created_at:
+                cache.delete(f'user_stats_v6:{view_user.id}:{new_spin.created_at.year}')
             expires_ms = int((new_spin.created_at + timedelta(hours=24)).timestamp() * 1000)
 
             user_rating = UserRating.objects.filter(
@@ -2181,6 +2184,8 @@ def webapp_casino(request):
         elif action == 'delete_spin':
             spin_id = body.get('spin_id')
             CasinoSpin.objects.filter(id=spin_id, user=view_user).update(is_deleted=True)
+            cache.delete(f'user_stats_v6:{view_user.id}:all')
+            cache.delete(f'user_stats_v6:{view_user.id}:{timezone.now().year}')
             return JsonResponse({'status': 'ok'})
 
         elif action == 'reset':
@@ -2453,7 +2458,13 @@ def webapp_rate_show(request):
         for history_item in history_qs:
             sender.update_history_message(history_item)
 
-        for y in [timezone.now().year, 'all']:
+        years = set(
+            ViewHistory.objects.filter(show_id=show_id, users=view_user)
+            .exclude(view_date__isnull=True)
+            .values_list('view_date__year', flat=True)
+        )
+        years.add(timezone.now().year)
+        for y in list(years) + ['all']:
             cache.delete(f'user_stats_v6:{view_user.id}:{y}')
             cache.delete(f'group_stats_v6:{view_user.id}:{y}')
 
@@ -2505,7 +2516,13 @@ def webapp_delete_rating(request):
         for history_item in history_qs:
             sender.update_history_message(history_item)
 
-        for y in [timezone.now().year, 'all']:
+        years = set(
+            ViewHistory.objects.filter(show_id=show_id, users=view_user)
+            .exclude(view_date__isnull=True)
+            .values_list('view_date__year', flat=True)
+        )
+        years.add(timezone.now().year)
+        for y in list(years) + ['all']:
             cache.delete(f'user_stats_v6:{view_user.id}:{y}')
             cache.delete(f'group_stats_v6:{view_user.id}:{y}')
 

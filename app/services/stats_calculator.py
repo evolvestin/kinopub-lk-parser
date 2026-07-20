@@ -28,6 +28,7 @@ from django.db.models.functions import (
 from django.utils import timezone
 
 from app.models import (
+    CasinoSpin,
     Person,
     ShowDuration,
     UserRating,
@@ -651,6 +652,7 @@ def generate_user_stats(user, year=None):
     ).annotate(final_duration=Coalesce('duration', 0))
 
     summary = _get_yearly_summary(base_qs, dur_qs, year)
+    summary['has_casino_history'] = CasinoSpin.objects.filter(user=user, is_deleted=False).exists()
 
     user_wl_items = WishlistItem.objects.filter(
         Q(user=user) | Q(folder__user=user, user__isnull=True), include_in_stats=True
