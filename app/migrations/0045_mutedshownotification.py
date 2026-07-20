@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0044_casinospin_is_deleted'),
     ]
@@ -14,11 +13,30 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='MutedShowNotification',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name='ID'
+                    ),
+                ),
                 ('created_at', models.DateTimeField(auto_now_add=True, db_index=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('show', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='muted_by_users', to='app.show')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='muted_notifications', to='app.viewuser')),
+                (
+                    'show',
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name='muted_by_users',
+                        to='app.show',
+                    ),
+                ),
+                (
+                    'user',
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name='muted_notifications',
+                        to='app.viewuser',
+                    ),
+                ),
             ],
             options={
                 'verbose_name': 'Muted Show Notification',

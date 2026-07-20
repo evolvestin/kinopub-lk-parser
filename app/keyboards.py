@@ -1,4 +1,3 @@
-from django.conf import settings
 
 from app.utils import get_webapp_base_url
 from shared.buttons import get_rating_label_text, get_show_control_buttons

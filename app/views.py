@@ -15,7 +15,7 @@ from django.contrib.auth.models import Permission, User
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Avg, F, Max, Prefetch, Q
+from django.db.models import Avg, F, Max, Prefetch, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -23,7 +23,6 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from redis import Redis
-from django.db.models import Sum
 
 from app.admin_site import admin_site
 from app.models import (
@@ -46,7 +45,6 @@ from app.models import (
     WishlistFolder,
     WishlistItem,
 )
-
 from app.services.metrics import (
     get_active_countries_list,
     get_duplicate_photo_urls_list,
@@ -1264,8 +1262,10 @@ def webapp_get_show_full(request, show_id):
         target_user = owner_user or view_user
 
         internal_rating, user_ratings = show.get_internal_rating_data()
-        
-        duration_qs = ShowDuration.objects.filter(show=show).aggregate(total=Sum('duration_seconds'))
+
+        duration_qs = ShowDuration.objects.filter(show=show).aggregate(
+            total=Sum('duration_seconds')
+        )
         total_duration = duration_qs['total'] or 0
 
         personal_rating = None
@@ -2136,7 +2136,7 @@ def webapp_casino(request):
                                 },
                                 'expires': expires_ms,
                             },
-                            'has_history': has_history
+                            'has_history': has_history,
                         }
                     )
             return JsonResponse({'active_spin': None, 'has_history': has_history})
@@ -2717,15 +2717,11 @@ def webapp_show_notification_status(request, show_id):
         show = Show.objects.get(id=show_id)
 
         in_wishlist = WishlistItem.objects.filter(
-            Q(user=view_user) | Q(folder__user=view_user),
-            show=show,
-            is_active=True
+            Q(user=view_user) | Q(folder__user=view_user), show=show, is_active=True
         ).exists()
 
         in_history = ViewHistory.objects.filter(
-            show=show,
-            users=view_user,
-            is_checked=True
+            show=show, users=view_user, is_checked=True
         ).exists()
 
         is_muted = MutedShowNotification.objects.filter(user=view_user, show=show).exists()
@@ -2739,16 +2735,18 @@ def webapp_show_notification_status(request, show_id):
         if not reasons:
             reasons.append('general')
 
-        return JsonResponse({
-            'show_id': show.id,
-            'title': show.title,
-            'original_title': show.original_title,
-            'plot': show.plot,
-            'poster_medium': get_poster_url(show.id, 'medium'),
-            'poster_large': get_poster_url(show.id, 'big'),
-            'reasons': reasons,
-            'is_muted': is_muted
-        })
+        return JsonResponse(
+            {
+                'show_id': show.id,
+                'title': show.title,
+                'original_title': show.original_title,
+                'plot': show.plot,
+                'poster_medium': get_poster_url(show.id, 'medium'),
+                'poster_large': get_poster_url(show.id, 'big'),
+                'reasons': reasons,
+                'is_muted': is_muted,
+            }
+        )
 
     except Show.DoesNotExist:
         return JsonResponse({'error': 'Show not found'}, status=404)

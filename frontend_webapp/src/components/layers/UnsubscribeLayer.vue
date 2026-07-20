@@ -28,16 +28,16 @@
       </div>
       <div style="font-size: 14px; color: var(--text-secondary); line-height: 1.5; font-weight: 500;">
         <template v-if="show.reasons.includes('history') && show.reasons.includes('wishlist')">
-          Этот тайтл находится в вашем <b>Избранном</b> и вы уже <b>смотрели его ранее</b>.
+          Это шоу находится в вашем <b>Избранном</b> и вы уже <b>смотрели его ранее</b>.
         </template>
         <template v-else-if="show.reasons.includes('wishlist')">
-          Этот тайтл добавлен в ваши папки <b>Избранного</b>.
+          Это шоу добавлено в ваши папки <b>Избранного</b>.
         </template>
         <template v-else-if="show.reasons.includes('history')">
-          Вы ранее <b>отмечали просмотр</b> этого тайтла в истории.
+          Вы ранее <b>отмечали просмотр</b> этого шоу в истории.
         </template>
         <template v-else>
-          Вы подписаны на получение обновлений по этому тайтлу.
+          Вы подписаны на получение обновлений по этому шоу.
         </template>
       </div>
     </div>
@@ -67,8 +67,6 @@
         </button>
       </div>
     </div>
-
-    <div class="plot-box" v-if="show.plot">{{ show.plot }}</div>
   </div>
 </template>
 

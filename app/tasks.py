@@ -21,7 +21,14 @@ from redis import Redis
 
 from app import history_parser
 from app.gdrive_backup import BackupManager
-from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser, WishlistItem, MutedShowNotification
+from app.models import (
+    Code,
+    LogEntry,
+    Show,
+    SiteMetric,
+    TaskRun,
+    ViewUser,
+)
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
     generate_global_metrics_snapshot,
@@ -548,14 +555,16 @@ def notify_new_episode_task(show_id, season, episode):
     except Show.DoesNotExist:
         return
 
-    users = ViewUser.objects.filter(
-        Q(wishlist_items__show=show, wishlist_items__is_active=True) |
-        Q(wishlist_folders__items__show=show, wishlist_folders__items__is_active=True) |
-        Q(history__show=show),
-        is_bot_active=True
-    ).exclude(
-        muted_notifications__show=show
-    ).distinct()
+    users = (
+        ViewUser.objects.filter(
+            Q(wishlist_items__show=show, wishlist_items__is_active=True)
+            | Q(wishlist_folders__items__show=show, wishlist_folders__items__is_active=True)
+            | Q(history__show=show),
+            is_bot_active=True,
+        )
+        .exclude(muted_notifications__show=show)
+        .distinct()
+    )
 
     sender = TelegramSender()
 

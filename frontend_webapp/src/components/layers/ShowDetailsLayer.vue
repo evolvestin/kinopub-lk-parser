@@ -34,9 +34,6 @@
           <span v-html="icons.star"></span>
           <div v-if="showRateGuide" class="guide-tooltip-left rate-guide">Поставить оценку</div>
         </button>
-        <button class="detail-notify-btn anim-item" style="position: relative; animation-delay: 0.3s;" @click="toggleMute">
-          <span v-html="isMuted ? icons_bell_off : icons_bell"></span>
-        </button>
       </div>
     </div>
 
@@ -72,12 +69,18 @@
 
     <div class="plot-box" v-if="show.plot">{{ show.plot }}</div>
 
-    <div v-if="!isSeries && (show.total_duration || lastViewDisplay)" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
-      <div class="label">
-        <div class="icon" style="color:var(--info)" v-html="icons.film"></div> Информация
+    <div v-if="!isSeries" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
+      <div class="label" style="justify-content: space-between; align-items: center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div class="icon" style="color:var(--info)" v-html="icons.film"></div> Информация
+        </div>
+        <button class="sm-tag clickable" @click="toggleMute" style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; border: 1px solid; outline: none;" :style="isMuted ? 'color: var(--danger); background: rgba(231, 76, 60, 0.1); border-color: var(--danger);' : 'color: var(--text-muted); background: var(--bg-input); border-color: var(--border);'">
+          <span v-html="isMuted ? icons.bell_off : icons.bell" style="width: 14px; height: 14px; display: flex; align-items: center;"></span>
+          <span>{{ isMuted ? 'Выкл' : 'Вкл' }}</span>
+        </button>
       </div>
       
-      <div style="padding: 0 20px;">
+      <div v-if="show.total_duration || lastViewDisplay" style="padding: 0 20px;">
         <div class="ep-badge clickable" 
              :class="{ 'watched': isAllEpisodesWatched }"
              @click="handleMovieBlockClick"
@@ -114,6 +117,10 @@
             <div class="icon" style="color:var(--info)" v-html="icons.list"></div> Эпизоды
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
+          <button class="sm-tag clickable" @click="toggleMute" style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; border: 1px solid; outline: none;" :style="isMuted ? 'color: var(--danger); background: rgba(231, 76, 60, 0.1); border-color: var(--danger);' : 'color: var(--text-muted); background: var(--bg-input); border-color: var(--border);'">
+            <span v-html="isMuted ? icons.bell_off : icons.bell" style="width: 14px; height: 14px; display: flex; align-items: center;"></span>
+            <span>{{ isMuted ? 'Выкл' : 'Вкл' }}</span>
+          </button>
           <div v-if="show.total_duration" 
                :style="isAllEpisodesWatched ? 'color:var(--accent); background:var(--accent-dim); border-color:var(--accent);' : 'color:var(--text-muted); background:var(--bg-input); border-color:var(--border);'"
                style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; padding:4px 10px; border-radius:12px; border: 1px solid; text-transform: uppercase;">
@@ -318,9 +325,6 @@ const lastViewDisplay = computed(() => {
   if (!show.value) return null
   return show.value.last_view?.display || null
 })
-
-const icons_bell = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>`
-const icons_bell_off = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"></path><path d="M18.63 13A17.89 17.89 0 0 1 18 8"></path><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"></path><path d="M18 8a6 6 0 0 0-9.33-5"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`
 
 const isMuted = ref(false)
 
@@ -532,29 +536,6 @@ const openRatingsDetails = (ratingType) => {
 </script>
 
 <style scoped>
-.detail-notify-btn {
-    position: absolute !important;
-    top: 144px !important;
-    right: -18px !important;
-    left: auto !important;
-    width: 44px !important;
-    height: 44px !important;
-    border-radius: 50% !important;
-    background: #e67e22 !important;
-    color: #fff !important;
-    box-shadow: 0 4px 15px rgba(230, 126, 34, 0.4) !important;
-    border: 3px solid var(--bg-main) !important;
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    z-index: 20;
-    cursor: pointer;
-    outline: none !important;
-    transition: transform var(--transition-bounce), background var(--transition-smooth), box-shadow var(--transition-smooth) !important;
-}
-.detail-notify-btn:active { transform: scale(0.85) !important; }
-.detail-notify-btn svg { width: 24px !important; height: 24px !important; }
-@media (max-width: 380px) { .detail-notify-btn { right: -10px !important; top: 144px !important; } }
 .ep-badge {
     display: flex;
     flex-direction: column;
@@ -593,6 +574,9 @@ const openRatingsDetails = (ratingType) => {
     color: var(--text-muted);
     font-weight: 700;
     line-height: 1;
+}
+.ep-badge.watched .ep-dur {
+    color: var(--text-secondary);
 }
 .ep-rating {
     font-size: 10px;

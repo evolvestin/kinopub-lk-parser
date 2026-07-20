@@ -409,13 +409,9 @@ class TelegramSender:
         )
 
         base_url = get_webapp_base_url()
-        webapp_url = f'{base_url}/webapp/?show_id={show.id}'
         unsub_webapp_url = f'{base_url}/webapp/?start_param=unsub_{show.id}'
 
-        kb_data = [
-            [{'text': '📱 Открыть в приложении', 'web_app': {'url': webapp_url}}],
-            [{'text': '🔕 Отписаться от уведомлений', 'web_app': {'url': unsub_webapp_url}}]
-        ]
+        kb_data = [[{'text': '🔕 Отписаться от уведомлений', 'web_app': {'url': unsub_webapp_url}}]]
 
         payload = {
             'chat_id': view_user.telegram_id,

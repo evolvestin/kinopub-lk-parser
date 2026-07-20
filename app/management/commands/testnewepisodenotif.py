@@ -1,12 +1,15 @@
 import logging
 import random
+
 from django.core.management.base import CommandError
+
 from app.management.base import LoggableBaseCommand
 from app.models import Show, ViewUser
 from app.tasks import notify_new_episode_task
 
+
 class Command(LoggableBaseCommand):
-    help = 'Sends a test new episode notification for a random show to active users or a specific telegram ID.'
+    help = 'Sends a test new episode notification for a show to users or a specific telegram ID.'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -45,12 +48,18 @@ class Command(LoggableBaseCommand):
             try:
                 user = ViewUser.objects.get(telegram_id=telegram_id)
             except ViewUser.DoesNotExist:
-                raise CommandError(f'User with telegram ID {telegram_id} does not exist.')
+                msg = f'User with telegram ID {telegram_id} does not exist.'
+                raise CommandError(msg) from ViewUser.DoesNotExist
 
             from app.telegram_bot import TelegramSender
+
             sender = TelegramSender()
             sender.send_new_episode_notification(user, random_show, season, episode)
-            logging.info(f'Sent test notification to user {telegram_id} for show {random_show.title}')
+            logging.info(
+                f'Sent test notification to user {telegram_id} for show {random_show.title}'
+            )
         else:
             notify_new_episode_task.delay(random_show.id, season, episode)
-            logging.info(f'Triggered notify_new_episode_task for show {random_show.id} (S{season}E{episode})')
+            logging.info(
+                f'Triggered notify_new_episode_task for show {random_show.id} (S{season}E{episode})'
+            )

@@ -124,11 +124,14 @@ onMounted(async () => {
   
   const lastView = localStorage.getItem('kp_last_active_view')
   const currentPath = router.currentRoute.value.path
-  const hasLayer = ['/show/', '/person/', '/genre/', '/country/', '/history/', '/show_type/', '/year/', '/status/'].some(keyword => 
-    currentPath.includes(keyword)
-  )
 
   let targetPath = '/search'
+  if (currentPath && currentPath !== '/') {
+    targetPath = currentPath
+  } else if (lastView && ['search', 'wishlist', 'stats'].includes(lastView)) {
+    targetPath = `/${lastView}`
+  }
+
   let targetQuery = { ...router.currentRoute.value.query }
 
   if (!targetQuery.shared_id) {
@@ -139,7 +142,11 @@ onMounted(async () => {
     }
   }
 
-  if (startParam) {
+  const processedStartParam = sessionStorage.getItem('processed_start_param')
+
+  if (startParam && startParam !== processedStartParam) {
+    sessionStorage.setItem('processed_start_param', startParam)
+
     if (startParam.startsWith('stat_')) {
       targetPath = '/stats'
       targetQuery.shared_id = startParam.replace('stat_', '')
@@ -150,7 +157,7 @@ onMounted(async () => {
       })
     } else if (startParam.startsWith('unsub_')) {
       const showId = startParam.replace('unsub_', '')
-      targetPath = `/search/show/${showId}/unsubscribe/${showId}`
+      targetPath = `/search/unsubscribe/${showId}`
     }
   }
 
