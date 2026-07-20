@@ -36,6 +36,7 @@ from app.models import (
     ExternalRating,
     Genre,
     LogEntry,
+    MutedShowNotification,
     Person,
     SharedStat,
     Show,
@@ -1953,4 +1954,12 @@ class WishlistItemAdmin(admin.ModelAdmin):
     list_filter = ('is_active', 'include_in_stats', 'user', 'folder')
     search_fields = ('show__title', 'show__original_title', 'user__username', 'folder__name')
     autocomplete_fields = ('user', 'folder', 'show')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(MutedShowNotification, site=admin_site)
+class MutedShowNotificationAdmin(admin.ModelAdmin):
+    list_display = ('user', 'show', 'created_at', 'updated_at')
+    search_fields = ('user__username', 'user__name', 'show__title', 'show__original_title')
+    autocomplete_fields = ('user', 'show')
     readonly_fields = ('created_at', 'updated_at')

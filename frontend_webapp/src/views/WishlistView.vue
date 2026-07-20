@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useWishlistStore } from '../stores/wishlistStore'
 import { useUIStore } from '../stores/uiStore'
+import { useStatsStore } from '../stores/useStatsStore'
 import { icons } from '../utils/icons'
 import FolderCard from '../components/wishlist/FolderCard.vue'
 import ShowCard from '../components/shared/ShowCard.vue'
@@ -9,6 +10,7 @@ import Sortable from 'sortablejs'
 
 const wishlistStore = useWishlistStore()
 const uiStore = useUIStore()
+const statsStore = useStatsStore()
 
 const isInitialLoading = ref(!wishlistStore.isLoaded)
 const isSortMenuOpen = ref(false)
@@ -191,6 +193,7 @@ onMounted(async () => {
   isInitialLoading.value = false
   initSortable()
   adjustHeaderFonts()
+  wishlistStore.fetchCasinoStatus()
 })
 
 onUnmounted(() => {
@@ -281,7 +284,7 @@ const handleCreateFolder = () => {
       </div>
     </div>
 
-    <div :class="{ 'blurred-content': isFakeMode }" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+    <div :class="{ 'blurred-content': isFakeMode }" style="display: flex; flex-direction: column; min-height: 100%;">
       <div class="header" style="padding-bottom: 8px;">
         <div class="header-name glow-text" 
              :class="{ 'single-folder': displayFolders.length === 1 && displayActiveFolder }" 

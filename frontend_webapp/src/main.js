@@ -81,3 +81,11 @@ document.addEventListener('contextmenu', (e) => {
     e.preventDefault()
   }
 })
+
+document.addEventListener('wheel', (e) => {
+  const container = e.target.closest('.h-scroll-container')
+  if (container && e.deltaY !== 0) {
+    e.preventDefault()
+    container.scrollLeft += e.deltaY
+  }
+}, { passive: false })

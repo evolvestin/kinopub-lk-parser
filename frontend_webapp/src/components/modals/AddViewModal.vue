@@ -36,6 +36,22 @@
           </button>
         </div>
 
+        <div v-if="statsStore.hasGroup" style="margin-bottom: 20px; flex-shrink: 0;">
+          <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 8px; text-transform: uppercase;">Кто смотрел?</div>
+          <div style="display: flex; gap: 20px; align-items: center;">
+            <label class="chk-row" :style="targetGroup ? { opacity: 0.6, cursor: 'not-allowed' } : {}">
+              <input type="checkbox" v-model="targetMe" :disabled="targetGroup" />
+              <div class="chk-box"></div>
+              <span class="chk-text">Я</span>
+            </label>
+            <label class="chk-row">
+              <input type="checkbox" v-model="targetGroup" />
+              <div class="chk-box"></div>
+              <span class="chk-text">Группа</span>
+            </label>
+          </div>
+        </div>
+
         <div style="font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:8px; text-transform:uppercase;">Когда смотрели?</div>
         <div class="view-toggle" style="margin-bottom: 16px; padding: 3px; background: var(--bg-input); flex-shrink: 0;">
           <button class="vt-btn" :class="{ active: dateMode === 'exact' }" @click="dateMode = 'exact'">Точная дата</button>
@@ -163,6 +179,32 @@ const selectedSeasonNumber = computed({
   set: (val) => updateQueryParams({ selectedSeasonNumber: val })
 })
 
+const targetMe = computed({
+  get: () => {
+    const isGroup = router.currentRoute.value.query.modal_targetGroup !== 'false'
+    if (isGroup) return true
+    return router.currentRoute.value.query.modal_targetMe !== 'false'
+  },
+  set: (val) => {
+    const params = { targetMe: val }
+    if (!val) {
+      params.targetGroup = false
+    }
+    updateQueryParams(params)
+  }
+})
+
+const targetGroup = computed({
+  get: () => router.currentRoute.value.query.modal_targetGroup !== 'false',
+  set: (val) => {
+    const params = { targetGroup: val }
+    if (val) {
+      params.targetMe = true
+    }
+    updateQueryParams(params)
+  }
+})
+
 const exactDate = computed({
   get: () => router.currentRoute.value.query.modal_exactDate || new Date().toISOString().split('T')[0],
   set: (val) => updateQueryParams({ exactDate: val })
@@ -198,18 +240,19 @@ const showHint = computed(() => {
 
 const modalHeight = computed(() => {
   const hintHeight = showHint.value ? 100 : 0
+  const groupOffset = statsStore.hasGroup ? 60 : 0
   
   if (!isSeries.value) {
-    return `${420 + hintHeight}px`
+    return `${420 + hintHeight + groupOffset}px`
   }
 
   if (!episodesData.value.length) {
-    return `${520 + hintHeight}px`
+    return `${520 + hintHeight + groupOffset}px`
   }
 
   const seasonsCount = episodesData.value.length
   const seasonsRows = Math.ceil(seasonsCount / 3)
-  const seasonsHeight = 220 + (seasonsRows * 64)
+  const seasonsHeight = 220 + (seasonsRows * 64) + groupOffset
 
   let maxEpisodesCount = 0
   episodesData.value.forEach(s => {
@@ -218,9 +261,9 @@ const modalHeight = computed(() => {
     }
   })
   const episodesRows = Math.ceil(maxEpisodesCount / 4)
-  const episodesHeight = 170 + (episodesRows * 64)
+  const episodesHeight = 170 + (episodesRows * 64) + groupOffset
 
-  const maxCalculated = Math.max(seasonsHeight, episodesHeight, 520 + hintHeight)
+  const maxCalculated = Math.max(seasonsHeight, episodesHeight, 520 + hintHeight + groupOffset)
   const maxHeightLimit = Math.min(620, Math.floor(window.innerHeight * 0.8))
   
   return `${Math.min(maxCalculated, maxHeightLimit)}px`
@@ -298,6 +341,11 @@ const save = async () => {
     return
   }
 
+  if (statsStore.hasGroup && !targetMe.value && !targetGroup.value) {
+    uiStore.showToast('Выберите, кого добавить')
+    return
+  }
+
   let dateVal = null
   if (dateMode.value === 'exact') dateVal = exactDate.value
   if (dateMode.value === 'month') dateVal = monthDate.value
@@ -310,7 +358,9 @@ const save = async () => {
       season: isSeries.value ? season.value : 0,
       episode: isSeries.value ? episode.value : 0,
       date_mode: dateMode.value,
-      date_val: dateVal
+      date_val: dateVal,
+      target_me: statsStore.hasGroup ? targetMe.value : true,
+      target_group: statsStore.hasGroup ? targetGroup.value : false
     })
     uiStore.showToast('Просмотр добавлен!')
     delete uiStore.showsCache[context.value.showId]

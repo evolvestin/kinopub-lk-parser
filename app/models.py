@@ -590,3 +590,16 @@ class CasinoSpin(BaseModel):
 
     def __str__(self):
         return f'{self.user} - {self.show.title} at {self.created_at}'
+
+
+class MutedShowNotification(BaseModel):
+    user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='muted_notifications')
+    show = models.ForeignKey(Show, on_delete=models.CASCADE, related_name='muted_by_users')
+
+    class Meta:
+        unique_together = ('user', 'show')
+        verbose_name = 'Muted Show Notification'
+        verbose_name_plural = 'Muted Show Notifications'
+
+    def __str__(self):
+        return f'{self.user} muted {self.show.title}'

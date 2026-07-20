@@ -430,6 +430,10 @@ if ENVIRONMENT == 'PROD':
                 'task': 'app.tasks.sync_poiskkino_ratings_task',
                 'schedule': crontab(minute=0, hour=5),
             },
+            'run_new_episodes': {
+                'task': 'app.tasks.run_new_episodes_task',
+                'schedule': crontab(minute=20, hour='8-21'),
+            },
         }
     )
 

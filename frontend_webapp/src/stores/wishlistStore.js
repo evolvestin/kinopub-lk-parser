@@ -13,6 +13,10 @@ export const useWishlistStore = defineStore('wishlist', () => {
   const isLoaded = ref(false)
   let fetchPromise = null
 
+  const casinoStatus = ref(null)
+  const isCasinoStatusLoaded = ref(false)
+  let casinoStatusPromise = null
+
   const isReorderFoldersMode = computed({
     get() {
       return router.currentRoute.value.query.reorder_folders === 'true'
@@ -74,6 +78,27 @@ export const useWishlistStore = defineStore('wishlist', () => {
     })()
 
     return fetchPromise
+  }
+
+  async function fetchCasinoStatus(force = false) {
+    if (isCasinoStatusLoaded.value && !force) return casinoStatus.value
+    if (casinoStatusPromise) return casinoStatusPromise
+
+    casinoStatusPromise = (async () => {
+      try {
+        const data = await api.post('casino/', { action: 'status' })
+        casinoStatus.value = data
+        isCasinoStatusLoaded.value = true
+        return data
+      } catch (error) {
+        console.error(error)
+        return null
+      } finally {
+        casinoStatusPromise = null
+      }
+    })()
+
+    return casinoStatusPromise
   }
 
   const FOLDER_COLORS = [
@@ -289,7 +314,10 @@ export const useWishlistStore = defineStore('wishlist', () => {
     isReorderItemsMode,
     FOLDER_COLORS,
     FOLDER_ICONS,
+    casinoStatus,
+    isCasinoStatusLoaded,
     fetchWishlist,
+    fetchCasinoStatus,
     setViewMode,
     setSortMode,
     createFolder,

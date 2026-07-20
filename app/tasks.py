@@ -21,7 +21,7 @@ from redis import Redis
 
 from app import history_parser
 from app.gdrive_backup import BackupManager
-from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser, WishlistItem
+from app.models import Code, LogEntry, Show, SiteMetric, TaskRun, ViewUser, WishlistItem, MutedShowNotification
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
     generate_global_metrics_snapshot,
@@ -319,7 +319,7 @@ def run_admin_command(self, task_run_id):
 @shared_task
 @single_instance_task(lock_name='selenium_global_lock', timeout=3600)
 def run_new_episodes_task():
-    logging.info('Starting daily new episodes parser task.')
+    logging.info('Starting new episodes parser task.')
     call_command('runnewepisodes')
 
 
@@ -548,17 +548,15 @@ def notify_new_episode_task(show_id, season, episode):
     except Show.DoesNotExist:
         return
 
-    # Находим всех пользователей, у которых это шоу в активном вишлисте
-    user_ids = (
-        WishlistItem.objects.filter(show=show, is_active=True)
-        .values_list('user_id', flat=True)
-        .distinct()
-    )
+    users = ViewUser.objects.filter(
+        Q(wishlist_items__show=show, wishlist_items__is_active=True) |
+        Q(wishlist_folders__items__show=show, wishlist_folders__items__is_active=True) |
+        Q(history__show=show),
+        is_bot_active=True
+    ).exclude(
+        muted_notifications__show=show
+    ).distinct()
 
-    if not user_ids:
-        return
-
-    users = ViewUser.objects.filter(id__in=user_ids, is_bot_active=True)
     sender = TelegramSender()
 
     for user in users:

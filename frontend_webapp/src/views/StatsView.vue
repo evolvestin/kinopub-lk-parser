@@ -10,7 +10,7 @@
     </div>
 
     <template v-if="currentStats">
-      <div :class="{ 'blurred-content': isFakeMode }" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+      <div :class="{ 'blurred-content': isFakeMode }" style="display: flex; flex-direction: column; min-height: 100%;">
         <div class="header">
           <div class="header-left">
             <div class="avatar">

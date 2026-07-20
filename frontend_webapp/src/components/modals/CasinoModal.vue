@@ -372,9 +372,10 @@ const startCountdown = (expiresMs) => {
 const checkStatus = async () => {
   state.value = 'loading'
   try {
-    const data = await api.post('casino/', { action: 'status' })
-    hasHistory.value = !!data.has_history
-    if (data.active_spin) {
+    await wishlistStore.fetchCasinoStatus()
+    const data = wishlistStore.casinoStatus
+    hasHistory.value = !!data?.has_history
+    if (data?.active_spin) {
       activeSpin.value = data.active_spin
       state.value = 'cooldown'
       startCountdown(data.active_spin.expires)
@@ -411,6 +412,23 @@ const selectFolder = async (folderId) => {
     winner.value = data.show
     hasHistory.value = true
     if (!pool.length) pool = [data.show]
+
+    wishlistStore.casinoStatus = {
+      active_spin: {
+        show: {
+          show_id: data.show.show_id,
+          title: data.show.title,
+          original_title: data.show.original_title,
+          year: data.show.year,
+          type: data.show.type,
+          poster_url: data.show.poster_url,
+          user_rating: data.show.user_rating,
+        },
+        expires: data.expires,
+      },
+      has_history: true
+    }
+    wishlistStore.isCasinoStatusLoaded = true
 
     let elapsed = 0
     const duration = 4000
@@ -506,6 +524,11 @@ const resetCooldown = async () => {
   try {
     await api.post('casino/', { action: 'reset' })
     uiStore.showToast('Кулдаун сброшен')
+    wishlistStore.casinoStatus = {
+      active_spin: null,
+      has_history: wishlistStore.casinoStatus?.has_history || false
+    }
+    wishlistStore.isCasinoStatusLoaded = true
     state.value = 'menu'
   } catch (e) {
     uiStore.showToast('Ошибка сброса')

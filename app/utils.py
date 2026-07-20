@@ -100,3 +100,15 @@ def get_scheduled_tasks_info():
 
     scheduled_tasks.sort(key=lambda x: x['seconds_left'])
     return scheduled_tasks
+
+
+def get_webapp_base_url() -> str:
+    live_url = cache.get('live_webapp_url')
+    if live_url:
+        return live_url.rstrip('/')
+    base_url = (
+        getattr(settings, 'WEBAPP_PUBLIC_URL', None)
+        or getattr(settings, 'BACKEND_URL', None)
+        or 'http://localhost:8000'
+    )
+    return base_url.rstrip('/')

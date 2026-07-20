@@ -23,6 +23,7 @@ import WlEditModal from './components/modals/WlEditModal.vue'
 import WlLimitModal from './components/modals/WlLimitModal.vue'
 import WlDeleteModal from './components/modals/WlDeleteModal.vue'
 import RatingsDetailsModal from './components/modals/RatingsDetailsModal.vue'
+import UnsubscribeLayer from './components/layers/UnsubscribeLayer.vue'
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -147,13 +148,12 @@ onMounted(async () => {
       nextTick(() => {
         uiStore.openLayer('show', startParam.replace('show_', ''))
       })
+    } else if (startParam.startsWith('unsub_')) {
+      targetPath = '/search'
+      nextTick(() => {
+        uiStore.openLayer('unsubscribe', startParam.replace('unsub_', ''))
+      })
     }
-  } else if (targetQuery.shared_id) {
-    targetPath = '/stats'
-  } else if (hasLayer) {
-    targetPath = currentPath
-  } else if (lastView && ['search', 'wishlist', 'stats'].includes(lastView)) {
-    targetPath = `/${lastView}`
   }
 
   await router.replace({ path: targetPath, query: targetQuery })
@@ -231,6 +231,7 @@ watch(() => uiStore.theme, (val) => {
         <CollectionLayer v-if="['person', 'genre', 'country', 'show_type', 'year', 'status'].includes(layer.type)" 
                         :type="layer.type" :itemId="layer.props.itemId" />
         <HistoryLayer v-if="layer.type === 'history'" v-bind="layer.props" />
+        <UnsubscribeLayer v-if="layer.type === 'unsubscribe'" :showId="layer.props.itemId" />
       </div>
     </div>
     

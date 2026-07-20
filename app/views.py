@@ -32,6 +32,7 @@ from app.models import (
     ExternalRating,
     Genre,
     LogEntry,
+    MutedShowNotification,
     Person,
     SharedStat,
     Show,
@@ -45,6 +46,7 @@ from app.models import (
     WishlistFolder,
     WishlistItem,
 )
+
 from app.services.metrics import (
     get_active_countries_list,
     get_duplicate_photo_urls_list,
@@ -1200,7 +1202,10 @@ def webapp_bake_stats(request):
 
             baked_data[str(yr)] = stat
 
-        final_payload = {'metadata': {'years': years}, 'data': baked_data}
+        final_payload = {
+            'metadata': {'years': years, 'user_id': view_user.id},
+            'data': baked_data,
+        }
         content_hash = hashlib.sha256(
             json.dumps(final_payload, sort_keys=True).encode()
         ).hexdigest()
@@ -1238,6 +1243,26 @@ def webapp_get_show_full(request, show_id):
 
         view_user = get_webapp_user(request)
 
+        shared_id = request.GET.get('shared_id')
+        if not shared_id and request.method == 'POST':
+            try:
+                body = json.loads(request.body)
+                shared_id = body.get('shared_id')
+            except Exception:
+                pass
+
+        owner_user = None
+        if shared_id:
+            try:
+                shared_stat = SharedStat.objects.get(id=shared_id)
+                user_id = shared_stat.data.get('metadata', {}).get('user_id')
+                if user_id:
+                    owner_user = ViewUser.objects.get(id=user_id)
+            except Exception:
+                pass
+
+        target_user = owner_user or view_user
+
         internal_rating, user_ratings = show.get_internal_rating_data()
         
         duration_qs = ShowDuration.objects.filter(show=show).aggregate(total=Sum('duration_seconds'))
@@ -1248,28 +1273,32 @@ def webapp_get_show_full(request, show_id):
 
         visible_ids = set()
         is_guest = True
-        if view_user:
-            is_guest = view_user.role == UserRole.GUEST
-            visible_ids.add(view_user.id)
+        if target_user:
+            is_guest = target_user.role == UserRole.GUEST
+            visible_ids.add(target_user.id)
             if not is_guest:
-                mate_ids = ViewUser.objects.filter(groups__users=view_user).values_list(
+                mate_ids = ViewUser.objects.filter(groups__users=target_user).values_list(
                     'id', flat=True
                 )
                 visible_ids.update(mate_ids)
 
             rating_obj = UserRating.objects.filter(
-                user=view_user, show=show, season_number__isnull=True
+                user=target_user, show=show, season_number__isnull=True
             ).first()
             if rating_obj:
                 personal_rating = rating_obj.rating
 
             personal_episodes_count = UserRating.objects.filter(
-                user=view_user, show=show, season_number__isnull=False
+                user=target_user, show=show, season_number__isnull=False
             ).count()
+
+        is_muted = False
+        if target_user:
+            is_muted = MutedShowNotification.objects.filter(user=target_user, show=show).exists()
 
         last_view = None
         user_show_history = []
-        if view_user:
+        if target_user:
             history_qs = (
                 ViewHistory.objects.filter(show=show)
                 .prefetch_related('users')
@@ -1301,7 +1330,7 @@ def webapp_get_show_full(request, show_id):
 
             if user_show_history:
                 my_last = next(
-                    (x for x in user_show_history if view_user.id in x['user_ids']), None
+                    (x for x in user_show_history if target_user.id in x['user_ids']), None
                 )
                 if my_last:
                     se_suffix = (
@@ -1457,6 +1486,7 @@ def webapp_get_show_full(request, show_id):
             'genres': genres_list,
             'crew': ordered_crew,
             'ext_rating': ext_rating_data,
+            'is_muted': is_muted,
             'updated_at': show.updated_at.strftime('%Y-%m-%d %H:%M:%S')
             if show.updated_at
             else None,
@@ -2264,6 +2294,8 @@ def webapp_add_view(request):
         episode = int(body.get('episode') or 0)
         date_mode = body.get('date_mode', 'exact')
         date_val = body.get('date_val')
+        target_me = body.get('target_me', True)
+        target_group = body.get('target_group', True)
 
         view_date = None
         if date_mode == 'exact' and date_val:
@@ -2296,8 +2328,19 @@ def webapp_add_view(request):
         else:
             vh._skip_broadcast = True
 
-        if not vh.users.filter(id=view_user.id).exists():
-            vh.users.add(view_user)
+        users_to_add = set()
+        if target_me:
+            users_to_add.add(view_user)
+
+        if target_group:
+            groups = ViewUserGroup.objects.filter(users=view_user)
+            for group in groups:
+                for member in group.users.all():
+                    users_to_add.add(member)
+
+        for u in users_to_add:
+            if not vh.users.filter(id=u.id).exists():
+                vh.users.add(u)
 
         show_title = vh.show.title or vh.show.original_title
         send_view_confirmation_task.delay(
@@ -2374,18 +2417,31 @@ def webapp_get_episodes(request):
         body = json.loads(request.body)
         show_id = body.get('show_id')
 
+        shared_id = body.get('shared_id')
+        owner_user = None
+        if shared_id:
+            try:
+                shared_stat = SharedStat.objects.get(id=shared_id)
+                user_id = shared_stat.data.get('metadata', {}).get('user_id')
+                if user_id:
+                    owner_user = ViewUser.objects.get(id=user_id)
+            except Exception:
+                pass
+
+        target_user = owner_user or view_user
+
         durations = ShowDuration.objects.filter(
             show_id=show_id, season_number__isnull=False, episode_number__isnull=False
         ).order_by('season_number', 'episode_number')
 
         ratings = UserRating.objects.filter(
-            user=view_user, show_id=show_id, season_number__isnull=False
+            user=target_user, show_id=show_id, season_number__isnull=False
         ).values('season_number', 'episode_number', 'rating')
 
         ratings_map = {(r['season_number'], r['episode_number']): r['rating'] for r in ratings}
 
         views = ViewHistory.objects.filter(
-            show_id=show_id, users=view_user, season_number__gt=0, episode_number__gt=0
+            show_id=show_id, users=target_user, season_number__gt=0, episode_number__gt=0
         ).values('id', 'season_number', 'episode_number')
 
         views_map = {(v['season_number'], v['episode_number']): v['id'] for v in views}
@@ -2648,3 +2704,82 @@ def admin_get_global_stats(request):
         year = None
     stats = generate_global_stats(year=year)
     return JsonResponse(stats)
+
+
+@csrf_exempt
+@require_http_methods(['POST', 'GET'])
+def webapp_show_notification_status(request, show_id):
+    try:
+        view_user = get_webapp_user(request)
+        if not view_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        show = Show.objects.get(id=show_id)
+
+        in_wishlist = WishlistItem.objects.filter(
+            Q(user=view_user) | Q(folder__user=view_user),
+            show=show,
+            is_active=True
+        ).exists()
+
+        in_history = ViewHistory.objects.filter(
+            show=show,
+            users=view_user,
+            is_checked=True
+        ).exists()
+
+        is_muted = MutedShowNotification.objects.filter(user=view_user, show=show).exists()
+
+        reasons = []
+        if in_history:
+            reasons.append('history')
+        if in_wishlist:
+            reasons.append('wishlist')
+
+        if not reasons:
+            reasons.append('general')
+
+        return JsonResponse({
+            'show_id': show.id,
+            'title': show.title,
+            'original_title': show.original_title,
+            'plot': show.plot,
+            'poster_medium': get_poster_url(show.id, 'medium'),
+            'poster_large': get_poster_url(show.id, 'big'),
+            'reasons': reasons,
+            'is_muted': is_muted
+        })
+
+    except Show.DoesNotExist:
+        return JsonResponse({'error': 'Show not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_toggle_mute_notification(request):
+    try:
+        view_user = get_webapp_user(request)
+        if not view_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        body = json.loads(request.body)
+        show_id = body.get('show_id')
+        mute = body.get('mute', True)
+
+        show = Show.objects.get(id=show_id)
+
+        if mute:
+            MutedShowNotification.objects.get_or_create(user=view_user, show=show)
+            msg = 'Уведомления отключены'
+        else:
+            MutedShowNotification.objects.filter(user=view_user, show=show).delete()
+            msg = 'Уведомления включены'
+
+        return JsonResponse({'status': 'ok', 'is_muted': mute, 'message': msg})
+
+    except Show.DoesNotExist:
+        return JsonResponse({'error': 'Show not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

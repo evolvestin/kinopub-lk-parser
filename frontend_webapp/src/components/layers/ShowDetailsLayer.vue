@@ -34,6 +34,9 @@
           <span v-html="icons.star"></span>
           <div v-if="showRateGuide" class="guide-tooltip-left rate-guide">Поставить оценку</div>
         </button>
+        <button class="detail-notify-btn anim-item" style="position: relative; animation-delay: 0.3s;" @click="toggleMute">
+          <span v-html="isMuted ? icons_bell_off : icons_bell"></span>
+        </button>
       </div>
     </div>
 
@@ -191,11 +194,15 @@ const statsStore = useStatsStore()
 const show = ref(null)
 const activePoster = ref('')
 const activeBg = ref('')
-
 const activeSeasonStr = ref(null)
+
+const cacheKey = computed(() => {
+  return statsStore.isShared ? `${props.showId}_shared_${statsStore.sharedId}` : `${props.showId}`
+})
+
 const seasonsData = computed(() => {
   if (!show.value) return []
-  return uiStore.episodesCache[props.showId] || []
+  return uiStore.episodesCache[cacheKey.value] || []
 })
 
 watch(seasonsData, (newVal) => {
@@ -235,17 +242,14 @@ const showRateGuide = computed(() => statsStore.currentStats && statsStore.curre
 const currentPersonalRating = computed(() => {
   if (!show.value) return null
   if (statsStore.isShared) {
-    const sharedRating = statsStore.sharedShowRatings[show.value.id]
-    return sharedRating !== undefined ? sharedRating : null
+    return show.value.personal_rating
   }
   const local = statsStore.userShowRatings[show.value.id]
   return local !== undefined ? local : show.value.personal_rating
 })
 
 const viewerRating = computed(() => {
-  if (!show.value) return null
-  const local = statsStore.userShowRatings[show.value.id]
-  return local !== undefined ? local : show.value.personal_rating
+  return currentPersonalRating.value
 })
 
 const isSeries = computed(() => {
@@ -310,31 +314,19 @@ const showStatusRu = computed(() => {
 
 const lastViewDisplay = computed(() => {
   if (!show.value) return null
-  
-  if (statsStore.isShared) {
-    const D = statsStore.currentStats
-    if (!D) return null
-    const pool = [...(D.history_movies || []), ...(D.history_episodes || [])]
-    const showHistory = pool.filter(i => i.show_id === show.value.id).sort((a, b) => b.view_date.localeCompare(a.view_date))
-    if (showHistory.length > 0) {
-      const myLast = showHistory[0]
-      let se_suffix = ''
-      if (myLast.season_number > 0) {
-        const epStr = myLast.episode_number < 10 ? `0${myLast.episode_number}` : myLast.episode_number
-        se_suffix = ` (s${myLast.season_number}e${epStr})`
-      }
-      return `${myLast.view_date}${se_suffix}`
-    }
-    return null
-  }
-  
   return show.value.last_view?.display || null
 })
 
+const icons_bell = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>`
+const icons_bell_off = `<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"></path><path d="M18.63 13A17.89 17.89 0 0 1 18 8"></path><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"></path><path d="M18 8a6 6 0 0 0-9.33-5"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`
+
+const isMuted = ref(false)
+
 const loadShowData = async () => {
-  if (uiStore.showsCache[props.showId]) {
-    const cachedData = uiStore.showsCache[props.showId]
+  if (uiStore.showsCache[cacheKey.value]) {
+    const cachedData = uiStore.showsCache[cacheKey.value]
     show.value = cachedData
+    isMuted.value = cachedData.is_muted
     activePoster.value = cachedData.poster_medium || ''
     activeBg.value = cachedData.poster_medium || ''
     if (cachedData.poster_large) {
@@ -344,9 +336,11 @@ const loadShowData = async () => {
   }
 
   try {
-    const data = await api.get(`show/${props.showId}/`)
+    const url = statsStore.isShared ? `show/${props.showId}/?shared_id=${statsStore.sharedId}` : `show/${props.showId}/`
+    const data = await api.get(url)
     show.value = data
-    uiStore.showsCache[props.showId] = data
+    isMuted.value = data.is_muted
+    uiStore.showsCache[cacheKey.value] = data
 
     if (data.crew) {
       data.crew.forEach(group => {
@@ -367,9 +361,13 @@ const loadShowData = async () => {
     }
 
     if (['Series', 'Documentary Series', 'TV Show'].includes(data.type)) {
-      if (!uiStore.episodesCache[props.showId]) {
-        api.post('get_episodes/', { show_id: props.showId }).then(res => {
-          uiStore.episodesCache[props.showId] = res.seasons || []
+      if (!uiStore.episodesCache[cacheKey.value]) {
+        const payload = { show_id: props.showId }
+        if (statsStore.isShared) {
+          payload.shared_id = statsStore.sharedId
+        }
+        api.post('get_episodes/', payload).then(res => {
+          uiStore.episodesCache[cacheKey.value] = res.seasons || []
         }).catch(() => {})
       }
     }
@@ -394,14 +392,44 @@ const loadShowData = async () => {
   }
 }
 
+const isTogglingMute = ref(false)
+const toggleMute = async () => {
+  if (isTogglingMute.value) return
+  isTogglingMute.value = true
+  
+  if (window.navigator.vibrate) {
+    window.navigator.vibrate(10)
+  }
+
+  const nextMuteValue = !isMuted.value
+  try {
+    const data = await api.post('toggle_mute_notification/', {
+      show_id: props.showId,
+      mute: nextMuteValue
+    })
+    isMuted.value = data.is_muted
+    uiStore.showToast(data.message)
+    delete uiStore.showsCache[props.showId]
+  } catch (e) {
+    console.error('[ShowDetailsLayer] Toggle mute error:', e)
+    uiStore.showToast('Не удалось обновить статус подписки')
+  } finally {
+    isTogglingMute.value = false
+  }
+}
+
 onMounted(loadShowData)
 
 watch(() => uiStore.modals.rateShow.isOpen, async (newVal, oldVal) => {
   if (oldVal === true && newVal === false) {
     await loadShowData()
     if (isSeries.value) {
-        const res = await api.post('get_episodes/', { show_id: props.showId })
-        uiStore.episodesCache[props.showId] = res.seasons || []
+        const payload = { show_id: props.showId }
+        if (statsStore.isShared) {
+          payload.shared_id = statsStore.sharedId
+        }
+        const res = await api.post('get_episodes/', payload)
+        uiStore.episodesCache[cacheKey.value] = res.seasons || []
     }
   }
 })
@@ -410,8 +438,12 @@ watch(() => uiStore.modals.addView.isOpen, async (newVal, oldVal) => {
   if (oldVal === true && newVal === false) {
     await loadShowData()
     if (isSeries.value) {
-        const res = await api.post('get_episodes/', { show_id: props.showId })
-        uiStore.episodesCache[props.showId] = res.seasons || []
+        const payload = { show_id: props.showId }
+        if (statsStore.isShared) {
+          payload.shared_id = statsStore.sharedId
+        }
+        const res = await api.post('get_episodes/', payload)
+        uiStore.episodesCache[cacheKey.value] = res.seasons || []
     }
     statsStore.fetchStats(statsStore.currentYear, true, true)
     statsStore.fetchStats('all', true, true)
@@ -419,10 +451,17 @@ watch(() => uiStore.modals.addView.isOpen, async (newVal, oldVal) => {
 })
 
 const openEpisodeModal = (ep) => {
+  let initialVal = ep.rating || null
+  if (statsStore.isShared) {
+    const cacheSeasons = uiStore.episodesCache[cacheKey.value] || []
+    const cacheSeason = cacheSeasons.find(s => s.season_number === activeSeasonStr.value)
+    const cacheEp = cacheSeason?.episodes?.find(e => e.episode_number === ep.episode_number)
+    initialVal = cacheEp?.rating || null
+  }
   uiStore.openModal('rateShow', {
       showId: show.value.id,
       title: show.value.title,
-      initialValue: ep.rating || null,
+      initialValue: initialVal,
       type: show.value.type,
       level: 'score',
       season: activeSeasonStr.value,
@@ -448,7 +487,7 @@ const openRating = () => {
   uiStore.openModal('rateShow', {
     showId: show.value.id,
     title: show.value.title,
-    initialValue: viewerRating.value,
+    initialValue: statsStore.userShowRatings[show.value.id] !== undefined ? statsStore.userShowRatings[show.value.id] : show.value.personal_rating,
     type: show.value.type
   })
 }
@@ -476,11 +515,35 @@ const openRatingsDetails = (ratingType) => {
 </script>
 
 <style scoped>
+.detail-notify-btn {
+    position: absolute !important;
+    top: 144px !important;
+    right: -18px !important;
+    left: auto !important;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 50% !important;
+    background: #e67e22 !important;
+    color: #fff !important;
+    box-shadow: 0 4px 15px rgba(230, 126, 34, 0.4) !important;
+    border: 3px solid var(--bg-main) !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    cursor: pointer;
+    outline: none !important;
+    transition: transform var(--transition-bounce), background var(--transition-smooth), box-shadow var(--transition-smooth) !important;
+}
+.detail-notify-btn:active { transform: scale(0.85) !important; }
+.detail-notify-btn svg { width: 24px !important; height: 24px !important; }
+@media (max-width: 380px) { .detail-notify-btn { right: -10px !important; top: 144px !important; } }
 .ep-badge {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 4px;
     background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -504,7 +567,6 @@ const openRatingsDetails = (ratingType) => {
     font-weight: 900;
     color: var(--text-primary);
     line-height: 1;
-    margin-bottom: 2px;
 }
 .ep-badge.watched .ep-num {
     color: var(--accent);
@@ -530,8 +592,8 @@ const openRatingsDetails = (ratingType) => {
     width: 10px; height: 10px;
 }
 .ep-grid-btn {
-    min-height: 58px;
+    min-height: 64px;
     height: auto;
-    padding: 4px !important;
+    padding: 6px !important;
 }
 </style>

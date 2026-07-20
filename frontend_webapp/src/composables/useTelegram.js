@@ -40,6 +40,46 @@ if (earlyInitData) {
   setCookie('tg_init_data', earlyInitData);
 }
 
+const cleanTelegramHash = () => {
+  const hash = window.location.hash;
+  if (!hash) return;
+  if (hash.includes('tgWebAppData=') || hash.includes('tgWebAppVersion=')) {
+    let path = '/';
+    let queryPart = hash.replace(/^[#]/, '');
+    if (queryPart.startsWith('/')) {
+      const qIdx = queryPart.indexOf('?');
+      const ampIdx = queryPart.indexOf('&');
+      let splitIdx = -1;
+      if (qIdx !== -1 && ampIdx !== -1) {
+        splitIdx = Math.min(qIdx, ampIdx);
+      } else {
+        splitIdx = qIdx !== -1 ? qIdx : ampIdx;
+      }
+      if (splitIdx !== -1) {
+        path = queryPart.substring(0, splitIdx);
+        queryPart = queryPart.substring(splitIdx + 1);
+      } else {
+        path = queryPart;
+        queryPart = '';
+      }
+    }
+    if (queryPart) {
+      const params = new URLSearchParams(queryPart);
+      const tgKeys = [
+        'tgWebAppData', 'tgWebAppVersion', 'tgWebAppPlatform', 
+        'tgWebAppBotInline', 'tgWebAppThemeParams', 'hash', 
+        'user', 'auth_date', 'query_id', 'signature'
+      ];
+      tgKeys.forEach(k => params.delete(k));
+      const remaining = params.toString();
+      window.location.hash = '#' + path + (remaining ? '?' + remaining : '');
+    } else {
+      window.location.hash = '#' + path;
+    }
+  }
+}
+cleanTelegramHash();
+
 const getStoredInitData = () => {
   if (window.__telegram_init_data__ && window.__telegram_init_data__ !== 'undefined' && window.__telegram_init_data__ !== 'null') {
     return window.__telegram_init_data__;

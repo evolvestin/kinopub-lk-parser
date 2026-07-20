@@ -6,6 +6,7 @@ from django.conf import settings
 
 from app.keyboards import get_history_notification_keyboard, get_role_management_keyboard
 from app.services.error_aggregator import ErrorAggregator
+from app.utils import get_webapp_base_url
 from shared.card_formatter import get_show_card_text
 from shared.constants import DATE_FORMAT, UserRole
 from shared.formatters import format_se
@@ -407,17 +408,14 @@ class TelegramSender:
             f'🎞 Серия: {code(se_text)}\n'
         )
 
-        base_url = (
-            getattr(settings, 'WEBAPP_PUBLIC_URL', None)
-            or getattr(settings, 'BACKEND_URL', None)
-            or 'http://localhost:8000'
-        ).rstrip('/')
-
+        base_url = get_webapp_base_url()
         webapp_url = f'{base_url}/webapp/?show_id={show.id}'
+        unsub_webapp_url = f'{base_url}/webapp/?start_param=unsub_{show.id}'
 
-        # Мы работаем внутри сервиса, который делает запросы к Bot API,
-        # поэтому формируем JSON структуру клавиатуры
-        kb_data = [[{'text': '📱 Открыть в приложении', 'web_app': {'url': webapp_url}}]]
+        kb_data = [
+            [{'text': '📱 Открыть в приложении', 'web_app': {'url': webapp_url}}],
+            [{'text': '🔕 Отписаться от уведомлений', 'web_app': {'url': unsub_webapp_url}}]
+        ]
 
         payload = {
             'chat_id': view_user.telegram_id,

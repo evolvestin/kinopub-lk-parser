@@ -61,6 +61,8 @@ urlpatterns = proxy_patterns + [
     path('api/webapp/casino/', views.webapp_casino, name='webapp_casino'),
     path('api/webapp/add_view/', views.webapp_add_view, name='webapp_add_view'),
     path('api/webapp/remove_view/', views.webapp_remove_view, name='webapp_remove_view'),
+    path('api/webapp/show/<int:show_id>/notification_status/', views.webapp_show_notification_status, name='webapp_show_notification_status'),
+    path('api/webapp/toggle_mute_notification/', views.webapp_toggle_mute_notification, name='webapp_toggle_mute_notification'),
     path('api/bot/check/<int:telegram_id>/', views.check_bot_user),
     path('api/bot/register/', views.register_bot_user),
     path('api/bot/set_role/', views.set_bot_user_role),

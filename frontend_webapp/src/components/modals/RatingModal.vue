@@ -321,7 +321,7 @@ const modalHeight = computed(() => {
   const baseHeight = (isShared ? 580 : 520) + hintHeight
 
   if (!isSeries.value) {
-    return `${420 + hintHeight}px`
+    return `${(isShared ? 500 : 420) + hintHeight}px`
   }
 
   if (!episodesData.value.length) {
