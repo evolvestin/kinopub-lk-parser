@@ -149,10 +149,8 @@ onMounted(async () => {
         uiStore.openLayer('show', startParam.replace('show_', ''))
       })
     } else if (startParam.startsWith('unsub_')) {
-      targetPath = '/search'
-      nextTick(() => {
-        uiStore.openLayer('unsubscribe', startParam.replace('unsub_', ''))
-      })
+      const showId = startParam.replace('unsub_', '')
+      targetPath = `/search/show/${showId}/unsubscribe/${showId}`
     }
   }
 

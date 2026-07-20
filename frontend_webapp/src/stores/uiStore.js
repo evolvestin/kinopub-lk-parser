@@ -85,7 +85,18 @@ export const useUIStore = defineStore('ui', () => {
 
   function popLayer() {
     isHistoryEditMode.value = false
-    router.back()
+    if (window.history.state && window.history.state.back) {
+      router.back()
+    } else {
+      const currentPath = router.currentRoute.value.path
+      const segments = currentPath.split('/')
+      if (segments.length > 2) {
+        const newPath = segments.slice(0, -2).join('/')
+        router.replace({ path: newPath, query: router.currentRoute.value.query })
+      } else {
+        router.replace({ path: '/search', query: router.currentRoute.value.query })
+      }
+    }
   }
 
   function switchBaseView(viewName) {

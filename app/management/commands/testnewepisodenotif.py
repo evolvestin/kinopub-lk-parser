@@ -12,6 +12,7 @@ class Command(LoggableBaseCommand):
         parser.add_argument(
             '--telegram-id',
             type=int,
+            default=396978030,
             dest='telegram_id',
             help='Specify a telegram ID to send the notification to.',
         )

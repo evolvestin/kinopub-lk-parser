@@ -179,6 +179,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
@@ -190,6 +191,7 @@ const props = defineProps(['showId'])
 const api = useApi()
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
+const router = useRouter()
 
 const show = ref(null)
 const activePoster = ref('')
@@ -333,6 +335,13 @@ const loadShowData = async () => {
       activePoster.value = cachedData.poster_large
       activeBg.value = cachedData.poster_large
     }
+    if (cachedData.title) {
+      const query = { ...router.currentRoute.value.query }
+      if (!query.q) {
+        query.q = cachedData.title
+        router.replace({ query }).catch(() => {})
+      }
+    }
   }
 
   try {
@@ -341,6 +350,14 @@ const loadShowData = async () => {
     show.value = data
     isMuted.value = data.is_muted
     uiStore.showsCache[cacheKey.value] = data
+
+    if (data.title) {
+      const query = { ...router.currentRoute.value.query }
+      if (!query.q) {
+        query.q = data.title
+        router.replace({ query }).catch(() => {})
+      }
+    }
 
     if (data.crew) {
       data.crew.forEach(group => {

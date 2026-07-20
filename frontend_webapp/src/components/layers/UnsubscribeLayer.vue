@@ -74,6 +74,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { icons } from '../../utils/icons'
@@ -88,6 +89,7 @@ const props = defineProps({
 
 const api = useApi()
 const uiStore = useUIStore()
+const router = useRouter()
 
 const show = ref(null)
 const activePoster = ref('')
@@ -97,7 +99,6 @@ const isToggling = ref(false)
 
 const goBack = () => {
   uiStore.popLayer()
-  uiStore.openLayer('show', props.showId)
 }
 
 const loadNotificationStatus = async () => {
@@ -109,6 +110,14 @@ const loadNotificationStatus = async () => {
 
     activePoster.value = data.poster_medium || ''
     activeBg.value = data.poster_medium || ''
+
+    if (data.title) {
+      const query = { ...router.currentRoute.value.query }
+      if (!query.q) {
+        query.q = data.title
+        router.replace({ query }).catch(() => {})
+      }
+    }
 
     if (data.poster_large) {
       preloadImage(data.poster_large).then(success => {
