@@ -426,24 +426,30 @@ const modalHeight = computed(() => {
   if (showFullVoters.value) {
     return '100%'
   }
-  
-  let staticHeight = 68 + 62 + 72 + 48
+
+  let staticHeight = 220
   if (statsStore.isShared) {
-    staticHeight += 84
+    staticHeight += 80
   }
   if (availableTabsCount.value > 1) {
-    staticHeight += 48
+    staticHeight += 44
   }
 
-  const hasCritics = showData.value.ext_rating && (
-    showData.value.ext_rating.film_critics !== null || 
-    showData.value.ext_rating.russian_film_critics !== null || 
-    showData.value.ext_rating.await_rating !== null ||
-    showData.value.ext_rating.tmdb !== null
-  )
-  
-  const kpContentHeight = 110 + 30 + 35 + (hasCritics ? 140 : 0)
-  const imdbContentHeight = 110 + 30 + 35
+  let criticsHeight = 0
+  if (showData.value.ext_rating) {
+    let rowsCount = 0
+    if (showData.value.ext_rating.film_critics !== null) rowsCount++
+    if (showData.value.ext_rating.russian_film_critics !== null) rowsCount++
+    if (showData.value.ext_rating.await_rating !== null) rowsCount++
+    if (showData.value.ext_rating.tmdb !== null) rowsCount++
+    
+    if (rowsCount > 0) {
+      criticsHeight = 52 + (rowsCount * 20) + ((rowsCount - 1) * 10)
+    }
+  }
+
+  const kpContentHeight = 110 + (showData.value.kinopoisk_votes ? 30 : 0) + criticsHeight
+  const imdbContentHeight = 110 + (showData.value.imdb_votes ? 30 : 0)
   const lrContentHeight = 110 + 55 + 85 + (totalVotesCount.value > 0 ? 64 : 0)
 
   const kpHeight = hasKp.value ? (staticHeight + kpContentHeight) : 0
@@ -451,9 +457,9 @@ const modalHeight = computed(() => {
   const lrHeight = hasLr.value ? (staticHeight + lrContentHeight) : 0
 
   const maxCalculated = Math.max(kpHeight, imdbHeight, lrHeight)
-  const maxHeightLimit = Math.min(620, Math.floor(window.innerHeight * 0.95))
-  const finalHeight = Math.min(maxCalculated, maxHeightLimit)
-  
+  const maxHeightLimit = Math.min(600, Math.floor(window.innerHeight * 0.95))
+  const finalHeight = Math.max(380, Math.min(maxCalculated, maxHeightLimit))
+
   return `${finalHeight}px`
 })
 
