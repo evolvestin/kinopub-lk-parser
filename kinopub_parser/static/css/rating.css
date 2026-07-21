@@ -67,9 +67,12 @@
     align-items: center;
     justify-content: center;
     margin-bottom: 20px;
+    width: 100%;
 }
 
 .rate-score-huge {
+    position: relative;
+    display: inline-block;
     font-size: 84px;
     font-weight: 900;
     line-height: 1;
@@ -81,11 +84,20 @@
 }
 
 .rate-score-huge span {
+    position: absolute;
+    left: calc(100% + 4px);
+    bottom: 8px;
     font-size: 20px;
     opacity: 0.4;
     letter-spacing: 0;
-    margin-left: 4px;
     color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.rate-score-display .external-link-btn {
+    position: absolute;
+    right: 0;
+    top: calc(50% - 19px);
 }
 
 .rate-slider-wrap {

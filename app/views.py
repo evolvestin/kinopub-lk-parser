@@ -1231,6 +1231,82 @@ def webapp_get_shared_stats(request, stat_id):
 
 @csrf_exempt
 @require_http_methods(['POST', 'GET'])
+def webapp_get_show_ratings_paginated(request, show_id):
+    view_user = get_webapp_user(request)
+    if not view_user:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+    offset = 0
+    limit = 20
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            offset = int(body.get('offset', 0))
+            limit = int(body.get('limit', 20))
+        except Exception:
+            pass
+    else:
+        offset = int(request.GET.get('offset', 0))
+        limit = int(request.GET.get('limit', 20))
+
+    try:
+        show = Show.objects.get(id=show_id)
+    except Show.DoesNotExist:
+        return JsonResponse({'error': 'Show not found'}, status=404)
+
+    users_query = (
+        UserRating.objects.filter(show=show)
+        .values('user_id')
+        .annotate(last_update=Max('updated_at'))
+        .order_by('-last_update')
+    )
+    total_count = users_query.count()
+    sliced_users = users_query[offset : offset + limit]
+    user_ids = [u['user_id'] for u in sliced_users]
+
+    ratings_qs = UserRating.objects.filter(show=show, user_id__in=user_ids).select_related('user')
+
+    grouped_ratings = {}
+    for r in ratings_qs:
+        uid = r.user.id
+        if uid not in grouped_ratings:
+            user_label = r.user.username if r.user.username else r.user.name
+            user_display = f'@{user_label}' if r.user.username else user_label
+            grouped_ratings[uid] = {
+                'user': user_display,
+                'show_rating': None,
+                'episodes': [],
+            }
+        if r.season_number is None and r.episode_number is None:
+            grouped_ratings[uid]['show_rating'] = r.rating
+        else:
+            grouped_ratings[uid]['episodes'].append(
+                {
+                    'season': r.season_number,
+                    'episode': r.episode_number,
+                    'rating': r.rating,
+                }
+            )
+
+    for uid in grouped_ratings:
+        grouped_ratings[uid]['episodes'].sort(key=lambda x: (x['season'], x['episode']))
+
+    ordered_ratings = []
+    for uid in user_ids:
+        if uid in grouped_ratings:
+            ordered_ratings.append(grouped_ratings[uid])
+
+    has_more = (offset + limit) < total_count
+
+    return JsonResponse({
+        'ratings': ordered_ratings,
+        'has_more': has_more,
+        'total_count': total_count
+    })
+
+
+@csrf_exempt
+@require_http_methods(['POST', 'GET'])
 def webapp_get_show_full(request, show_id):
     try:
         show = (
@@ -1427,8 +1503,17 @@ def webapp_get_show_full(request, show_id):
         except Exception:
             pass
 
-        ratings_qs = UserRating.objects.filter(show=show).select_related('user')
-        total_ratings_count = ratings_qs.count()
+        recent_users_query = (
+            UserRating.objects.filter(show=show)
+            .values('user_id')
+            .annotate(last_update=Max('updated_at'))
+            .order_by('-last_update')[:3]
+        )
+        recent_user_ids = [u['user_id'] for u in recent_users_query]
+
+        ratings_qs = UserRating.objects.filter(show=show, user_id__in=recent_user_ids).select_related('user')
+        total_ratings_count = UserRating.objects.filter(show=show).count()
+        total_voters_count = UserRating.objects.filter(show=show).values('user_id').distinct().count()
 
         grouped_ratings = {}
         for r in ratings_qs:
@@ -1455,7 +1540,12 @@ def webapp_get_show_full(request, show_id):
         for uid in grouped_ratings:
             grouped_ratings[uid]['episodes'].sort(key=lambda x: (x['season'], x['episode']))
 
-        user_ratings_details = list(grouped_ratings.values())
+        user_ratings_details = []
+        for uid in recent_user_ids:
+            if uid in grouped_ratings:
+                user_ratings_details.append(grouped_ratings[uid])
+
+        user_ratings_details_list = list(grouped_ratings.values())
 
         data = {
             'id': show.id,
@@ -1478,6 +1568,7 @@ def webapp_get_show_full(request, show_id):
             'total_duration': total_duration,
             'user_ratings_details': user_ratings_details,
             'total_ratings_count': total_ratings_count,
+            'total_voters_count': total_voters_count,
             'personal_rating': personal_rating,
             'personal_episodes_count': personal_episodes_count,
             'last_view': last_view,

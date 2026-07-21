@@ -13,7 +13,7 @@
         {{ showData?.title || 'Загрузка...' }}
       </div>
 
-      <div v-if="showData && availableTabsCount > 1" class="view-toggle" style="margin-bottom: 20px; flex-shrink: 0; padding: 3px; background: var(--bg-input);">
+      <div v-if="showData && availableTabsCount > 1 && !showFullVoters" class="view-toggle" style="margin-bottom: 20px; flex-shrink: 0; padding: 3px; background: var(--bg-input);">
         <button v-if="hasKp" class="vt-btn" :class="{ active: ratingType === 'kp' }" style="flex: 1;" @click="ratingType = 'kp'">Кинопоиск</button>
         <button v-if="hasImdb" class="vt-btn" :class="{ active: ratingType === 'imdb' }" style="flex: 1;" @click="ratingType = 'imdb'">IMDb</button>
         <button v-if="hasLr" class="vt-btn" :class="{ active: ratingType === 'lr' }" style="flex: 1;" @click="ratingType = 'lr'">LocalRating (LR)</button>
@@ -108,59 +108,105 @@
             </div>
           </div>
 
-          <div v-else-if="ratingType === 'lr'" class="rate-container" style="padding: 0; align-items: stretch;">
-            <div class="rate-score-display" style="margin-bottom: 10px; height: auto; padding: 15px 0; align-self: center;">
-              <div class="rate-score-huge">
-                {{ showData.internal_rating ? showData.internal_rating.toFixed(1) : '—' }}<span style="font-size: 16px; color: var(--text-muted);">/ 10</span>
+          <div v-else-if="ratingType === 'lr'" class="rate-container" style="padding: 0; align-items: stretch; width: 100%;">
+            <template v-if="!showFullVoters">
+              <div class="rate-score-display" style="margin-bottom: 10px; height: auto; padding: 15px 0; align-self: center;">
+                <div class="rate-score-huge">
+                  {{ showData.internal_rating ? showData.internal_rating.toFixed(1) : '—' }}<span style="font-size: 16px; color: var(--text-muted);">/ 10</span>
+                </div>
               </div>
-            </div>
 
-            <div style="text-align: center; font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; font-weight: 600; display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center;">
-              <div>Проголосовало участников: <span style="color: var(--text-primary); font-weight: 800;">{{ showData.user_ratings ? showData.user_ratings.length : '0' }}</span></div>
-              <div v-if="isSeries && showData.total_ratings_count">Общее количество оценок: <span style="color: var(--text-primary); font-weight: 800;">{{ showData.total_ratings_count }}</span></div>
-            </div>
+              <div style="text-align: center; font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; font-weight: 600; display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center;">
+                <div>Проголосовало участников: <span style="color: var(--text-primary); font-weight: 800;">{{ totalVotesCount }}</span></div>
+                <div v-if="isSeries && showData.total_ratings_count">Общее количество оценок: <span style="color: var(--text-primary); font-weight: 800;">{{ showData.total_ratings_count }}</span></div>
+              </div>
 
-            <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4; text-align: center; background: var(--bg-input); padding: 10px 14px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed var(--border);">
-              Локальный рейтинг (LocalRating) рассчитывается на основе оценок всех пользователей бота, которые оценили данное шоу.
-            </div>
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4; text-align: center; background: var(--bg-input); padding: 10px 14px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed var(--border);">
+                Локальный рейтинг (LocalRating) рассчитывается на основе оценок всех пользователей бота, которые оценили данное шоу.
+              </div>
 
-            <div v-if="showData.user_ratings_details?.length" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
-              <div v-for="ur in showData.user_ratings_details" :key="ur.user" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; text-align: left; width: 100%;">
-                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                  <span style="font-size: 14px; font-weight: 800; color: var(--text-primary);">{{ ur.user }}</span>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Оценка {{ isSeries ? 'сериала' : 'фильма' }}:</span>
-                    <span v-if="ur.show_rating" class="rating-badge" :class="getRatingClass(ur.show_rating)" style="font-size: 13px; font-weight: 800; padding: 3px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
-                      <span v-html="icons.star"></span>{{ ur.show_rating.toFixed(1) }}
-                    </span>
-                    <span v-else style="font-size: 13px; font-weight: 800; color: var(--text-muted);">—</span>
+              <div v-if="recentVoters.length" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+                <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Последние оценившие:</div>
+                <div v-for="ur in recentVoters" :key="ur.user" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; text-align: left; width: 100%;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <span style="font-size: 14px; font-weight: 800; color: var(--text-primary);">{{ ur.user }}</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Оценка {{ isSeries ? 'сериала' : 'фильма' }}:</span>
+                      <span v-if="ur.show_rating" class="rating-badge" :class="getRatingClass(ur.show_rating)" style="font-size: 13px; font-weight: 800; padding: 3px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+                        <span v-html="icons.star"></span>{{ ur.show_rating.toFixed(1) }}
+                      </span>
+                      <span v-else style="font-size: 13px; font-weight: 800; color: var(--text-muted);">—</span>
+                    </div>
+                  </div>
+
+                  <div v-if="isSeries && ur.episodes?.length" style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border);">
+                    <div style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Оценки серий:</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                      <span v-for="ep in ur.episodes" :key="`${ep.season}-${ep.episode}`" class="rating-badge" :class="getRatingClass(ep.rating)" style="font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 2px;">
+                        {{ formatSe(ep.season, ep.episode) }}: {{ ep.rating }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div v-else-if="showData.user_ratings?.length" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                <div v-for="ur in showData.user_ratings" :key="ur.label" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; width: 100%;">
+                  <span style="font-size: 14px; font-weight: 700; color: var(--text-primary);">{{ ur.label }}</span>
+                  <span class="rating-badge" :class="getRatingClass(ur.rating)" style="font-size: 13px; font-weight: 800; padding: 3px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+                    <span v-html="icons.star"></span>{{ ur.rating.toFixed(1) }}
+                  </span>
+                </div>
+              </div>
+
+              <button v-if="totalVotesCount > 3" class="btn-primary" style="margin-top: 20px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); box-shadow: none;" @click="openFullVotersList">
+                👥 Показать всех оценивших ({{ totalVotesCount }})
+              </button>
+            </template>
+
+            <template v-else>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; width: 100%; border-bottom: 1px dashed var(--border); padding-bottom: 12px;">
+                <button class="modal-back-btn clickable" @click="showFullVoters = false">
+                  <span v-html="icons.chevron_left"></span>
+                </button>
+                <span style="font-size: 14px; font-weight: 800; color: var(--text-primary);">Все оценившие ({{ totalVotesCount }})</span>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; max-height: 400px; overflow-y: auto; padding-right: 4px;" class="custom-scrollbar" ref="votersListContainer">
+                <div v-for="ur in fullVotersList" :key="ur.user" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; text-align: left; width: 100%;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <span style="font-size: 14px; font-weight: 800; color: var(--text-primary);">{{ ur.user }}</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Оценка {{ isSeries ? 'сериала' : 'фильма' }}:</span>
+                      <span v-if="ur.show_rating" class="rating-badge" :class="getRatingClass(ur.show_rating)" style="font-size: 13px; font-weight: 800; padding: 3px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
+                        <span v-html="icons.star"></span>{{ ur.show_rating.toFixed(1) }}
+                      </span>
+                      <span v-else style="font-size: 13px; font-weight: 800; color: var(--text-muted);">—</span>
+                    </div>
+                  </div>
+
+                  <div v-if="isSeries && ur.episodes?.length" style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border);">
+                    <div style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Оценки серий:</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                      <span v-for="ep in ur.episodes" :key="`${ep.season}-${ep.episode}`" class="rating-badge" :class="getRatingClass(ep.rating)" style="font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 2px;">
+                        {{ formatSe(ep.season, ep.episode) }}: {{ ep.rating }}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div v-if="isSeries && ur.episodes?.length" style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border);">
-                  <div style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Оценки серий:</div>
-                  <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                    <span v-for="ep in ur.episodes" :key="`${ep.season}-${ep.episode}`" class="rating-badge" :class="getRatingClass(ep.rating)" style="font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 2px;">
-                      {{ formatSe(ep.season, ep.episode) }}: {{ ep.rating }}
-                    </span>
-                  </div>
+                <div v-if="fullVotersLoading" class="loader-inline" style="padding: 15px;">
+                  <div class="spinner" style="width: 24px; height: 24px;"></div>
                 </div>
-              </div>
-            </div>
 
-            <div v-else-if="showData.user_ratings?.length" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-              <div v-for="ur in showData.user_ratings" :key="ur.label" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; width: 100%;">
-                <span style="font-size: 14px; font-weight: 700; color: var(--text-primary);">{{ ur.label }}</span>
-                <span class="rating-badge" :class="getRatingClass(ur.rating)" style="font-size: 13px; font-weight: 800; padding: 3px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
-                  <span v-html="icons.star"></span>{{ ur.rating.toFixed(1) }}
-                </span>
+                <div ref="votersSentinel" style="height: 20px; width: 100%; pointer-events: none;"></div>
               </div>
-            </div>
+            </template>
           </div>
         </div>
       </div>
 
-      <div v-if="showData" style="display: flex; gap: 12px; margin-top: 16px; flex-shrink: 0; width: 100%;">
+      <div v-if="showData && !showFullVoters" style="display: flex; gap: 12px; margin-top: 16px; flex-shrink: 0; width: 100%;">
         <button class="btn-primary" style="margin: 0;" @click="openRating">
           🌟 Оценить
         </button>
@@ -171,7 +217,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, nextTick, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
@@ -186,6 +232,15 @@ const router = useRouter()
 
 const showData = ref(null)
 const loading = ref(true)
+
+const showFullVoters = ref(false)
+const fullVotersList = ref([])
+const fullVotersLoading = ref(false)
+const fullVotersHasMore = ref(true)
+const fullVotersOffset = ref(0)
+const votersSentinel = ref(null)
+const votersListContainer = ref(null)
+let votersObserver = null
 
 const updateQueryParams = (params) => {
   const query = { ...router.currentRoute.value.query }
@@ -243,6 +298,14 @@ const currentPersonalRating = computed(() => {
   if (!showData.value) return null
   const local = statsStore.userShowRatings[showData.value.id]
   return local !== undefined ? local : showData.value.personal_rating
+})
+
+const totalVotesCount = computed(() => {
+  return showData.value ? (showData.value.total_voters_count || showData.value.user_ratings?.length || 0) : 0
+})
+
+const recentVoters = computed(() => {
+  return showData.value ? (showData.value.user_ratings_details || []) : []
 })
 
 const formatSe = (season, episode) => {
@@ -312,6 +375,54 @@ const loadShowData = async () => {
   }
 }
 
+const loadFullVoters = async (isLoadMore = false) => {
+  if (fullVotersLoading.value) return
+  if (!isLoadMore) {
+    fullVotersOffset.value = 0
+    fullVotersList.value = []
+    fullVotersHasMore.value = true
+  }
+  fullVotersLoading.value = true
+  try {
+    const data = await api.post(`show/${props.showId || showId.value}/ratings_paginated/`, {
+      offset: fullVotersOffset.value,
+      limit: 20
+    })
+    if (isLoadMore) {
+      fullVotersList.value.push(...(data.ratings || []))
+    } else {
+      fullVotersList.value = data.ratings || []
+    }
+    fullVotersHasMore.value = data.has_more
+  } catch (e) {
+    uiStore.showToast('Ошибка загрузки оценок')
+  } finally {
+    fullVotersLoading.value = false
+  }
+}
+
+const setupVotersObserver = () => {
+  if (votersObserver) votersObserver.disconnect()
+  votersObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && fullVotersHasMore.value && !fullVotersLoading.value) {
+      fullVotersOffset.value += 20
+      loadFullVoters(true)
+    }
+  }, {
+    root: votersListContainer.value,
+    rootMargin: '200px'
+  })
+  if (votersSentinel.value) {
+    votersObserver.observe(votersSentinel.value)
+  }
+}
+
+const openFullVotersList = async () => {
+  showFullVoters.value = true
+  await loadFullVoters()
+  nextTick(setupVotersObserver)
+}
+
 const openRating = () => {
   if (!showData.value) return
   uiStore.openModal('rateShow', {
@@ -322,15 +433,26 @@ const openRating = () => {
   })
 }
 
+onUnmounted(() => {
+  if (votersObserver) votersObserver.disconnect()
+})
+
 watch(showId, (newId) => {
   if (newId) {
     showData.value = null
+    showFullVoters.value = false
+    if (votersObserver) votersObserver.disconnect()
     loadShowData()
   }
 }, { immediate: true })
 
 watch(showData, () => {
   selectDefaultTab()
+})
+
+watch(ratingType, () => {
+  showFullVoters.value = false
+  if (votersObserver) votersObserver.disconnect()
 })
 </script>
 

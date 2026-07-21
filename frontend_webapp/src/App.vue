@@ -142,6 +142,10 @@ onMounted(async () => {
     }
   }
 
+  if (targetQuery.shared_id) {
+    targetPath = '/stats'
+  }
+
   const processedStartParam = sessionStorage.getItem('processed_start_param')
 
   if (startParam && startParam !== processedStartParam) {
