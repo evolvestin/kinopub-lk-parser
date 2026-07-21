@@ -430,7 +430,7 @@ const modalHeight = computed(() => {
     return '100vh'
   }
 
-  let staticHeight = 220
+  let staticHeight = 280 
   if (statsStore.isShared) {
     staticHeight += 80
   }
@@ -451,8 +451,12 @@ const modalHeight = computed(() => {
     }
   }
 
-  const kpContentHeight = 110 + (showData.value.kinopoisk_votes ? 30 : 0) + criticsHeight
-  const imdbContentHeight = 110 + (showData.value.imdb_votes ? 30 : 0)
+  // Учитываем высоту блока с датой последнего обновления
+  const hasLastUpdatedDate = !!lastUpdatedDate.value
+  const lastUpdatedHeight = hasLastUpdatedDate ? 56 : 0
+
+  const kpContentHeight = 110 + (showData.value.kinopoisk_votes ? 30 : 0) + criticsHeight + lastUpdatedHeight
+  const imdbContentHeight = 110 + (showData.value.imdb_votes ? 30 : 0) + lastUpdatedHeight
   const lrContentHeight = 110 + 55 + 85 + (totalVotesCount.value > 0 ? 64 : 0)
 
   const kpHeight = hasKp.value ? (staticHeight + kpContentHeight) : 0
