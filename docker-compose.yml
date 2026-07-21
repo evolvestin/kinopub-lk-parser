@@ -96,11 +96,18 @@ services:
       - "${ASGI_PORT:-8013}:8001"
     volumes:
       - .:/app:delegated
-      - /app/frontend_webapp/dist # Сохраняем билд фронта
+      - /app/frontend_webapp/dist
       - ./data:/data
     environment:
       - VITE_DEV_SERVER_HOST=frontend
-    command: daphne -b 0.0.0.0 -p 8001 kinopub_parser.asgi:application
+    command: >
+      sh -c "
+        if [ \"$DJANGO_DEBUG\" = \"true\" ] || [ \"$DJANGO_DEBUG\" = \"True\" ]; then
+          python manage.py runserver 0.0.0.0:8001;
+        else
+          daphne -b 0.0.0.0 -p 8001 kinopub_parser.asgi:application;
+        fi
+      "
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8001/ && python manage.py healthcheck --touch"]
       interval: 30s

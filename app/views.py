@@ -15,7 +15,7 @@ from django.contrib.auth.models import Permission, User
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Avg, F, Max, Prefetch, Q, Sum
+from django.db.models import Avg, Case, F, IntegerField, Max, Prefetch, Q, Sum, Value, When
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -23,6 +23,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from redis import Redis
+
 
 from app.admin_site import admin_site
 from app.models import (
@@ -1232,77 +1233,99 @@ def webapp_get_shared_stats(request, stat_id):
 @csrf_exempt
 @require_http_methods(['POST', 'GET'])
 def webapp_get_show_ratings_paginated(request, show_id):
-    view_user = get_webapp_user(request)
-    if not view_user:
-        return JsonResponse({'error': 'Unauthorized'}, status=403)
-
-    offset = 0
-    limit = 20
-    if request.method == 'POST':
-        try:
-            body = json.loads(request.body)
-            offset = int(body.get('offset', 0))
-            limit = int(body.get('limit', 20))
-        except Exception:
-            pass
-    else:
-        offset = int(request.GET.get('offset', 0))
-        limit = int(request.GET.get('limit', 20))
-
     try:
-        show = Show.objects.get(id=show_id)
-    except Show.DoesNotExist:
-        return JsonResponse({'error': 'Show not found'}, status=404)
+        view_user = get_webapp_user(request)
 
-    users_query = (
-        UserRating.objects.filter(show=show)
-        .values('user_id')
-        .annotate(last_update=Max('updated_at'))
-        .order_by('-last_update')
-    )
-    total_count = users_query.count()
-    sliced_users = users_query[offset : offset + limit]
-    user_ids = [u['user_id'] for u in sliced_users]
+        offset = 0
+        limit = 20
+        shared_id = None
 
-    ratings_qs = UserRating.objects.filter(show=show, user_id__in=user_ids).select_related('user')
-
-    grouped_ratings = {}
-    for r in ratings_qs:
-        uid = r.user.id
-        if uid not in grouped_ratings:
-            user_label = r.user.username if r.user.username else r.user.name
-            user_display = f'@{user_label}' if r.user.username else user_label
-            grouped_ratings[uid] = {
-                'user': user_display,
-                'show_rating': None,
-                'episodes': [],
-            }
-        if r.season_number is None and r.episode_number is None:
-            grouped_ratings[uid]['show_rating'] = r.rating
+        if request.method == 'POST':
+            try:
+                body = json.loads(request.body)
+                offset = int(body.get('offset', 0))
+                limit = int(body.get('limit', 20))
+                shared_id = body.get('shared_id')
+            except Exception:
+                pass
         else:
-            grouped_ratings[uid]['episodes'].append(
-                {
-                    'season': r.season_number,
-                    'episode': r.episode_number,
-                    'rating': r.rating,
+            offset = int(request.GET.get('offset', 0))
+            limit = int(request.GET.get('limit', 20))
+            shared_id = request.GET.get('shared_id')
+
+        owner_user = None
+        if shared_id:
+            try:
+                shared_stat = SharedStat.objects.get(id=shared_id)
+                user_id = shared_stat.data.get('metadata', {}).get('user_id')
+                if user_id:
+                    owner_user = ViewUser.objects.get(id=user_id)
+            except Exception:
+                pass
+
+        target_user = owner_user or view_user
+        if not target_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        try:
+            show = Show.objects.get(id=show_id)
+        except Show.DoesNotExist:
+            return JsonResponse({'error': 'Show not found'}, status=404)
+
+        users_query = (
+            UserRating.objects.filter(show=show)
+            .values('user_id')
+            .annotate(last_update=Max('updated_at'))
+            .order_by('-last_update')
+        )
+        total_count = users_query.count()
+        sliced_users = users_query[offset : offset + limit]
+        user_ids = [u['user_id'] for u in sliced_users]
+
+        ratings_qs = UserRating.objects.filter(show=show, user_id__in=user_ids).select_related('user')
+
+        grouped_ratings = {}
+        for r in ratings_qs:
+            uid = r.user.id
+            if uid not in grouped_ratings:
+                user_label = r.user.username if r.user.username else r.user.name
+                user_display = f'@{user_label}' if r.user.username else user_label
+                grouped_ratings[uid] = {
+                    'user': user_display,
+                    'user_name': r.user.name or r.user.username or str(r.user.telegram_id),
+                    'user_username': r.user.username,
+                    'show_rating': None,
+                    'episodes': [],
                 }
-            )
+            if r.season_number is None and r.episode_number is None:
+                grouped_ratings[uid]['show_rating'] = r.rating
+            else:
+                grouped_ratings[uid]['episodes'].append(
+                    {
+                        'season': r.season_number,
+                        'episode': r.episode_number,
+                        'rating': r.rating,
+                    }
+                )
 
-    for uid in grouped_ratings:
-        grouped_ratings[uid]['episodes'].sort(key=lambda x: (x['season'], x['episode']))
+        for uid in grouped_ratings:
+            grouped_ratings[uid]['episodes'].sort(key=lambda x: (x['season'] or 0, x['episode'] or 0))
 
-    ordered_ratings = []
-    for uid in user_ids:
-        if uid in grouped_ratings:
-            ordered_ratings.append(grouped_ratings[uid])
+        ordered_ratings = []
+        for uid in user_ids:
+            if uid in grouped_ratings:
+                ordered_ratings.append(grouped_ratings[uid])
 
-    has_more = (offset + limit) < total_count
+        has_more = (offset + limit) < total_count
 
-    return JsonResponse({
-        'ratings': ordered_ratings,
-        'has_more': has_more,
-        'total_count': total_count
-    })
+        return JsonResponse({
+            'ratings': ordered_ratings,
+            'has_more': has_more,
+            'total_count': total_count
+        })
+    except Exception as e:
+        logger.error(f'Error in webapp_get_show_ratings_paginated: {e}', exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @csrf_exempt
@@ -1508,9 +1531,18 @@ def webapp_get_show_full(request, show_id):
 
         recent_users_query = (
             UserRating.objects.filter(show=show)
-            .values('user_id')
+            .values('user_id', 'user__role')
             .annotate(last_update=Max('updated_at'))
-            .order_by('-last_update')[:3]
+            .annotate(
+                role_priority=Case(
+                    When(user__role=UserRole.ADMIN, then=Value(1)),
+                    When(user__role=UserRole.VIEWER, then=Value(2)),
+                    When(user__role=UserRole.GUEST, then=Value(3)),
+                    default=Value(4),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by('role_priority', '-last_update')[:1]
         )
         recent_user_ids = [u['user_id'] for u in recent_users_query]
 
@@ -1526,6 +1558,8 @@ def webapp_get_show_full(request, show_id):
                 user_display = f'@{user_label}' if r.user.username else user_label
                 grouped_ratings[uid] = {
                     'user': user_display,
+                    'user_name': r.user.name or r.user.username or str(r.user.telegram_id),
+                    'user_username': r.user.username,
                     'show_rating': None,
                     'episodes': [],
                 }
@@ -2504,8 +2538,6 @@ def webapp_remove_view(request):
 def webapp_get_episodes(request):
     try:
         view_user = get_webapp_user(request)
-        if not view_user:
-            return JsonResponse({'error': 'Unauthorized'}, status=403)
 
         body = json.loads(request.body)
         show_id = body.get('show_id')
@@ -2522,6 +2554,8 @@ def webapp_get_episodes(request):
                 pass
 
         target_user = owner_user or view_user
+        if not target_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
 
         durations = ShowDuration.objects.filter(
             show_id=show_id, season_number__isnull=False, episode_number__isnull=False

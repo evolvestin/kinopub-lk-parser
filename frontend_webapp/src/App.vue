@@ -161,7 +161,7 @@ onMounted(async () => {
       })
     } else if (startParam.startsWith('unsub_')) {
       const showId = startParam.replace('unsub_', '')
-      targetPath = `/search/unsubscribe/${showId}`
+      targetPath = `/search/show/${showId}/unsubscribe/${showId}`
     }
   }
 

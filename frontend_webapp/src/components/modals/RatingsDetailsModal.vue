@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay show" @click.self="close">
-    <div class="modal-content" :class="activeScoreColorClass" style="padding: 24px; min-height: 480px; display: flex; flex-direction: column;">
+    <div class="modal-content" :class="activeScoreColorClass" :style="{ padding: '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column' }">
       
       <div class="modal-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0; width: 100%;">
         <div style="font-size: 12px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">
@@ -19,7 +19,7 @@
         <button v-if="hasLr" class="vt-btn" :class="{ active: ratingType === 'lr' }" style="flex: 1;" @click="ratingType = 'lr'">LocalRating (LR)</button>
       </div>
 
-      <div style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto;" class="custom-scrollbar">
+      <div style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overflow-x: hidden;" class="custom-scrollbar">
         <div v-if="loading" class="loader-inline">
           <div class="spinner"></div>
         </div>
@@ -30,14 +30,14 @@
               <div class="rate-score-huge">
                 {{ showData.kinopoisk_rating ? showData.kinopoisk_rating.toFixed(1) : '—' }}<span style="font-size: 16px;">/ 10</span>
               </div>
-              <a v-if="showData.kinopoisk_url" :href="showData.kinopoisk_url" target="_blank" class="external-link-btn" style="color: #f15a24; background: rgba(241, 90, 36, 0.15); border: 1px solid rgba(241, 90, 36, 0.3); padding: 8px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; height: 38px; width: 38px;" title="Открыть на Кинопоиске">
+              <a v-if="showData.kinopoisk_url" :href="showData.kinopoisk_url" target="_blank" class="external-link-btn" style="color: #f15a24; background: rgba(241, 90, 36, 0.15); border: 1px solid rgba(241, 90, 36, 0.3); padding: 8px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; height: 38px; width: 38px; right: 6px;" title="Открыть на Кинопоиске">
                 <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                   <polyline points="15 3 21 3 21 9"></polyline>
                   <line x1="10" y1="14" x2="21" y2="3"></line>
                 </svg>
               </a>
-              <a v-else :href="'https://www.kinopoisk.ru/index.php?kp_query=' + encodeURIComponent(showData.title)" target="_blank" class="external-link-btn" style="color: #f15a24; background: rgba(241, 90, 36, 0.15); border: 1px solid rgba(241, 90, 36, 0.3); padding: 8px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; height: 38px; width: 38px;" title="Найти на Кинопоиске">
+              <a v-else :href="'https://www.kinopoisk.ru/index.php?kp_query=' + encodeURIComponent(showData.title)" target="_blank" class="external-link-btn" style="color: #f15a24; background: rgba(241, 90, 36, 0.15); border: 1px solid rgba(241, 90, 36, 0.3); padding: 8px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; height: 38px; width: 38px; right: 6px;" title="Найти на Кинопоиске">
                 <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                   <polyline points="15 3 21 3 21 9"></polyline>
@@ -82,14 +82,14 @@
               <div class="rate-score-huge">
                 {{ showData.imdb_rating ? showData.imdb_rating.toFixed(1) : '—' }}<span style="font-size: 16px;">/ 10</span>
               </div>
-              <a v-if="showData.imdb_url" :href="showData.imdb_url" target="_blank" class="external-link-btn" style="color: #f5c518; background: rgba(245, 197, 24, 0.15); border: 1px solid rgba(245, 197, 24, 0.3); padding: 8px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; height: 38px; width: 38px;" title="Открыть на IMDb">
+              <a v-if="showData.imdb_url" :href="showData.imdb_url" target="_blank" class="external-link-btn" style="color: #f5c518; background: rgba(245, 197, 24, 0.15); border: 1px solid rgba(245, 197, 24, 0.3); padding: 8px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; height: 38px; width: 38px; right: 6px;" title="Открыть на IMDb">
                 <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                   <polyline points="15 3 21 3 21 9"></polyline>
                   <line x1="10" y1="14" x2="21" y2="3"></line>
                 </svg>
               </a>
-              <a v-else :href="'https://www.imdb.com/find?q=' + encodeURIComponent(showData.original_title || showData.title)" target="_blank" class="external-link-btn" style="color: #f5c518; background: rgba(245, 197, 24, 0.15); border: 1px solid rgba(245, 197, 24, 0.3); padding: 8px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; height: 38px; width: 38px;" title="Найти на IMDb">
+              <a v-else :href="'https://www.imdb.com/find?q=' + encodeURIComponent(showData.original_title || showData.title)" target="_blank" class="external-link-btn" style="color: #f5c518; background: rgba(245, 197, 24, 0.15); border: 1px solid rgba(245, 197, 24, 0.3); padding: 8px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; height: 38px; width: 38px; right: 6px;" title="Найти на IMDb">
                 <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                   <polyline points="15 3 21 3 21 9"></polyline>
@@ -116,50 +116,16 @@
                 </div>
               </div>
 
-              <div style="text-align: center; font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; font-weight: 600; display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center;">
+              <div style="text-align: center; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; font-weight: 600; display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center;">
                 <div>Проголосовало участников: <span style="color: var(--text-primary); font-weight: 800;">{{ totalVotesCount }}</span></div>
                 <div v-if="isSeries && showData.total_ratings_count">Общее количество оценок: <span style="color: var(--text-primary); font-weight: 800;">{{ showData.total_ratings_count }}</span></div>
               </div>
 
-              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4; text-align: center; background: var(--bg-input); padding: 10px 14px; border-radius: 12px; margin-bottom: 20px; border: 1px dashed var(--border);">
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4; text-align: center; background: var(--bg-input); padding: 10px 14px; border-radius: 12px; margin-bottom: 12px; border: 1px dashed var(--border);">
                 Локальный рейтинг (LocalRating) рассчитывается на основе оценок всех пользователей бота, которые оценили данное шоу.
               </div>
 
-              <div v-if="recentVoters.length" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
-                <div style="font-size: 12px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Последние оценившие:</div>
-                <div v-for="ur in recentVoters" :key="ur.user" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; text-align: left; width: 100%;">
-                  <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                    <span style="font-size: 14px; font-weight: 800; color: var(--text-primary);">{{ ur.user }}</span>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Оценка {{ isSeries ? 'сериала' : 'фильма' }}:</span>
-                      <span v-if="ur.show_rating" class="rating-badge" :class="getRatingClass(ur.show_rating)" style="font-size: 13px; font-weight: 800; padding: 3px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
-                        <span v-html="icons.star"></span>{{ ur.show_rating.toFixed(1) }}
-                      </span>
-                      <span v-else style="font-size: 13px; font-weight: 800; color: var(--text-muted);">—</span>
-                    </div>
-                  </div>
-
-                  <div v-if="isSeries && ur.episodes?.length" style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--border);">
-                    <div style="font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Оценки серий:</div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                      <span v-for="ep in ur.episodes" :key="`${ep.season}-${ep.episode}`" class="rating-badge" :class="getRatingClass(ep.rating)" style="font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; display: inline-flex; align-items: center; gap: 2px;">
-                        {{ formatSe(ep.season, ep.episode) }}: {{ ep.rating }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div v-else-if="showData.user_ratings?.length" style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                <div v-for="ur in showData.user_ratings" :key="ur.label" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; width: 100%;">
-                  <span style="font-size: 14px; font-weight: 700; color: var(--text-primary);">{{ ur.label }}</span>
-                  <span class="rating-badge" :class="getRatingClass(ur.rating)" style="font-size: 13px; font-weight: 800; padding: 3px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
-                    <span v-html="icons.star"></span>{{ ur.rating.toFixed(1) }}
-                  </span>
-                </div>
-              </div>
-
-              <button v-if="totalVotesCount > 3" class="btn-primary" style="margin-top: 20px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); box-shadow: none;" @click="openFullVotersList">
+              <button v-if="totalVotesCount > 0" class="btn-primary" style="margin-top: 8px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); box-shadow: none;" @click="openFullVotersList">
                 👥 Показать всех оценивших ({{ totalVotesCount }})
               </button>
             </template>
@@ -175,7 +141,12 @@
               <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; max-height: 400px; overflow-y: auto; padding-right: 4px;" class="custom-scrollbar" ref="votersListContainer">
                 <div v-for="ur in fullVotersList" :key="ur.user" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; text-align: left; width: 100%;">
                   <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                    <span style="font-size: 14px; font-weight: 800; color: var(--text-primary);">{{ ur.user }}</span>
+                    <span style="font-size: 14px; font-weight: 800; color: var(--text-primary);">
+                      {{ ur.user_name || ur.user }}
+                      <template v-if="ur.user_username">
+                        (<a href="#" @click.prevent="openTelegramLink('https://t.me/' + ur.user_username)" class="shared-banner-link">@{{ ur.user_username }}</a>)
+                      </template>
+                    </span>
                     <div style="display: flex; align-items: center; gap: 6px;">
                       <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Оценка {{ isSeries ? 'сериала' : 'фильма' }}:</span>
                       <span v-if="ur.show_rating" class="rating-badge" :class="getRatingClass(ur.show_rating)" style="font-size: 13px; font-weight: 800; padding: 3px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px;">
@@ -199,7 +170,7 @@
                   <div class="spinner" style="width: 24px; height: 24px;"></div>
                 </div>
 
-                <div ref="votersSentinel" style="height: 20px; width: 100%; pointer-events: none;"></div>
+                <div ref="votersSentinel" style="height: 20px; width: 100%; grid-column: 1/-1;"></div>
               </div>
             </template>
           </div>
@@ -222,6 +193,7 @@ import { useRouter } from 'vue-router'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useApi } from '../../composables/useApi'
+import { useTelegram } from '../../composables/useTelegram'
 import { icons } from '../../utils/icons'
 import { getRatingClass } from '../../utils/helpers'
 
@@ -229,6 +201,7 @@ const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const api = useApi()
 const router = useRouter()
+const { tg, showConfirm } = useTelegram()
 
 const showData = ref(null)
 const loading = ref(true)
@@ -241,6 +214,18 @@ const fullVotersOffset = ref(0)
 const votersSentinel = ref(null)
 const votersListContainer = ref(null)
 let votersObserver = null
+
+const openTelegramLink = (url) => {
+  showConfirm('Переход в профиль Telegram может свернуть текущее мини-приложение. Продолжить?', (ok) => {
+    if (ok) {
+      if (tg && typeof tg.openTelegramLink === 'function') {
+        tg.openTelegramLink(url)
+      } else {
+        window.open(url, '_blank')
+      }
+    }
+  })
+}
 
 const updateQueryParams = (params) => {
   const query = { ...router.currentRoute.value.query }
@@ -384,9 +369,10 @@ const loadFullVoters = async (isLoadMore = false) => {
   }
   fullVotersLoading.value = true
   try {
-    const data = await api.post(`show/${props.showId || showId.value}/ratings_paginated/`, {
+    const data = await api.post(`show/${showId.value}/ratings_paginated/`, {
       offset: fullVotersOffset.value,
-      limit: 20
+      limit: 20,
+      shared_id: router.currentRoute.value.query.shared_id || null
     })
     if (isLoadMore) {
       fullVotersList.value.push(...(data.ratings || []))
@@ -432,6 +418,44 @@ const openRating = () => {
     type: showData.value.type
   })
 }
+
+const modalHeight = computed(() => {
+  if (loading.value || !showData.value) {
+    return '300px'
+  }
+  if (showFullVoters.value) {
+    return '550px'
+  }
+  
+  let staticHeight = 68 + 62 + 72 + 48
+  if (statsStore.isShared) {
+    staticHeight += 84
+  }
+  if (availableTabsCount.value > 1) {
+    staticHeight += 48
+  }
+
+  const hasCritics = showData.value.ext_rating && (
+    showData.value.ext_rating.film_critics !== null || 
+    showData.value.ext_rating.russian_film_critics !== null || 
+    showData.value.ext_rating.await_rating !== null ||
+    showData.value.ext_rating.tmdb !== null
+  )
+  
+  const kpContentHeight = 110 + 30 + 35 + (hasCritics ? 140 : 0)
+  const imdbContentHeight = 110 + 30 + 35
+  const lrContentHeight = 110 + 55 + 85 + (totalVotesCount.value > 0 ? 64 : 0)
+
+  const kpHeight = hasKp.value ? (staticHeight + kpContentHeight) : 0
+  const imdbHeight = hasImdb.value ? (staticHeight + imdbContentHeight) : 0
+  const lrHeight = hasLr.value ? (staticHeight + lrContentHeight) : 0
+
+  const maxCalculated = Math.max(kpHeight, imdbHeight, lrHeight)
+  const maxHeightLimit = Math.min(620, Math.floor(window.innerHeight * 0.95))
+  const finalHeight = Math.min(maxCalculated, maxHeightLimit)
+  
+  return `${finalHeight}px`
+})
 
 onUnmounted(() => {
   if (votersObserver) votersObserver.disconnect()
