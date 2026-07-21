@@ -19,12 +19,12 @@
         <button v-if="hasLr" class="vt-btn" :class="{ active: ratingType === 'lr' }" style="flex: 1;" @click="ratingType = 'lr'">LocalRating (LR)</button>
       </div>
 
-      <div style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; overflow-x: hidden;" class="custom-scrollbar">
+      <div style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-x: hidden;" :style="{ overflowY: showFullVoters ? 'hidden' : 'auto' }" class="custom-scrollbar">
         <div v-if="loading" class="loader-inline">
           <div class="spinner"></div>
         </div>
 
-        <div v-else-if="showData">
+        <div v-else-if="showData" :style="showFullVoters ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } : {}">
           <div v-if="ratingType === 'kp'" class="rate-container" style="padding: 0;">
             <div class="rate-score-display" style="margin-bottom: 10px; height: auto; padding: 15px 0; display: flex; align-items: center; justify-content: center; gap: 16px; position: relative;">
               <div class="rate-score-huge">
@@ -108,7 +108,7 @@
             </div>
           </div>
 
-          <div v-else-if="ratingType === 'lr'" class="rate-container" style="padding: 0; align-items: stretch; width: 100%;">
+          <div v-else-if="ratingType === 'lr'" class="rate-container" :style="showFullVoters ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: 0, alignItems: 'stretch', width: '100%' } : { padding: 0, alignItems: 'stretch', width: '100%' }">
             <template v-if="!showFullVoters">
               <div class="rate-score-display" style="margin-bottom: 10px; height: auto; padding: 15px 0; align-self: center;">
                 <div class="rate-score-huge">

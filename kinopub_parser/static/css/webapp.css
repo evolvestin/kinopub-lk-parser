@@ -614,7 +614,7 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
     border-radius: 24px !important;
     transform: scale(0.95);
     opacity: 0;
-    transition: all 0.3s ease;
+    transition: transform 0.3s ease, opacity 0.3s ease;
     margin: 0 auto;
     border: 1px solid var(--border);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
