@@ -871,6 +871,7 @@ def bot_get_show_ratings_details(request, show_id):
                     'user': fmt['user'],
                     'show_rating': None,
                     'episodes': [],
+                    'is_anonymous': fmt['is_anonymous'],
                 }
 
             if r.season_number is None and r.episode_number is None:
@@ -885,6 +886,7 @@ def bot_get_show_ratings_details(request, show_id):
                 )
 
         result = list(grouped_data.values())
+        result.sort(key=lambda x: (x['is_anonymous'], x['user']))
         return JsonResponse({'ratings': result})
 
     except Exception as e:
@@ -1286,9 +1288,9 @@ def webapp_get_show_ratings_paginated(request, show_id):
 
         users_query = (
             UserRating.objects.filter(show=show)
-            .values('user_id')
+            .values('user_id', 'user__is_anonymous')
             .annotate(last_update=Max('updated_at'))
-            .order_by('-last_update')
+            .order_by('user__is_anonymous', '-last_update')
         )
         total_count = users_query.count()
         sliced_users = users_query[offset : offset + limit]
@@ -1550,7 +1552,7 @@ def webapp_get_show_full(request, show_id):
 
         recent_users_query = (
             UserRating.objects.filter(show=show)
-            .values('user_id', 'user__role')
+            .values('user_id', 'user__role', 'user__is_anonymous')
             .annotate(last_update=Max('updated_at'))
             .annotate(
                 role_priority=Case(
@@ -1561,7 +1563,7 @@ def webapp_get_show_full(request, show_id):
                     output_field=IntegerField(),
                 )
             )
-            .order_by('role_priority', '-last_update')[:1]
+            .order_by('user__is_anonymous', 'role_priority', '-last_update')[:1]
         )
         recent_user_ids = [u['user_id'] for u in recent_users_query]
 

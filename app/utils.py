@@ -26,34 +26,45 @@ def format_user_for_rating(rater, current_user, override_public_user_id=None):
 
     if is_me:
         if is_anon:
-            return {'user': 'Вы', 'user_name': 'Вы', 'user_username': None}
+            prefix = "[Аноним]"
+            display = f"{prefix} Вы"
+            return {
+                'user': display,
+                'user_name': display,
+                'user_username': None,
+                'is_anonymous': True
+            }
         else:
             display = f"{label} (Вы)"
             return {
                 'user': f"{label} (@{username}) (Вы)" if username else display, 
                 'user_name': display, 
-                'user_username': username
+                'user_username': username,
+                'is_anonymous': False
             }
     else:
         if is_anon:
             if is_admin:
-                display = f"🕵️ {label}"
+                display = f"[Аноним] {label}"
                 return {
                     'user': f"{display} (@{username})" if username else display, 
                     'user_name': display, 
-                    'user_username': username
+                    'user_username': username,
+                    'is_anonymous': True
                 }
             else:
                 return {
                     'user': 'Анонимный зритель', 
                     'user_name': 'Анонимный зритель', 
-                    'user_username': None
+                    'user_username': None,
+                    'is_anonymous': True
                 }
         else:
             return {
                 'user': f"{label} (@{username})" if username else label, 
                 'user_name': label, 
-                'user_username': username
+                'user_username': username,
+                'is_anonymous': False
             }
 
 def update_heartbeat():

@@ -333,7 +333,7 @@ class Show(BaseModel):
             user_average = total_rating / user_ratings_count[user_id]
             rater = user_objects[user_id]
             fmt = format_user_for_rating(rater, current_user, override_public_user_id)
-            user_results.append({'label': fmt['user'], 'rating': user_average})
+            user_results.append({'label': fmt['user'], 'rating': user_average, 'is_anonymous': fmt['is_anonymous']})
 
         user_averages = [item['rating'] for item in user_results]
         mean_rating = sum(user_averages) / len(user_averages)
@@ -345,7 +345,7 @@ class Show(BaseModel):
             weight = min(1.0, (len(user_averages) - 1) / 19)
             overall_rating = (1 - weight) * mean_rating + weight * median_rating
 
-        user_results.sort(key=lambda x: x['rating'], reverse=True)
+        user_results.sort(key=lambda x: (not x['is_anonymous'], x['rating']), reverse=True)
 
         return overall_rating, user_results
 

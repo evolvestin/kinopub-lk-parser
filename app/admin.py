@@ -547,8 +547,16 @@ class ViewUserAdmin(admin.ModelAdmin):
         'django_user',
         'role_message_id',
         'telegram_actions',
+        'get_avatar_preview',
         'created_at',
         'updated_at',
+    )
+    fieldsets = (
+        (None, {'fields': ('telegram_id', 'role', 'language', 'is_bot_active')}),
+        ('Персональные данные', {'fields': ('name', 'username', 'get_avatar_preview', 'photo_url')}),
+        ('Конфиденциальность', {'fields': ('is_anonymous', 'privacy_choice_made')}),
+        ('Технические характеристики', {'fields': ('screen_width', 'screen_height')}),
+        ('Системные данные', {'fields': ('django_user', 'role_message_id', 'telegram_actions', 'created_at', 'updated_at')}),
     )
     actions = ['resend_role_message']
 
@@ -576,7 +584,7 @@ class ViewUserAdmin(admin.ModelAdmin):
         color = self._get_role_color(obj.role)
         name = obj.name or '-'
         if color:
-            return format_html('<span style="color: {}; font_weight: bold;">{}</span>', color, name)
+            return format_html('<span style="color: {}; font-weight: bold;">{}</span>', color, name)
         return name
 
     @admin.display(description='Username', ordering='username')
@@ -585,7 +593,7 @@ class ViewUserAdmin(admin.ModelAdmin):
         username = obj.username or '-'
         if color:
             return format_html(
-                '<span style="color: {}; font_weight: bold;">{}</span>', color, username
+                '<span style="color: {}; font-weight: bold;">{}</span>', color, username
             )
         return username
 
@@ -612,6 +620,12 @@ class ViewUserAdmin(admin.ModelAdmin):
         if obj.django_user:
             url = reverse('admin:auth_user_change', args=[obj.django_user.id])
             return format_html('<a href="{}">{}</a>', url, obj.django_user)
+        return '-'
+
+    @admin.display(description='Avatar Preview')
+    def get_avatar_preview(self, obj):
+        if obj.photo_url:
+            return format_html('<img src="{}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;" />', obj.photo_url)
         return '-'
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
@@ -665,15 +679,17 @@ class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
         'get_users',
         'get_source_display_styled',
         'get_is_checked_display',
+        'telegram_message_id',
         'created_at',
     )
     list_filter = ('source', 'is_checked', 'date_precision', 'view_date', 'users')
-    search_fields = ('show__title', 'show__original_title')
+    search_fields = ('show__title', 'show__original_title', 'telegram_message_id')
     autocomplete_fields = ('show',)
     filter_horizontal = ('users',)
     readonly_fields = (
         'view_date',
         'date_precision',
+        'telegram_message_id',
         'created_at',
         'updated_at',
     )
