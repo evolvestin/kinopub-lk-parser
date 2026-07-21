@@ -422,17 +422,32 @@ const toggleMute = async () => {
     window.navigator.vibrate(10)
   }
 
-  const nextMuteValue = !isMuted.value
+  const previousMuteValue = isMuted.value
+  const nextMuteValue = !previousMuteValue
+
+  isMuted.value = nextMuteValue
+  const localMessage = nextMuteValue ? 'Уведомления отключены' : 'Уведомления включены'
+  uiStore.showToast(localMessage)
+
+  if (uiStore.showsCache[cacheKey.value]) {
+    uiStore.showsCache[cacheKey.value].is_muted = nextMuteValue
+  }
+
   try {
     const data = await api.post('toggle_mute_notification/', {
       show_id: props.showId,
       mute: nextMuteValue
     })
     isMuted.value = data.is_muted
-    uiStore.showToast(data.message)
-    delete uiStore.showsCache[props.showId]
+    if (uiStore.showsCache[cacheKey.value]) {
+      uiStore.showsCache[cacheKey.value].is_muted = data.is_muted
+    }
   } catch (e) {
     console.error('[ShowDetailsLayer] Toggle mute error:', e)
+    isMuted.value = previousMuteValue
+    if (uiStore.showsCache[cacheKey.value]) {
+      uiStore.showsCache[cacheKey.value].is_muted = previousMuteValue
+    }
     uiStore.showToast('Не удалось обновить статус подписки')
   } finally {
     isTogglingMute.value = false
