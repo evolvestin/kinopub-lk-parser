@@ -194,7 +194,7 @@ Object.assign(window.App, {
             let arrowClass = '';
 
             if (wlSortMode.startsWith('added')) {
-                triggerText = 'По дате';
+                triggerText = 'Добавлен';
                 triggerIcon = window.App.Icons.sort_arrow;
                 arrowClass = wlSortMode.endsWith('asc') ? 'rotate-180' : '';
             } else if (wlSortMode.startsWith('year')) {

@@ -49,7 +49,7 @@ const handleCasinoClick = () => {
 }
 
 const sortLabel = computed(() => {
-  if (wishlistStore.sortMode.startsWith('added')) return 'По дате'
+  if (wishlistStore.sortMode.startsWith('added')) return 'Добавлен'
   if (wishlistStore.sortMode.startsWith('year')) return 'По году'
   return 'Порядок'
 })
@@ -393,7 +393,7 @@ const handleCreateFolder = () => {
                   </div>
                   <div class="sort-item" :class="{ active: wishlistStore.sortMode.startsWith('added') }" @click="setSort('added')">
                     <span class="sort-arrow-icon" :class="{ 'rotate-180': wishlistStore.sortMode === 'added_asc' }" v-html="icons.sort_arrow"></span>
-                    <span>Дата</span>
+                    <span>Добавлен</span>
                   </div>
                   <div class="sort-item" :class="{ active: wishlistStore.sortMode.startsWith('year') }" @click="setSort('year')">
                     <span class="sort-arrow-icon" :class="{ 'rotate-180': wishlistStore.sortMode === 'year_asc' }" v-html="icons.sort_arrow"></span>
