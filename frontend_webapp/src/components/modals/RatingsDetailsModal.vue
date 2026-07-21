@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay show" @click.self="close">
-    <div class="modal-content" :class="activeScoreColorClass" :style="{ padding: '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column' }">
+    <div class="modal-content" :class="[activeScoreColorClass, { 'voters-full-screen': showFullVoters }]" :style="{ padding: showFullVoters ? '16px' : '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column' }">
       
       <div class="modal-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0; width: 100%;">
         <div style="font-size: 12px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">
@@ -131,14 +131,14 @@
             </template>
 
             <template v-else>
-              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; width: 100%; border-bottom: 1px dashed var(--border); padding-bottom: 12px;">
-                <button class="modal-back-btn clickable" @click="showFullVoters = false">
-                  <span v-html="icons.chevron_left"></span>
+              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; width: 100%; border-bottom: 1px dashed var(--border); padding-bottom: 12px; flex-shrink: 0;">
+                <button class="tab clickable" @click="showFullVoters = false" style="margin: 0; padding: 8px 16px; color: var(--text-primary) !important; background: var(--bg-input);">
+                  <span v-html="icons.chevron_left"></span> Назад
                 </button>
-                <span style="font-size: 14px; font-weight: 800; color: var(--text-primary);">Все оценившие ({{ totalVotesCount }})</span>
+                <span style="font-size: 16px; font-weight: 800; color: var(--text-primary);">Все оценившие ({{ totalVotesCount }})</span>
               </div>
 
-              <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; max-height: 400px; overflow-y: auto; padding-right: 4px;" class="custom-scrollbar" ref="votersListContainer">
+              <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;" class="custom-scrollbar" ref="votersListContainer">
                 <div v-for="ur in fullVotersList" :key="ur.user" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; text-align: left; width: 100%;">
                   <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                     <span style="font-size: 14px; font-weight: 800; color: var(--text-primary);">
@@ -424,7 +424,7 @@ const modalHeight = computed(() => {
     return '300px'
   }
   if (showFullVoters.value) {
-    return '550px'
+    return '100%'
   }
   
   let staticHeight = 68 + 62 + 72 + 48
@@ -482,6 +482,19 @@ watch(ratingType, () => {
 
 <style scoped>
 @import '../../../../kinopub_parser/static/css/rating.css';
+
+.voters-full-screen {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  padding: 16px !important;
+  padding-top: calc(16px + env(safe-area-inset-top)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+}
 
 .external-link-btn:hover {
   transform: scale(1.05);
