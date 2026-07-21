@@ -152,9 +152,19 @@
               <!-- Персоны (Дубликаты) -->
               <template v-else-if="modalDataContext.is_person && item.is_duplicate_group && item.persons">
                 <div class="merge-header">
-                  <div style="display: flex; align-items: center; gap: 8px;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 11px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: 0.5px;">Группа дубликатов</span>
                     <a :href="item.admin_url" target="_blank" class="edit-link" style="opacity: 1; color: var(--info); font-size: 10px;">[Админка]</a>
+                    
+                    <span v-if="item.kp_status === 'same'" style="font-size: 10px; font-weight: 800; color: #2ecc71; background: rgba(46, 204, 113, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Фото KP совпадают</span>
+                    <span v-else-if="item.kp_status === 'different'" style="font-size: 10px; font-weight: 800; color: #e74c3c; background: rgba(231, 76, 60, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Фото KP отличаются</span>
+                    <span v-else-if="item.kp_status === 'partial'" style="font-size: 10px; font-weight: 800; color: #f1c40f; background: rgba(241, 196, 15, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Фото KP частично совпадают</span>
+                    <span v-else-if="item.kp_status === 'missing'" style="font-size: 10px; font-weight: 800; color: #9ca3af; background: rgba(156, 163, 175, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Нет фото KP</span>
+
+                    <span v-if="item.tmdb_status === 'same'" style="font-size: 10px; font-weight: 800; color: #2ecc71; background: rgba(46, 204, 113, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Фото TMDB совпадают</span>
+                    <span v-else-if="item.tmdb_status === 'different'" style="font-size: 10px; font-weight: 800; color: #e74c3c; background: rgba(231, 76, 60, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Фото TMDB отличаются</span>
+                    <span v-else-if="item.tmdb_status === 'partial'" style="font-size: 10px; font-weight: 800; color: #f1c40f; background: rgba(241, 196, 15, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Фото TMDB частично совпадают</span>
+                    <span v-else-if="item.tmdb_status === 'missing'" style="font-size: 10px; font-weight: 800; color: #9ca3af; background: rgba(156, 163, 175, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Нет фото TMDB</span>
                   </div>
                   <button class="btn-merge-action" @click="executeMerge(item.persons[0].id, item.persons)">Объединить</button>
                 </div>
@@ -171,6 +181,16 @@
                           <span class="person-id-badge">#{{ p.id }}</span>
                         </div>
                         <div v-if="p.en_name" class="person-en-name">{{ p.en_name }}</div>
+                        <div style="margin-top: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                          <div v-if="p.tmdb_photo_url" style="display: flex; align-items: center; gap: 6px;">
+                            <img :src="p.tmdb_photo_url" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="TMDB">
+                            <span style="font-size: 11px; color: var(--text-muted);">TMDB</span>
+                          </div>
+                          <div v-if="p.kp_photo_url" style="display: flex; align-items: center; gap: 6px;">
+                            <img :src="p.kp_photo_url" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="KP">
+                            <span style="font-size: 11px; color: var(--text-muted);">KP</span>
+                          </div>
+                        </div>
                       </div>
                       <a :href="`/admin/app/person/${p.id}/change/`" target="_blank" class="edit-link-btn-small" @click.stop>Правка</a>
                     </label>

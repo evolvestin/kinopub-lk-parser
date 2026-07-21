@@ -590,7 +590,7 @@ def get_duplicate_photo_urls_list(source_type: str):
     persons_qs = (
         Person.objects.filter(master_person__isnull=True)
         .filter(**{f'{field}__in': urls})
-        .values('id', 'name', 'en_name', field)
+        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
     )
 
     grouped_persons = defaultdict(list)
@@ -600,12 +600,45 @@ def get_duplicate_photo_urls_list(source_type: str):
                 'id': p['id'],
                 'name': p['name'],
                 'en_name': p['en_name'],
+                'tmdb_photo_url': p['tmdb_photo_url'],
+                'kp_photo_url': p['kp_photo_url'],
             }
         )
 
     results = []
     for url in urls:
         persons_list = sorted(grouped_persons[url], key=lambda x: x['id'])
+
+        kp_status = None
+        if field == 'tmdb_photo_url':
+            kp_urls = {p['kp_photo_url'] for p in persons_list if p.get('kp_photo_url')}
+            kp_urls.discard('')
+            has_kp_count = sum(1 for p in persons_list if p.get('kp_photo_url') and p.get('kp_photo_url') != '')
+            if len(kp_urls) == 0:
+                kp_status = 'missing'
+            elif len(kp_urls) == 1:
+                if has_kp_count == len(persons_list):
+                    kp_status = 'same'
+                else:
+                    kp_status = 'partial'
+            else:
+                kp_status = 'different'
+
+        tmdb_status = None
+        if field == 'kp_photo_url':
+            tmdb_urls = {p['tmdb_photo_url'] for p in persons_list if p.get('tmdb_photo_url')}
+            tmdb_urls.discard('')
+            has_tmdb_count = sum(1 for p in persons_list if p.get('tmdb_photo_url') and p.get('tmdb_photo_url') != '')
+            if len(tmdb_urls) == 0:
+                tmdb_status = 'missing'
+            elif len(tmdb_urls) == 1:
+                if has_tmdb_count == len(persons_list):
+                    tmdb_status = 'same'
+                else:
+                    tmdb_status = 'partial'
+            else:
+                tmdb_status = 'different'
+
         results.append(
             {
                 'id': 0,
@@ -613,6 +646,8 @@ def get_duplicate_photo_urls_list(source_type: str):
                 'persons': persons_list,
                 'tmdb_photo_url': url if field == 'tmdb_photo_url' else None,
                 'kp_photo_url': url if field == 'kp_photo_url' else None,
+                'kp_status': kp_status,
+                'tmdb_status': tmdb_status,
                 'admin_url': f'/admin/app/person/?q={url}',
             }
         )
