@@ -428,6 +428,8 @@ const handleCreateFolder = () => {
             <div class="icon" v-html="icons.bookmark"></div> Избранное пусто
         </div>
       </template>
+
+      <div class="safe-bottom-spacer"></div>
     </div>
   </div>
 </template>

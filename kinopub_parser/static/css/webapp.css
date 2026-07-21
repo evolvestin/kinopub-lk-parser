@@ -138,7 +138,22 @@ body {
     flex-direction: column;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+}
+
+.safe-bottom-spacer {
+    height: calc(88px + env(safe-area-inset-bottom));
+    width: 100%;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+body.is-webapp #view-wishlist::after,
+body.is-webapp #view-stats::after {
+    content: '';
+    display: block;
+    min-height: calc(88px + env(safe-area-inset-bottom));
+    flex-shrink: 0;
+    width: 100%;
 }
 
 .view.active-view {

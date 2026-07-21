@@ -1,5 +1,5 @@
 <template>
-  <div class="view active-view" style="display: flex; flex-direction: column; overflow-y: auto; position: relative;">
+  <div class="view active-view" id="view-stats" style="display: flex; flex-direction: column; overflow-y: auto; position: relative;">
     <div v-if="isFakeMode" class="onboarding-overlay-fixed">
       <div class="onboarding-card">
         <div class="onboarding-icon">📊</div>
@@ -283,6 +283,8 @@
                 </div>
             </template>
         </div>
+
+        <div class="safe-bottom-spacer"></div>
       </div>
     </template>
   </div>
