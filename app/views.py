@@ -1392,11 +1392,11 @@ def webapp_get_show_full(request, show_id):
                 user=target_user, show=show, season_number__isnull=False
             ).count()
 
-            has_any_muted = MutedShowNotification.objects.filter(user=target_user).exists()
+            has_any_muted = MutedShowNotification.objects.filter(user=target_user, is_active=True).exists()
 
         is_muted = False
         if target_user:
-            is_muted = MutedShowNotification.objects.filter(user=target_user, show=show).exists()
+            is_muted = MutedShowNotification.objects.filter(user=target_user, show=show, is_active=True).exists()
 
         last_view = None
         user_show_history = []
@@ -2852,7 +2852,7 @@ def webapp_show_notification_status(request, show_id):
         ).exists()
 
         is_muted = MutedShowNotification.objects.filter(user=view_user, show=show, is_active=True).exists()
-        has_any_muted = MutedShowNotification.objects.filter(user=view_user).exists()
+        has_any_muted = MutedShowNotification.objects.filter(user=view_user, is_active=True).exists()
 
         reasons = []
         if in_history:
@@ -2904,7 +2904,7 @@ def webapp_toggle_mute_notification(request):
         )
         msg = 'Уведомления отключены' if mute else 'Уведомления включены'
 
-        has_any_muted = MutedShowNotification.objects.filter(user=view_user).exists()
+        has_any_muted = MutedShowNotification.objects.filter(user=view_user, is_active=True).exists()
 
         return JsonResponse({'status': 'ok', 'is_muted': mute, 'has_any_muted': has_any_muted, 'message': msg})
 

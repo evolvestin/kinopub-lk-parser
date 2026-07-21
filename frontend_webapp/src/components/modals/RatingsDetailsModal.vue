@@ -3,13 +3,23 @@
     <div class="modal-content" :class="[activeScoreColorClass, { 'voters-full-screen': showFullVoters }]" :style="{ padding: showFullVoters ? '16px' : '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column' }">
       
       <div class="modal-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-shrink: 0; width: 100%;">
-        <div style="font-size: 12px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">
-          Рейтинги и оценки
-        </div>
+        <template v-if="showFullVoters">
+          <button class="tab clickable" @click="showFullVoters = false" style="margin: 0; padding: 8px 16px; color: var(--text-primary) !important; background: var(--bg-input); display: inline-flex; align-items: center; gap: 4px; border: none; font-size: 14px; font-weight: 700; border-radius: 12px;">
+            <span v-html="icons.chevron_left"></span> Назад
+          </button>
+          <span style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin-left: 12px; margin-right: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            Все оценившие ({{ totalVotesCount }})
+          </span>
+        </template>
+        <template v-else>
+          <div style="font-size: 12px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">
+            Рейтинги и оценки
+          </div>
+        </template>
         <button class="modal-close" @click="close">×</button>
       </div>
 
-      <div class="show-title" style="margin-bottom: 16px; font-size: 20px; font-weight: 900; color: var(--text-primary); text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2;">
+      <div class="show-title" :style="showFullVoters ? { marginBottom: '12px', fontSize: '16px' } : { marginBottom: '16px', fontSize: '20px' }" style="font-weight: 900; color: var(--text-primary); text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.2; word-break: break-word;">
         {{ showData?.title || 'Загрузка...' }}
       </div>
 
@@ -131,13 +141,6 @@
             </template>
 
             <template v-else>
-              <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; width: 100%; border-bottom: 1px dashed var(--border); padding-bottom: 12px; flex-shrink: 0;">
-                <button class="tab clickable" @click="showFullVoters = false" style="margin: 0; padding: 8px 16px; color: var(--text-primary) !important; background: var(--bg-input);">
-                  <span v-html="icons.chevron_left"></span> Назад
-                </button>
-                <span style="font-size: 16px; font-weight: 800; color: var(--text-primary);">Все оценившие ({{ totalVotesCount }})</span>
-              </div>
-
               <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px;" class="custom-scrollbar" ref="votersListContainer">
                 <div v-for="ur in fullVotersList" :key="ur.user" style="display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; text-align: left; width: 100%;">
                   <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">

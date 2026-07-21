@@ -541,7 +541,7 @@ class SiteMetric(BaseModel):
 
 class WishlistFolder(BaseModel):
     user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='wishlist_folders')
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, blank=True)
     icon = models.CharField(max_length=50, default='folder')
     color = models.CharField(max_length=20, default='#60a5fa')
     sort_order = models.IntegerField(default=0)
