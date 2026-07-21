@@ -427,7 +427,7 @@ const modalHeight = computed(() => {
     return '300px'
   }
   if (showFullVoters.value) {
-    return '100%'
+    return '100vh'
   }
 
   let staticHeight = 220
@@ -492,11 +492,23 @@ watch(ratingType, () => {
 <style scoped>
 @import '../../../../kinopub_parser/static/css/rating.css';
 
+.modal-content {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              border-radius 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              margin 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .voters-full-screen {
-  width: 100% !important;
-  max-width: 100% !important;
-  height: 100% !important;
-  max-height: 100% !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
   border-radius: 0 !important;
   margin: 0 !important;
   border: none !important;

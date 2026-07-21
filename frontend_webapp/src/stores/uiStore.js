@@ -66,6 +66,10 @@ export const useUIStore = defineStore('ui', () => {
     return stack
   })
 
+  const isCasinoHistoryOpen = computed(() => {
+    return layerStack.value.some(layer => layer.type === 'history' && layer.props.historyId === 'casino')
+  })
+
   const hasOpenLayers = computed(() => layerStack.value.length > 0)
   
   const activeView = computed(() => {
@@ -205,7 +209,7 @@ export const useUIStore = defineStore('ui', () => {
 
   return {
     isLoading, isAppReady, theme, toast, layerStack, hasOpenLayers, activeView, modals,
-    isHistoryEditMode, episodesCache, showsCache, dismissedHints,
+    isHistoryEditMode, episodesCache, showsCache, dismissedHints, isCasinoHistoryOpen,
     openLayer, popLayer, switchBaseView, showToast, toggleTheme, fitText, fitAll,
     openModal, closeModal, dismissHint,
     setLoading: (v) => { isLoading.value = v },

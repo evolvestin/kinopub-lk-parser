@@ -136,6 +136,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUIStore } from '../../stores/uiStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useStatsStore } from '../../stores/useStatsStore'
@@ -147,6 +148,7 @@ const uiStore = useUIStore()
 const wishlistStore = useWishlistStore()
 const statsStore = useStatsStore()
 const api = useApi()
+const router = useRouter()
 
 const state = ref('loading')
 const activeSpin = ref(null)
@@ -505,7 +507,6 @@ const runReveal = (expiresMs) => {
 }
 
 const loadHistory = async () => {
-  close()
   uiStore.setLoading(true)
   try {
     const data = await api.post('casino/', { action: 'history' })
@@ -544,8 +545,16 @@ const close = () => {
 }
 
 const goToWinner = (showId) => {
-  close()
-  uiStore.openLayer('show', showId)
+  const query = { ...router.currentRoute.value.query }
+  delete query.modal
+  Object.keys(query).forEach(k => {
+    if (k.startsWith('modal_')) delete query[k]
+  })
+  
+  const basePath = router.currentRoute.value.path.split('/show/')[0]
+  const newPath = `${basePath}/show/${showId}`.replace(/\/+/g, '/')
+  
+  router.replace({ path: newPath, query })
 }
 
 const goToSearch = () => {

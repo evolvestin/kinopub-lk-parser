@@ -74,13 +74,13 @@
         <div style="display:flex; align-items:center; gap:8px;">
           <div class="icon" style="color:var(--info)" v-html="icons.film"></div> Информация
         </div>
-        <button class="sm-tag clickable" @click="toggleMute" style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; border: 1px solid; outline: none;" :style="isMuted ? 'color: var(--danger); background: rgba(231, 76, 60, 0.1); border-color: var(--danger);' : 'color: var(--text-muted); background: var(--bg-input); border-color: var(--border);'">
+        <button v-if="!statsStore.isShared" class="sm-tag clickable" @click="toggleMute" style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; border: 1px solid; outline: none;" :style="isMuted ? 'color: var(--danger); background: rgba(231, 76, 60, 0.1); border-color: var(--danger);' : 'color: var(--text-muted); background: var(--bg-input); border-color: var(--border);'">
           <span v-html="isMuted ? icons.bell_off : icons.bell" style="width: 14px; height: 14px; display: flex; align-items: center;"></span>
           <span>{{ isMuted ? 'Выкл' : 'Вкл' }}</span>
         </button>
       </div>
 
-      <div v-if="showMuteGuide" class="onboarding-inline-banner" style="margin: 0 20px 12px 20px; animation: fadeInUp 0.5s ease-out 0.4s both;">
+      <div v-if="showMuteGuide && !statsStore.isShared" class="onboarding-inline-banner" style="margin: 0 20px 12px 20px; animation: fadeInUp 0.5s ease-out 0.4s both;">
         <div class="o-icon">🔔</div>
         <div class="o-content" style="text-align: left;">
           <div class="o-title">Управление уведомлениями</div>
@@ -126,7 +126,7 @@
             <div class="icon" style="color:var(--info)" v-html="icons.list"></div> Эпизоды
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
-          <button class="sm-tag clickable" @click="toggleMute" style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; border: 1px solid; outline: none;" :style="isMuted ? 'color: var(--danger); background: rgba(231, 76, 60, 0.1); border-color: var(--danger);' : 'color: var(--text-muted); background: var(--bg-input); border-color: var(--border);'">
+          <button v-if="!statsStore.isShared" class="sm-tag clickable" @click="toggleMute" style="display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; border: 1px solid; outline: none;" :style="isMuted ? 'color: var(--danger); background: rgba(231, 76, 60, 0.1); border-color: var(--danger);' : 'color: var(--text-muted); background: var(--bg-input); border-color: var(--border);'">
             <span v-html="isMuted ? icons.bell_off : icons.bell" style="width: 14px; height: 14px; display: flex; align-items: center;"></span>
             <span>{{ isMuted ? 'Выкл' : 'Вкл' }}</span>
           </button>
@@ -145,7 +145,7 @@
         </div>
       </div>
 
-      <div v-if="showMuteGuide" class="onboarding-inline-banner" style="margin: 0 20px 12px 20px; animation: fadeInUp 0.5s ease-out 0.4s both;">
+      <div v-if="showMuteGuide && !statsStore.isShared" class="onboarding-inline-banner" style="margin: 0 20px 12px 20px; animation: fadeInUp 0.5s ease-out 0.4s both;">
         <div class="o-icon">🔔</div>
         <div class="o-content" style="text-align: left;">
           <div class="o-title">Управление уведомлениями</div>

@@ -252,7 +252,7 @@ watch(() => uiStore.theme, (val) => {
       <ShareModal v-if="uiStore.modals.share.isOpen" />
     </Transition>
     <Transition name="modal">
-      <CasinoModal v-if="uiStore.modals.casino.isOpen" />
+      <CasinoModal v-if="uiStore.modals.casino.isOpen && !uiStore.isCasinoHistoryOpen" />
     </Transition>
     <Transition name="modal">
       <RatingModal v-if="uiStore.modals.rateShow.isOpen" v-bind="uiStore.modals.rateShow.context" @close="uiStore.closeModal('rateShow')" />
