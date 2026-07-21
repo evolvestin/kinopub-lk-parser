@@ -35,13 +35,13 @@
       </div>
       
       <div style="display: flex; gap: 12px; margin-top: 30px; align-items: center;">
-        <button class="btn-primary" style="margin-top: 0; flex: 1;" @click="save">Сохранить</button>
         <button v-if="isEdit" 
                 class="btn-primary" 
                 style="background: var(--bg-input); color: var(--danger); border: 1px solid var(--border); margin-top: 0; width: 56px; height: 56px; padding: 0; flex-shrink: 0;" 
                 @click="deleteFolder">
           <span v-html="icons.trash" style="display: block; margin: auto;"></span>
         </button>
+        <button class="btn-primary" style="margin-top: 0; flex: 1;" @click="save">Сохранить</button>
       </div>
     </div>
   </div>

@@ -88,19 +88,19 @@
         </div>
       </div>
 
-      <div style="display: flex; gap: 12px; margin-top: 20px; flex-shrink: 0; position: relative; z-index: 10;">
+      <div style="display: flex; gap: 12px; margin-top: 20px; flex-shrink: 0; position: relative; z-index: 10; align-items: center;">
         <button 
           v-if="showDeleteButton" 
           class="btn-primary" 
-          style="margin: 0; background: var(--bg-input); color: var(--danger); flex: 1; box-shadow: none;" 
+          style="background: var(--bg-input); color: var(--danger); border: 1px solid var(--border); margin: 0; width: 56px; height: 56px; padding: 0; flex-shrink: 0; box-shadow: none;" 
           @click="deleteRating"
         >
-          Удалить
+          <span v-html="icons.trash" style="display: block; margin: auto;"></span>
         </button>
         <button 
           v-if="level === 'show' || level === 'score'" 
           class="btn-primary" 
-          style="margin: 0; flex: 2;" 
+          style="margin: 0; flex: 1;" 
           :disabled="isSaving || isRatingUnchanged" 
           @click="saveRating"
         >
