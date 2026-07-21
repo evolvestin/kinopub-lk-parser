@@ -7,6 +7,8 @@ window.USER_ROLE = initialRole
 export const useUserStore = defineStore('user', () => {
   const userData = ref(null)
   const userRole = ref(initialRole)
+  const isAnonymous = ref(true)
+  const privacyChoiceMade = ref(false)
 
   const isGuest = computed(() => userRole.value === 'guest')
   const firstName = computed(() => userData.value?.first_name || 'Guest')
@@ -32,6 +34,8 @@ export const useUserStore = defineStore('user', () => {
     userRole,
     isGuest,
     firstName,
+    isAnonymous,
+    privacyChoiceMade,
     setUser
   }
 })

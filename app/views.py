@@ -24,7 +24,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from redis import Redis
 
-
 from app.admin_site import admin_site
 from app.models import (
     CasinoSpin,
@@ -72,6 +71,7 @@ from app.services.stats_calculator import (
 from app.services.telegram_auth import validate_telegram_init_data
 from app.tasks import send_view_confirmation_task
 from app.telegram_bot import TelegramSender
+from app.utils import format_user_for_rating
 from shared.constants import (
     GENRES_MAPPING,
     PROFESSIONS_PLURAL_MAP_RU,
@@ -127,7 +127,7 @@ def _get_user_ratings_for_shows(user, show_ids):
 
 def _serialize_show_details(show, user=None):
     """Собирает словарь с данными о шоу и рейтингами."""
-    internal_rating, user_ratings = show.get_internal_rating_data()
+    internal_rating, user_ratings = show.get_internal_rating_data(current_user=user)
     personal_rating = None
     personal_episodes_count = 0
 
@@ -301,7 +301,12 @@ def protected_bot_api(func):
 def check_bot_user(request, telegram_id):
     try:
         user = ViewUser.objects.get(telegram_id=telegram_id)
-        return JsonResponse({'exists': True, 'role': user.role})
+        return JsonResponse({
+            'exists': True, 
+            'role': user.role,
+            'is_anonymous': user.is_anonymous,
+            'privacy_choice_made': user.privacy_choice_made
+        })
     except ViewUser.DoesNotExist:
         return JsonResponse({'exists': False, 'role': UserRole.GUEST})
 
@@ -535,7 +540,7 @@ def bot_search_shows(request):
     results = []
     for show in shows:
         poster_url = get_poster_url(show.id)
-        internal_rating, user_ratings_list = show.get_internal_rating_data()
+        internal_rating, user_ratings_list = show.get_internal_rating_data(current_user=user)
 
         results.append(
             {
@@ -594,20 +599,14 @@ def bot_get_by_imdb(request, imdb_id):
         if not show:
             return JsonResponse({'error': 'Not found'}, status=404)
 
-        data = {
-            'id': show.id,
-            'title': show.title,
-            'original_title': show.original_title,
-            'type': show.type,
-            'year': show.year,
-            'status': show.status,
-            'kinopoisk_rating': show.kinopoisk_rating,
-            'imdb_rating': show.imdb_rating,
-            'countries': [str(c) for c in show.countries.all()],
-            'genres': [g.name for g in show.genres.all()],
-            'kinopoisk_url': show.kinopoisk_url,
-            'imdb_url': show.imdb_url,
-        }
+        user = None
+        if telegram_id := request.GET.get('telegram_id'):
+            try:
+                user = ViewUser.objects.get(telegram_id=telegram_id)
+            except ViewUser.DoesNotExist:
+                pass
+
+        data = _serialize_show_details(show, user)
         return JsonResponse(data)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
@@ -846,6 +845,13 @@ def bot_get_show_episodes(request, show_id):
 @require_http_methods(['GET'])
 def bot_get_show_ratings_details(request, show_id):
     try:
+        user = None
+        if telegram_id := request.GET.get('telegram_id'):
+            try:
+                user = ViewUser.objects.get(telegram_id=telegram_id)
+            except ViewUser.DoesNotExist:
+                pass
+
         ratings = (
             UserRating.objects.filter(show_id=show_id)
             .select_related('user')
@@ -860,9 +866,9 @@ def bot_get_show_ratings_details(request, show_id):
         for r in ratings:
             uid = r.user.id
             if uid not in grouped_data:
-                user_label = r.user.username if r.user.username else r.user.name
+                fmt = format_user_for_rating(r.user, user)
                 grouped_data[uid] = {
-                    'user': f'@{user_label}' if r.user.username else user_label,
+                    'user': fmt['user'],
                     'show_rating': None,
                     'episodes': [],
                 }
@@ -1202,7 +1208,11 @@ def webapp_bake_stats(request):
             baked_data[str(yr)] = stat
 
         final_payload = {
-            'metadata': {'years': years, 'user_id': view_user.id},
+            'metadata': {
+                'years': years, 
+                'user_id': view_user.id,
+                'anon_user': anon_user
+            },
             'data': baked_data,
         }
         content_hash = hashlib.sha256(
@@ -1213,7 +1223,7 @@ def webapp_bake_stats(request):
         return JsonResponse({'id': stat_id})
 
     except Exception as e:
-        logging.error(f'WebApp Bake Stats Error: {e}', exc_info=True)
+        logger.error(f'WebApp Bake Stats Error: {e}', exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
 
 
@@ -1253,17 +1263,19 @@ def webapp_get_show_ratings_paginated(request, show_id):
             limit = int(request.GET.get('limit', 20))
             shared_id = request.GET.get('shared_id')
 
-        owner_user = None
+        override_public_user_id = None
         if shared_id:
             try:
                 shared_stat = SharedStat.objects.get(id=shared_id)
-                user_id = shared_stat.data.get('metadata', {}).get('user_id')
-                if user_id:
-                    owner_user = ViewUser.objects.get(id=user_id)
+                meta = shared_stat.data.get('metadata', {})
+                user_id = meta.get('user_id')
+                is_anon_in_share = meta.get('anon_user', True)
+                if user_id and not is_anon_in_share:
+                    override_public_user_id = user_id
             except Exception:
                 pass
 
-        target_user = owner_user or view_user
+        target_user = view_user
         if not target_user:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
 
@@ -1288,12 +1300,11 @@ def webapp_get_show_ratings_paginated(request, show_id):
         for r in ratings_qs:
             uid = r.user.id
             if uid not in grouped_ratings:
-                user_label = r.user.username if r.user.username else r.user.name
-                user_display = f'@{user_label}' if r.user.username else user_label
+                fmt = format_user_for_rating(r.user, target_user, override_public_user_id)
                 grouped_ratings[uid] = {
-                    'user': user_display,
-                    'user_name': r.user.name or r.user.username or str(r.user.telegram_id),
-                    'user_username': r.user.username,
+                    'user': fmt['user'],
+                    'user_name': fmt['user_name'],
+                    'user_username': fmt['user_username'],
                     'show_rating': None,
                     'episodes': [],
                 }
@@ -1348,19 +1359,24 @@ def webapp_get_show_full(request, show_id):
             except Exception:
                 pass
 
-        owner_user = None
+        override_public_user_id = None
         if shared_id:
             try:
                 shared_stat = SharedStat.objects.get(id=shared_id)
-                user_id = shared_stat.data.get('metadata', {}).get('user_id')
-                if user_id:
-                    owner_user = ViewUser.objects.get(id=user_id)
+                meta = shared_stat.data.get('metadata', {})
+                user_id = meta.get('user_id')
+                is_anon_in_share = meta.get('anon_user', True)
+                if user_id and not is_anon_in_share:
+                    override_public_user_id = user_id
             except Exception:
                 pass
 
-        target_user = owner_user or view_user
+        target_user = view_user
 
-        internal_rating, user_ratings = show.get_internal_rating_data()
+        internal_rating, user_ratings = show.get_internal_rating_data(
+            current_user=target_user,
+            override_public_user_id=override_public_user_id
+        )
 
         duration_qs = ShowDuration.objects.filter(show=show).aggregate(
             total=Sum('duration_seconds')
@@ -1393,6 +1409,9 @@ def webapp_get_show_full(request, show_id):
             ).count()
 
             has_any_muted = MutedShowNotification.objects.filter(user=target_user, is_active=True).exists()
+
+        if override_public_user_id:
+            visible_ids.add(override_public_user_id)
 
         is_muted = False
         if target_user:
@@ -1554,12 +1573,11 @@ def webapp_get_show_full(request, show_id):
         for r in ratings_qs:
             uid = r.user.id
             if uid not in grouped_ratings:
-                user_label = r.user.username if r.user.username else r.user.name
-                user_display = f'@{user_label}' if r.user.username else user_label
+                fmt = format_user_for_rating(r.user, target_user, override_public_user_id)
                 grouped_ratings[uid] = {
-                    'user': user_display,
-                    'user_name': r.user.name or r.user.username or str(r.user.telegram_id),
-                    'user_username': r.user.username,
+                    'user': fmt['user'],
+                    'user_name': fmt['user_name'],
+                    'user_username': fmt['user_username'],
                     'show_rating': None,
                     'episodes': [],
                 }
@@ -2912,3 +2930,41 @@ def webapp_toggle_mute_notification(request):
         return JsonResponse({'error': 'Show not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_set_privacy(request):
+    try:
+        view_user = get_webapp_user(request)
+        if not view_user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+
+        body = json.loads(request.body)
+        is_anonymous = body.get('is_anonymous', True)
+
+        view_user.is_anonymous = is_anonymous
+        view_user.privacy_choice_made = True
+        view_user.save(update_fields=['is_anonymous', 'privacy_choice_made'])
+
+        return JsonResponse({'status': 'ok'})
+    except Exception as e:
+        logger.error(f'WebApp Set Privacy Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@csrf_exempt
+@protected_bot_api
+@require_http_methods(['POST'])
+def bot_set_privacy(request):
+    try:
+        data = json.loads(request.body)
+        user = ViewUser.objects.get(telegram_id=data['telegram_id'])
+        user.is_anonymous = data.get('is_anonymous', True)
+        user.privacy_choice_made = True
+        user.save(update_fields=['is_anonymous', 'privacy_choice_made'])
+        return JsonResponse({'status': 'ok'})
+    except ViewUser.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)

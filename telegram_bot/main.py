@@ -144,6 +144,11 @@ def register_router() -> Router:
         callbacks.rate_episode_set_handler, F.data.startswith('rate_ep_set_')
     )
 
+    # Приватность оценок
+    router.callback_query.register(
+        callbacks.privacy_choice_handler, F.data.startswith('set_priv_')
+    )
+
     # Просмотр списка оценок
     router.callback_query.register(
         callbacks.show_ratings_list_handler, F.data.startswith('show_ratings_')

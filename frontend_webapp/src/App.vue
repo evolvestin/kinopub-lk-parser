@@ -24,6 +24,7 @@ import WlLimitModal from './components/modals/WlLimitModal.vue'
 import WlDeleteModal from './components/modals/WlDeleteModal.vue'
 import RatingsDetailsModal from './components/modals/RatingsDetailsModal.vue'
 import UnsubscribeLayer from './components/layers/UnsubscribeLayer.vue'
+import PrivacyModal from './components/modals/PrivacyModal.vue'
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -277,6 +278,9 @@ watch(() => uiStore.theme, (val) => {
     </Transition>
     <Transition name="modal">
       <RatingsDetailsModal v-if="uiStore.modals.details.isOpen" />
+    </Transition>
+    <Transition name="modal">
+      <PrivacyModal v-if="uiStore.modals.privacy.isOpen" />
     </Transition>
   </div>
 </template>

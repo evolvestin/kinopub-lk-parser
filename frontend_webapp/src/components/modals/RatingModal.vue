@@ -21,6 +21,29 @@
         Вы просматриваете чужую статистику, но здесь вы видите и редактируете <strong>исключительно свою собственную оценку</strong>.
       </div>
 
+      <div v-if="!statsStore.isShared && !userStore.privacyChoiceMade" style="margin-bottom: 20px; padding: 12px; background: var(--bg-input); border: 1px solid var(--accent); border-radius: 12px; font-size: 13px; line-height: 1.4; text-align: left; flex-shrink: 0;">
+        <span style="color: var(--accent); font-weight: 800; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">🛑 Приватность оценок</span>
+        Как другие увидят вашу оценку?
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+          <label class="chk-row" style="width: 100%;">
+            <input type="radio" :value="true" v-model="userStore.isAnonymous">
+            <div class="chk-box" style="border-radius: 50%;"></div>
+            <div style="display: flex; flex-direction: column;">
+              <span class="chk-text">Анонимно</span>
+              <span style="font-size: 11px; color: var(--text-muted);">Скрыто. (По умолчанию)</span>
+            </div>
+          </label>
+          <label class="chk-row" style="width: 100%;">
+            <input type="radio" :value="false" v-model="userStore.isAnonymous">
+            <div class="chk-box" style="border-radius: 50%;"></div>
+            <div style="display: flex; flex-direction: column;">
+              <span class="chk-text">Публично</span>
+              <span style="font-size: 11px; color: var(--text-muted);">Имя и юзернейм.</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <div v-if="isSeries" class="view-toggle" id="rate-mode-toggle" style="margin-bottom: 20px; flex-shrink: 0;">
         <button class="vt-btn" :class="{ active: level === 'show' }" style="flex: 1;" @click="level = 'show'">Весь сериал</button>
         <button class="vt-btn" :class="{ active: level !== 'show' }" style="flex: 1;" @click="goToSeasons">По сериям</button>
@@ -118,6 +141,7 @@ import { useRouter } from 'vue-router'
 import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
+import { useUserStore } from '../../stores/userStore'
 import { icons } from '../../utils/icons'
 
 const props = defineProps(['showId', 'title', 'initialValue', 'type'])
@@ -126,6 +150,7 @@ const emit = defineEmits(['close'])
 const api = useApi()
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
+const userStore = useUserStore()
 const router = useRouter()
 
 const episodesData = ref([])
@@ -467,6 +492,18 @@ const close = () => {
 
 const saveRating = async () => {
   isSaving.value = true
+
+  if (!statsStore.isShared && !userStore.privacyChoiceMade) {
+    try {
+      await api.post('set_privacy/', { is_anonymous: userStore.isAnonymous })
+      userStore.privacyChoiceMade = true
+    } catch (e) {
+      uiStore.showToast('Ошибка сохранения настроек')
+      isSaving.value = false
+      return
+    }
+  }
+
   try {
     await api.post('rate/', {
       show_id: props.showId,
@@ -530,4 +567,19 @@ const deleteRating = async () => {
 
 <style scoped>
 @import '../../../../kinopub_parser/static/css/rating.css';
+
+.chk-row input[type="radio"]:checked + .chk-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.chk-row input[type="radio"]:checked + .chk-box::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-radius: 50%;
+  border: none;
+  margin: 0;
+  transform: none;
+}
 </style>

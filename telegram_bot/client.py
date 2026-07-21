@@ -89,8 +89,11 @@ async def get_show_details(show_id: int, telegram_id: int = None) -> dict | None
     return await _execute_request(f'show/{show_id}/', params=params)
 
 
-async def get_show_by_imdb_id(imdb_id: str) -> dict | None:
-    return await _execute_request(f'imdb/{imdb_id}/')
+async def get_show_by_imdb_id(imdb_id: str, telegram_id: int = None) -> dict | None:
+    params = {}
+    if telegram_id:
+        params['telegram_id'] = telegram_id
+    return await _execute_request(f'imdb/{imdb_id}/', params=params)
 
 
 async def assign_view(telegram_id: int, view_id: int) -> dict | None:
@@ -149,8 +152,11 @@ async def get_show_episodes(show_id: int, telegram_id: int = None) -> list:
     return data.get('episodes', []) if data else []
 
 
-async def get_show_ratings_details(show_id: int) -> list:
-    data = await _execute_request(f'show/{show_id}/ratings/')
+async def get_show_ratings_details(show_id: int, telegram_id: int = None) -> list:
+    params = {}
+    if telegram_id:
+        params['telegram_id'] = telegram_id
+    data = await _execute_request(f'show/{show_id}/ratings/', params=params)
     return data.get('ratings', []) if data else []
 
 
@@ -210,3 +216,31 @@ async def get_shared_stats_meta(stat_id: str) -> dict | None:
     except Exception as e:
         logging.error(f'Error fetching shared stats meta ({stat_id}): {e}')
     return None
+
+
+async def assign_group_view(telegram_id: int, group_id: int, view_id: int) -> dict | None:
+    payload = {'telegram_id': telegram_id, 'group_id': group_id, 'view_id': view_id}
+    return await _execute_request('assign_group_view/', method='POST', payload=payload)
+
+
+async def get_shared_stats_meta(stat_id: str) -> dict | None:
+    url = f'{BACKEND_URL}/api/webapp/shared_stats/{stat_id}/'
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=5) as response:
+                if response.status == 200:
+                    res_data = await response.json()
+                    data = res_data.get('data', {})
+                    if data:
+                        first_year_data = next(iter(data.values()), {})
+                        return first_year_data.get('meta', {})
+    except Exception as e:
+        logging.error(f'Error fetching shared stats meta ({stat_id}): {e}')
+    return None
+
+async def get_user_info(telegram_id: int) -> dict | None:
+    return await _execute_request(f'check/{telegram_id}/')
+
+async def set_user_privacy(telegram_id: int, is_anonymous: bool) -> dict | None:
+    payload = {'telegram_id': telegram_id, 'is_anonymous': is_anonymous}
+    return await _execute_request('set_privacy/', method='POST', payload=payload)

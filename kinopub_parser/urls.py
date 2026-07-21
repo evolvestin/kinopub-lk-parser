@@ -92,6 +92,8 @@ urlpatterns = proxy_patterns + [
     path('api/bot/rate/', views.bot_rate_show),
     path('api/bot/log/', views.bot_log_message),
     path('api/bot/log_entry/', views.bot_create_log_entry),
+    path('api/bot/set_privacy/', views.bot_set_privacy),
+    path('api/webapp/set_privacy/', views.webapp_set_privacy, name='webapp_set_privacy'),
 ]
 
 if not settings.DEBUG:

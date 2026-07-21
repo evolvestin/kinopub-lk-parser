@@ -820,6 +820,8 @@ def generate_user_stats(user, year=None):
             'years': all_years,
             'role': user_role,
             'photo_url': user.photo_url,
+            'is_anonymous': user.is_anonymous,
+            'privacy_choice_made': user.privacy_choice_made,
         },
         'summary': summary,
         'heatmap': _get_heatmap(dur_qs, year, all_years),

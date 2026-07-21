@@ -406,7 +406,7 @@ async def _process_search(bot: Bot, chat_id: int, query: str):
         return
 
     if len(results) == 1:
-        full_info = await client.get_show_details(results[0]['id'])
+        full_info = await client.get_show_details(results[0]['id'], telegram_id=chat_id)
         if full_info:
             await _send_show_card(sender, chat_id, full_info)
         return
@@ -458,7 +458,7 @@ async def handle_imdb_lookup(message: Message, bot: Bot):
     imdb_id = match.group(1)
     sender = MessageSender(bot)
 
-    show_data = await client.get_show_by_imdb_id(imdb_id)
+    show_data = await client.get_show_by_imdb_id(imdb_id, telegram_id=message.from_user.id)
     if show_data:
         await _send_show_card(sender, message.chat.id, show_data)
 
@@ -476,14 +476,14 @@ async def handle_ratings_command(message: Message, bot: Bot):
 
 async def _send_ratings_report(sender: MessageSender, chat_id: int, show_id: int):
     """Общая логика отправки отчета с оценками (используется в start и команде)"""
-    show_data = await client.get_show_details(show_id)
+    show_data = await client.get_show_details(show_id, telegram_id=chat_id)
     if not show_data:
         await sender.send_message(chat_id, '❌ Ошибки получения данных.')
         return
 
     ratings_details = None
     if show_data.get('type') in SERIES_TYPES:
-        ratings_details = await client.get_show_ratings_details(show_id)
+        ratings_details = await client.get_show_ratings_details(show_id, telegram_id=chat_id)
 
     bot_username = await BotInstance().get_bot_username()
 

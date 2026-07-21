@@ -15,6 +15,7 @@ from shared.constants import (
 )
 from shared.formatters import format_se
 
+from app.utils import format_user_for_rating
 
 class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -192,6 +193,8 @@ class ViewUser(BaseModel):
     role_message_id = models.IntegerField(
         null=True, blank=True, help_text='ID сообщения в админ-канале для управления ролью'
     )
+    is_anonymous = models.BooleanField(default=True, verbose_name='Анонимный')
+    privacy_choice_made = models.BooleanField(default=False)
 
     def update_personal_details(
         self,
@@ -305,7 +308,7 @@ class Show(BaseModel):
                 result.append(norm)
         return sorted(result)
 
-    def get_internal_rating_data(self):
+    def get_internal_rating_data(self, current_user=None, override_public_user_id=None):
         ratings = self.ratings.select_related('user').all()
         if not ratings:
             return None, []
@@ -325,13 +328,12 @@ class Show(BaseModel):
             user_ratings_count[user_id] += 1
 
         user_results = []
+        
         for user_id, total_rating in user_ratings_sum.items():
             user_average = total_rating / user_ratings_count[user_id]
-            if username := user_objects[user_id].username:
-                user_label = f'@{username}'
-            else:
-                user_label = user_objects[user_id].name
-            user_results.append({'label': user_label, 'rating': user_average})
+            rater = user_objects[user_id]
+            fmt = format_user_for_rating(rater, current_user, override_public_user_id)
+            user_results.append({'label': fmt['user'], 'rating': user_average})
 
         user_averages = [item['rating'] for item in user_results]
         mean_rating = sum(user_averages) / len(user_averages)

@@ -33,7 +33,7 @@ export const useUIStore = defineStore('ui', () => {
     })
 
     const result = {}
-    const keys = ['share', 'casino', 'rateShow', 'addView', 'details', 'wlFolder', 'wlEdit', 'wlLimit', 'wlDelete']
+    const keys = ['share', 'casino', 'rateShow', 'addView', 'details', 'wlFolder', 'wlEdit', 'wlLimit', 'wlDelete', 'privacy']
     keys.forEach(k => {
       result[k] = {
         isOpen: active === k,

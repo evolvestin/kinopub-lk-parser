@@ -23,6 +23,9 @@
             </div>
           </div>
           <div class="top-controls">
+            <button v-if="!statsStore.isShared" class="theme-btn" @click="uiStore.openModal('privacy')">
+              <span v-html="icons.shield"></span>
+            </button>
             <button v-if="!statsStore.isShared" class="share-btn" @click="uiStore.openModal('share')">
               <span v-html="icons.share"></span>
             </button>

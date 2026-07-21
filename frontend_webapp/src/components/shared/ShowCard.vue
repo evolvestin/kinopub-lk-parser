@@ -168,7 +168,10 @@ const onDelete = (event) => {
 
   showConfirm("Удалить эту запись?", (ok) => {
     if (ok) {
-      const itemId = props.show.id || props.show.show_id;
+      const itemId = props.historyId === 'wishlist_watched' 
+          ? props.show.wl_item_id 
+          : (props.show.id || props.show.show_id);
+          
       if (el) {
         el.classList.remove('wiggle')
         el.classList.add('anim-shrink')

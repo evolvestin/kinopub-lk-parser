@@ -209,7 +209,6 @@ const { tg, showConfirm } = useTelegram()
 const showData = ref(null)
 const loading = ref(true)
 
-const showFullVoters = ref(false)
 const fullVotersList = ref([])
 const fullVotersLoading = ref(false)
 const fullVotersHasMore = ref(true)
@@ -251,6 +250,11 @@ const showId = computed(() => {
 const ratingType = computed({
   get: () => router.currentRoute.value.query.modal_ratingType || 'kp',
   set: (val) => updateQueryParams({ ratingType: val })
+})
+
+const showFullVoters = computed({
+  get: () => router.currentRoute.value.query.modal_fullVoters === 'true',
+  set: (val) => updateQueryParams({ fullVoters: val ? 'true' : null })
 })
 
 const lastUpdatedDate = computed(() => {
@@ -406,10 +410,8 @@ const setupVotersObserver = () => {
   }
 }
 
-const openFullVotersList = async () => {
+const openFullVotersList = () => {
   showFullVoters.value = true
-  await loadFullVoters()
-  nextTick(setupVotersObserver)
 }
 
 const openRating = () => {
@@ -474,10 +476,25 @@ onUnmounted(() => {
   if (votersObserver) votersObserver.disconnect()
 })
 
-watch(showId, (newId) => {
+watch(() => router.currentRoute.value.query.modal_fullVoters, async (newVal) => {
+  if (newVal === 'true') {
+    if (fullVotersList.value.length === 0) {
+      await loadFullVoters()
+    }
+    nextTick(setupVotersObserver)
+  } else {
+    if (votersObserver) votersObserver.disconnect()
+  }
+}, { immediate: true })
+
+watch(showId, (newId, oldId) => {
   if (newId) {
     showData.value = null
-    showFullVoters.value = false
+    if (oldId !== undefined && newId !== oldId) {
+      fullVotersList.value = []
+      fullVotersOffset.value = 0
+      fullVotersHasMore.value = true
+    }
     if (votersObserver) votersObserver.disconnect()
     loadShowData()
   }
@@ -487,9 +504,10 @@ watch(showData, () => {
   selectDefaultTab()
 })
 
-watch(ratingType, () => {
-  showFullVoters.value = false
-  if (votersObserver) votersObserver.disconnect()
+watch(ratingType, (newVal) => {
+  if (showFullVoters.value && newVal !== 'lr') {
+    showFullVoters.value = false
+  }
 })
 </script>
 

@@ -7,10 +7,54 @@ from django.core.cache import cache
 from django.utils import timezone
 from redis import Redis
 
-from shared.constants import DATETIME_FORMAT
+from shared.constants import DATETIME_FORMAT, UserRole
 
 logger = logging.getLogger(__name__)
 
+
+def format_user_for_rating(rater, current_user, override_public_user_id=None):
+    is_me = current_user and rater.id == current_user.id
+    is_admin = current_user and current_user.role == UserRole.ADMIN
+
+    is_anon = getattr(rater, 'is_anonymous', True)
+
+    if override_public_user_id and rater.id == override_public_user_id:
+        is_anon = False
+
+    label = rater.name or rater.username or str(rater.telegram_id)
+    username = rater.username
+
+    if is_me:
+        if is_anon:
+            return {'user': 'Вы', 'user_name': 'Вы', 'user_username': None}
+        else:
+            display = f"{label} (Вы)"
+            return {
+                'user': f"{label} (@{username}) (Вы)" if username else display, 
+                'user_name': display, 
+                'user_username': username
+            }
+    else:
+        if is_anon:
+            if is_admin:
+                display = f"🕵️ {label}"
+                return {
+                    'user': f"{display} (@{username})" if username else display, 
+                    'user_name': display, 
+                    'user_username': username
+                }
+            else:
+                return {
+                    'user': 'Анонимный зритель', 
+                    'user_name': 'Анонимный зритель', 
+                    'user_username': None
+                }
+        else:
+            return {
+                'user': f"{label} (@{username})" if username else label, 
+                'user_name': label, 
+                'user_username': username
+            }
 
 def update_heartbeat():
     if getattr(settings, 'LOCAL_RUN', False):

@@ -263,6 +263,9 @@ export const useStatsStore = defineStore('stats', () => {
           if (years.length > 0 && !years.includes('all')) years = ['all', ...years]
           availableYears.value = years
           if (data.meta.role) userStore.userRole = data.meta.role
+          
+          if (data.meta.is_anonymous !== undefined) userStore.isAnonymous = data.meta.is_anonymous
+          if (data.meta.privacy_choice_made !== undefined) userStore.privacyChoiceMade = data.meta.privacy_choice_made
         }
 
         statsCache.value[year] = markRaw(data)
@@ -325,6 +328,42 @@ export const useStatsStore = defineStore('stats', () => {
         await api.post('casino/', { action: 'delete_spin', spin_id: historyId })
       } catch (error) {
         console.error('[StatsStore] Failed to hide casino spin:', error)
+        statsCache.value = originalCache
+      }
+      return
+    }
+
+    if (layerHistoryId === 'wishlist_watched') {
+      Object.keys(statsCache.value).forEach(year => {
+        const stats = statsCache.value[year]
+        if (stats && Array.isArray(stats.wishlist_watched_items)) {
+          const filtered = stats.wishlist_watched_items.filter(item => item.wl_item_id !== historyId)
+          
+          const newSummary = { ...stats.summary }
+          if (filtered.length !== stats.wishlist_watched_items.length) {
+            if (newSummary.wishlist_watched > 0) newSummary.wishlist_watched--
+          }
+
+          statsCache.value[year] = markRaw({
+            ...stats,
+            summary: newSummary,
+            wishlist_watched_items: filtered
+          })
+        }
+      })
+      
+      uiStore.showToast('Удалено из статистики')
+      
+      try {
+        await api.post('wishlist/', {
+          action: 'remove_item',
+          item_id: historyId,
+          keep_stats: false,
+          is_stat_removal: true
+        })
+      } catch (error) {
+        console.error('[StatsStore] Failed to remove wishlist watched item:', error)
+        uiStore.showToast('Не удалось удалить')
         statsCache.value = originalCache
       }
       return
