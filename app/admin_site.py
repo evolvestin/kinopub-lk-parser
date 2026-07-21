@@ -69,7 +69,14 @@ class CustomAdminSite(admin.AdminSite):
             {
                 'name': '👥 Пользователи и Активность',
                 'app_label': 'activity',
-                'models': ['ViewUser', 'ViewUserGroup', 'ViewHistory', 'UserRating', 'CasinoSpin'],
+                'models': [
+                    'ViewUser',
+                    'ViewUserGroup',
+                    'ViewHistory',
+                    'UserRating',
+                    'CasinoSpin',
+                    'MutedShowNotification',
+                ],
             },
             {
                 'name': '🔖 Избранное (Wishlists)',

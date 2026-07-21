@@ -562,7 +562,7 @@ def notify_new_episode_task(show_id, season, episode):
             | Q(history__show=show),
             is_bot_active=True,
         )
-        .exclude(muted_notifications__show=show)
+        .exclude(muted_notifications__show=show, muted_notifications__is_active=True)
         .distinct()
     )
 

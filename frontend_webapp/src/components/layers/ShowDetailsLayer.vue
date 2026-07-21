@@ -67,7 +67,7 @@
       </div>
     </div>
 
-    <div class="plot-box" v-if="show.plot">{{ show.plot }}</div>
+    <div class="plot-box" v-if="show.plot" style="margin-top: 20px;">{{ show.plot }}</div>
 
     <div v-if="!isSeries" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
       <div class="label" style="justify-content: space-between; align-items: center;">
@@ -78,6 +78,15 @@
           <span v-html="isMuted ? icons.bell_off : icons.bell" style="width: 14px; height: 14px; display: flex; align-items: center;"></span>
           <span>{{ isMuted ? 'Выкл' : 'Вкл' }}</span>
         </button>
+      </div>
+
+      <div v-if="showMuteGuide" class="onboarding-inline-banner" style="margin: 0 20px 12px 20px; animation: fadeInUp 0.5s ease-out 0.4s both;">
+        <div class="o-icon">🔔</div>
+        <div class="o-content" style="text-align: left;">
+          <div class="o-title">Управление уведомлениями</div>
+          <div class="o-text">Вы можете выключить или включить уведомления кнопкой (🔔 / 🔕) в шапке этого блока. Уведомления отправляются только по шоу из вашего Избранного или истории просмотров.</div>
+        </div>
+        <button class="o-close" @click="uiStore.dismissHint('mute_guide')">×</button>
       </div>
       
       <div v-if="show.total_duration || lastViewDisplay" style="padding: 0 20px;">
@@ -134,6 +143,15 @@
             Сезон: {{ activeSeasonTotalDuration }}
           </div>
         </div>
+      </div>
+
+      <div v-if="showMuteGuide" class="onboarding-inline-banner" style="margin: 0 20px 12px 20px; animation: fadeInUp 0.5s ease-out 0.4s both;">
+        <div class="o-icon">🔔</div>
+        <div class="o-content" style="text-align: left;">
+          <div class="o-title">Управление уведомлениями</div>
+          <div class="o-text">Вы можете выключить или включить уведомления о выходе новых серий кнопкой (🔔 / 🔕) в шапке этого блока. Уведомления отправляются только по шоу из вашего Избранного или истории просмотров.</div>
+        </div>
+        <button class="o-close" @click="uiStore.dismissHint('mute_guide')">×</button>
       </div>
       
       <div v-if="seasonsData.length > 1" class="h-scroll-container" style="padding-bottom: 16px; gap: 8px;">
@@ -204,6 +222,8 @@ const show = ref(null)
 const activePoster = ref('')
 const activeBg = ref('')
 const activeSeasonStr = ref(null)
+const isMuted = ref(false)
+const hasAnyMuted = ref(false)
 
 const cacheKey = computed(() => {
   return statsStore.isShared ? `${props.showId}_shared_${statsStore.sharedId}` : `${props.showId}`
@@ -247,6 +267,7 @@ const formatEpisodeDuration = (sec) => {
 const showWishlistGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.wishlist_added === 0 && !uiStore.dismissedHints['wishlist_guide'])
 const showViewGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.total_views === 0 && !uiStore.dismissedHints['view_guide'])
 const showRateGuide = computed(() => statsStore.currentStats && statsStore.currentStats.ratings?.total === 0 && !uiStore.dismissedHints['rate_guide'])
+const showMuteGuide = computed(() => !uiStore.dismissedHints['mute_guide'] && !hasAnyMuted.value)
 
 const currentPersonalRating = computed(() => {
   if (!show.value) return null
@@ -326,13 +347,12 @@ const lastViewDisplay = computed(() => {
   return show.value.last_view?.display || null
 })
 
-const isMuted = ref(false)
-
 const loadShowData = async () => {
   if (uiStore.showsCache[cacheKey.value]) {
     const cachedData = uiStore.showsCache[cacheKey.value]
     show.value = cachedData
     isMuted.value = cachedData.is_muted
+    hasAnyMuted.value = cachedData.has_any_muted || false
     activePoster.value = cachedData.poster_medium || ''
     activeBg.value = cachedData.poster_medium || ''
     if (cachedData.poster_large) {
@@ -353,6 +373,7 @@ const loadShowData = async () => {
     const data = await api.get(url)
     show.value = data
     isMuted.value = data.is_muted
+    hasAnyMuted.value = data.has_any_muted || false
     uiStore.showsCache[cacheKey.value] = data
 
     if (data.title) {
@@ -439,8 +460,10 @@ const toggleMute = async () => {
       mute: nextMuteValue
     })
     isMuted.value = data.is_muted
+    hasAnyMuted.value = data.has_any_muted || false
     if (uiStore.showsCache[cacheKey.value]) {
       uiStore.showsCache[cacheKey.value].is_muted = data.is_muted
+      uiStore.showsCache[cacheKey.value].has_any_muted = data.has_any_muted
     }
   } catch (e) {
     console.error('[ShowDetailsLayer] Toggle mute error:', e)

@@ -595,6 +595,7 @@ class CasinoSpin(BaseModel):
 class MutedShowNotification(BaseModel):
     user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='muted_notifications')
     show = models.ForeignKey(Show, on_delete=models.CASCADE, related_name='muted_by_users')
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         unique_together = ('user', 'show')
@@ -602,4 +603,5 @@ class MutedShowNotification(BaseModel):
         verbose_name_plural = 'Muted Show Notifications'
 
     def __str__(self):
-        return f'{self.user} muted {self.show.title}'
+        status = 'muted' if self.is_active else 'unmuted'
+        return f'{self.user} {status} {self.show.title}'

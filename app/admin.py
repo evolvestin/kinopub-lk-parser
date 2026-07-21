@@ -1959,7 +1959,8 @@ class WishlistItemAdmin(admin.ModelAdmin):
 
 @admin.register(MutedShowNotification, site=admin_site)
 class MutedShowNotificationAdmin(admin.ModelAdmin):
-    list_display = ('user', 'show', 'created_at', 'updated_at')
+    list_display = ('user', 'show', 'is_active', 'created_at', 'updated_at')
+    list_filter = ('is_active', 'user', 'show')
     search_fields = ('user__username', 'user__name', 'show__title', 'show__original_title')
     autocomplete_fields = ('user', 'show')
     readonly_fields = ('created_at', 'updated_at')
