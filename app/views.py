@@ -88,6 +88,57 @@ from shared.media import get_poster_url
 logger = logging.getLogger('app')
 
 
+def redirect_index(request):
+    return render(request, 'redirect.html', {'site_url': settings.SITE_URL})
+
+
+def metrics(request):
+    metrics_history = get_global_metrics_history()
+
+    def _get_latest_date(qs, field):
+        dt = qs.order_by(f'-{field}').values_list(field, flat=True).first()
+        if dt:
+            return timezone.localtime(dt).strftime('%d.%m.%Y %H:%M')
+        return 'Никогда'
+
+    last_parser_log = (
+        LogEntry.objects.filter(message__contains='Parser session finished')
+        .order_by('-created_at')
+        .first()
+    )
+
+    last_actions = {
+        'history': _get_latest_date(ViewHistory.objects.all(), 'created_at'),
+        'parser_run': timezone.localtime(last_parser_log.created_at).strftime('%d.%m.%Y %H:%M')
+        if last_parser_log
+        else 'Никогда',
+        'shows': _get_latest_date(Show.objects.all(), 'created_at'),
+        'ratings': _get_latest_date(ExternalRating.objects.all(), 'updated_at'),
+        'durations': _get_latest_date(ShowDuration.objects.all(), 'updated_at'),
+        'photos': _get_latest_date(Person.objects.filter(is_photo_fetched=True), 'updated_at'),
+        'tg': _get_latest_date(TelegramLog.objects.all(), 'created_at'),
+    }
+
+    cutoff_24h = timezone.now() - timedelta(days=1)
+    errors_24h_count = LogEntry.objects.filter(
+        created_at__gte=cutoff_24h, level__in=['ERROR', 'CRITICAL']
+    ).count()
+
+    bot_users_active = ViewUser.objects.filter(is_bot_active=True).count()
+    bot_users_total = ViewUser.objects.count()
+
+    context = {
+        'last_actions': last_actions,
+        'errors_24h_count': errors_24h_count,
+        'bot_users_active': bot_users_active,
+        'bot_users_total': bot_users_total,
+        'metrics_json': json.dumps(metrics_history),
+    }
+    if request.user.is_staff:
+        context['app_list'] = admin_site.get_app_list(request)
+    return render(request, 'index.html', context)
+
+
 def robots_txt(request):
     lines = [
         'User-agent: *',

@@ -18,7 +18,8 @@ else:
 
 urlpatterns = proxy_patterns + [
     path('robots.txt', views.robots_txt, name='robots_txt'),
-    path('', views.index, name='index'),
+    path('', views.redirect_index, name='index'),
+    path('metrics/', views.metrics, name='metrics'),
     path('admin/', admin_site.urls),
     path('api/internal/set_url', views.internal_set_url, name='internal_set_url'),
     path(

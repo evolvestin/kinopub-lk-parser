@@ -4,7 +4,7 @@
       <div class="header-container">
         <div class="header-title">KinoPub Observer</div>
         <div class="wa-nav-links">
-          <a href="/" class="wa-nav-btn active">Метрики</a>
+          <a href="/metrics/" class="wa-nav-btn active">Метрики</a>
           <a href="/admin/" class="wa-nav-btn">Админка</a>
           <a href="/admin/tasks/" class="wa-nav-btn">Задачи</a>
         </div>

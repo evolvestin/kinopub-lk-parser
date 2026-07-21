@@ -1,0 +1,83 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <title>Перенаправление...</title>
+    <link rel="stylesheet" href="{% static 'css/kp_theme.css' %}?v={{ APP_VERSION }}">
+    <link rel="stylesheet" href="{% static 'css/webapp.css' %}?v={{ APP_VERSION }}">
+    <style>
+        body {
+            background-color: var(--bg-main) !important;
+            color: var(--text-primary) !important;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+            padding: 20px;
+        }
+        .redirect-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 400px;
+            animation: slideInUp 0.5s ease-out;
+        }
+        .redirect-title {
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+        .redirect-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        .metrics-btn {
+            background: var(--bg-input);
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all var(--transition-smooth);
+        }
+        .metrics-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+            background: var(--bg-card);
+        }
+        .spinner {
+            margin-bottom: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="redirect-container">
+        <div class="spinner"></div>
+        <div class="redirect-title">Перенаправление</div>
+        <div class="redirect-text">
+            Подождите, сейчас вы будете перенаправлены на основной сайт.<br>
+        </div>
+        <a href="{% url 'metrics' %}" class="metrics-btn">Метрики</a>
+    </div>
+
+    <script>
+        const siteUrl = "{{ site_url|escapejs }}";
+        if (siteUrl) {
+            setTimeout(() => {
+                window.location.href = siteUrl;
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
