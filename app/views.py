@@ -1179,7 +1179,7 @@ def webapp_bake_stats(request):
                             info = user_info_map.get(uid)
                             if info:
                                 mapped_users.append(info)
-                            else:
+                            elif include_group:
                                 mapped_users.append({'id': 0, 'name': 'Участник', 'photo': None})
                         mapped_users.sort(key=lambda x: x['id'])
                         item['user_ids'] = [u['id'] for u in mapped_users]
@@ -1193,6 +1193,7 @@ def webapp_bake_stats(request):
                 stat['meta']['id'] = 1 if group_exists else 0
                 stat['meta']['username'] = None
             else:
+                stat['meta']['is_anonymous'] = False
                 stat['meta']['id'] = user_info_map[view_user.id]['id']
                 if view_user.photo_url:
                     stat['meta']['photo_url'] = view_user.photo_url
