@@ -183,11 +183,11 @@
                         <div v-if="p.en_name" class="person-en-name">{{ p.en_name }}</div>
                         <div style="margin-top: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                           <div v-if="p.tmdb_photo_url && !item.tmdb_photo_url" style="display: flex; align-items: center; gap: 6px;">
-                            <img :src="p.tmdb_photo_url" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="TMDB">
+                            <img :src="p.tmdb_photo_url" :style="{ width: item.kp_photo_url ? '50px' : '20px', height: item.kp_photo_url ? '50px' : '20px' }" style="border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="TMDB">
                             <span style="font-size: 11px; color: var(--text-muted);">TMDB</span>
                           </div>
-                          <div v-if="p.kp_photo_url" style="display: flex; align-items: center; gap: 6px;">
-                            <img :src="p.kp_photo_url" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="KP">
+                          <div v-if="p.kp_photo_url && !item.kp_photo_url" style="display: flex; align-items: center; gap: 6px;">
+                            <img :src="p.kp_photo_url" :style="{ width: item.tmdb_photo_url ? '50px' : '20px', height: item.tmdb_photo_url ? '50px' : '20px' }" style="border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="KP">
                             <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">KP</span>
                           </div>
                         </div>
