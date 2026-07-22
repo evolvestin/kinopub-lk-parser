@@ -11,20 +11,15 @@ from django.utils import timezone
 from app.models import (
     Country,
     Genre,
-    LogEntry,
     Person,
     Show,
     ShowCrew,
     SiteMetric,
-    TelegramLog,
-    ViewUser,
 )
 from kinopub_parser import celery_app
 from shared.constants import (
     GENRES_MAPPING,
     PROFESSION_TRANS_MAP,
-    PROFESSIONS_MAPPING_EN,
-    PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_COUNTRY,
     RAW_TO_NORMALIZED_EN,
     RAW_TO_NORMALIZED_GENRE,
@@ -94,16 +89,6 @@ def get_unused_countries_list():
     )
 
 
-def get_total_countries_with_shows_list():
-    return (
-        Country.objects.filter(show__isnull=False)
-        .distinct()
-        .annotate(num_shows=Count('show'))
-        .order_by('-num_shows')
-        .values('id', 'name', 'iso_code', 'emoji_flag')
-    )
-
-
 def _format_type(t):
     if not t:
         return 'Неизвестно'
@@ -120,12 +105,6 @@ def calculate_has_kp_metric():
     return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
-def get_has_kp_list(show_type: str):
-    return Show.objects.filter(type=show_type, ext_rating__kp__isnull=False).values(
-        'id', 'title', 'original_title'
-    )
-
-
 def calculate_has_imdb_metric():
     stats = (
         Show.objects.filter(ext_rating__imdb__isnull=False)
@@ -136,19 +115,9 @@ def calculate_has_imdb_metric():
     return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
-def get_has_imdb_list(show_type: str):
-    return Show.objects.filter(type=show_type, ext_rating__imdb__isnull=False).values(
-        'id', 'title', 'original_title'
-    )
-
-
 def calculate_total_shows_metric():
     stats = Show.objects.values('type').annotate(total=Count('id')).order_by('-total')
     return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
-
-
-def get_total_shows_list(show_type: str):
-    return Show.objects.filter(type=show_type).values('id', 'title', 'original_title')
 
 
 def calculate_missing_imdb_metric():
@@ -386,14 +355,6 @@ def calculate_total_persons_by_show_type_metric():
     return [{'name': _format_type(item['show__type']), 'value': item['total']} for item in stats]
 
 
-def get_total_persons_by_show_type_list(show_type: str):
-    return (
-        Person.objects.filter(showcrew__show__type=show_type)
-        .distinct()
-        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
-    )
-
-
 def calculate_persons_avatar_stats_metric():
     has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
     has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
@@ -436,38 +397,6 @@ def calculate_persons_avatar_stats_metric():
         },
     ]
     return sorted(data, key=lambda x: x['value'], reverse=True)
-
-
-def get_persons_avatar_stats_list(category: str):
-    has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
-    has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
-    tmdb_done = Q(is_photo_fetched=True)
-
-    invalid_url = Q(showcrew__show__kinopoisk_url__endswith='/film/0')
-    kp_waiting = (
-        Q(showcrew__show__kinopoisk_url__isnull=False)
-        & ~Q(showcrew__show__kinopoisk_url='')
-        & ~invalid_url
-        & Q(showcrew__show__ext_rating__isnull=True)
-    )
-
-    qs = Person.objects.all()
-    if category == 'Есть фото (TMDB)':
-        qs = qs.filter(has_tmdb)
-    elif category == 'Есть фото (KP)':
-        qs = qs.filter(has_kp).exclude(has_tmdb)
-    elif category == 'TMDB не найдено':
-        qs = qs.filter(tmdb_done).exclude(has_tmdb)
-    elif category == 'KP не найдено':
-        qs = qs.exclude(has_kp).exclude(kp_waiting)
-    elif category == 'В ожидании TMDB':
-        qs = qs.exclude(tmdb_done | has_tmdb)
-    elif category == 'В ожидании KP':
-        qs = qs.filter(kp_waiting).exclude(has_kp)
-    elif category == 'Не найдено вообще':
-        qs = qs.filter(tmdb_done).exclude(has_tmdb | has_kp).exclude(kp_waiting)
-
-    return qs.distinct().values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
 
 
 def calculate_professions_stats_metric():
@@ -515,15 +444,6 @@ def calculate_professions_stats_metric():
         result.append({'name': 'Неизвестно', 'value': unknown_count})
 
     return sorted(result, key=lambda x: x['value'], reverse=True)
-
-
-def get_professions_stats_list(profession: str):
-    search_list = PROFESSIONS_MAPPING_RU.get(profession, [profession])
-    return (
-        Person.objects.filter(showcrew__profession__in=search_list)
-        .distinct()
-        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
-    )
 
 
 def calculate_missing_status_metric():
@@ -698,15 +618,6 @@ def calculate_en_professions_stats_metric():
     return sorted(result, key=lambda x: x['value'], reverse=True)
 
 
-def get_en_professions_stats_list(en_profession: str):
-    search_list = PROFESSIONS_MAPPING_EN.get(en_profession, [en_profession])
-    return (
-        Person.objects.filter(showcrew__en_profession__in=search_list)
-        .distinct()
-        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
-    )
-
-
 def calculate_total_genres_metric():
     known_keys = set(GENRES_MAPPING.keys())
     db_genres = set(Genre.objects.values_list('name', flat=True))
@@ -783,33 +694,3 @@ def get_missing_durations_list(show_type: str):
 def calculate_unused_persons_metric():
     count = Person.objects.filter(showcrew__isnull=True).count()
     return [{'name': 'Без ролей', 'value': count}]
-
-
-def get_unused_persons_list():
-    return (
-        Person.objects.filter(showcrew__isnull=True)
-        .order_by('-created_at')
-        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
-    )
-
-
-def calculate_last_tg_activity_metric():
-    last_log = TelegramLog.objects.order_by('-created_at').first()
-    if not last_log:
-        return [{'name': 'Активность', 'value': 0}]
-
-    timestamp = int(last_log.created_at.timestamp())
-    return [{'name': 'Последнее сообщение', 'value': timestamp}]
-
-
-def calculate_recent_errors_metric():
-    cutoff = timezone.now() - timedelta(days=1)
-    count = LogEntry.objects.filter(created_at__gte=cutoff, level__in=['ERROR', 'CRITICAL']).count()
-    return [{'name': 'Ошибки (24ч)', 'value': count}]
-
-
-def calculate_bot_users_health_metric():
-    active = ViewUser.objects.filter(is_bot_active=True).count()
-    inactive = ViewUser.objects.filter(is_bot_active=False).count()
-    data = [{'name': 'Активны', 'value': active}, {'name': 'Отключены', 'value': inactive}]
-    return sorted(data, key=lambda x: x['value'], reverse=True)

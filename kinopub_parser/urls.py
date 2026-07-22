@@ -47,7 +47,6 @@ urlpatterns = proxy_patterns + [
         name='webapp_get_collection',
     ),
     path('api/webapp/search/', views.webapp_search, name='webapp_search'),
-    path('api/webapp/stats/', views.webapp_get_stats, name='webapp_get_stats'),
     path(
         'api/webapp/detailed_stats/',
         views.webapp_get_detailed_stats,
@@ -96,7 +95,6 @@ urlpatterns = proxy_patterns + [
     path('api/bot/toggle_claim/', views.bot_toggle_claim),
     path('api/bot/assign_group_view/', views.bot_assign_group_view),
     path('api/bot/get_user_groups/', views.bot_get_user_groups),
-    path('api/bot/toggle_view_user/', views.bot_toggle_view_user),
     path('api/bot/toggle_view_user/', views.bot_toggle_view_user),
     path('api/bot/toggle_check/', views.bot_toggle_view_check),
     path('api/bot/rate/', views.bot_rate_show),

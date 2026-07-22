@@ -121,11 +121,6 @@ async def check_user_role(telegram_id: int) -> str:
     return UserRole.GUEST
 
 
-async def toggle_claim(telegram_id: int, view_id: int) -> dict | None:
-    payload = {'telegram_id': telegram_id, 'view_id': view_id}
-    return await _execute_request('toggle_claim/', method='POST', payload=payload)
-
-
 async def toggle_view_user(telegram_id: int, view_id: int) -> dict | None:
     payload = {'telegram_id': telegram_id, 'view_id': view_id}
     return await _execute_request('toggle_view_user/', method='POST', payload=payload)
