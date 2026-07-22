@@ -308,8 +308,8 @@ const metricGroups = ref([
     title: 'Рейтинги', icon: 'star', color: 'var(--accent)',
     metrics: [
       { key: 'has_kp', icon: 'smile', color: 'var(--info)', label: 'Есть рейтинг KP', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг Кинопоиска.', showDesc: false },
-      { key: 'missing_kp', icon: 'frown', color: 'var(--danger)', label: 'Нет рейтинга KP', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.', showDesc: false },
       { key: 'has_imdb', icon: 'smile', color: 'var(--accent)', label: 'Есть рейтинг IMDb', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг IMDb.', showDesc: false },
+      { key: 'missing_kp', icon: 'frown', color: 'var(--danger)', label: 'Нет рейтинга KP', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.', showDesc: false },
       { key: 'missing_imdb', icon: 'frown', color: '#f1c40f', label: 'Нет рейтинга IMDb', centerLabel: 'БЕЗ IMDB', valField: 'value', severity: 'critical', desc: 'Шоу, у которых указана ссылка на IMDb, но в таблице внешних рейтингов данные отсутствуют.', showDesc: false },
     ]
   },
@@ -324,11 +324,11 @@ const metricGroups = ref([
   {
     title: 'Люди и роли', icon: 'users', color: '#9b59b6',
     metrics: [
-      { key: 'duplicate_photo_urls', icon: 'users', color: '#ef1960', label: 'Дубликаты людей', centerLabel: 'ДУБЛИКАТОВ', valField: 'value', severity: 'critical', desc: 'Разные записи людей с совпадающими аватарками.', showDesc: false },
       { key: 'total_persons_by_show_type', icon: 'user', color: '#388bfd', label: 'Персоны в базе', centerLabel: 'ПЕРСОН', valField: 'value', severity: 'info', desc: 'Количество уникальных людей в различных типах шоу.', showDesc: false },
       { key: 'persons_avatar_stats', icon: 'eye', color: '#e67e22', label: 'Наличие фотографий', centerLabel: 'С ФОТО', valField: 'value', severity: 'warning', desc: 'Соотношение загруженных фото для людей.', showDesc: false },
       { key: 'professions_stats', icon: 'rocket', color: '#1abc9c', label: 'Роли в кино', centerLabel: 'РОЛЕЙ', valField: 'value', severity: 'info', desc: 'Топ уникальных профессий.', showDesc: false },
       { key: 'en_professions_stats', icon: 'gear', color: '#a371f7', label: 'Роли в кино (EN)', centerLabel: 'ROLES', valField: 'value', severity: 'info', desc: 'Топ профессий на английском языке.', showDesc: false },
+      { key: 'duplicate_photo_urls', icon: 'users', color: '#ef1960', label: 'Дубликаты людей', centerLabel: 'ДУБЛИКАТОВ', valField: 'value', severity: 'critical', desc: 'Разные записи людей с совпадающими аватарками.', showDesc: false },
       { key: 'unused_persons', icon: 'trash', color: 'var(--danger)', label: 'Балласт', centerLabel: 'ПЕРСОН', valField: 'value', severity: 'critical', desc: 'Люди, не привязанные ни к одному шоу.', showDesc: false }
     ]
   }
