@@ -70,6 +70,8 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
         logger.error('TMDB_API_KEY is not set.')
         return False
 
+    rejected_urls = set(person_instance.rejected_photos.values_list('photo_url', flat=True))
+
     def clean_name(n):
         if not n:
             return None
@@ -138,6 +140,12 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
 
                 valid_candidates = []
                 for res in results:
+                    profile_path = res.get('profile_path')
+                    if profile_path:
+                        full_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
+                        if full_url in rejected_urls:
+                            continue
+
                     if _is_valid_tmdb_match(query, res):
                         score = 0
                         known_for_list = res.get('known_for', [])

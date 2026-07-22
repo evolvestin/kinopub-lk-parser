@@ -33,6 +33,7 @@ from app.models import (
     LogEntry,
     MutedShowNotification,
     Person,
+    RejectedPersonPhoto,
     SharedStat,
     Show,
     ShowCrew,
@@ -352,12 +353,14 @@ def protected_bot_api(func):
 def check_bot_user(request, telegram_id):
     try:
         user = ViewUser.objects.get(telegram_id=telegram_id)
-        return JsonResponse({
-            'exists': True, 
-            'role': user.role,
-            'is_anonymous': user.is_anonymous,
-            'privacy_choice_made': user.privacy_choice_made
-        })
+        return JsonResponse(
+            {
+                'exists': True,
+                'role': user.role,
+                'is_anonymous': user.is_anonymous,
+                'privacy_choice_made': user.privacy_choice_made,
+            }
+        )
     except ViewUser.DoesNotExist:
         return JsonResponse({'exists': False, 'role': UserRole.GUEST})
 
@@ -1261,11 +1264,7 @@ def webapp_bake_stats(request):
             baked_data[str(yr)] = stat
 
         final_payload = {
-            'metadata': {
-                'years': years, 
-                'user_id': view_user.id,
-                'anon_user': anon_user
-            },
+            'metadata': {'years': years, 'user_id': view_user.id, 'anon_user': anon_user},
             'data': baked_data,
         }
         content_hash = hashlib.sha256(
@@ -1347,7 +1346,9 @@ def webapp_get_show_ratings_paginated(request, show_id):
         sliced_users = users_query[offset : offset + limit]
         user_ids = [u['user_id'] for u in sliced_users]
 
-        ratings_qs = UserRating.objects.filter(show=show, user_id__in=user_ids).select_related('user')
+        ratings_qs = UserRating.objects.filter(show=show, user_id__in=user_ids).select_related(
+            'user'
+        )
 
         grouped_ratings = {}
         for r in ratings_qs:
@@ -1373,7 +1374,9 @@ def webapp_get_show_ratings_paginated(request, show_id):
                 )
 
         for uid in grouped_ratings:
-            grouped_ratings[uid]['episodes'].sort(key=lambda x: (x['season'] or 0, x['episode'] or 0))
+            grouped_ratings[uid]['episodes'].sort(
+                key=lambda x: (x['season'] or 0, x['episode'] or 0)
+            )
 
         ordered_ratings = []
         for uid in user_ids:
@@ -1382,11 +1385,9 @@ def webapp_get_show_ratings_paginated(request, show_id):
 
         has_more = (offset + limit) < total_count
 
-        return JsonResponse({
-            'ratings': ordered_ratings,
-            'has_more': has_more,
-            'total_count': total_count
-        })
+        return JsonResponse(
+            {'ratings': ordered_ratings, 'has_more': has_more, 'total_count': total_count}
+        )
     except Exception as e:
         logger.error(f'Error in webapp_get_show_ratings_paginated: {e}', exc_info=True)
         return JsonResponse({'error': str(e)}, status=500)
@@ -1427,8 +1428,7 @@ def webapp_get_show_full(request, show_id):
         target_user = view_user
 
         internal_rating, user_ratings = show.get_internal_rating_data(
-            current_user=target_user,
-            override_public_user_id=override_public_user_id
+            current_user=target_user, override_public_user_id=override_public_user_id
         )
 
         duration_qs = ShowDuration.objects.filter(show=show).aggregate(
@@ -1461,14 +1461,18 @@ def webapp_get_show_full(request, show_id):
                 user=target_user, show=show, season_number__isnull=False
             ).count()
 
-            has_any_muted = MutedShowNotification.objects.filter(user=target_user, is_active=True).exists()
+            has_any_muted = MutedShowNotification.objects.filter(
+                user=target_user, is_active=True
+            ).exists()
 
         if override_public_user_id:
             visible_ids.add(override_public_user_id)
 
         is_muted = False
         if target_user:
-            is_muted = MutedShowNotification.objects.filter(user=target_user, show=show, is_active=True).exists()
+            is_muted = MutedShowNotification.objects.filter(
+                user=target_user, show=show, is_active=True
+            ).exists()
 
         last_view = None
         user_show_history = []
@@ -1618,9 +1622,13 @@ def webapp_get_show_full(request, show_id):
         )
         recent_user_ids = [u['user_id'] for u in recent_users_query]
 
-        ratings_qs = UserRating.objects.filter(show=show, user_id__in=recent_user_ids).select_related('user')
+        ratings_qs = UserRating.objects.filter(
+            show=show, user_id__in=recent_user_ids
+        ).select_related('user')
         total_ratings_count = UserRating.objects.filter(show=show).count()
-        total_voters_count = UserRating.objects.filter(show=show).values('user_id').distinct().count()
+        total_voters_count = (
+            UserRating.objects.filter(show=show).values('user_id').distinct().count()
+        )
 
         grouped_ratings = {}
         for r in ratings_qs:
@@ -2922,8 +2930,12 @@ def webapp_show_notification_status(request, show_id):
             show=show, users=view_user, is_checked=True
         ).exists()
 
-        is_muted = MutedShowNotification.objects.filter(user=view_user, show=show, is_active=True).exists()
-        has_any_muted = MutedShowNotification.objects.filter(user=view_user, is_active=True).exists()
+        is_muted = MutedShowNotification.objects.filter(
+            user=view_user, show=show, is_active=True
+        ).exists()
+        has_any_muted = MutedShowNotification.objects.filter(
+            user=view_user, is_active=True
+        ).exists()
 
         reasons = []
         if in_history:
@@ -2969,15 +2981,17 @@ def webapp_toggle_mute_notification(request):
         show = Show.objects.get(id=show_id)
 
         MutedShowNotification.objects.update_or_create(
-            user=view_user,
-            show=show,
-            defaults={'is_active': mute}
+            user=view_user, show=show, defaults={'is_active': mute}
         )
         msg = 'Уведомления отключены' if mute else 'Уведомления включены'
 
-        has_any_muted = MutedShowNotification.objects.filter(user=view_user, is_active=True).exists()
+        has_any_muted = MutedShowNotification.objects.filter(
+            user=view_user, is_active=True
+        ).exists()
 
-        return JsonResponse({'status': 'ok', 'is_muted': mute, 'has_any_muted': has_any_muted, 'message': msg})
+        return JsonResponse(
+            {'status': 'ok', 'is_muted': mute, 'has_any_muted': has_any_muted, 'message': msg}
+        )
 
     except Show.DoesNotExist:
         return JsonResponse({'error': 'Show not found'}, status=404)
@@ -3021,3 +3035,33 @@ def bot_set_privacy(request):
         return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@staff_member_required
+@require_http_methods(['POST'])
+def reject_person_photo_api(request):
+    try:
+        data = json.loads(request.body)
+        person_id = data.get('person_id')
+        photo_url = data.get('photo_url')
+
+        if not person_id or not photo_url:
+            return JsonResponse({'error': 'Person ID and Photo URL are required'}, status=400)
+
+        with transaction.atomic():
+            person = Person.objects.get(id=person_id)
+            RejectedPersonPhoto.objects.get_or_create(person=person, photo_url=photo_url)
+
+            if person.tmdb_photo_url == photo_url:
+                person.tmdb_photo_url = None
+                person.is_photo_fetched = False
+                person.save(update_fields=['tmdb_photo_url', 'is_photo_fetched'])
+
+            cache.delete(f'user_stats:person:{person_id}')
+
+        return JsonResponse({'status': 'ok'})
+    except Person.DoesNotExist:
+        return JsonResponse({'error': 'Person not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

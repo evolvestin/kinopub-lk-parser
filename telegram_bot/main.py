@@ -145,9 +145,7 @@ def register_router() -> Router:
     )
 
     # Приватность оценок
-    router.callback_query.register(
-        callbacks.privacy_choice_handler, F.data.startswith('set_priv_')
-    )
+    router.callback_query.register(callbacks.privacy_choice_handler, F.data.startswith('set_priv_'))
 
     # Просмотр списка оценок
     router.callback_query.register(

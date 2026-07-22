@@ -8,7 +8,7 @@ from app.keyboards import get_history_notification_keyboard, get_role_management
 from app.services.error_aggregator import ErrorAggregator
 from app.utils import get_webapp_base_url
 from shared.card_formatter import get_show_card_text
-from shared.constants import DATE_FORMAT, UserRole, SHOW_TYPE_DISPLAY_RU
+from shared.constants import DATE_FORMAT, SHOW_TYPE_DISPLAY_RU, UserRole
 from shared.formatters import format_se
 from shared.html_helper import bold, code, html_secure, italic
 
@@ -413,10 +413,12 @@ class TelegramSender:
         unsub_webapp_url = f'{base_url}/webapp/?start_param=unsub_{show.id}'
 
         show_type_ru = SHOW_TYPE_DISPLAY_RU.get(show.type, show.type)
-        kb_data = [[
-            {'text': f'🎬 {show_type_ru}', 'web_app': {'url': show_webapp_url}},
-            {'text': '🔕 Отписаться', 'web_app': {'url': unsub_webapp_url}}
-        ]]
+        kb_data = [
+            [
+                {'text': f'🎬 {show_type_ru}', 'web_app': {'url': show_webapp_url}},
+                {'text': '🔕 Отписаться', 'web_app': {'url': unsub_webapp_url}},
+            ]
+        ]
 
         payload = {
             'chat_id': view_user.telegram_id,

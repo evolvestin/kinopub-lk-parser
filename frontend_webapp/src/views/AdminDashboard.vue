@@ -182,17 +182,20 @@
                         </div>
                         <div v-if="p.en_name" class="person-en-name">{{ p.en_name }}</div>
                         <div style="margin-top: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                          <div v-if="p.tmdb_photo_url" style="display: flex; align-items: center; gap: 6px;">
+                          <div v-if="p.tmdb_photo_url && !item.tmdb_photo_url" style="display: flex; align-items: center; gap: 6px;">
                             <img :src="p.tmdb_photo_url" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="TMDB">
                             <span style="font-size: 11px; color: var(--text-muted);">TMDB</span>
                           </div>
                           <div v-if="p.kp_photo_url" style="display: flex; align-items: center; gap: 6px;">
-                            <img :src="p.kp_photo_url" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="KP">
-                            <span style="font-size: 11px; color: var(--text-muted);">KP</span>
+                            <img :src="p.kp_photo_url" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="KP">
+                            <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">KP</span>
                           </div>
                         </div>
                       </div>
-                      <a :href="`/admin/app/person/${p.id}/change/`" target="_blank" class="edit-link-btn-small" @click.stop>Правка</a>
+                      <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end; flex-shrink: 0;">
+                        <a :href="`/admin/app/person/${p.id}/change/`" target="_blank" class="edit-link-btn-small" @click.stop>Правка</a>
+                        <button v-if="item.tmdb_photo_url" type="button" class="reject-photo-btn-small" @click.stop="rejectTmdbPhoto(p.id, item.tmdb_photo_url, item.persons[0].id)">Отклонить фото</button>
+                      </div>
                     </label>
                   </div>
                 </div>
@@ -632,6 +635,30 @@ const executeMerge = async (groupId, personsArray) => {
   }
 }
 
+const rejectTmdbPhoto = async (personId, photoUrl, groupId) => {
+  if (!confirm('Вы уверены, что хотите отклонить это фото для данного человека? Оно больше никогда не будет ему присвоено автоматически.')) return
+
+  try {
+    const response = await fetch('/api/metrics/reject_person_photo/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ person_id: personId, photo_url: photoUrl })
+    })
+
+    if (!response.ok) throw new Error('Ошибка API')
+
+    const groupItem = modalItems.value.find(i => i.persons && i.persons[0].id === groupId)
+    if (groupItem && groupItem.persons) {
+      groupItem.persons = groupItem.persons.filter(p => p.id !== personId)
+      if (groupItem.persons.length < 2) {
+        groupItem.persons = null
+      }
+    }
+  } catch (e) {
+    alert('Ошибка: ' + e.message)
+  }
+}
+
 onUnmounted(() => {
   if (observer) observer.disconnect()
 })
@@ -794,7 +821,7 @@ onUnmounted(() => {
 .modal-footer { padding: 15px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; background: var(--bg-card); border-radius: 0 0 24px 24px; margin: 0; flex-shrink: 0; }
 .add-all-btn { background: var(--accent); color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s; }
 .add-all-btn:hover:not(:disabled) { transform: scale(0.98); }
-.add-all-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.add-all-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
 @keyframes pulseGlowRed {
     0% { box-shadow: 0 4px 12px rgba(231, 76, 60, 0.05); border-color: var(--border); }
@@ -906,5 +933,25 @@ onUnmounted(() => {
   0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
   70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(46, 204, 113, 0); }
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+}
+
+.reject-photo-btn-small {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--danger);
+    background: rgba(231, 76, 60, 0.15);
+    padding: 4px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.reject-photo-btn-small:hover {
+    background: var(--danger);
+    color: #fff;
+    transform: translateY(-1px);
 }
 </style>

@@ -60,6 +60,7 @@ class CustomAdminSite(admin.AdminSite):
                     'Show',
                     'ExternalRating',
                     'Person',
+                    'RejectedPersonPhoto',
                     'ShowCrew',
                     'ShowDuration',
                     'Country',

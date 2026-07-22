@@ -258,25 +258,28 @@ async def rate_mode_show_handler(callback: CallbackQuery, bot: Bot):
 async def check_privacy_and_prompt(callback: CallbackQuery, bot: Bot) -> bool:
     user_info = await client.get_user_info(callback.from_user.id)
     if user_info and not user_info.get('privacy_choice_made'):
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-        
+        from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
         text = (
-            "🛑 <b>Настройки приватности оценок</b>\n\n"
-            "Перед тем как оставить свою первую оценку, выберите, как другие пользователи будут её видеть:\n\n"
-            "🕶 <b>Анонимно</b> (По умолчанию)\n"
-            "Ваше имя скрыто. Другие увидят «Анонимный зритель», а вы — «Вы».\n\n"
-            "🌐 <b>Публично</b>\n"
-            "Другие увидят ваше имя и юзернейм в списках оценивших.\n\n"
-            "<i>Вы сможете изменить это в любой момент через настройки WebApp.</i>"
+            '🛑 <b>Настройки приватности оценок</b>\n\n'
+            'Перед тем как оставить свою первую оценку, выберите, '
+            'как другие пользователи будут её видеть:\n\n'
+            '🕶 <b>Анонимно</b> (По умолчанию)\n'
+            'Ваше имя скрыто. Другие увидят «Анонимный зритель», а вы — «Вы».\n\n'
+            '🌐 <b>Публично</b>\n'
+            'Другие увидят ваше имя и юзернейм в списках оценивших.\n\n'
+            '<i>Вы сможете изменить это в любой момент через настройки WebApp.</i>'
         )
-        
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🕶 Анонимно", callback_data="set_priv_1")],
-            [InlineKeyboardButton(text="🌐 Публично", callback_data="set_priv_0")],
-            [InlineKeyboardButton(text="❌ Отмена", callback_data="delete_msg")]
-        ])
-        
-        await bot.send_message(callback.from_user.id, text, reply_markup=kb, parse_mode="HTML")
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text='🕶 Анонимно', callback_data='set_priv_1')],
+                [InlineKeyboardButton(text='🌐 Публично', callback_data='set_priv_0')],
+                [InlineKeyboardButton(text='❌ Отмена', callback_data='delete_msg')],
+            ]
+        )
+
+        await bot.send_message(callback.from_user.id, text, reply_markup=kb, parse_mode='HTML')
         await callback.answer()
         return False
     return True
@@ -322,15 +325,19 @@ async def rate_episode_set_handler(callback: CallbackQuery, bot: Bot):
     show_id, season, episode, rating = get_args(callback.data, 3, 4, 5, 6)
     await _submit_rating(callback, bot, show_id, rating, season, episode)
 
+
 @safe_callback
 async def privacy_choice_handler(callback: CallbackQuery, bot: Bot):
     parts = callback.data.split('_')
     is_anon = parts[2] == '1'
-    
+
     await client.set_user_privacy(callback.from_user.id, is_anon)
     await callback.message.delete()
-    await callback.message.answer("✅ Настройки приватности сохранены.\nПожалуйста, нажмите на оценку еще раз.")
+    await callback.message.answer(
+        '✅ Настройки приватности сохранены.\nПожалуйста, нажмите на оценку еще раз.'
+    )
     await callback.answer()
+
 
 @safe_callback
 async def rate_mode_ep_handler(callback: CallbackQuery, bot: Bot):
@@ -392,7 +399,9 @@ async def show_ratings_list_handler(callback: CallbackQuery, bot: Bot):
 
     ratings_details = None
     if show_data.get('type') in SERIES_TYPES:
-        ratings_details = await client.get_show_ratings_details(show_id, telegram_id=callback.from_user.id)
+        ratings_details = await client.get_show_ratings_details(
+            show_id, telegram_id=callback.from_user.id
+        )
 
     bot_username = await BotInstance().get_bot_username()
 

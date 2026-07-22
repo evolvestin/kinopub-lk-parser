@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import JSONField
 
+from app.utils import format_user_for_rating
 from shared.constants import (
     DATETIME_FORMAT,
     RATING_VALUES,
@@ -15,7 +16,6 @@ from shared.constants import (
 )
 from shared.formatters import format_se
 
-from app.utils import format_user_for_rating
 
 class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
@@ -328,12 +328,14 @@ class Show(BaseModel):
             user_ratings_count[user_id] += 1
 
         user_results = []
-        
+
         for user_id, total_rating in user_ratings_sum.items():
             user_average = total_rating / user_ratings_count[user_id]
             rater = user_objects[user_id]
             fmt = format_user_for_rating(rater, current_user, override_public_user_id)
-            user_results.append({'label': fmt['user'], 'rating': user_average, 'is_anonymous': fmt['is_anonymous']})
+            user_results.append(
+                {'label': fmt['user'], 'rating': user_average, 'is_anonymous': fmt['is_anonymous']}
+            )
 
         user_averages = [item['rating'] for item in user_results]
         mean_rating = sum(user_averages) / len(user_averages)
@@ -607,3 +609,16 @@ class MutedShowNotification(BaseModel):
     def __str__(self):
         status = 'muted' if self.is_active else 'unmuted'
         return f'{self.user} {status} {self.show.title}'
+
+
+class RejectedPersonPhoto(BaseModel):
+    person = models.ForeignKey(Person, on_delete=models.CASCADE, related_name='rejected_photos')
+    photo_url = models.URLField(max_length=500, db_index=True)
+
+    class Meta:
+        unique_together = ('person', 'photo_url')
+        verbose_name = 'Rejected Person Photo'
+        verbose_name_plural = 'Rejected Person Photos'
+
+    def __str__(self):
+        return f'{self.person.name} - {self.photo_url}'

@@ -38,6 +38,7 @@ from app.models import (
     LogEntry,
     MutedShowNotification,
     Person,
+    RejectedPersonPhoto,
     SharedStat,
     Show,
     ShowCrew,
@@ -553,10 +554,24 @@ class ViewUserAdmin(admin.ModelAdmin):
     )
     fieldsets = (
         (None, {'fields': ('telegram_id', 'role', 'language', 'is_bot_active')}),
-        ('Персональные данные', {'fields': ('name', 'username', 'get_avatar_preview', 'photo_url')}),
+        (
+            'Персональные данные',
+            {'fields': ('name', 'username', 'get_avatar_preview', 'photo_url')},
+        ),
         ('Конфиденциальность', {'fields': ('is_anonymous', 'privacy_choice_made')}),
         ('Технические характеристики', {'fields': ('screen_width', 'screen_height')}),
-        ('Системные данные', {'fields': ('django_user', 'role_message_id', 'telegram_actions', 'created_at', 'updated_at')}),
+        (
+            'Системные данные',
+            {
+                'fields': (
+                    'django_user',
+                    'role_message_id',
+                    'telegram_actions',
+                    'created_at',
+                    'updated_at',
+                )
+            },
+        ),
     )
     actions = ['resend_role_message']
 
@@ -625,7 +640,11 @@ class ViewUserAdmin(admin.ModelAdmin):
     @admin.display(description='Avatar Preview')
     def get_avatar_preview(self, obj):
         if obj.photo_url:
-            return format_html('<img src="{}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;" />', obj.photo_url)
+            return format_html(
+                '<img src="{}" style="width: 50px; height: 50px; '
+                'border-radius: 50%; object-fit: cover;" />',
+                obj.photo_url,
+            )
         return '-'
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
@@ -1062,10 +1081,16 @@ class PersonAdminForm(forms.ModelForm):
         fields = '__all__'
 
 
+class RejectedPersonPhotoInline(admin.TabularInline):
+    model = RejectedPersonPhoto
+    extra = 0
+    readonly_fields = ('created_at', 'updated_at')
+
+
 @admin.register(Person, site=admin_site)
 class PersonAdmin(BaseNameAdmin):
     form = PersonAdminForm
-    inlines = [PersonShowCrewInline]
+    inlines = [PersonShowCrewInline, RejectedPersonPhotoInline]
     list_display = (
         'name',
         'get_photo_display',
@@ -1980,3 +2005,15 @@ class MutedShowNotificationAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'user__name', 'show__title', 'show__original_title')
     autocomplete_fields = ('user', 'show')
     readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(RejectedPersonPhoto, site=admin_site)
+class RejectedPersonPhotoAdmin(admin.ModelAdmin):
+    list_display = ('person', 'photo_url_link', 'created_at', 'updated_at')
+    autocomplete_fields = ('person',)
+    search_fields = ('person__name', 'photo_url')
+    readonly_fields = ('created_at', 'updated_at')
+
+    @admin.display(description='Photo URL')
+    def photo_url_link(self, obj):
+        return format_html('<a href="{0}" target="_blank">{0}</a>', obj.photo_url)

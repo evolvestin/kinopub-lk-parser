@@ -613,7 +613,9 @@ def get_duplicate_photo_urls_list(source_type: str):
         if field == 'tmdb_photo_url':
             kp_urls = {p['kp_photo_url'] for p in persons_list if p.get('kp_photo_url')}
             kp_urls.discard('')
-            has_kp_count = sum(1 for p in persons_list if p.get('kp_photo_url') and p.get('kp_photo_url') != '')
+            has_kp_count = sum(
+                1 for p in persons_list if p.get('kp_photo_url') and p.get('kp_photo_url') != ''
+            )
             if len(kp_urls) == 0:
                 kp_status = 'missing'
             elif len(kp_urls) == 1:
@@ -628,7 +630,9 @@ def get_duplicate_photo_urls_list(source_type: str):
         if field == 'kp_photo_url':
             tmdb_urls = {p['tmdb_photo_url'] for p in persons_list if p.get('tmdb_photo_url')}
             tmdb_urls.discard('')
-            has_tmdb_count = sum(1 for p in persons_list if p.get('tmdb_photo_url') and p.get('tmdb_photo_url') != '')
+            has_tmdb_count = sum(
+                1 for p in persons_list if p.get('tmdb_photo_url') and p.get('tmdb_photo_url') != ''
+            )
             if len(tmdb_urls) == 0:
                 tmdb_status = 'missing'
             elif len(tmdb_urls) == 1:

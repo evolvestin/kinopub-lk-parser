@@ -218,28 +218,9 @@ async def get_shared_stats_meta(stat_id: str) -> dict | None:
     return None
 
 
-async def assign_group_view(telegram_id: int, group_id: int, view_id: int) -> dict | None:
-    payload = {'telegram_id': telegram_id, 'group_id': group_id, 'view_id': view_id}
-    return await _execute_request('assign_group_view/', method='POST', payload=payload)
-
-
-async def get_shared_stats_meta(stat_id: str) -> dict | None:
-    url = f'{BACKEND_URL}/api/webapp/shared_stats/{stat_id}/'
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=5) as response:
-                if response.status == 200:
-                    res_data = await response.json()
-                    data = res_data.get('data', {})
-                    if data:
-                        first_year_data = next(iter(data.values()), {})
-                        return first_year_data.get('meta', {})
-    except Exception as e:
-        logging.error(f'Error fetching shared stats meta ({stat_id}): {e}')
-    return None
-
 async def get_user_info(telegram_id: int) -> dict | None:
     return await _execute_request(f'check/{telegram_id}/')
+
 
 async def set_user_privacy(telegram_id: int, is_anonymous: bool) -> dict | None:
     payload = {'telegram_id': telegram_id, 'is_anonymous': is_anonymous}

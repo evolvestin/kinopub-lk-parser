@@ -34,6 +34,11 @@ urlpatterns = proxy_patterns + [
     path('api/metrics/details/<str:key>/', views.get_metric_details, name='get_metric_details'),
     path('api/metrics/queue_update/', views.queue_update_details, name='queue_update_details'),
     path('api/metrics/merge_persons/', views.merge_persons_api, name='merge_persons_api'),
+    path(
+        'api/metrics/reject_person_photo/',
+        views.reject_person_photo_api,
+        name='reject_person_photo_api',
+    ),
     # WebApp Endpoints
     path('webapp/', views.webapp_index, name='webapp_index'),
     path(
@@ -58,7 +63,11 @@ urlpatterns = proxy_patterns + [
     path('api/webapp/delete_rating/', views.webapp_delete_rating, name='webapp_delete_rating'),
     path('api/webapp/get_episodes/', views.webapp_get_episodes, name='webapp_get_episodes'),
     path('api/webapp/show/<int:show_id>/', views.webapp_get_show_full, name='webapp_get_show_full'),
-    path('api/webapp/show/<int:show_id>/ratings_paginated/', views.webapp_get_show_ratings_paginated, name='webapp_get_show_ratings_paginated'),
+    path(
+        'api/webapp/show/<int:show_id>/ratings_paginated/',
+        views.webapp_get_show_ratings_paginated,
+        name='webapp_get_show_ratings_paginated',
+    ),
     path('api/webapp/wishlist/', views.webapp_wishlist_data, name='webapp_wishlist_data'),
     path('api/webapp/casino/', views.webapp_casino, name='webapp_casino'),
     path('api/webapp/add_view/', views.webapp_add_view, name='webapp_add_view'),
