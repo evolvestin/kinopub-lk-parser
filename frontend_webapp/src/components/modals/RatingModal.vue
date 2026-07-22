@@ -1,6 +1,6 @@
 <template>
   <div class="modal-overlay show" @click.self="close">
-    <div class="modal-content" :class="scoreColorClass" :style="{ padding: '24px', height: modalHeight, minHeight: modalHeight, display: 'flex', flexDirection: 'column' }">
+    <div class="modal-content" :class="scoreColorClass" :style="{ padding: '24px', height: modalHeight, minHeight: modalHeight, maxHeight: 'none', display: 'flex', flexDirection: 'column' }">
       
       <div class="modal-header-container" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; width: 100%;">
         <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
@@ -343,19 +343,24 @@ const showHint = computed(() => {
 const modalHeight = computed(() => {
   const hintHeight = showHint.value ? 100 : 0
   const isShared = statsStore.isShared
-  const baseHeight = (isShared ? 580 : 520) + hintHeight
+  const privacyHeight = (!isShared && !userStore.privacyChoiceMade) ? 130 : 0
+  const baseHeight = (isShared ? 580 : 520) + hintHeight + privacyHeight
+
+  const maxHeightLimit = Math.min(620 + privacyHeight, Math.floor(window.innerHeight * 0.95))
 
   if (!isSeries.value) {
-    return `${(isShared ? 500 : 420) + hintHeight}px`
+    const finalHeight = Math.max(400, Math.min((isShared ? 500 : 420) + hintHeight + privacyHeight, maxHeightLimit))
+    return `${finalHeight}px`
   }
 
   if (!episodesData.value.length) {
-    return `${baseHeight}px`
+    const finalHeight = Math.max(400, Math.min(baseHeight, maxHeightLimit))
+    return `${finalHeight}px`
   }
 
   const seasonsCount = episodesData.value.length
   const seasonsRows = Math.ceil(seasonsCount / 3)
-  let seasonsHeight = 280 + (seasonsRows * 64)
+  let seasonsHeight = 280 + (seasonsRows * 64) + privacyHeight
 
   let maxEpisodesCount = 0
   episodesData.value.forEach(s => {
@@ -364,7 +369,7 @@ const modalHeight = computed(() => {
     }
   })
   const episodesRows = Math.ceil(maxEpisodesCount / 4)
-  let episodesHeight = 230 + (episodesRows * 64)
+  let episodesHeight = 230 + (episodesRows * 64) + privacyHeight
 
   if (isShared) {
     seasonsHeight += 60
@@ -372,8 +377,7 @@ const modalHeight = computed(() => {
   }
 
   const maxCalculated = Math.max(seasonsHeight, episodesHeight, baseHeight)
-  const maxHeightLimit = Math.min(620, Math.floor(window.innerHeight * 0.8))
-  const finalHeight = Math.min(maxCalculated, maxHeightLimit)
+  const finalHeight = Math.max(400, Math.min(maxCalculated, maxHeightLimit))
   
   return `${finalHeight}px`
 })

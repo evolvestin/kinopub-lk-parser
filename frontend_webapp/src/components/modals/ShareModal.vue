@@ -26,7 +26,7 @@
             <div class="chk-box"></div>
             <span class="chk-text">Включить вкладку "Группа"</span>
         </label>
-        <label class="chk-row" v-if="config.include_group" style="padding-left:34px;">
+        <label class="chk-row" v-if="statsStore.hasGroup && config.include_group" style="padding-left:34px;">
             <input type="checkbox" v-model="config.anon_group">
             <div class="chk-box"></div>
             <span class="chk-text">Скрыть имена участников</span>
