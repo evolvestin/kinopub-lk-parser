@@ -2293,10 +2293,17 @@ def webapp_casino(request):
 
             folder_id = body.get('folder_id')
             if folder_id == 'all':
-                items = WishlistItem.objects.filter(folder__user=view_user).select_related('show')
+                items = WishlistItem.objects.filter(
+                    folder__user=view_user,
+                    folder__is_deleted=False,
+                    is_active=True,
+                ).select_related('show')
             else:
                 items = WishlistItem.objects.filter(
-                    folder__user=view_user, folder__id=folder_id
+                    folder__user=view_user,
+                    folder__id=folder_id,
+                    folder__is_deleted=False,
+                    is_active=True,
                 ).select_related('show')
 
             if not items.exists():

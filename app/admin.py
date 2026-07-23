@@ -339,6 +339,8 @@ class ShowStatusFilter(admin.SimpleListFilter):
 @admin.register(Show, site=admin_site)
 class ShowAdmin(admin.ModelAdmin):
     list_display = (
+        'id',
+        'kinopub_id',
         'title',
         'original_title',
         'get_type_display_ru',
@@ -361,7 +363,7 @@ class ShowAdmin(admin.ModelAdmin):
         'year',
         'ignore_collision',
     )
-    search_fields = ('title', 'original_title', 'plot')
+    search_fields = ('id', 'kinopub_id', 'title', 'original_title', 'plot')
     inlines = [
         ExternalRatingInline,
         ShowDurationInline,
@@ -371,6 +373,7 @@ class ShowAdmin(admin.ModelAdmin):
     ]
     readonly_fields = (
         'id',
+        'kinopub_id',
         'admin_actions',
         'title',
         'original_title',
