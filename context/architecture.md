@@ -140,3 +140,12 @@ Any code generating new database records must follow this "Save-As-Is" architect
 ## Debug Elements Policy
 
 **RULE**: Any debug or development-only UI elements (such as "DEBUG: RESET" button) must be positioned absolutely or out of the standard layout flow so they never take up physical space or shift production elements, and they must never overlap with critical UI elements like titles or close buttons.
+
+
+## Telegram Inline Query Keyboard Policy
+
+**RULE**: Inline Keyboards attached to Inline Query results (`InlineQueryResultArticle` / `answerInlineQuery`) MUST NOT contain `web_app` buttons (`WebAppInfo`). Telegram API strictly forbids `web_app` buttons in inline search results and will reject the request with `TelegramBadRequest: BUTTON_TYPE_INVALID`.
+
+1. **Implementation**:
+    * Keyboards built for inline query search results must pass `is_inline=True`.
+    * `keyboards.get_show_card_keyboard` accepts `is_inline: bool = False`. When `is_inline=True`, `webapp_url` is automatically omitted, ensuring only standard callback/URL buttons are sent.
