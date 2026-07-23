@@ -62,25 +62,30 @@ class Command(LoggableBaseCommand):
                     new_items_on_page = 0
 
                     for item in items:
-                        show_id = item['show_id']
+                        kinopub_id = item['show_id']
                         season = item['season']
                         episode = item['episode']
 
-                        show_qs = Show.objects.filter(id=show_id)
+                        show_qs = Show.objects.filter(kinopub_id=kinopub_id)
                         show_exists = show_qs.exists()
-                        show_has_details = show_exists and show_qs.first().year is not None
+                        show_obj = show_qs.first() if show_exists else None
+                        show_has_details = show_exists and show_obj.year is not None
 
-                        duration_exists = ShowDuration.objects.filter(
-                            show_id=show_id, season_number=season, episode_number=episode
-                        ).exists()
+                        duration_exists = False
+                        if show_exists:
+                            duration_exists = ShowDuration.objects.filter(
+                                show=show_obj, season_number=season, episode_number=episode
+                            ).exists()
 
                         if show_has_details and duration_exists:
                             continue
 
-                        logging.info(f'Processing update for: {item["title"]} (ID: {show_id})')
+                        logging.info(
+                            f'Processing update for: {item["title"]} (KinoPub ID: {kinopub_id})'
+                        )
 
                         show, created = Show.objects.get_or_create(
-                            id=show_id,
+                            kinopub_id=kinopub_id,
                             defaults={
                                 'title': item['title'],
                                 'original_title': item['original_title'],
@@ -94,13 +99,13 @@ class Command(LoggableBaseCommand):
 
                         if not show_has_details or not duration_exists:
                             enqueue_show_update(
-                                [show_id],
+                                [show.id],
                                 details=not show_has_details,
                                 durations=not duration_exists,
                                 ratings=not show_has_details,
                             )
 
-                            notify_new_episode_task.delay(show_id, season, episode)
+                            notify_new_episode_task.delay(show.id, season, episode)
 
                             new_items_on_page += 1
                             total_processed_count += 1

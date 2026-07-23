@@ -64,7 +64,7 @@ class Command(LoggableBaseCommand):
         processed_count = 0
 
         try:
-            for index, show_id in enumerate(ids_to_scan, start=1):
+            for index, kinopub_id in enumerate(ids_to_scan, start=1):
                 if driver is None:
                     logging.info('Initializing Selenium driver (aux account)...')
                     driver = initialize_driver_session(session_type='aux')
@@ -72,19 +72,22 @@ class Command(LoggableBaseCommand):
                         self.stdout.write(self.style.ERROR('Failed to initialize driver.'))
                         return
 
-                logging.info(f'[{index}/{len(ids_to_scan)}] Processing Show ID: {show_id}')
+                logging.info(f'[{index}/{len(ids_to_scan)}] Processing KinoPub ID: {kinopub_id}')
 
                 try:
-                    target_url = f'{settings.SITE_AUX_URL}item/view/{show_id}'
+                    target_url = f'{settings.SITE_AUX_URL}item/view/{kinopub_id}'
                     driver = open_url_safe(driver, target_url, session_type='aux')
 
-                    update_show_details(driver, show_id, force=True, session_type='aux')
+                    update_show_details(driver, kinopub_id, force=True, session_type='aux')
 
                     try:
-                        show = Show.objects.get(id=show_id)
+                        show = Show.objects.get(kinopub_id=kinopub_id)
                         process_show_durations(driver, show, session_type='aux')
                     except Show.DoesNotExist:
-                        logging.warning(f'Show {show_id} does not exist after details update.')
+                        logging.warning(
+                            f'Show with kinopub_id={kinopub_id} '
+                            f'does not exist after details update.'
+                        )
 
                     processed_count += 1
                     time.sleep(settings.FULL_SCAN_PAGE_DELAY_SECONDS)
@@ -96,7 +99,7 @@ class Command(LoggableBaseCommand):
                         driver = None
                         continue
 
-                    logging.error(f'Error processing Show ID {show_id}: {e}', exc_info=True)
+                    logging.error(f'Error processing KinoPub ID {kinopub_id}: {e}', exc_info=True)
                     continue
 
             if processed_count > 0:

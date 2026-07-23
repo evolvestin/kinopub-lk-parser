@@ -96,8 +96,8 @@ def _extract_int_from_string(text):
     return int(digits)
 
 
-def update_show_details(driver, show_id, force=False, session_type='main'):
-    target_path = f'item/view/{show_id}'
+def update_show_details(driver, kinopub_id, force=False, session_type='main'):
+    target_path = f'item/view/{kinopub_id}'
     base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
 
     try:
@@ -106,16 +106,16 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         )
         time.sleep(2)
     except Exception as e:
-        logging.error(f'Error navigating to show page {show_id}: {e}')
+        logging.error(f'Error navigating to show page {kinopub_id}: {e}')
         return
 
     if '/user/login' in driver.current_url:
-        logging.error(f'Failed to fetch show {show_id}: Stuck on login page.')
+        logging.error(f'Failed to fetch show {kinopub_id}: Stuck on login page.')
         return
 
     page_title = driver.title.strip()
     if page_title == 'Not Found (#404)':
-        logging.warning(f'Show {show_id} returned 404 (Not Found).')
+        logging.warning(f'Show {kinopub_id} returned 404 (Not Found).')
         return
 
     try:
@@ -129,10 +129,10 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         except TimeoutException:
             page_text = driver.find_element(By.TAG_NAME, 'body').text
             if 'Запрошенная страница не найдена' in page_text:
-                logging.warning(f'Show {show_id} returned 404 content.')
+                logging.warning(f'Show {kinopub_id} returned 404 content.')
                 return
 
-            logging.warning(f'Info table not found for show {show_id}. Metadata update aborted.')
+            logging.warning(f'Info table not found for show {kinopub_id}. Metadata update aborted.')
             return
 
         try:
@@ -165,25 +165,26 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         }
         if not title_text or title_text in forbidden_titles:
             logging.error(
-                f'Detected invalid header "{title_text}" for ID {show_id}. Aborting save.'
+                f'Detected invalid header '
+                f'"{title_text}" for KinoPub ID {kinopub_id}. Aborting save.'
             )
             return
 
-        try:
-            show = Show.objects.get(id=show_id)
+        show = Show.objects.filter(kinopub_id=kinopub_id).first()
+        if show:
             if not force:
                 three_months_ago = timezone.now() - timedelta(days=90)
                 if show.year is not None and show.updated_at >= three_months_ago:
                     return
-        except Show.DoesNotExist:
+        else:
             show = Show(
-                id=show_id,
+                kinopub_id=kinopub_id,
                 type='Unknown',
                 title=title_text,
                 original_title=title_text,
             )
 
-        logging.info(f'Fetching extended details for show id={show_id}')
+        logging.info(f'Fetching extended details for show kinopub_id={kinopub_id}')
 
         if title_text:
             show.title = title_text
@@ -300,7 +301,9 @@ def update_show_details(driver, show_id, force=False, session_type='main'):
         show.save()
 
     except Exception as e:
-        logging.error(f'An error occurred while updating show details for id={show_id}: {e}')
+        logging.error(
+            f'An error occurred while updating show details for kinopub_id={kinopub_id}: {e}'
+        )
         raise
 
 
@@ -697,9 +700,16 @@ def _fetch_playlist_data(driver, url, session_type='main'):
     return None
 
 
-def get_movie_duration_and_save(driver, show_id, session_type='main'):
+def get_movie_duration_and_save(driver, show, session_type='main'):
+    if isinstance(show, int):
+        show = Show.objects.get(id=show)
+
+    if not show.kinopub_id:
+        logging.warning(f'Show ID {show.id} has no kinopub_id. Skipping duration fetch.')
+        return
+
     base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
-    movie_url = f'{base_url.rstrip("/")}/item/play/{show_id}/s0e1'
+    movie_url = f'{base_url.rstrip("/")}/item/play/{show.kinopub_id}/s0e1'
     playlist_data = _fetch_playlist_data(driver, movie_url, session_type=session_type)
 
     if playlist_data:
@@ -711,21 +721,28 @@ def get_movie_duration_and_save(driver, show_id, session_type='main'):
 
         if duration_sec:
             ShowDuration.objects.update_or_create(
-                show_id=show_id,
+                show=show,
                 season_number=None,
                 episode_number=None,
                 defaults={'duration_seconds': duration_sec},
             )
-            logging.info('Cached duration for movie id%d: %d seconds.', show_id, duration_sec)
+            logging.info('Cached duration for movie id%d: %d seconds.', show.id, duration_sec)
         else:
             logging.warning('Playlist data found but duration is missing for %s', movie_url)
     else:
         logging.warning('Could not fetch playlist data for movie %s', movie_url)
 
 
-def get_season_durations_and_save(driver, show_id, season, session_type='main'):
+def get_season_durations_and_save(driver, show, season, session_type='main'):
+    if isinstance(show, int):
+        show = Show.objects.get(id=show)
+
+    if not show.kinopub_id:
+        logging.warning(f'Show ID {show.id} has no kinopub_id. Skipping season duration fetch.')
+        return
+
     base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
-    episode_url = f'{base_url.rstrip("/")}/item/play/{show_id}/s{season}e1'
+    episode_url = f'{base_url.rstrip("/")}/item/play/{show.kinopub_id}/s{season}e1'
     playlist_data = _fetch_playlist_data(driver, episode_url, session_type=session_type)
 
     if not playlist_data:
@@ -739,7 +756,7 @@ def get_season_durations_and_save(driver, show_id, season, session_type='main'):
 
         if item_season == season and item_episode is not None and duration_sec is not None:
             ShowDuration.objects.update_or_create(
-                show_id=show_id,
+                show=show,
                 season_number=item_season,
                 episode_number=item_episode,
                 defaults={'duration_seconds': duration_sec},
@@ -750,11 +767,11 @@ def get_season_durations_and_save(driver, show_id, season, session_type='main'):
         logging.info(
             'Cached/updated %d episode durations for show id%d, season %d.',
             updated_count,
-            show_id,
+            show.id,
             season,
         )
     else:
-        logging.warning('No episodes found in playlist for show id%d season %d', show_id, season)
+        logging.warning('No episodes found in playlist for show id%d season %d', show.id, season)
 
 
 def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main'):
@@ -791,7 +808,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
             link_element = block.find_element(By.CSS_SELECTOR, '.item-title a')
             title = link_element.text.strip()
             href = link_element.get_attribute('href')
-            show_id = int(re.search(r'/item/view/(\d+)', href).group(1))
+            kinopub_id = int(re.search(r'/item/view/(\d+)', href).group(1))
 
             try:
                 original_title = block.find_element(By.CSS_SELECTOR, '.item-author a').text.strip()
@@ -821,7 +838,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
 
             views_on_page.append(
                 {
-                    'show_id': show_id,
+                    'kinopub_id': kinopub_id,
                     'title': title,
                     'original_title': original_title,
                     'view_date': current_date_from_site,
@@ -833,16 +850,32 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
         except Exception as e:
             logging.error('Error parsing a view block: %s', e)
 
-    shows_to_create = [
-        Show(
-            id=item['show_id'],
-            title=item['title'],
-            original_title=item['original_title'],
-            type=item['type'],
-        )
-        for item in views_on_page
-    ]
-    Show.objects.bulk_create(shows_to_create, ignore_conflicts=True)
+    kinopub_ids_on_page = list({item['kinopub_id'] for item in views_on_page})
+    existing_shows = {
+        s.kinopub_id: s for s in Show.objects.filter(kinopub_id__in=kinopub_ids_on_page)
+    }
+
+    shows_to_create = []
+    for item in views_on_page:
+        kinopub_id = item['kinopub_id']
+        if kinopub_id not in existing_shows:
+            shows_to_create.append(
+                Show(
+                    kinopub_id=kinopub_id,
+                    title=item['title'],
+                    original_title=item['original_title'],
+                    type=item['type'],
+                )
+            )
+            existing_shows[kinopub_id] = None
+
+    if shows_to_create:
+        Show.objects.bulk_create(shows_to_create, ignore_conflicts=True)
+
+    db_shows = {s.kinopub_id: s.id for s in Show.objects.filter(kinopub_id__in=kinopub_ids_on_page)}
+
+    for item in views_on_page:
+        item['show_id'] = db_shows[item['kinopub_id']]
 
     unique_show_ids = list({item['show_id'] for item in views_on_page})
     enqueue_show_update(unique_show_ids, details=True, durations=False, ratings=True)
@@ -1109,12 +1142,16 @@ def run_parser_session(headless=True, driver_instance=None):
 
 
 def process_show_durations(driver, show, session_type='main'):
+    if not show.kinopub_id:
+        logging.warning(f'Show ID {show.id} has no kinopub_id. Skipping duration fetch.')
+        return
+
     if show.type not in SERIES_TYPES:
         get_movie_duration_and_save(driver, show.id, session_type=session_type)
     else:
         try:
             base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
-            player_url = f'{base_url.rstrip("/")}/item/play/{show.id}/s1e1'
+            player_url = f'{base_url.rstrip("/")}/item/play/{show.kinopub_id}/s1e1'
             logging.info(f'Navigating to player to fetch seasons list: {player_url}')
 
             driver = open_url_safe(driver, player_url, session_type=session_type)

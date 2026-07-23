@@ -274,7 +274,7 @@ class ViewUserGroup(BaseModel):
 
 
 class Show(BaseModel):
-    id = models.IntegerField(primary_key=True)
+    id = models.BigAutoField(primary_key=True)
     kinopub_id = models.IntegerField(
         null=True, blank=True, unique=True, db_index=True, verbose_name='KinoPub ID'
     )

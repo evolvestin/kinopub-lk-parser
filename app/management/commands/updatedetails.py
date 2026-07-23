@@ -102,10 +102,15 @@ class Command(LoggableBaseCommand):
                     except Exception as e:
                         raise Exception(f'Driver unresponsive: {e}') from e
 
+                    show = Show.objects.get(id=show_id)
+                    if not show.kinopub_id:
+                        logging.warning(f'Show ID {show_id} has no kinopub_id. Skipping.')
+                        continue
+
                     if specific_id:
                         Show.objects.filter(id=show_id).update(year=None, updated_at=timezone.now())
 
-                    update_show_details(driver, show_id, session_type='aux')
+                    update_show_details(driver, show.kinopub_id, session_type='aux')
 
                     logging.info(f'Successfully updated details for show ID {show_id}.')
                     updated_count += 1

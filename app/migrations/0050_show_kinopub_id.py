@@ -7,7 +7,6 @@ def copy_id_to_kinopub_id(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0049_rejectedpersonphoto'),
     ]

@@ -365,15 +365,21 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
             try:
                 _ = driver.current_url
 
+                try:
+                    show = Show.objects.get(id=show_id)
+                except Show.DoesNotExist:
+                    logging.warning(f'Show {show_id} not found in DB, skipping.')
+                    continue
+
                 if session_type == 'aux':
-                    process_func(driver, show_id, force=True, session_type=session_type)
-                else:
-                    try:
-                        show = Show.objects.get(id=show_id)
-                        process_func(driver, show, session_type=session_type)
-                    except Show.DoesNotExist:
-                        logging.warning(f'Show {show_id} not found in DB, skipping.')
+                    if not show.kinopub_id:
+                        logging.warning(
+                            f'Show {show_id} has no kinopub_id, skipping details update.'
+                        )
                         continue
+                    process_func(driver, show.kinopub_id, force=True, session_type=session_type)
+                else:
+                    process_func(driver, show, session_type=session_type)
 
                 processed_count += 1
             except Exception as e:

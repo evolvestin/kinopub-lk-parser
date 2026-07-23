@@ -64,12 +64,12 @@ def parse_and_save_catalog_page(driver, mode):
             if not match:
                 continue
 
-            show_id = int(match.group(1))
+            kinopub_id = int(match.group(1))
             title = item['title']
             original_title = item['original_title'] if item['original_title'] else title
 
             show_data = {
-                'id': show_id,
+                'kinopub_id': kinopub_id,
                 'title': title,
                 'original_title': original_title,
                 'type': SHOW_TYPE_MAPPING.get(mode, mode.capitalize()),
@@ -107,9 +107,13 @@ def parse_and_save_catalog_page(driver, mode):
     if not shows_on_page:
         return 0
 
-    page_ids = [s['id'] for s in shows_on_page]
-    existing_ids = set(Show.objects.filter(id__in=page_ids).values_list('id', flat=True))
-    new_ids = [sid for sid in page_ids if sid not in existing_ids]
+    kinopub_ids_on_page = [s['kinopub_id'] for s in shows_on_page]
+    existing_kinopub_ids = set(
+        Show.objects.filter(kinopub_id__in=kinopub_ids_on_page).values_list('kinopub_id', flat=True)
+    )
+    new_kinopub_ids = [
+        kinopubid for kinopubid in kinopub_ids_on_page if kinopubid not in existing_kinopub_ids
+    ]
 
     shows_to_upsert = [Show(**data) for data in shows_on_page]
 
@@ -126,14 +130,17 @@ def parse_and_save_catalog_page(driver, mode):
     Show.objects.bulk_create(
         shows_to_upsert,
         update_conflicts=True,
-        unique_fields=['id'],
+        unique_fields=['kinopub_id'],
         update_fields=update_fields,
     )
 
-    if new_ids:
-        enqueue_show_update(new_ids, details=True, durations=True, ratings=True)
+    if new_kinopub_ids:
+        created_show_ids = list(
+            Show.objects.filter(kinopub_id__in=new_kinopub_ids).values_list('id', flat=True)
+        )
+        enqueue_show_update(created_show_ids, details=True, durations=True, ratings=True)
 
-    return len(new_ids)
+    return len(new_kinopub_ids)
 
 
 def run_full_scan_session(headless=True, target_type=None, process_all_pages=False):

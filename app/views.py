@@ -1992,11 +1992,14 @@ def get_metric_details(request, key):
                 }
             )
         else:
+            kinopub_id = item.get('kinopub_id') or item['id']
             item.update(
                 {
                     'in_queue': item['id'] in all_queued,
                     'poster_url': get_poster_url(item['id'], 'small'),
-                    'kinopub_url': f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{item["id"]}',
+                    'kinopub_url': f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{kinopub_id}'
+                    if kinopub_id
+                    else None,
                     'admin_url': reverse('admin:app_show_change', args=[item['id']]),
                 }
             )

@@ -23,6 +23,7 @@ def get_show_card_text(
     user_ratings: list[dict] | None = None,
     bot_username: str | None = None,
     show_history: bool = True,
+    kinopub_id: int | None = None,
 ) -> str:
     """
     Генерирует стандартизированный текст карточки сериала/фильма
@@ -31,8 +32,8 @@ def get_show_card_text(
     raw_title = html_secure(title)
     original_title = html_secure(original_title)
 
-    if kinopub_link and show_id:
-        link = html_link(f'{kinopub_link.rstrip("/")}/item/view/{show_id}', '🔗')
+    if kinopub_link and kinopub_id:
+        link = html_link(f'{kinopub_link.rstrip("/")}/item/view/{kinopub_id}', '🔗')
         lines = [f'🎬{link} {bold(raw_title)}']
     else:
         lines = [f'🎬 {bold(raw_title)}']

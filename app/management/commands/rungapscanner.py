@@ -24,11 +24,11 @@ class Command(LoggableBaseCommand):
     help = 'Scans gaps between the last checked ID and current Max ID, updates missing shows.'
 
     def handle(self, *args, **options):
-        bounds = Show.objects.aggregate(max_id=Max('id'))
+        bounds = Show.objects.filter(kinopub_id__isnull=False).aggregate(max_id=Max('kinopub_id'))
         end_id = bounds.get('max_id')
 
         if not end_id:
-            logging.warning('GapScanner: Database is empty, nothing to scan.')
+            logging.warning('GapScanner: Database has no Kinopub shows, nothing to scan.')
             return
 
         last_log = (
@@ -51,10 +51,12 @@ class Command(LoggableBaseCommand):
             logging.info(f'GapScanner: All IDs up to {end_id} are already checked.')
             return
 
-        existing_ids = set(
-            Show.objects.filter(id__gte=start_id, id__lte=end_id).values_list('id', flat=True)
+        existing_kinopub_ids = set(
+            Show.objects.filter(kinopub_id__gte=start_id, kinopub_id__lte=end_id).values_list(
+                'kinopub_id', flat=True
+            )
         )
-        missing_ids = sorted(list(set(range(start_id, end_id + 1)) - existing_ids))
+        missing_ids = sorted(list(set(range(start_id, end_id + 1)) - existing_kinopub_ids))
         total_missing = len(missing_ids)
 
         if not missing_ids:
@@ -72,13 +74,13 @@ class Command(LoggableBaseCommand):
         current_id = start_id
 
         try:
-            for idx, show_id in enumerate(missing_ids, start=1):
-                current_id = show_id
+            for idx, kinopub_id in enumerate(missing_ids, start=1):
+                current_id = kinopub_id
 
                 if idx % 50 == 0 or idx == 1:
                     logging.info(
                         f'GapScanner Progress: Checked {idx}/{total_missing}'
-                        f' (Current ID: {show_id})'
+                        f' (Current ID: {kinopub_id})'
                     )
 
                 if driver is None:
@@ -97,7 +99,7 @@ class Command(LoggableBaseCommand):
                         logging.error('GapScanner: Failed to initialize driver after 3 attempts.')
                         return
 
-                target_url = f'{settings.SITE_AUX_URL}item/view/{show_id}'
+                target_url = f'{settings.SITE_AUX_URL}item/view/{kinopub_id}'
                 max_attempts = 3
                 attempt = 0
                 success = False
@@ -114,7 +116,7 @@ class Command(LoggableBaseCommand):
                             continue
 
                         is_valid_show = False
-                        content_title = f'ID {show_id}'
+                        content_title = f'ID {kinopub_id}'
 
                         try:
                             title_el = driver.find_element(By.TAG_NAME, 'h3')
@@ -149,18 +151,18 @@ class Command(LoggableBaseCommand):
                                 is_valid_show = True
 
                         if is_valid_show:
-                            logging.info(f'GapScanner: FOUND [{show_id}] - {content_title}')
-                            update_show_details(driver, show_id, force=True, session_type='aux')
+                            logging.info(f'GapScanner: FOUND [{kinopub_id}] - {content_title}')
+                            update_show_details(driver, kinopub_id, force=True, session_type='aux')
 
                             # Проверяем, создалось ли шоу на самом деле
                             try:
-                                show = Show.objects.get(id=show_id)
+                                show = Show.objects.get(kinopub_id=kinopub_id)
                                 process_show_durations(driver, show, session_type='aux')
                                 processed_count += 1
                                 found_count += 1
                             except Show.DoesNotExist:
                                 logging.warning(
-                                    f'GapScanner: Show {show_id} was marked '
+                                    f'GapScanner: Show kinopub_id={kinopub_id} was marked '
                                     f'valid but update_show_details aborted.'
                                 )
 
@@ -169,7 +171,7 @@ class Command(LoggableBaseCommand):
                     except Exception as e:
                         if is_fatal_selenium_error(e):
                             logging.warning(
-                                f'GapScanner: Driver crash on ID {show_id}, restarting...'
+                                f'GapScanner: Driver crash on ID {kinopub_id}, restarting...'
                             )
                             close_driver(driver)
                             driver = None
@@ -181,7 +183,7 @@ class Command(LoggableBaseCommand):
 
                         if attempt >= max_attempts:
                             logging.error(
-                                f'GapScanner: Failed ID {show_id} after {max_attempts} attempts.'
+                                f'GapScanner: Failed ID {kinopub_id} after {max_attempts} attempts.'
                             )
                             raise e
                         else:
