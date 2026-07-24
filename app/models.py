@@ -68,6 +68,9 @@ class Genre(BaseModel):
 class Person(BaseModel):
     name = models.CharField(max_length=255, unique=True)
     en_name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    tmdb_id = models.IntegerField(
+        null=True, blank=True, unique=True, db_index=True, verbose_name='TMDB ID'
+    )
     tmdb_photo_url = models.URLField(max_length=500, null=True, blank=True, db_index=True)
     kp_photo_url = models.URLField(max_length=500, null=True, blank=True, db_index=True)
     is_photo_fetched = models.BooleanField(default=False, db_index=True)
@@ -287,6 +290,9 @@ class Show(BaseModel):
     tmdb_id = models.IntegerField(
         null=True, blank=True, unique=True, db_index=True, verbose_name='TMDB ID'
     )
+    imdb_id = models.CharField(
+        max_length=20, null=True, blank=True, unique=True, db_index=True, verbose_name='IMDb ID'
+    )
     title = models.CharField(max_length=255)
     original_title = models.CharField(max_length=255)
     type = models.CharField(max_length=50, default='Series', db_index=True)
@@ -419,6 +425,9 @@ class ShowDuration(BaseModel):
     season_number = models.IntegerField(null=True, blank=True)
     episode_number = models.IntegerField(null=True, blank=True)
     duration_seconds = models.IntegerField()
+    is_estimated = models.BooleanField(
+        default=False, db_index=True, verbose_name='Оценочная длительность'
+    )
 
     class Meta:
         unique_together = [['show', 'season_number', 'episode_number']]
