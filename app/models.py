@@ -67,10 +67,10 @@ class Genre(BaseModel):
 
 class Person(BaseModel):
     name = models.CharField(max_length=255, unique=True)
-    en_name = models.CharField(max_length=255, null=True, blank=True)
-    tmdb_photo_url = models.URLField(max_length=500, null=True, blank=True)
-    kp_photo_url = models.URLField(max_length=500, null=True, blank=True)
-    is_photo_fetched = models.BooleanField(default=False)
+    en_name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    tmdb_photo_url = models.URLField(max_length=500, null=True, blank=True, db_index=True)
+    kp_photo_url = models.URLField(max_length=500, null=True, blank=True, db_index=True)
+    is_photo_fetched = models.BooleanField(default=False, db_index=True)
     master_person = models.ForeignKey(
         'self', on_delete=models.SET_NULL, null=True, blank=True, related_name='aliases'
     )
@@ -147,13 +147,19 @@ class Person(BaseModel):
 class ShowCrew(BaseModel):
     show = models.ForeignKey('Show', on_delete=models.CASCADE)
     person = models.ForeignKey('Person', on_delete=models.CASCADE)
-    profession = models.CharField(max_length=255, null=True, blank=True)
-    en_profession = models.CharField(max_length=255, null=True, blank=True)
+    profession = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    en_profession = models.CharField(max_length=255, null=True, blank=True, db_index=True)
 
     class Meta:
         verbose_name = 'Show Crew Member'
         verbose_name_plural = 'Show Crew Members'
         unique_together = ('show', 'person', 'profession')
+        indexes = [
+            models.Index(fields=['profession', 'show'], name='idx_crew_prof_show'),
+            models.Index(fields=['en_profession', 'show'], name='idx_crew_enprof_show'),
+            models.Index(fields=['person', 'profession'], name='idx_crew_person_prof'),
+            models.Index(fields=['person', 'en_profession'], name='idx_crew_person_enprof'),
+        ]
 
     @property
     def normalized_profession(self):
@@ -278,17 +284,21 @@ class Show(BaseModel):
     kinopub_id = models.IntegerField(
         null=True, blank=True, unique=True, db_index=True, verbose_name='KinoPub ID'
     )
+    tmdb_id = models.IntegerField(
+        null=True, blank=True, unique=True, db_index=True, verbose_name='TMDB ID'
+    )
     title = models.CharField(max_length=255)
     original_title = models.CharField(max_length=255)
-    type = models.CharField(max_length=50, default='Series')
-    year = models.IntegerField(null=True, blank=True)
-    status = models.CharField(max_length=50, null=True, blank=True)
+    type = models.CharField(max_length=50, default='Series', db_index=True)
+    year = models.IntegerField(null=True, blank=True, db_index=True)
+    status = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     kinopoisk_url = models.URLField(max_length=255, null=True, blank=True)
     kinopoisk_rating = models.FloatField(null=True, blank=True)
     kinopoisk_votes = models.IntegerField(null=True, blank=True)
     imdb_url = models.URLField(max_length=255, null=True, blank=True)
     imdb_rating = models.FloatField(null=True, blank=True)
     imdb_votes = models.IntegerField(null=True, blank=True)
+    tmdb_poster_path = models.CharField(max_length=255, null=True, blank=True)
     plot = models.TextField(null=True, blank=True)
     countries = models.ManyToManyField(Country, blank=True)
     genres = models.ManyToManyField(Genre, blank=True)
@@ -362,6 +372,10 @@ class Show(BaseModel):
     class Meta:
         verbose_name = 'Show'
         verbose_name_plural = 'Shows'
+        indexes = [
+            models.Index(fields=['type', 'year'], name='idx_show_type_year'),
+            models.Index(fields=['status', 'year'], name='idx_show_status_year'),
+        ]
 
 
 class ViewHistory(BaseModel):
@@ -373,7 +387,7 @@ class ViewHistory(BaseModel):
     ]
 
     show = models.ForeignKey(Show, on_delete=models.CASCADE)
-    view_date = models.DateField(null=True, blank=True)
+    view_date = models.DateField(null=True, blank=True, db_index=True)
     date_precision = models.CharField(max_length=10, default='exact')
     season_number = models.IntegerField(default=0, null=True, blank=True)
     episode_number = models.IntegerField(default=0, null=True, blank=True)
@@ -391,8 +405,8 @@ class ViewHistory(BaseModel):
     class Meta:
         indexes = [
             models.Index(
-                fields=['show', 'view_date', 'season_number', 'episode_number'],
-                name='idx_view',
+                fields=['is_checked', 'view_date'],
+                name='idx_view_checked_date',
             ),
         ]
         unique_together = [['show', 'view_date', 'season_number', 'episode_number']]
@@ -407,9 +421,6 @@ class ShowDuration(BaseModel):
     duration_seconds = models.IntegerField()
 
     class Meta:
-        indexes = [
-            models.Index(fields=['show', 'season_number', 'episode_number'], name='idx_duration'),
-        ]
         unique_together = [['show', 'season_number', 'episode_number']]
         verbose_name = 'Show duration'
         verbose_name_plural = 'Show durations'
@@ -447,7 +458,18 @@ class UserRating(BaseModel):
         verbose_name_plural = 'User Ratings'
         unique_together = ('user', 'show', 'season_number', 'episode_number')
         indexes = [
-            models.Index(fields=['user', 'show', 'season_number', 'episode_number']),
+            models.Index(
+                fields=['user', 'show', 'season_number', 'episode_number'],
+                name='app_userrat_user_id_22de90_idx',
+            ),
+            models.Index(
+                fields=['show', 'season_number', 'episode_number'],
+                name='idx_userrat_show_se_ep',
+            ),
+            models.Index(
+                fields=['show', 'user'],
+                name='idx_userrat_show_user',
+            ),
         ]
 
     def __str__(self):
@@ -579,6 +601,24 @@ class WishlistItem(BaseModel):
         verbose_name = 'Wishlist Item'
         verbose_name_plural = 'Wishlist Items'
         ordering = ['-sort_order', '-id']
+        indexes = [
+            models.Index(
+                fields=['folder', 'is_active'],
+                name='idx_wl_folder_active',
+            ),
+            models.Index(
+                fields=['user', 'is_active', 'include_in_stats'],
+                name='idx_wl_user_stats',
+            ),
+            models.Index(
+                fields=['user', 'show', 'is_active'],
+                name='idx_wl_user_show_active',
+            ),
+            models.Index(
+                fields=['show', 'is_active'],
+                name='idx_wl_show_active',
+            ),
+        ]
 
     def __str__(self):
         folder_name = self.folder.name if self.folder else 'Deleted Folder'
@@ -594,6 +634,12 @@ class CasinoSpin(BaseModel):
         verbose_name = 'Casino Spin'
         verbose_name_plural = 'Casino Spins'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['user', 'is_deleted', 'created_at'],
+                name='idx_casino_user_deleted',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.user} - {self.show.title} at {self.created_at}'
@@ -608,6 +654,12 @@ class MutedShowNotification(BaseModel):
         unique_together = ('user', 'show')
         verbose_name = 'Muted Show Notification'
         verbose_name_plural = 'Muted Show Notifications'
+        indexes = [
+            models.Index(
+                fields=['user', 'is_active'],
+                name='idx_muted_user_active',
+            ),
+        ]
 
     def __str__(self):
         status = 'muted' if self.is_active else 'unmuted'
