@@ -377,7 +377,7 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
                             f'Show {show_id} has no kinopub_id, skipping details update.'
                         )
                         continue
-                    process_func(driver, show.kinopub_id, force=True, session_type=session_type)
+                    process_func(driver, show.kinopub_id, force=False, session_type=session_type)
                 else:
                     process_func(driver, show, session_type=session_type)
 
@@ -584,6 +584,8 @@ def notify_new_episode_task(show_id, season, episode):
 def auto_enqueue_missing_metadata_task():
     logging.info('Starting auto-enqueue task for shows with missing metadata.')
 
+    recent_cutoff = timezone.now() - timedelta(days=7)
+
     detail_ids = list(
         Show.objects.filter(
             Q(year__isnull=True)
@@ -593,12 +595,18 @@ def auto_enqueue_missing_metadata_task():
             | Q(countries__isnull=True)
             | (Q(type__in=SERIES_TYPES) & (Q(status__isnull=True) | Q(status='')))
         )
+        .filter(kinopub_id__isnull=False)
+        .filter(updated_at__lt=recent_cutoff)
         .values_list('id', flat=True)
         .distinct()
     )
 
     duration_ids = list(
-        Show.objects.filter(showduration__isnull=True).values_list('id', flat=True).distinct()
+        Show.objects.filter(showduration__isnull=True)
+        .filter(kinopub_id__isnull=False)
+        .filter(updated_at__lt=recent_cutoff)
+        .values_list('id', flat=True)
+        .distinct()
     )
 
     if detail_ids:
