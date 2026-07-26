@@ -34,7 +34,7 @@ from app.services.metrics import (
     generate_global_metrics_snapshot,
 )
 from app.services.stats_calculator import generate_user_stats
-from app.services.tmdb_client import sync_show_from_tmdb
+from app.services.tmdb_client import parse_tmdb_library, sync_show_from_tmdb
 from app.telegram_bot import TelegramSender
 from app.utils import enqueue_show_update
 from shared.constants import (
@@ -637,3 +637,16 @@ def sync_tmdb_metadata_task(
             r.sadd('queue:priority_ratings_sync', show.id)
         except Exception as e:
             logging.error(f'Failed to enqueue priority ratings sync for show {show.id}: {e}')
+
+
+@shared_task
+@safe_execution
+def parse_tmdb_library_task(
+    media_type: str = 'movie',
+    mode: str = 'discover',
+    pages: int = 10,
+    sort_by: str = 'popularity.desc',
+):
+    logging.info(f'Starting TMDB library parser task ({media_type}, mode={mode}, pages={pages}).')
+    count = parse_tmdb_library(media_type=media_type, mode=mode, pages=pages, sort_by=sort_by)
+    logging.info(f'TMDB library parser enqueued {count} items for syncing.')

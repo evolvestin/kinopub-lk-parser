@@ -6,6 +6,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.models import Country, Genre, Person, Show, ShowCrew, ShowDuration
+from kinopub_parser import celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,136 @@ class TMDBClient:
         except requests.RequestException as e:
             logger.error(f'TMDB find_by_imdb_id error for {imdb_id}: {e}')
         return None, None
+
+    def discover(
+        self,
+        media_type: str = 'movie',
+        page: int = 1,
+        sort_by: str = 'popularity.desc',
+        year: int | None = None,
+    ) -> dict | None:
+        if not self.api_key:
+            return None
+        endpoint = f'{self.base_url}/discover/{media_type}'
+        headers, params = self._get_headers_and_params()
+        params['page'] = page
+        params['sort_by'] = sort_by
+        if year:
+            year_key = 'primary_release_year' if media_type == 'movie' else 'first_air_date_year'
+            params[year_key] = year
+
+        try:
+            response = self.session.get(endpoint, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+        except requests.RequestException as e:
+            logger.error(f'TMDB discover error for {media_type} page {page}: {e}')
+        return None
+
+    def get_popular(self, media_type: str = 'movie', page: int = 1) -> dict | None:
+        if not self.api_key:
+            return None
+        endpoint = f'{self.base_url}/{media_type}/popular'
+        headers, params = self._get_headers_and_params()
+        params['page'] = page
+
+        try:
+            response = self.session.get(endpoint, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+        except requests.RequestException as e:
+            logger.error(f'TMDB get_popular error for {media_type} page {page}: {e}')
+        return None
+
+    def get_top_rated(self, media_type: str = 'movie', page: int = 1) -> dict | None:
+        if not self.api_key:
+            return None
+        endpoint = f'{self.base_url}/{media_type}/top_rated'
+        headers, params = self._get_headers_and_params()
+        params['page'] = page
+
+        try:
+            response = self.session.get(endpoint, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+        except requests.RequestException as e:
+            logger.error(f'TMDB get_top_rated error for {media_type} page {page}: {e}')
+        return None
+
+    def get_trending(
+        self, media_type: str = 'movie', time_window: str = 'week', page: int = 1
+    ) -> dict | None:
+        if not self.api_key:
+            return None
+        endpoint = f'{self.base_url}/trending/{media_type}/{time_window}'
+        headers, params = self._get_headers_and_params()
+        params['page'] = page
+
+        try:
+            response = self.session.get(endpoint, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+        except requests.RequestException as e:
+            logger.error(f'TMDB get_trending error for {media_type}/{time_window} page {page}: {e}')
+        return None
+
+    def fetch_library_page(
+        self,
+        mode: str = 'discover',
+        media_type: str = 'movie',
+        page: int = 1,
+        sort_by: str = 'popularity.desc',
+    ) -> dict | None:
+        if mode == 'popular':
+            return self.get_popular(media_type=media_type, page=page)
+        elif mode == 'top_rated':
+            return self.get_top_rated(media_type=media_type, page=page)
+        elif mode == 'trending':
+            return self.get_trending(media_type=media_type, page=page)
+        else:
+            return self.discover(media_type=media_type, page=page, sort_by=sort_by)
+
+
+def parse_tmdb_library(
+    media_type: str = 'movie',
+    mode: str = 'discover',
+    pages: int = 10,
+    sort_by: str = 'popularity.desc',
+    sync_eager: bool = False,
+) -> int:
+    client = TMDBClient()
+    processed_count = 0
+
+    for page in range(1, pages + 1):
+        data = client.fetch_library_page(
+            mode=mode, media_type=media_type, page=page, sort_by=sort_by
+        )
+        if not data:
+            break
+
+        results = data.get('results', [])
+        if not results:
+            break
+
+        for item in results:
+            item_tmdb_id = item.get('id')
+            if not item_tmdb_id:
+                continue
+
+            if sync_eager:
+                sync_show_from_tmdb(tmdb_id=item_tmdb_id, media_type=media_type)
+            else:
+                celery_app.send_task(
+                    'app.tasks.sync_tmdb_metadata_task',
+                    kwargs={'tmdb_id': item_tmdb_id, 'media_type': media_type},
+                )
+            processed_count += 1
+
+        total_pages = data.get('total_pages', 1)
+        if page >= total_pages:
+            break
+
+    return processed_count
 
 
 def sync_show_from_tmdb(
