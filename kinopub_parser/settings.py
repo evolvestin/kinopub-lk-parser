@@ -51,11 +51,6 @@ if WEBAPP_PUBLIC_URL := os.getenv('WEBAPP_PUBLIC_URL'):
     if clean_url not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(clean_url)
 
-if WEBAPP_PUBLIC_URL := os.getenv('WEBAPP_PUBLIC_URL'):
-    clean_url = WEBAPP_PUBLIC_URL.rstrip('/')
-    if clean_url not in CSRF_TRUSTED_ORIGINS:
-        CSRF_TRUSTED_ORIGINS.append(clean_url)
-
 TIME_ZONE = 'UTC'
 USE_TZ = True
 USE_I18N = True

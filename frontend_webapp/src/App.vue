@@ -265,9 +265,6 @@ watch(() => uiStore.theme, (val) => {
       <WlFolderModal v-if="uiStore.modals.wlFolder.isOpen" />
     </Transition>
     <Transition name="modal">
-      <WlFolderModal v-if="uiStore.modals.wlFolder.isOpen" />
-    </Transition>
-    <Transition name="modal">
       <WlEditModal v-if="uiStore.modals.wlEdit.isOpen" />
     </Transition>
     <Transition name="modal">

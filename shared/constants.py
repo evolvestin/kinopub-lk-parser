@@ -4,6 +4,43 @@ DATE_FORMAT = '%Y-%m-%d'
 DATETIME_FORMAT = f'{DATE_FORMAT} %H:%M:%S'
 RATING_VALUES = [i / 2 for i in range(2, 21)]
 
+
+class RedisQueue(StrEnum):
+    UPDATE_DETAILS = 'queue:update_details'
+    UPDATE_DURATIONS = 'queue:update_durations'
+    PRIORITY_RATINGS_SYNC = 'queue:priority_ratings_sync'
+    ERRORS = 'queue:errors'
+
+
+class RedisLock(StrEnum):
+    SELENIUM_GLOBAL = 'selenium_global_lock'
+    BACKUP = 'backup_lock'
+    COOKIES_BACKUP = 'cookies_backup_lock'
+    PROCESS_QUEUES = 'process_queues_lock'
+    FETCH_PERSON_PHOTOS = 'fetch_person_photos_lock'
+    SYNC_POISKKINO_RATINGS = 'sync_poiskkino_ratings'
+
+
+class ParserSessionType(StrEnum):
+    MAIN = 'main'
+    AUX = 'aux'
+
+
+class DatePrecision(StrEnum):
+    EXACT = 'exact'
+    MONTH = 'month'
+    YEAR = 'year'
+    UNKNOWN = 'unknown'
+
+
+class TaskRunStatus(StrEnum):
+    QUEUED = 'QUEUED'
+    RUNNING = 'RUNNING'
+    SUCCESS = 'SUCCESS'
+    FAILURE = 'FAILURE'
+    STOPPED = 'STOPPED'
+
+
 PROFESSIONS_MAPPING_RU = {
     'Актёр': ['актеры', 'Актер', 'В ролях'],
     'Актёр дубляжа': ['актеры дубляжа'],

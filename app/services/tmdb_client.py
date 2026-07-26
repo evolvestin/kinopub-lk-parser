@@ -1,0 +1,268 @@
+import logging
+
+import requests
+from django.conf import settings
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+from app.models import Country, Genre, Person, Show, ShowCrew, ShowDuration
+
+logger = logging.getLogger(__name__)
+
+TMDB_STATUS_MAPPING = {
+    'Ended': 'Finished',
+    'Canceled': 'Finished',
+    'Returning Series': 'Ongoing',
+    'In Production': 'Ongoing',
+    'Planned': 'Pre Production',
+    'Pilot': 'Pre Production',
+    'Released': 'Finished',
+    'Post Production': 'Post Production',
+    'Rumored': 'Pre Production',
+}
+
+
+class TMDBClient:
+    BASE_URL = 'https://api.themoviedb.org/3'
+
+    def __init__(self):
+        self.api_key = settings.TMDB_API_KEY
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=['GET'],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
+
+    def _get_headers_and_params(self) -> tuple[dict, dict]:
+        headers = {}
+        params = {'language': 'ru-RU'}
+        if self.api_key:
+            if self.api_key.startswith('ey'):
+                headers['Authorization'] = f'Bearer {self.api_key}'
+            else:
+                params['api_key'] = self.api_key
+        return headers, params
+
+    def get_details(self, tmdb_id: int, media_type: str = 'movie') -> dict | None:
+        if not self.api_key:
+            return None
+        endpoint = f'{self.BASE_URL}/{media_type}/{tmdb_id}'
+        headers, params = self._get_headers_and_params()
+        params['append_to_response'] = 'external_ids,credits'
+
+        try:
+            response = self.session.get(endpoint, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                return response.json()
+        except requests.RequestException as e:
+            logger.error(f'TMDB get_details error for {media_type}/{tmdb_id}: {e}')
+        return None
+
+    def find_by_imdb_id(self, imdb_id: str) -> tuple[dict | None, str | None]:
+        if not self.api_key or not imdb_id:
+            return None, None
+        endpoint = f'{self.BASE_URL}/find/{imdb_id}'
+        headers, params = self._get_headers_and_params()
+        params['external_source'] = 'imdb_id'
+
+        try:
+            response = self.session.get(endpoint, headers=headers, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                movie_results = data.get('movie_results', [])
+                if movie_results:
+                    return movie_results[0], 'movie'
+                tv_results = data.get('tv_results', [])
+                if tv_results:
+                    return tv_results[0], 'tv'
+        except requests.RequestException as e:
+            logger.error(f'TMDB find_by_imdb_id error for {imdb_id}: {e}')
+        return None, None
+
+
+def sync_show_from_tmdb(
+    show_id: int = None, tmdb_id: int = None, imdb_id: str = None, media_type: str = 'movie'
+) -> Show | None:
+    show = None
+    if show_id:
+        show = Show.objects.filter(id=show_id).first()
+    if not show and tmdb_id:
+        show = Show.objects.filter(tmdb_id=tmdb_id).first()
+    if not show and imdb_id:
+        show = Show.objects.filter(imdb_id=imdb_id).first()
+
+    client = TMDBClient()
+    target_tmdb_id = tmdb_id or (show.tmdb_id if show else None)
+    target_imdb_id = imdb_id or (show.imdb_id if show else None)
+
+    if show and show.type in ['Series', 'Documentary Series', 'TV Show']:
+        media_type = 'tv'
+
+    if not target_tmdb_id and target_imdb_id:
+        found_data, detected_type = client.find_by_imdb_id(target_imdb_id)
+        if found_data:
+            target_tmdb_id = found_data.get('id')
+            if detected_type:
+                media_type = detected_type
+
+    if not target_tmdb_id:
+        return None
+
+    details = client.get_details(target_tmdb_id, media_type=media_type)
+    if not details:
+        return None
+
+    external_ids = details.get('external_ids', {})
+    found_imdb_id = external_ids.get('imdb_id') or target_imdb_id
+
+    if not show and found_imdb_id:
+        show = Show.objects.filter(imdb_id=found_imdb_id).first()
+
+    if not show:
+        show = Show()
+
+    show.tmdb_id = target_tmdb_id
+    if found_imdb_id:
+        show.imdb_id = found_imdb_id
+        if not show.imdb_url:
+            show.imdb_url = f'https://www.imdb.com/title/{found_imdb_id}/'
+
+    raw_title = details.get('title') or details.get('name')
+    if raw_title:
+        show.title = raw_title
+
+    raw_orig_title = details.get('original_title') or details.get('original_name')
+    if raw_orig_title:
+        show.original_title = raw_orig_title
+
+    date_str = details.get('release_date') or details.get('first_air_date')
+    if date_str and len(date_str) >= 4 and date_str[:4].isdigit():
+        show.year = int(date_str[:4])
+
+    overview = details.get('overview')
+    if overview:
+        show.plot = overview
+
+    poster_path = details.get('poster_path')
+    if poster_path:
+        show.tmdb_poster_path = poster_path
+
+    status_str = details.get('status')
+    if status_str:
+        show.status = TMDB_STATUS_MAPPING.get(status_str, status_str)
+
+    if not show.type or show.type == 'Unknown':
+        show.type = 'Series' if media_type == 'tv' else 'Movie'
+
+    show.save()
+
+    for g_data in details.get('genres', []):
+        g_name = g_data.get('name')
+        if g_name:
+            genre_obj, _ = Genre.objects.get_or_create(name=g_name)
+            show.genres.add(genre_obj)
+
+    for c_data in details.get('production_countries', []):
+        c_name = c_data.get('name')
+        if c_name:
+            country_obj, _ = Country.objects.get_or_create(name=c_name)
+            show.countries.add(country_obj)
+
+    credits_data = details.get('credits', {})
+    cast_data = credits_data.get('cast', [])
+    crew_data = credits_data.get('crew', [])
+
+    for person_data in cast_data[:30]:
+        p_tmdb_id = person_data.get('id')
+        p_name = person_data.get('name')
+        if not p_name:
+            continue
+
+        person = None
+        if p_tmdb_id:
+            person = Person.objects.filter(tmdb_id=p_tmdb_id).first()
+        if not person:
+            person, _ = Person.objects.get_or_create(name=p_name)
+
+        if p_tmdb_id and not person.tmdb_id:
+            person.tmdb_id = p_tmdb_id
+
+        p_en_name = person_data.get('original_name')
+        if p_en_name and not person.en_name:
+            person.en_name = p_en_name
+
+        profile_path = person_data.get('profile_path')
+        if profile_path and not person.tmdb_photo_url:
+            person.tmdb_photo_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
+            person.is_photo_fetched = True
+
+        person.save()
+
+        character = person_data.get('character') or 'Актёр'
+        ShowCrew.objects.get_or_create(
+            show=show,
+            person=person,
+            profession=character,
+            defaults={'en_profession': 'Actor'},
+        )
+
+    for person_data in crew_data:
+        job = person_data.get('job')
+        if job not in ['Director', 'Producer', 'Writer', 'Executive Producer']:
+            continue
+
+        p_tmdb_id = person_data.get('id')
+        p_name = person_data.get('name')
+        if not p_name:
+            continue
+
+        person = None
+        if p_tmdb_id:
+            person = Person.objects.filter(tmdb_id=p_tmdb_id).first()
+        if not person:
+            person, _ = Person.objects.get_or_create(name=p_name)
+
+        if p_tmdb_id and not person.tmdb_id:
+            person.tmdb_id = p_tmdb_id
+
+        p_en_name = person_data.get('original_name')
+        if p_en_name and not person.en_name:
+            person.en_name = p_en_name
+
+        profile_path = person_data.get('profile_path')
+        if profile_path and not person.tmdb_photo_url:
+            person.tmdb_photo_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
+            person.is_photo_fetched = True
+
+        person.save()
+
+        ShowCrew.objects.get_or_create(
+            show=show,
+            person=person,
+            profession=job,
+            defaults={'en_profession': person_data.get('department')},
+        )
+
+    if media_type == 'movie':
+        runtime = details.get('runtime')
+        if runtime and runtime > 0:
+            has_exact = ShowDuration.objects.filter(
+                show=show,
+                season_number__isnull=True,
+                episode_number__isnull=True,
+                is_estimated=False,
+            ).exists()
+            if not has_exact:
+                ShowDuration.objects.update_or_create(
+                    show=show,
+                    season_number=None,
+                    episode_number=None,
+                    defaults={'duration_seconds': runtime * 60, 'is_estimated': True},
+                )
+
+    return show

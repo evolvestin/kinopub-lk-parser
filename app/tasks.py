@@ -34,9 +34,15 @@ from app.services.metrics import (
     generate_global_metrics_snapshot,
 )
 from app.services.stats_calculator import generate_user_stats
+from app.services.tmdb_client import sync_show_from_tmdb
 from app.telegram_bot import TelegramSender
 from app.utils import enqueue_show_update
-from shared.constants import SERIES_TYPES
+from shared.constants import (
+    SERIES_TYPES,
+    ParserSessionType,
+    RedisLock,
+    RedisQueue,
+)
 from shared.formatters import format_se
 
 
@@ -104,7 +110,7 @@ def safe_execution(func):
 
 
 @shared_task
-@single_instance_task(lock_name='selenium_global_lock', timeout=7200)
+@single_instance_task(lock_name=RedisLock.SELENIUM_GLOBAL, timeout=7200)
 def run_history_parser_task():
     logging.info('Starting periodic history parser task.')
     history_parser.run_parser_session()
@@ -196,13 +202,13 @@ def cleanup_old_data_task():
 
 
 @shared_task
-@single_instance_task(lock_name='backup_lock', timeout=300)
+@single_instance_task(lock_name=RedisLock.BACKUP, timeout=300)
 def backup_database():
     BackupManager().perform_backup()
 
 
 @shared_task
-@single_instance_task(lock_name='cookies_backup_lock', timeout=60)
+@single_instance_task(lock_name=RedisLock.COOKIES_BACKUP, timeout=60)
 def backup_cookies():
     BackupManager().perform_cookies_backup()
 
@@ -324,14 +330,14 @@ def run_admin_command(self, task_run_id):
 
 
 @shared_task
-@single_instance_task(lock_name='selenium_global_lock', timeout=3600)
+@single_instance_task(lock_name=RedisLock.SELENIUM_GLOBAL, timeout=3600)
 def run_new_episodes_task():
     logging.info('Starting new episodes parser task.')
     call_command('runnewepisodes')
 
 
 @shared_task
-@single_instance_task(lock_name='selenium_global_lock', timeout=14400)
+@single_instance_task(lock_name=RedisLock.SELENIUM_GLOBAL, timeout=14400)
 def run_daily_sync_task():
     logging.info('Starting Daily Synchronization Task via Celery.')
     call_command('rundailysync')
@@ -402,20 +408,17 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
     time_limit=2400,  # Жесткий лимит 40 мин
     soft_time_limit=1100,  # Мягкий лимит
 )
-@single_instance_task(lock_name='process_queues_lock', timeout=1200)
+@single_instance_task(lock_name=RedisLock.PROCESS_QUEUES, timeout=1200)
 def process_queues_task(self):
     """
     Объединенная задача для последовательной обработки очередей Redis.
     Блокировка занимается ТОЛЬКО если в очередях есть задачи.
     """
-    queue_details = 'queue:update_details'
-    queue_durations = 'queue:update_durations'
-
     # 1. Предварительная проверка наличия задач без захвата блокировки
     try:
         redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
-        count_details = redis_client.scard(queue_details)
-        count_durations = redis_client.scard(queue_durations)
+        count_details = redis_client.scard(RedisQueue.UPDATE_DETAILS)
+        count_durations = redis_client.scard(RedisQueue.UPDATE_DURATIONS)
 
         if count_details == 0 and count_durations == 0:
             return
@@ -430,7 +433,7 @@ def process_queues_task(self):
         'Acquiring Selenium lock...'
     )
 
-    with _redis_lock('selenium_global_lock', timeout=3600) as acquired:
+    with _redis_lock(RedisLock.SELENIUM_GLOBAL, timeout=3600) as acquired:
         if not acquired:
             logging.warning('Skipping process_queues_task: selenium_global_lock is busy.')
             return
@@ -439,8 +442,8 @@ def process_queues_task(self):
         if count_details > 0:
             try:
                 _process_batch_from_queue(
-                    queue_name=queue_details,
-                    session_type='aux',
+                    queue_name=RedisQueue.UPDATE_DETAILS,
+                    session_type=ParserSessionType.AUX,
                     process_func=history_parser.update_show_details,
                 )
             except Exception as e:
@@ -454,8 +457,8 @@ def process_queues_task(self):
         if count_durations > 0:
             try:
                 _process_batch_from_queue(
-                    queue_name=queue_durations,
-                    session_type='main',
+                    queue_name=RedisQueue.UPDATE_DURATIONS,
+                    session_type=ParserSessionType.MAIN,
                     process_func=history_parser.process_show_durations,
                 )
             except Exception as e:
@@ -500,14 +503,14 @@ def precalculate_all_stats():
 
 
 @shared_task
-@single_instance_task(lock_name='selenium_global_lock', timeout=21600)
+@single_instance_task(lock_name=RedisLock.SELENIUM_GLOBAL, timeout=21600)
 def run_gap_scanner_task():
     logging.info('Starting monthly gap scanner task.')
     call_command('rungapscanner')
 
 
 @shared_task(time_limit=3600, soft_time_limit=3300)
-@single_instance_task(lock_name='fetch_person_photos_lock', timeout=3600)
+@single_instance_task(lock_name=RedisLock.FETCH_PERSON_PHOTOS, timeout=3600)
 @safe_execution
 def fetch_person_photos_task(limit=2000):
     call_command('fetchpersonphotos', limit=limit)
@@ -526,7 +529,7 @@ def get_kp_mapping():
 
 
 @shared_task
-@single_instance_task(lock_name='sync_poiskkino_ratings', timeout=1800)
+@single_instance_task(lock_name=RedisLock.SYNC_POISKKINO_RATINGS, timeout=1800)
 def sync_poiskkino_ratings_task():
     call_command('syncpoiskkinoratings')
 
@@ -618,3 +621,19 @@ def auto_enqueue_missing_metadata_task():
         enqueue_show_update(duration_ids, details=False, durations=True)
 
     logging.info('Auto-enqueue task completed.')
+
+
+@shared_task
+@safe_execution
+def sync_tmdb_metadata_task(
+    show_id: int = None, tmdb_id: int = None, imdb_id: str = None, media_type: str = 'movie'
+):
+    show = sync_show_from_tmdb(
+        show_id=show_id, tmdb_id=tmdb_id, imdb_id=imdb_id, media_type=media_type
+    )
+    if show:
+        try:
+            r = Redis.from_url(settings.CELERY_BROKER_URL)
+            r.sadd('queue:priority_ratings_sync', show.id)
+        except Exception as e:
+            logging.error(f'Failed to enqueue priority ratings sync for show {show.id}: {e}')

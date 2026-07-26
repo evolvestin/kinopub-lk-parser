@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0053_remove_showduration_idx_duration_and_more'),
     ]
@@ -13,16 +12,27 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='person',
             name='tmdb_id',
-            field=models.IntegerField(blank=True, db_index=True, null=True, unique=True, verbose_name='TMDB ID'),
+            field=models.IntegerField(
+                blank=True, db_index=True, null=True, unique=True, verbose_name='TMDB ID'
+            ),
         ),
         migrations.AddField(
             model_name='show',
             name='imdb_id',
-            field=models.CharField(blank=True, db_index=True, max_length=20, null=True, unique=True, verbose_name='IMDb ID'),
+            field=models.CharField(
+                blank=True,
+                db_index=True,
+                max_length=20,
+                null=True,
+                unique=True,
+                verbose_name='IMDb ID',
+            ),
         ),
         migrations.AddField(
             model_name='showduration',
             name='is_estimated',
-            field=models.BooleanField(db_index=True, default=False, verbose_name='Оценочная длительность'),
+            field=models.BooleanField(
+                db_index=True, default=False, verbose_name='Оценочная длительность'
+            ),
         ),
     ]

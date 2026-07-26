@@ -724,7 +724,7 @@ def get_movie_duration_and_save(driver, show, session_type='main'):
                 show=show,
                 season_number=None,
                 episode_number=None,
-                defaults={'duration_seconds': duration_sec},
+                defaults={'duration_seconds': duration_sec, 'is_estimated': False},
             )
             logging.info('Cached duration for movie id%d: %d seconds.', show.id, duration_sec)
         else:
@@ -759,7 +759,7 @@ def get_season_durations_and_save(driver, show, season, session_type='main'):
                 show=show,
                 season_number=item_season,
                 episode_number=item_episode,
-                defaults={'duration_seconds': duration_sec},
+                defaults={'duration_seconds': duration_sec, 'is_estimated': False},
             )
             updated_count += 1
 

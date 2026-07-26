@@ -114,3 +114,39 @@ class PoiskkinoClient:
                 break
 
         return results
+
+    def fetch_ratings_by_imdb_ids(self, imdb_ids: list[str]) -> list[dict]:
+        if not self.api_key or not imdb_ids:
+            return []
+
+        headers = {'X-API-KEY': self.api_key}
+        results = []
+        chunk_size = 250
+
+        for i in range(0, len(imdb_ids), chunk_size):
+            chunk = imdb_ids[i : i + chunk_size]
+            params = {
+                'limit': chunk_size,
+                'externalId.imdb': chunk,
+                'selectFields': self._SELECT_FIELDS + ['externalId'],
+            }
+
+            try:
+                response = self.session.get(
+                    self.BASE_URL, headers=headers, params=params, timeout=20
+                )
+
+                if response.status_code == 403:
+                    logging.warning(
+                        'Poiskkino API limit reached (403) during IMDb ID fetch. Stopping.'
+                    )
+                    break
+
+                response.raise_for_status()
+                data = response.json()
+                results.extend(data.get('docs', []))
+            except requests.RequestException as e:
+                logging.error(f'Poiskkino fetch_ratings_by_imdb_ids error: {e}')
+                break
+
+        return results

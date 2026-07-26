@@ -2433,6 +2433,18 @@ def admin_get_folder_content(request, folder_id):
         return JsonResponse({'error': 'Folder not found'}, status=404)
 
 
+def _parse_date_by_mode(date_mode: str, date_val: str | None):
+    if not date_val:
+        return None
+    if date_mode == 'exact':
+        return datetime.strptime(str(date_val), '%Y-%m-%d').date()
+    elif date_mode == 'month':
+        return datetime.strptime(str(date_val), '%Y-%m').date()
+    elif date_mode == 'year':
+        return datetime.strptime(str(date_val), '%Y').date()
+    return None
+
+
 @csrf_exempt
 @require_http_methods(['POST'])
 def webapp_add_view(request):
@@ -2450,13 +2462,7 @@ def webapp_add_view(request):
         target_me = body.get('target_me', True)
         target_group = body.get('target_group', True)
 
-        view_date = None
-        if date_mode == 'exact' and date_val:
-            view_date = datetime.strptime(str(date_val), '%Y-%m-%d').date()
-        elif date_mode == 'month' and date_val:
-            view_date = datetime.strptime(str(date_val), '%Y-%m').date()
-        elif date_mode == 'year' and date_val:
-            view_date = datetime.strptime(str(date_val), '%Y').date()
+        view_date = _parse_date_by_mode(date_mode, date_val)
 
         vh = ViewHistory.objects.filter(
             show_id=show_id,
@@ -2527,13 +2533,7 @@ def webapp_remove_view(request):
             date_mode = body.get('date_mode', 'exact')
             date_val = body.get('date_val')
 
-            view_date = None
-            if date_mode == 'exact' and date_val:
-                view_date = datetime.strptime(str(date_val), '%Y-%m-%d').date()
-            elif date_mode == 'month' and date_val:
-                view_date = datetime.strptime(str(date_val), '%Y-%m').date()
-            elif date_mode == 'year' and date_val:
-                view_date = datetime.strptime(str(date_val), '%Y').date()
+            view_date = _parse_date_by_mode(date_mode, date_val)
 
             vh = ViewHistory.objects.filter(
                 show_id=show_id,

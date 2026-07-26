@@ -374,6 +374,8 @@ class ShowAdmin(admin.ModelAdmin):
     readonly_fields = (
         'id',
         'kinopub_id',
+        'tmdb_id',
+        'imdb_id',
         'admin_actions',
         'title',
         'original_title',
@@ -382,13 +384,79 @@ class ShowAdmin(admin.ModelAdmin):
         'get_status_display_ru',
         'year',
         'kinopoisk_url',
+        'kinopoisk_rating',
         'get_ext_kp_rating',
         'kinopoisk_votes',
         'imdb_url',
+        'imdb_rating',
         'get_ext_imdb_rating',
         'imdb_votes',
+        'tmdb_poster_path',
         'created_at',
         'updated_at',
+    )
+    fieldsets = (
+        (
+            'Идентификаторы и действия',
+            {
+                'fields': (
+                    'id',
+                    'kinopub_id',
+                    'tmdb_id',
+                    'imdb_id',
+                    'admin_actions',
+                ),
+            },
+        ),
+        (
+            'Основная информация',
+            {
+                'fields': (
+                    'title',
+                    'original_title',
+                    'get_type_display_ru',
+                    'get_status_display_ru',
+                    'year',
+                    'plot',
+                    'ignore_collision',
+                ),
+            },
+        ),
+        (
+            'Внешние платформы и рейтинги',
+            {
+                'fields': (
+                    'kinopoisk_url',
+                    'kinopoisk_rating',
+                    'get_ext_kp_rating',
+                    'kinopoisk_votes',
+                    'imdb_url',
+                    'imdb_rating',
+                    'get_ext_imdb_rating',
+                    'imdb_votes',
+                    'tmdb_poster_path',
+                ),
+            },
+        ),
+        (
+            'Категории',
+            {
+                'fields': (
+                    'countries',
+                    'genres',
+                ),
+            },
+        ),
+        (
+            'Даты',
+            {
+                'fields': (
+                    'created_at',
+                    'updated_at',
+                ),
+                'classes': ('collapse',),
+            },
+        ),
     )
     filter_horizontal = ('countries', 'genres')
     actions = ['action_update_details', 'action_update_durations']
@@ -1136,6 +1204,7 @@ class PersonAdmin(BaseNameAdmin):
             {
                 'fields': (
                     'get_photo_display',
+                    'tmdb_id',
                     'tmdb_photo_url',
                     'clear_tmdb_photo',
                     'kp_photo_url',

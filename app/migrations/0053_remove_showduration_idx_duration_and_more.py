@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0052_reset_show_sequence'),
     ]
@@ -21,7 +20,9 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='show',
             name='tmdb_id',
-            field=models.IntegerField(blank=True, db_index=True, null=True, unique=True, verbose_name='TMDB ID'),
+            field=models.IntegerField(
+                blank=True, db_index=True, null=True, unique=True, verbose_name='TMDB ID'
+            ),
         ),
         migrations.AddField(
             model_name='show',
@@ -80,7 +81,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='casinospin',
-            index=models.Index(fields=['user', 'is_deleted', 'created_at'], name='idx_casino_user_deleted'),
+            index=models.Index(
+                fields=['user', 'is_deleted', 'created_at'], name='idx_casino_user_deleted'
+            ),
         ),
         migrations.AddIndex(
             model_name='mutedshownotification',
@@ -112,7 +115,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='userrating',
-            index=models.Index(fields=['show', 'season_number', 'episode_number'], name='idx_userrat_show_se_ep'),
+            index=models.Index(
+                fields=['show', 'season_number', 'episode_number'], name='idx_userrat_show_se_ep'
+            ),
         ),
         migrations.AddIndex(
             model_name='userrating',
@@ -128,11 +133,15 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='wishlistitem',
-            index=models.Index(fields=['user', 'is_active', 'include_in_stats'], name='idx_wl_user_stats'),
+            index=models.Index(
+                fields=['user', 'is_active', 'include_in_stats'], name='idx_wl_user_stats'
+            ),
         ),
         migrations.AddIndex(
             model_name='wishlistitem',
-            index=models.Index(fields=['user', 'show', 'is_active'], name='idx_wl_user_show_active'),
+            index=models.Index(
+                fields=['user', 'show', 'is_active'], name='idx_wl_user_show_active'
+            ),
         ),
         migrations.AddIndex(
             model_name='wishlistitem',

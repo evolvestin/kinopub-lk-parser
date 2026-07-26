@@ -33,9 +33,6 @@ class Command(LoggableBaseCommand):
 
         logging.info('Fetching daily rating updates from Poiskkino...')
         kp_mapping = get_kp_mapping()
-        if not kp_mapping:
-            logging.warning('No Kinopoisk mappings found. Skipping.')
-            return
 
         data = client.fetch_updated_ratings(yesterday, today)
         logging.info(f'Fetched {len(data)} daily updates.')
@@ -62,27 +59,31 @@ class Command(LoggableBaseCommand):
         # Объединяем приоритетные и плановые ID, сохраняя лимит
         combined_show_ids = list(priority_show_ids | missing_show_ids)[:limit]
 
-        # Инвертируем маппинг для обратного поиска: SID -> KP_ID
-        reverse_mapping = {sid: kp for kp, sid in kp_mapping.items()}
+        reverse_kp_mapping = {sid: kp for kp, sid in kp_mapping.items()}
+
+        shows_with_imdb = dict(
+            Show.objects.filter(id__in=combined_show_ids)
+            .exclude(imdb_id__isnull=True)
+            .exclude(imdb_id='')
+            .values_list('id', 'imdb_id')
+        )
+
+        imdb_mapping = {imdb_id: sid for sid, imdb_id in shows_with_imdb.items()}
 
         missing_kp_ids = []
-        skipped_priority_ids = []
+        missing_imdb_ids = []
         invalid_url_sids = []
 
         for sid in combined_show_ids:
-            kp_id = reverse_mapping.get(sid)
+            kp_id = reverse_kp_mapping.get(sid)
             if kp_id:
                 missing_kp_ids.append(kp_id)
             else:
-                invalid_url_sids.append(sid)
-                if sid in priority_show_ids:
-                    skipped_priority_ids.append(sid)
-
-        if skipped_priority_ids:
-            logging.warning(
-                f'Priority IDs without valid Kinopoisk URL: {skipped_priority_ids}. '
-                f'Check if URLs are correct and contain /film/ID or /series/ID.'
-            )
+                imdb_id = shows_with_imdb.get(sid)
+                if imdb_id:
+                    missing_imdb_ids.append(imdb_id)
+                else:
+                    invalid_url_sids.append(sid)
 
         if invalid_url_sids:
             blank_ratings = [
@@ -96,36 +97,18 @@ class Command(LoggableBaseCommand):
                 batch_size=500,
             )
             logging.info(
-                f'Marked {len(invalid_url_sids)} shows with invalid/missing KP URLs as processed.'
+                f'Marked {len(invalid_url_sids)} shows without KP URL and IMDb ID as processed.'
             )
 
         if missing_kp_ids:
-            logging.info(f'Fetching {len(missing_kp_ids)} missing/stale/priority records by IDs...')
+            logging.info(f'Fetching {len(missing_kp_ids)} missing/stale records by KP IDs...')
             catchup_data = client.fetch_ratings_by_ids(missing_kp_ids)
             data.extend(catchup_data)
 
-            # Проверяем, что API вернуло для приоритетных задач
-            received_kp_ids = {item['id'] for item in catchup_data if item.get('id')}
-            not_found_kp_ids = set(missing_kp_ids) - received_kp_ids
-
-            if not_found_kp_ids:
-                not_found_sids = [kp_mapping[kp] for kp in not_found_kp_ids if kp in kp_mapping]
-                logging.warning(
-                    f'Poiskkino API returned NO data for these Show IDs: {not_found_sids}. '
-                    f'Possible reasons: item missing in Poiskkino DB or invalid KP ID.'
-                )
-
-                if not_found_sids:
-                    blank_ratings = [
-                        ExternalRating(show_id=sid, updated_at=now) for sid in not_found_sids
-                    ]
-                    ExternalRating.objects.bulk_create(
-                        blank_ratings,
-                        update_conflicts=True,
-                        unique_fields=['show_id'],
-                        update_fields=['updated_at'],
-                        batch_size=500,
-                    )
+        if missing_imdb_ids:
+            logging.info(f'Fetching {len(missing_imdb_ids)} records by IMDb IDs from Poiskkino...')
+            imdb_catchup_data = client.fetch_ratings_by_imdb_ids(missing_imdb_ids)
+            data.extend(imdb_catchup_data)
 
         if not data:
             logging.info('No data to process.')
@@ -141,18 +124,27 @@ class Command(LoggableBaseCommand):
 
         for i in range(0, len(data_list), batch_size):
             batch = data_list[i : i + batch_size]
-            self._process_batch(batch, kp_mapping, now)
+            self._process_batch(batch, kp_mapping, imdb_mapping, now)
             total_processed += len(batch)
             logging.info(f'Saved batch {total_processed}/{len(data_list)} to database.')
 
         logging.info(f'Successfully synchronized {total_processed} shows in total.')
 
-    def _process_batch(self, batch_data, kp_mapping, now):
+    def _process_batch(self, batch_data, kp_mapping, imdb_mapping, now):
         data_map = {}
         for item in batch_data:
             kp_id = item.get('id')
+            ext_ids = item.get('externalId') or {}
+            imdb_id = ext_ids.get('imdb')
+
+            show_id = None
             if kp_id and kp_id in kp_mapping:
-                data_map[kp_mapping[kp_id]] = item
+                show_id = kp_mapping[kp_id]
+            elif imdb_id and imdb_id in imdb_mapping:
+                show_id = imdb_mapping[imdb_id]
+
+            if show_id:
+                data_map[show_id] = item
 
         if not data_map:
             return
@@ -208,6 +200,12 @@ class Command(LoggableBaseCommand):
             v_data = item.get('votes') or {}
 
             updated_fields = []
+
+            if kp_id := item.get('id'):
+                kp_url = f'https://www.kinopoisk.ru/film/{kp_id}/'
+                if not show.kinopoisk_url:
+                    show.kinopoisk_url = kp_url
+                    updated_fields.append('kinopoisk_url')
 
             if kp_r := r_data.get('kp'):
                 show.kinopoisk_rating = kp_r
@@ -300,6 +298,7 @@ class Command(LoggableBaseCommand):
             Show.objects.bulk_update(
                 shows_to_update,
                 [
+                    'kinopoisk_url',
                     'kinopoisk_rating',
                     'kinopoisk_votes',
                     'imdb_rating',

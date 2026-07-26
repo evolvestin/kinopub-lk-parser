@@ -1,4 +1,5 @@
 import re
+
 from django.db import migrations
 
 
@@ -14,7 +15,11 @@ def populate_imdb_ids(apps, schema_editor):
     shows_to_update = []
     seen_in_batch = set()
 
-    qs = Show.objects.exclude(imdb_url__isnull=True).exclude(imdb_url='').filter(imdb_id__isnull=True)
+    qs = (
+        Show.objects.exclude(imdb_url__isnull=True)
+        .exclude(imdb_url='')
+        .filter(imdb_id__isnull=True)
+    )
 
     for show in qs.iterator():
         match = re.search(r'(tt\d+)', show.imdb_url)
@@ -30,7 +35,6 @@ def populate_imdb_ids(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('app', '0054_person_tmdb_id_show_imdb_id_and_more'),
     ]

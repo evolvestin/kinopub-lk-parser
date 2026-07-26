@@ -68,6 +68,12 @@ def parse_and_save_catalog_page(driver, mode):
             title = item['title']
             original_title = item['original_title'] if item['original_title'] else title
 
+            extracted_imdb_id = None
+            if item['imdb_url']:
+                imdb_match = re.search(r'(tt\d+)', item['imdb_url'])
+                if imdb_match:
+                    extracted_imdb_id = imdb_match.group(1)
+
             show_data = {
                 'kinopub_id': kinopub_id,
                 'title': title,
@@ -77,6 +83,7 @@ def parse_and_save_catalog_page(driver, mode):
                 'kinopoisk_rating': None,
                 'imdb_url': None,
                 'imdb_rating': None,
+                'imdb_id': extracted_imdb_id,
             }
 
             if item['kinopoisk_url']:
@@ -107,40 +114,39 @@ def parse_and_save_catalog_page(driver, mode):
     if not shows_on_page:
         return 0
 
-    kinopub_ids_on_page = [s['kinopub_id'] for s in shows_on_page]
-    existing_kinopub_ids = set(
-        Show.objects.filter(kinopub_id__in=kinopub_ids_on_page).values_list('kinopub_id', flat=True)
-    )
-    new_kinopub_ids = [
-        kinopubid for kinopubid in kinopub_ids_on_page if kinopubid not in existing_kinopub_ids
-    ]
+    new_created_count = 0
+    for data in shows_on_page:
+        k_id = data['kinopub_id']
+        i_id = data.get('imdb_id')
 
-    shows_to_upsert = [Show(**data) for data in shows_on_page]
+        existing_show = Show.objects.filter(kinopub_id=k_id).first()
+        if not existing_show and i_id:
+            existing_show = Show.objects.filter(imdb_id=i_id).first()
 
-    update_fields = [
-        'title',
-        'original_title',
-        'type',
-        'kinopoisk_url',
-        'kinopoisk_rating',
-        'imdb_url',
-        'imdb_rating',
-    ]
+        if existing_show:
+            existing_show.kinopub_id = k_id
+            if data['title']:
+                existing_show.title = data['title']
+            if data['original_title']:
+                existing_show.original_title = data['original_title']
+            if data['kinopoisk_url']:
+                existing_show.kinopoisk_url = data['kinopoisk_url']
+            if data['kinopoisk_rating']:
+                existing_show.kinopoisk_rating = data['kinopoisk_rating']
+            if data['imdb_url']:
+                existing_show.imdb_url = data['imdb_url']
+            if data['imdb_rating']:
+                existing_show.imdb_rating = data['imdb_rating']
+            if i_id and not existing_show.imdb_id:
+                existing_show.imdb_id = i_id
 
-    Show.objects.bulk_create(
-        shows_to_upsert,
-        update_conflicts=True,
-        unique_fields=['kinopub_id'],
-        update_fields=update_fields,
-    )
+            existing_show.save()
+        else:
+            created_show = Show.objects.create(**data)
+            new_created_count += 1
+            enqueue_show_update([created_show.id], details=True, durations=True, ratings=True)
 
-    if new_kinopub_ids:
-        created_show_ids = list(
-            Show.objects.filter(kinopub_id__in=new_kinopub_ids).values_list('id', flat=True)
-        )
-        enqueue_show_update(created_show_ids, details=True, durations=True, ratings=True)
-
-    return len(new_kinopub_ids)
+    return new_created_count
 
 
 def run_full_scan_session(headless=True, target_type=None, process_all_pages=False):

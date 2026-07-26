@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from redis import Redis
 
-from shared.constants import DATETIME_FORMAT, UserRole
+from shared.constants import DATETIME_FORMAT, RedisQueue, UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -89,11 +89,11 @@ def enqueue_show_update(
     try:
         r = Redis.from_url(settings.CELERY_BROKER_URL)
         if details:
-            r.sadd('queue:update_details', *show_ids)
+            r.sadd(RedisQueue.UPDATE_DETAILS, *show_ids)
         if durations:
-            r.sadd('queue:update_durations', *show_ids)
+            r.sadd(RedisQueue.UPDATE_DURATIONS, *show_ids)
         if ratings:
-            r.sadd('queue:priority_ratings_sync', *show_ids)
+            r.sadd(RedisQueue.PRIORITY_RATINGS_SYNC, *show_ids)
     except Exception as e:
         logger.error(f'Failed to enqueue shows {show_ids} for update: {e}')
 
