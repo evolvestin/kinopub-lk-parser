@@ -6,28 +6,10 @@ import requests
 from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.db import DatabaseError
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+
+from app.services.tmdb_client import get_tmdb_session
 
 logger = logging.getLogger(__name__)
-
-_tmdb_session = None
-
-
-def get_tmdb_session():
-    global _tmdb_session
-    if _tmdb_session is None:
-        _tmdb_session = requests.Session()
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=['GET'],
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        _tmdb_session.mount('http://', adapter)
-        _tmdb_session.mount('https://', adapter)
-    return _tmdb_session
 
 
 def _is_valid_tmdb_match(query: str, tmdb_result: dict) -> bool:

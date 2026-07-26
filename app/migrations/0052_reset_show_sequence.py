@@ -6,7 +6,7 @@ def reset_show_sequence(apps, schema_editor):
         with schema_editor.connection.cursor() as cursor:
             cursor.execute(
                 "SELECT setval(pg_get_serial_sequence('app_show', 'id'), "
-                "COALESCE(MAX(id), 1)) FROM app_show;"
+                'COALESCE(MAX(id), 1)) FROM app_show;'
             )
 
 

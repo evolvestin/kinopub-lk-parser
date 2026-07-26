@@ -21,6 +21,24 @@ TMDB_STATUS_MAPPING = {
     'Rumored': 'Pre Production',
 }
 
+_tmdb_session = None
+
+
+def get_tmdb_session():
+    global _tmdb_session
+    if _tmdb_session is None:
+        _tmdb_session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=['GET'],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        _tmdb_session.mount('http://', adapter)
+        _tmdb_session.mount('https://', adapter)
+    return _tmdb_session
+
 
 class TMDBClient:
     BASE_URL = 'https://api.themoviedb.org/3'
