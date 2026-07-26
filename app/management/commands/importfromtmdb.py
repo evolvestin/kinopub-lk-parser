@@ -47,6 +47,7 @@ class Command(LoggableBaseCommand):
             logging.info(f'Importing top {popular_limit} popular items ({media_type}) from TMDB...')
             session = get_tmdb_session()
             api_key = settings.TMDB_API_KEY
+            base_url = settings.TMDB_API_BASE_URL
             headers = {}
             params = {'language': 'ru-RU', 'page': 1}
 
@@ -60,7 +61,7 @@ class Command(LoggableBaseCommand):
 
             while imported_count < popular_limit and page <= 10:
                 params['page'] = page
-                url = f'https://api.themoviedb.org/3/{media_type}/popular'
+                url = f'{base_url}/{media_type}/popular'
                 resp = session.get(url, headers=headers, params=params, timeout=10)
                 if resp.status_code != 200:
                     break

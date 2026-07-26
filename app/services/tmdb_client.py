@@ -28,6 +28,12 @@ def get_tmdb_session():
     global _tmdb_session
     if _tmdb_session is None:
         _tmdb_session = requests.Session()
+        proxy = settings.TMDB_PROXY
+        if proxy:
+            _tmdb_session.proxies = {
+                'http': proxy,
+                'https': proxy,
+            }
         retry_strategy = Retry(
             total=3,
             backoff_factor=1,
@@ -41,20 +47,10 @@ def get_tmdb_session():
 
 
 class TMDBClient:
-    BASE_URL = 'https://api.themoviedb.org/3'
-
     def __init__(self):
         self.api_key = settings.TMDB_API_KEY
-        self.session = requests.Session()
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=['GET'],
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        self.session.mount('http://', adapter)
-        self.session.mount('https://', adapter)
+        self.base_url = settings.TMDB_API_BASE_URL
+        self.session = get_tmdb_session()
 
     def _get_headers_and_params(self) -> tuple[dict, dict]:
         headers = {}
@@ -69,7 +65,7 @@ class TMDBClient:
     def get_details(self, tmdb_id: int, media_type: str = 'movie') -> dict | None:
         if not self.api_key:
             return None
-        endpoint = f'{self.BASE_URL}/{media_type}/{tmdb_id}'
+        endpoint = f'{self.base_url}/{media_type}/{tmdb_id}'
         headers, params = self._get_headers_and_params()
         params['append_to_response'] = 'external_ids,credits'
 
@@ -84,7 +80,7 @@ class TMDBClient:
     def find_by_imdb_id(self, imdb_id: str) -> tuple[dict | None, str | None]:
         if not self.api_key or not imdb_id:
             return None, None
-        endpoint = f'{self.BASE_URL}/find/{imdb_id}'
+        endpoint = f'{self.base_url}/find/{imdb_id}'
         headers, params = self._get_headers_and_params()
         params['external_source'] = 'imdb_id'
 

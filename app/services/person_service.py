@@ -92,7 +92,7 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
     except Exception as e:
         logger.error(f'Error fetching shows meta for {person_instance.name}: {e}')
 
-    base_url = 'https://api.themoviedb.org/3/search/person'
+    base_url = f'{settings.TMDB_API_BASE_URL}/search/person'
     found_path = None
     session = get_tmdb_session()
 

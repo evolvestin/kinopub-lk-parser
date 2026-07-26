@@ -274,6 +274,8 @@ SITE_AUX_URL = os.getenv('SITE_AUX_URL')
 
 POSTER_BASE_URL = os.getenv('POSTER_BASE_URL', 'https://google.com/')
 TMDB_API_KEY = os.getenv('TMDB_API_KEY')
+TMDB_API_BASE_URL = os.getenv('TMDB_API_BASE_URL', 'https://api.themoviedb.org/3').rstrip('/')
+TMDB_PROXY = os.getenv('TMDB_PROXY') or os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY')
 POISKKINO_API_KEY = os.getenv('POISKKINO_API_KEY')
 
 # --- App Core Config ---
