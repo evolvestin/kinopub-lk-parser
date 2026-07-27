@@ -150,10 +150,70 @@ def calculate_missing_kp_metric():
     return data
 
 
+def calculate_missing_imdb_id_metric():
+    qs = Show.objects.filter(kinopub_id__isnull=False).filter(
+        Q(imdb_id__isnull=True) | Q(imdb_id='')
+    )
+    stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_missing_imdb_id_list(show_type: str):
+    return (
+        Show.objects.filter(type=show_type, kinopub_id__isnull=False)
+        .filter(Q(imdb_id__isnull=True) | Q(imdb_id=''))
+        .values('id', 'kinopub_id', 'title', 'original_title')
+    )
+
+
+def calculate_tmdb_only_shows_metric():
+    qs = Show.objects.filter(tmdb_id__isnull=False, kinopub_id__isnull=True)
+    stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_tmdb_only_shows_list(show_type: str):
+    return Show.objects.filter(
+        type=show_type, tmdb_id__isnull=False, kinopub_id__isnull=True
+    ).values('id', 'tmdb_id', 'title', 'original_title')
+
+
+def calculate_missing_tmdb_id_metric():
+    qs = Show.objects.filter(kinopub_id__isnull=False, tmdb_id__isnull=True)
+    stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_missing_tmdb_id_list(show_type: str):
+    return Show.objects.filter(
+        type=show_type, kinopub_id__isnull=False, tmdb_id__isnull=True
+    ).values('id', 'kinopub_id', 'title', 'original_title')
+
+
+def calculate_tmdb_no_kp_metric():
+    qs = Show.objects.filter(tmdb_id__isnull=False).filter(
+        Q(kinopoisk_url__isnull=True) | Q(kinopoisk_url='')
+    )
+    stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_tmdb_no_kp_list(show_type: str):
+    return (
+        Show.objects.filter(type=show_type, tmdb_id__isnull=False)
+        .filter(Q(kinopoisk_url__isnull=True) | Q(kinopoisk_url=''))
+        .values('id', 'tmdb_id', 'title', 'original_title')
+    )
+
+
 def generate_global_metrics_snapshot() -> dict:
     return {
         'missing_kp': calculate_missing_kp_metric(),
         'missing_imdb': calculate_missing_imdb_metric(),
+        'missing_imdb_id': calculate_missing_imdb_id_metric(),
+        'tmdb_only_shows': calculate_tmdb_only_shows_metric(),
+        'missing_tmdb_id': calculate_missing_tmdb_id_metric(),
+        'tmdb_no_kp': calculate_tmdb_no_kp_metric(),
         'has_kp': calculate_has_kp_metric(),
         'has_imdb': calculate_has_imdb_metric(),
         'total_shows': calculate_total_shows_metric(),
@@ -510,7 +570,7 @@ def get_duplicate_photo_urls_list(source_type: str):
     persons_qs = (
         Person.objects.filter(master_person__isnull=True)
         .filter(**{f'{field}__in': urls})
-        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url')
+        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id')
     )
 
     grouped_persons = defaultdict(list)
@@ -522,6 +582,7 @@ def get_duplicate_photo_urls_list(source_type: str):
                 'en_name': p['en_name'],
                 'tmdb_photo_url': p['tmdb_photo_url'],
                 'kp_photo_url': p['kp_photo_url'],
+                'tmdb_id': p['tmdb_id'],
             }
         )
 

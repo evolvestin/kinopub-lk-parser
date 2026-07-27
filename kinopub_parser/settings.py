@@ -393,12 +393,12 @@ CELERY_BEAT_SCHEDULE = {
     },
     'update_site_metrics': {
         'task': 'app.tasks.update_site_metrics_task',
-        'schedule': crontab(minute=0, hour=0),  # every 24 hours
+        'schedule': crontab(minute=10),  # every 24 hours
         'options': {'queue': 'metrics'},
     },
     'auto_enqueue_missing_metadata': {
         'task': 'app.tasks.auto_enqueue_missing_metadata_task',
-        'schedule': crontab(minute=0, hour=9),  # every 24 hours
+        'schedule': crontab(minute=5, hour=9),  # every 24 hours
     },
 }
 

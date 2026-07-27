@@ -179,6 +179,7 @@
                         <div class="person-meta-row">
                           <span class="person-name">{{ p.name }}</span>
                           <span class="person-id-badge">#{{ p.id }}</span>
+                          <span v-if="p.tmdb_id" class="tmdb-id-badge">TMDB #{{ p.tmdb_id }}</span>
                         </div>
                         <div v-if="p.en_name" class="person-en-name">{{ p.en_name }}</div>
                         <div style="margin-top: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -286,14 +287,23 @@ const PALETTES = {
 
 const metricGroups = ref([
   {
-    title: 'Метаданные', icon: 'star', color: 'var(--info)',
+    title: 'Сводка', icon: 'chart', color: 'var(--info)',
     metrics: [
       { key: 'total_shows', icon: 'tv', color: '#9b59b6', label: 'Всего шоу', centerLabel: 'ВСЕГО ШОУ', valField: 'value', severity: 'info', desc: 'Общее количество фильмов, сериалов и других типов шоу в базе данных.', showDesc: false },
+      { key: 'missing_imdb_id', icon: 'globe', color: '#388bfd', label: 'KinoPub без IMDb ID', centerLabel: 'БЕЗ IMDB ID', valField: 'value', severity: 'info', desc: 'Шоу из Кинопаба, у которых отсутствует привязка к идентификатору IMDb.', showDesc: false },
+      { key: 'missing_tmdb_id', icon: 'globe', color: '#388bfd', label: 'KinoPub без TMDB ID', centerLabel: 'БЕЗ TMDB ID', valField: 'value', severity: 'info', desc: 'Шоу из Кинопаба, у которых отсутствует привязка к идентификатору TMDB.', showDesc: false },
+      { key: 'tmdb_only_shows', icon: 'globe', color: '#388bfd', label: 'TMDB Без KinoPub ID', centerLabel: 'ТОЛЬКО TMDB', valField: 'value', severity: 'info', desc: 'Шоу, импортированные из TMDB дампов, но отсутствующие в Кинопабе.', showDesc: false },
+      { key: 'tmdb_no_kp', icon: 'globe', color: '#388bfd', label: 'TMDB без Кинопоиска', centerLabel: 'БЕЗ КИНОПОИСКА', valField: 'value', severity: 'info', desc: 'Шоу с TMDB ID, но без ссылки на Кинопоиск.', showDesc: false }
+    ]
+  },
+  {
+    title: 'Метаданные', icon: 'star', color: 'var(--info)',
+    metrics: [
       { key: 'missing_year', icon: 'cal', color: '#e67e22', label: 'Год не указан', centerLabel: 'БЕЗ ГОДА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе не заполнен год выхода.', showDesc: false },
       { key: 'missing_status', icon: 'target', color: '#ef1960', label: 'Статус не указан', centerLabel: 'БЕЗ СТАТУСА', valField: 'value', severity: 'critical', desc: 'Сериалы и ТВ-шоу, у которых в базе отсутствует статус (Завершен/В эфире).', showDesc: false },
       { key: 'title_collision', icon: 'edit', color: 'var(--info)', label: 'Коллизии названий', centerLabel: 'КОЛЛИЗИЙ', valField: 'collisions', severity: 'critical', desc: 'Случаи, когда основное название шоу содержит в себе оригинальное (например, "Интерстеллар Interstellar").', showDesc: false },
-      { key: 'missing_durations', icon: 'time', color: '#6887ff', label: 'Без хронометража', centerLabel: 'БЕЗ ХРОНОМ.', valField: 'value', severity: 'critical', desc: 'Шоу, для которых в базе нет данных о времени (секундах) эпизодов или фильма.', showDesc: false },
-      { key: 'missing_plot', icon: 'list', color: '#1abc9c', label: 'Нет описания', centerLabel: 'БЕЗ ОПИС.', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в базе отсутствует или пустое текстовое описание.', showDesc: false }
+      { key: 'missing_durations', icon: 'time', color: '#6887ff', label: 'Без хронометража', centerLabel: 'БЕЗ ХРОНО', valField: 'value', severity: 'critical', desc: 'Шоу, для которых в базе нет данных о времени (секундах) эпизодов или фильма.', showDesc: false }, 
+      { key: 'missing_plot', icon: 'list', color: '#1abc9c', label: 'Нет описания', centerLabel: 'БЕЗ ОПИСАНИЯ', valField: 'value', severity: 'info', desc: 'Шоу, у которых в базе отсутствует или пустое текстовое описание.', showDesc: false }
     ]
   },
   {
@@ -557,7 +567,9 @@ const openDetails = async (key, typeLabel) => {
       modalItems.value = data.items
       data.items.forEach(item => {
         if (item.is_duplicate_group && item.persons && item.persons.length > 0) {
-          mergeSelections.value[item.persons[0].id] = item.persons[0].id
+          const tmdbMatch = item.persons.find(p => p.tmdb_id)
+          const defaultMasterId = tmdbMatch ? tmdbMatch.id : item.persons[0].id
+          mergeSelections.value[item.persons[0].id] = defaultMasterId
         }
       })
     }
@@ -953,5 +965,15 @@ onUnmounted(() => {
     background: var(--danger);
     color: #fff;
     transform: translateY(-1px);
+}
+.tmdb-id-badge {
+    font-size: 10px;
+    font-weight: 800;
+    font-family: monospace;
+    background: rgba(56, 139, 253, 0.2);
+    border: 1px solid var(--info);
+    color: var(--info);
+    padding: 1px 5px;
+    border-radius: 4px;
 }
 </style>

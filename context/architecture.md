@@ -2,6 +2,18 @@ File: context/architecture.md
 Scope: Top of file
 # Architectural Rules for AI/LLM
 
+## Naming & Terminology Standard
+
+**CRITICAL RULE**: Maintain strict separation between KinoPub and Kinopoisk terminology across codebase, database fields, UI labels, logs, and documentation.
+
+1. **Kinopoisk (Кинопоиск)**:
+   - Abbreviation: `KP` / `КП` (e.g., `kp_rating`, `ext_rating__kp`, `Есть рейтинг KP`, `KP photo`).
+   - Allowed ONLY for Kinopoisk (Кинопоиск) external platform and ratings.
+
+2. **KinoPub (Кинопаб)**:
+   - Name: `KinoPub` / `Кинопаб` / `kinopub` (e.g., `kinopub_id`, `KinoPub без IMDb ID`).
+   - **STRICTLY FORBIDDEN**: Never abbreviate KinoPub as "KP" or "КП".
+
 ## Data Integrity Principle: Raw-First Approach
 
 **CRITICAL RULE**: Do NOT filter, normalize, or sanitize data BEFORE it enters the database.

@@ -63,6 +63,7 @@ from shared.constants import (
     PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_EN,
     RAW_TO_NORMALIZED_RU,
+    SERIES_TYPES,
     SHOW_STATUS_DISPLAY_RU,
     SHOW_TYPE_DISPLAY_RU,
     UserRole,
@@ -372,10 +373,10 @@ class ShowAdmin(admin.ModelAdmin):
         ShowCrewInline,
     ]
     readonly_fields = (
-        'id',
-        'kinopub_id',
-        'tmdb_id',
-        'imdb_id',
+        'get_id_display',
+        'get_kinopub_id_display',
+        'get_tmdb_id_display',
+        'get_imdb_id_display',
         'admin_actions',
         'title',
         'original_title',
@@ -400,10 +401,10 @@ class ShowAdmin(admin.ModelAdmin):
             'Идентификаторы и действия',
             {
                 'fields': (
-                    'id',
-                    'kinopub_id',
-                    'tmdb_id',
-                    'imdb_id',
+                    'get_id_display',
+                    'get_kinopub_id_display',
+                    'get_tmdb_id_display',
+                    'get_imdb_id_display',
                     'admin_actions',
                 ),
             },
@@ -460,6 +461,82 @@ class ShowAdmin(admin.ModelAdmin):
     )
     filter_horizontal = ('countries', 'genres')
     actions = ['action_update_details', 'action_update_durations']
+
+    def _format_copyable_id_with_link(self, value, link_url=None, link_label=None, title='ID'):
+        if not value:
+            return '-'
+
+        html = (
+            '<div style="display: flex; align-items: center; gap: 10px;">'
+            '<div style="display: flex; align-items: center; gap: 6px;">'
+            '<span style="font-family: ui-monospace, monospace; font-weight: 700; '
+            'color: var(--body-fg); '
+            'background: var(--darkened-bg); padding: 2px 6px; border-radius: 4px; '
+            'border: 1px solid var(--border-color); font-size: 11px; '
+            'letter-spacing: 0.5px;">{0}</span>'
+            '<a href="javascript:void(0)" title="Копировать {2}" '
+            'style="display: inline-flex; align-items: center; justify-content: center; '
+            'width: 26px; height: 26px; '
+            'background: var(--secondary); border: 1px solid var(--border-color); '
+            'border-radius: 4px; '
+            'color: var(--link-fg); transition: all 0.2s ease;" '
+            "onclick=\"navigator.clipboard.writeText('{0}'); "
+            "const icon = this.querySelector('.material-icons'); "
+            "icon.innerText = 'check'; this.style.borderColor = 'var(--accent)'; "
+            "this.style.color = 'var(--accent)'; "
+            "setTimeout(() => {{ icon.innerText = 'content_copy'; "
+            "this.style.borderColor = ''; this.style.color = ''; }}, 1500); "
+            'return false;">'
+            '<span class="material-icons" style="font-size: 16px;">content_copy</span>'
+            '</a>'
+            '</div>'
+        )
+
+        if link_url and link_label:
+            html += (
+                '<a class="button" href="{1}" target="_blank" style="background-color: #3498db; '
+                'color: white; display: inline-flex; align-items: center; '
+                'gap: 4px; padding: 3px 8px;">'
+                '<span class="material-icons" style="font-size: 14px;">open_in_new</span> {3}'
+                '</a>'
+            )
+            return format_html(html + '</div>', value, link_url, title, link_label)
+
+        return format_html(html + '</div>', value, None, title)
+
+    @admin.display(description='ID')
+    def get_id_display(self, obj):
+        if not obj or not obj.id:
+            return '-'
+        return self._format_copyable_id_with_link(obj.id, title='ID')
+
+    @admin.display(description='KinoPub ID')
+    def get_kinopub_id_display(self, obj):
+        if not obj or not obj.kinopub_id:
+            return '-'
+        url = f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{obj.kinopub_id}'
+        return self._format_copyable_id_with_link(
+            obj.kinopub_id, link_url=url, link_label='Открыть на KinoPub', title='KinoPub ID'
+        )
+
+    @admin.display(description='TMDB ID')
+    def get_tmdb_id_display(self, obj):
+        if not obj or not obj.tmdb_id:
+            return '-'
+        media_type = 'tv' if obj.type in SERIES_TYPES else 'movie'
+        url = f'https://www.themoviedb.org/{media_type}/{obj.tmdb_id}'
+        return self._format_copyable_id_with_link(
+            obj.tmdb_id, link_url=url, link_label='Открыть на TMDB', title='TMDB ID'
+        )
+
+    @admin.display(description='IMDb ID')
+    def get_imdb_id_display(self, obj):
+        if not obj or not obj.imdb_id:
+            return '-'
+        url = obj.imdb_url or f'https://www.imdb.com/title/{obj.imdb_id}/'
+        return self._format_copyable_id_with_link(
+            obj.imdb_id, link_url=url, link_label='Открыть на IMDb', title='IMDb ID'
+        )
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request).select_related('ext_rating')

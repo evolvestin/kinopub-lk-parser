@@ -1,87 +1,210 @@
+import gzip
+import json
 import logging
+import tempfile
+import time
+from datetime import timedelta
+
+import requests
+from django.utils import timezone
 
 from app.management.base import LoggableBaseCommand
-from app.services.tmdb_client import parse_tmdb_library, sync_show_from_tmdb
+from app.models import Show
+from shared.constants import ShowType
+
+logger = logging.getLogger(__name__)
 
 
 class Command(LoggableBaseCommand):
-    help = 'Imports or updates shows directly from TMDB API or parses the TMDB library.'
+    help = 'Bulk imports shows from TMDB daily export JSON dumps.'
 
     def add_arguments(self, parser):
-        parser.add_argument('--tmdb-id', type=int, help='TMDB ID of the show/movie to import.')
-        parser.add_argument(
-            '--imdb-id', type=str, help='IMDb ID of the show/movie (e.g. tt0816692).'
-        )
         parser.add_argument(
             '--type',
             type=str,
-            choices=['movie', 'tv'],
-            default='movie',
-            help='Media type: movie or tv.',
+            choices=['movie', 'tv', 'all'],
+            default='all',
+            help='Media type to import: movie, tv, or all (default: all).',
         )
         parser.add_argument(
-            '--mode',
+            '--date',
             type=str,
-            choices=['discover', 'popular', 'top_rated', 'trending'],
-            default='discover',
-            help='Library parsing mode.',
+            help='Dump date in MM_DD_YYYY format. Defaults to today/yesterday UTC.',
         )
         parser.add_argument(
-            '--pages',
+            '--batch-size',
             type=int,
-            default=10,
-            help='Number of library pages to parse.',
-        )
-        parser.add_argument(
-            '--sort-by',
-            type=str,
-            default='popularity.desc',
-            help='Sorting order for discover mode.',
-        )
-        parser.add_argument(
-            '--popular',
-            type=int,
-            help='Import N popular items from TMDB (legacy argument).',
-        )
-        parser.add_argument(
-            '--eager',
-            action='store_true',
-            help='Process items synchronously instead of queueing tasks.',
+            default=5000,
+            help='Batch size for DB insertions (default: 5000).',
         )
 
     def handle(self, *args, **options):
-        tmdb_id = options.get('tmdb_id')
-        imdb_id = options.get('imdb_id')
-        media_type = options.get('type', 'movie')
-        mode = options.get('mode', 'discover')
-        pages = options.get('pages', 10)
-        sort_by = options.get('sort_by', 'popularity.desc')
-        popular_limit = options.get('popular')
-        eager = options.get('eager', False)
+        media_type = options.get('type', 'all')
+        dump_date_str = options.get('date')
+        batch_size = options.get('batch-size', 5000)
 
-        if tmdb_id or imdb_id:
-            logging.info(f'Starting TMDB direct import for TMDB ID: {tmdb_id}, IMDb ID: {imdb_id}')
-            show = sync_show_from_tmdb(tmdb_id=tmdb_id, imdb_id=imdb_id, media_type=media_type)
-            if show:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f'Successfully imported/linked show: "{show.title}" (ID: {show.id})'
-                    )
-                )
-            else:
-                self.stdout.write(self.style.ERROR('Failed to import show from TMDB.'))
-            return
+        types_to_process = []
+        if media_type in ('movie', 'all'):
+            types_to_process.append('movie')
+        if media_type in ('tv', 'all'):
+            types_to_process.append('tv')
 
-        if popular_limit:
-            mode = 'popular'
-            pages = max(1, (popular_limit + 19) // 20)
+        target_dates = self._resolve_dump_dates(dump_date_str)
 
-        logging.info(f'Parsing TMDB library (mode={mode}, type={media_type}, pages={pages})...')
-        count = parse_tmdb_library(
-            media_type=media_type, mode=mode, pages=pages, sort_by=sort_by, sync_eager=eager
+        initial_db_count = Show.objects.count()
+        existing_tmdb_ids = set(
+            Show.objects.filter(tmdb_id__isnull=False).values_list('tmdb_id', flat=True)
         )
-        self.stdout.write(
-            self.style.SUCCESS(
-                f'Successfully parsed and processed {count} items from TMDB library.'
+
+        total_processed_dump = 0
+        total_added = 0
+        total_already_existed = 0
+        start_time = time.time()
+
+        self.stdout.write(self.style.NOTICE(f'Initial shows count in DB: {initial_db_count}'))
+        self.stdout.write(self.style.NOTICE(f'Existing TMDB IDs in DB: {len(existing_tmdb_ids)}'))
+
+        for m_type in types_to_process:
+            self.stdout.write(
+                self.style.MIGRATE_HEADING(f'\n--- Processing {m_type.upper()} dump ---')
             )
-        )
+
+            dump_file_path, used_date = self._download_dump(m_type, target_dates)
+            if not dump_file_path:
+                self.stdout.write(
+                    self.style.ERROR(f'Failed to download dump for {m_type}. Skipping.')
+                )
+                continue
+
+            self.stdout.write(
+                self.style.SUCCESS(f'Successfully downloaded {m_type} dump for date {used_date}')
+            )
+
+            processed, added, existed = self._process_dump_file(
+                dump_file_path=dump_file_path,
+                media_type=m_type,
+                existing_tmdb_ids=existing_tmdb_ids,
+                batch_size=batch_size,
+            )
+
+            total_processed_dump += processed
+            total_added += added
+            total_already_existed += existed
+
+        final_db_count = Show.objects.count()
+        elapsed_time = round(time.time() - start_time, 2)
+
+        self.stdout.write(self.style.MIGRATE_HEADING('\n========================================'))
+        self.stdout.write(self.style.MIGRATE_HEADING('         IMPORT SUMMARY REPORT          '))
+        self.stdout.write(self.style.MIGRATE_HEADING('========================================'))
+        self.stdout.write(f'Execution Time:           {elapsed_time} seconds')
+        self.stdout.write(f'Initial Shows in DB:      {initial_db_count}')
+        self.stdout.write(f'Total Read from Dump:     {total_processed_dump}')
+        self.stdout.write(f'Already Existed (TMDB):   {total_already_existed}')
+        self.stdout.write(f'New Shows Added:          {total_added}')
+        self.stdout.write(f'Final Shows in DB:        {final_db_count}')
+        self.stdout.write(self.style.MIGRATE_HEADING('========================================\n'))
+
+    def _resolve_dump_dates(self, custom_date_str: str | None) -> list[str]:
+        if custom_date_str:
+            return [custom_date_str]
+
+        now = timezone.now()
+        today_str = now.strftime('%m_%d_%Y')
+        yesterday_str = (now - timedelta(days=1)).strftime('%m_%d_%Y')
+        return [today_str, yesterday_str]
+
+    def _download_dump(self, media_type: str, dates: list[str]) -> tuple[str | None, str | None]:
+        file_prefix = 'movie_ids' if media_type == 'movie' else 'tv_series_ids'
+
+        for d_str in dates:
+            url = f'http://files.tmdb.org/p/exports/{file_prefix}_{d_str}.json.gz'
+            self.stdout.write(f'Attempting download: {url}')
+
+            try:
+                response = requests.get(url, stream=True, timeout=30)
+                if response.status_code == 200:
+                    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json.gz')
+                    for chunk in response.iter_content(chunk_size=65536):
+                        if chunk:
+                            tmp_file.write(chunk)
+                    tmp_file.close()
+                    return tmp_file.name, d_str
+            except requests.RequestException as e:
+                logger.warning(f'Failed to download dump from {url}: {e}')
+
+        return None, None
+
+    def _process_dump_file(
+        self,
+        dump_file_path: str,
+        media_type: str,
+        existing_tmdb_ids: set[int],
+        batch_size: int,
+    ) -> tuple[int, int, int]:
+        show_type_val = ShowType.MOVIE if media_type == 'movie' else ShowType.SERIES
+
+        processed_count = 0
+        added_count = 0
+        already_existed_count = 0
+
+        batch_to_create = []
+
+        try:
+            with gzip.open(dump_file_path, 'rt', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    processed_count += 1
+
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    tmdb_id = data.get('id')
+                    if not tmdb_id:
+                        continue
+
+                    if tmdb_id in existing_tmdb_ids:
+                        already_existed_count += 1
+                        continue
+
+                    orig_title = (
+                        data.get('original_title') or data.get('original_name') or f'TMDB {tmdb_id}'
+                    )
+                    title = orig_title
+
+                    show_obj = Show(
+                        tmdb_id=tmdb_id,
+                        title=title,
+                        original_title=orig_title,
+                        type=show_type_val,
+                    )
+                    batch_to_create.append(show_obj)
+                    existing_tmdb_ids.add(tmdb_id)
+
+                    if len(batch_to_create) >= batch_size:
+                        created = Show.objects.bulk_create(batch_to_create, ignore_conflicts=True)
+                        added_count += len(created)
+                        batch_to_create.clear()
+
+                        self.stdout.write(
+                            f'Progress ({media_type}): Processed {processed_count} | '
+                            f'Added {added_count} | Already in DB {already_existed_count}'
+                        )
+
+            if batch_to_create:
+                created = Show.objects.bulk_create(batch_to_create, ignore_conflicts=True)
+                added_count += len(created)
+                batch_to_create.clear()
+
+        finally:
+            import os
+
+            if os.path.exists(dump_file_path):
+                os.remove(dump_file_path)
+
+        return processed_count, added_count, already_existed_count

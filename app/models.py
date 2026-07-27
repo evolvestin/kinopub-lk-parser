@@ -150,8 +150,8 @@ class Person(BaseModel):
 class ShowCrew(BaseModel):
     show = models.ForeignKey('Show', on_delete=models.CASCADE)
     person = models.ForeignKey('Person', on_delete=models.CASCADE)
-    profession = models.CharField(max_length=255, null=True, blank=True, db_index=True)
-    en_profession = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    profession = models.CharField(max_length=500, null=True, blank=True, db_index=True)
+    en_profession = models.CharField(max_length=500, null=True, blank=True, db_index=True)
 
     class Meta:
         verbose_name = 'Show Crew Member'

@@ -52,14 +52,18 @@ from app.services.metrics import (
     get_global_metrics_history,
     get_missing_country_meta_list,
     get_missing_durations_list,
+    get_missing_imdb_id_list,
     get_missing_imdb_list,
     get_missing_kp_list,
     get_missing_plot_list,
     get_missing_status_list,
+    get_missing_tmdb_id_list,
     get_missing_year_list,
     get_no_countries_list,
     get_no_genres_list,
     get_title_collision_list,
+    get_tmdb_no_kp_list,
+    get_tmdb_only_shows_list,
     get_total_genres_list,
     get_unmapped_genres_list,
     get_unused_countries_list,
@@ -1863,6 +1867,26 @@ def get_metric_details(request, key):
             {'type': db_show_type, 'imdb_url__isnull': 'False', 'ext_rating__imdb__isnull': 'True'}
         )
         target_task = 'priority_sync'
+    elif key == 'missing_imdb_id':
+        items = list(get_missing_imdb_id_list(db_show_type))
+        query_params.update(
+            {'type': db_show_type, 'kinopub_id__isnull': 'False', 'imdb_id__isnull': 'True'}
+        )
+    elif key == 'tmdb_only_shows':
+        items = list(get_tmdb_only_shows_list(db_show_type))
+        query_params.update(
+            {'type': db_show_type, 'tmdb_id__isnull': 'False', 'kinopub_id__isnull': 'True'}
+        )
+    elif key == 'missing_tmdb_id':
+        items = list(get_missing_tmdb_id_list(db_show_type))
+        query_params.update(
+            {'type': db_show_type, 'kinopub_id__isnull': 'False', 'tmdb_id__isnull': 'True'}
+        )
+    elif key == 'tmdb_no_kp':
+        items = list(get_tmdb_no_kp_list(db_show_type))
+        query_params.update(
+            {'type': db_show_type, 'tmdb_id__isnull': 'False', 'kinopoisk_url__isnull': 'True'}
+        )
     elif key == 'title_collision':
         items = list(get_title_collision_list(db_show_type))
         query_params['type'] = db_show_type

@@ -124,7 +124,9 @@ def parse_and_save_catalog_page(driver, mode):
             existing_show = Show.objects.filter(imdb_id=i_id).first()
 
         if existing_show:
-            existing_show.kinopub_id = k_id
+            if not existing_show.kinopub_id:
+                if not Show.objects.filter(kinopub_id=k_id).exclude(id=existing_show.id).exists():
+                    existing_show.kinopub_id = k_id
             if data['title']:
                 existing_show.title = data['title']
             if data['original_title']:
@@ -138,10 +140,13 @@ def parse_and_save_catalog_page(driver, mode):
             if data['imdb_rating']:
                 existing_show.imdb_rating = data['imdb_rating']
             if i_id and not existing_show.imdb_id:
-                existing_show.imdb_id = i_id
+                if not Show.objects.filter(imdb_id=i_id).exclude(id=existing_show.id).exists():
+                    existing_show.imdb_id = i_id
 
             existing_show.save()
         else:
+            if data.get('imdb_id') and Show.objects.filter(imdb_id=data['imdb_id']).exists():
+                data['imdb_id'] = None
             created_show = Show.objects.create(**data)
             new_created_count += 1
             enqueue_show_update([created_show.id], details=True, durations=True, ratings=True)
