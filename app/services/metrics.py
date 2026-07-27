@@ -27,7 +27,27 @@ from shared.constants import (
     RAW_TO_NORMALIZED_RU,
     SERIES_TYPES,
     SHOW_TYPE_DISPLAY_RU,
+    SHOW_TYPE_MAPPING,
 )
+
+
+def _format_type(t):
+    if not t:
+        return 'Неизвестно'
+    mapped = SHOW_TYPE_MAPPING.get(t, t)
+    return SHOW_TYPE_DISPLAY_RU.get(mapped, mapped)
+
+
+def _aggregate_by_display_type(stats_qs, type_field='type', count_field='total'):
+    merged = defaultdict(int)
+    for item in stats_qs:
+        raw_type = item.get(type_field)
+        display_name = _format_type(raw_type)
+        merged[display_name] += item.get(count_field, 0)
+    return [
+        {'name': k, 'value': v}
+        for k, v in sorted(merged.items(), key=lambda x: x['value'], reverse=True)
+    ]
 
 
 def calculate_missing_country_meta_metric():
@@ -103,7 +123,7 @@ def calculate_has_kp_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def calculate_has_imdb_metric():
@@ -113,21 +133,18 @@ def calculate_has_imdb_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def calculate_total_shows_metric():
     stats = Show.objects.values('type').annotate(total=Count('id')).order_by('-total')
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def calculate_missing_imdb_metric():
     qs = Show.objects.filter(imdb_url__isnull=False, ext_rating__isnull=True).exclude(imdb_url='')
-
-    stats = qs.values('type').annotate(total_missing=Count('id')).order_by('-total_missing')
-
-    data = [{'name': _format_type(item['type']), 'value': item['total_missing']} for item in stats]
-    return data
+    stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
+    return _aggregate_by_display_type(stats)
 
 
 def get_missing_imdb_list(show_type: str):
@@ -144,11 +161,8 @@ def calculate_missing_kp_metric():
         .exclude(kinopoisk_url='')
         .exclude(kinopoisk_url__endswith='/film/0')
     )
-
-    stats = qs.values('type').annotate(total_missing=Count('id')).order_by('-total_missing')
-
-    data = [{'name': _format_type(item['type']), 'value': item['total_missing']} for item in stats]
-    return data
+    stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
+    return _aggregate_by_display_type(stats)
 
 
 def calculate_missing_imdb_id_metric():
@@ -156,7 +170,7 @@ def calculate_missing_imdb_id_metric():
         Q(imdb_id__isnull=True) | Q(imdb_id='')
     )
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_missing_imdb_id_list(show_type: str):
@@ -170,7 +184,7 @@ def get_missing_imdb_id_list(show_type: str):
 def calculate_tmdb_only_shows_metric():
     qs = Show.objects.filter(tmdb_id__isnull=False, kinopub_id__isnull=True)
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_tmdb_only_shows_list(show_type: str):
@@ -182,7 +196,7 @@ def get_tmdb_only_shows_list(show_type: str):
 def calculate_missing_tmdb_id_metric():
     qs = Show.objects.filter(kinopub_id__isnull=False, tmdb_id__isnull=True)
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_missing_tmdb_id_list(show_type: str):
@@ -196,7 +210,7 @@ def calculate_tmdb_no_kp_metric():
         Q(kinopoisk_url__isnull=True) | Q(kinopoisk_url='')
     )
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_tmdb_no_kp_list(show_type: str):
@@ -215,7 +229,7 @@ def calculate_tmdb_missing_status_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_tmdb_missing_status_list(show_type: str):
@@ -372,7 +386,7 @@ def calculate_missing_year_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_missing_year_list(show_type: str):
@@ -388,7 +402,7 @@ def calculate_tmdb_missing_year_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_tmdb_missing_year_list(show_type: str):
@@ -405,7 +419,7 @@ def calculate_missing_plot_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_missing_plot_list(show_type: str):
@@ -424,7 +438,7 @@ def calculate_tmdb_missing_plot_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_tmdb_missing_plot_list(show_type: str):
@@ -442,7 +456,7 @@ def calculate_no_genres_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_no_genres_list(show_type: str):
@@ -458,7 +472,7 @@ def calculate_tmdb_no_genres_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_tmdb_no_genres_list(show_type: str):
@@ -474,7 +488,7 @@ def calculate_no_countries_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_no_countries_list(show_type: str):
@@ -490,7 +504,7 @@ def calculate_tmdb_no_countries_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_tmdb_no_countries_list(show_type: str):
@@ -506,7 +520,7 @@ def calculate_total_persons_by_show_type_metric():
         .annotate(total=Count('canonical_id', distinct=True))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['show__type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
 
 
 def calculate_persons_avatar_stats_metric():
@@ -605,7 +619,7 @@ def calculate_missing_status_metric():
         Q(status__isnull=True) | Q(status='')
     )
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_missing_status_list(show_type: str):
@@ -841,7 +855,7 @@ def calculate_missing_durations_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_missing_durations_list(show_type: str):
@@ -859,7 +873,7 @@ def calculate_tmdb_missing_durations_metric():
         .annotate(total=Count('id'))
         .order_by('-total')
     )
-    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+    return _aggregate_by_display_type(stats)
 
 
 def get_tmdb_missing_durations_list(show_type: str):

@@ -431,6 +431,10 @@ if ENVIRONMENT == 'PROD':
                 'task': 'app.tasks.run_new_episodes_task',
                 'schedule': crontab(minute=20, hour='8-21'),
             },
+            'enrich_tmdb_shows': {
+                'task': 'app.tasks.enrich_tmdb_shows_task',
+                'schedule': crontab(minute=35, hour='*/2'),
+            },
         }
     )
 

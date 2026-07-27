@@ -646,3 +646,11 @@ def sync_tmdb_metadata_task(
 def parse_tmdb_library_task(media_type: str = 'all', batch_size: int = 5000):
     logging.info(f'Starting TMDB dump import task (type={media_type}, batch_size={batch_size}).')
     call_command('importfromtmdb', type=media_type, batch_size=batch_size)
+
+
+@shared_task(time_limit=3600, soft_time_limit=3300)
+@single_instance_task(lock_name=RedisLock.ENRICH_TMDB_SHOWS, timeout=3600)
+@safe_execution
+def enrich_tmdb_shows_task(limit: int = 5000):
+    logging.info(f'Starting scheduled TMDB shows enrichment task (limit={limit}).')
+    call_command('enrichfromtmdb', limit=limit)

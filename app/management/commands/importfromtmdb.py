@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from app.management.base import LoggableBaseCommand
 from app.models import Show
-from shared.constants import ShowType
+from shared.constants import SHOW_TYPE_MAPPING, ShowType
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,11 @@ class Command(LoggableBaseCommand):
         existing_tmdb_ids: set[int],
         batch_size: int,
     ) -> tuple[int, int, int]:
-        show_type_val = ShowType.MOVIE if media_type == 'movie' else ShowType.SERIES
+        show_type_val = (
+            SHOW_TYPE_MAPPING[ShowType.MOVIE]
+            if media_type == 'movie'
+            else SHOW_TYPE_MAPPING[ShowType.SERIES]
+        )
 
         processed_count = 0
         added_count = 0

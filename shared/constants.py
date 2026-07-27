@@ -19,6 +19,7 @@ class RedisLock(StrEnum):
     PROCESS_QUEUES = 'process_queues_lock'
     FETCH_PERSON_PHOTOS = 'fetch_person_photos_lock'
     SYNC_POISKKINO_RATINGS = 'sync_poiskkino_ratings'
+    ENRICH_TMDB_SHOWS = 'enrich_tmdb_shows_lock'
 
 
 class ParserSessionType(StrEnum):
