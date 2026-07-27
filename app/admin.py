@@ -67,6 +67,7 @@ from shared.constants import (
     SERIES_TYPES,
     SHOW_STATUS_DISPLAY_RU,
     SHOW_TYPE_DISPLAY_RU,
+    RedisQueue,
     UserRole,
 )
 
@@ -648,14 +649,14 @@ class ShowAdmin(admin.ModelAdmin):
             return False
 
     def process_update_details(self, request, object_id):
-        if self._add_to_redis_queue('queue:update_details', object_id):
+        if self._add_to_redis_queue(RedisQueue.UPDATE_DETAILS, object_id):
             self.message_user(request, f'Show {object_id} added to "Update Details" queue.')
         else:
             self.message_user(request, 'Error connecting to Redis.', level='ERROR')
         return HttpResponseRedirect(reverse('admin:app_show_change', args=[object_id]))
 
     def process_update_durations(self, request, object_id):
-        if self._add_to_redis_queue('queue:update_durations', object_id):
+        if self._add_to_redis_queue(RedisQueue.UPDATE_DURATIONS, object_id):
             self.message_user(request, f'Show {object_id} added to "Update Durations" queue.')
         else:
             self.message_user(request, 'Error connecting to Redis.', level='ERROR')
@@ -665,7 +666,7 @@ class ShowAdmin(admin.ModelAdmin):
     def action_update_details(self, request, queryset):
         count = 0
         for show in queryset:
-            if self._add_to_redis_queue('queue:update_details', show.id):
+            if self._add_to_redis_queue(RedisQueue.UPDATE_DETAILS, show.id):
                 count += 1
         self.message_user(request, f'{count} shows added to "Update Details" queue.')
 
@@ -673,7 +674,7 @@ class ShowAdmin(admin.ModelAdmin):
     def action_update_durations(self, request, queryset):
         count = 0
         for show in queryset:
-            if self._add_to_redis_queue('queue:update_durations', show.id):
+            if self._add_to_redis_queue(RedisQueue.UPDATE_DURATIONS, show.id):
                 count += 1
         self.message_user(request, f'{count} shows added to "Update Durations" queue.')
 

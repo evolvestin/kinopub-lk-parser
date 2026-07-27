@@ -16,7 +16,12 @@ from app.models import TaskRun
 from app.tasks import run_admin_command
 from app.utils import get_scheduled_tasks_info
 from kinopub_parser import celery_app
-from shared.constants import DATETIME_FORMAT, SHOW_TYPE_DISPLAY_RU, SHOW_TYPE_MAPPING
+from shared.constants import (
+    DATETIME_FORMAT,
+    SHOW_TYPE_DISPLAY_RU,
+    SHOW_TYPE_MAPPING,
+    TaskRunStatus,
+)
 
 
 class CustomAdminSite(admin.AdminSite):
@@ -225,9 +230,9 @@ class CustomAdminSite(admin.AdminSite):
             if 'stop_task_id' in request.POST:
                 try:
                     task_to_stop = TaskRun.objects.get(
-                        id=request.POST.get('stop_task_id'), status='RUNNING'
+                        id=request.POST.get('stop_task_id'), status=TaskRunStatus.RUNNING
                     )
-                    task_to_stop.status = 'STOPPED'
+                    task_to_stop.status = TaskRunStatus.STOPPED
                     task_to_stop.save()
 
                     messages.warning(
@@ -241,13 +246,15 @@ class CustomAdminSite(admin.AdminSite):
             command_name = request.POST.get('command')
 
             if command_name and command_name in commands_info:
-                running_tasks = TaskRun.objects.filter(command=command_name, status='RUNNING')
+                running_tasks = TaskRun.objects.filter(
+                    command=command_name, status=TaskRunStatus.RUNNING
+                )
                 for old_task in running_tasks:
                     if old_task.celery_task_id:
                         celery_app.control.revoke(
                             old_task.celery_task_id, terminate=True, signal='SIGINT'
                         )
-                    old_task.status = 'STOPPED'
+                    old_task.status = TaskRunStatus.STOPPED
                     old_task.save()
 
                 if running_tasks.exists():
@@ -278,7 +285,9 @@ class CustomAdminSite(admin.AdminSite):
 
                 if command_name == 'resetlocks':
                     task_run = TaskRun.objects.create(
-                        command=command_name, arguments=arguments_str, status='RUNNING'
+                        command=command_name,
+                        arguments=arguments_str,
+                        status=TaskRunStatus.RUNNING,
                     )
 
                     cmd = [sys.executable, 'manage.py', command_name]
@@ -291,12 +300,12 @@ class CustomAdminSite(admin.AdminSite):
                         )
                         task_run.output = (result.stdout + '\n' + result.stderr).strip()
                         if result.returncode == 0:
-                            task_run.status = 'SUCCESS'
+                            task_run.status = TaskRunStatus.SUCCESS
                         else:
-                            task_run.status = 'FAILURE'
+                            task_run.status = TaskRunStatus.FAILURE
                             task_run.error_message = f'Exit code: {result.returncode}'
                     except Exception as e:
-                        task_run.status = 'FAILURE'
+                        task_run.status = TaskRunStatus.FAILURE
                         task_run.error_message = str(e)
 
                     task_run.save()

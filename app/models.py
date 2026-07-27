@@ -12,6 +12,7 @@ from shared.constants import (
     RAW_TO_NORMALIZED_EN,
     RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
+    TaskRunStatus,
     UserRole,
 )
 from shared.formatters import format_se
@@ -490,16 +491,16 @@ class UserRating(BaseModel):
 
 class TaskRun(BaseModel):
     STATUS_CHOICES = [
-        ('QUEUED', 'В очереди'),
-        ('RUNNING', 'Выполняется'),
-        ('SUCCESS', 'Успешно'),
-        ('FAILURE', 'Ошибка'),
-        ('STOPPED', 'Остановлено'),
+        (TaskRunStatus.QUEUED.value, 'В очереди'),
+        (TaskRunStatus.RUNNING.value, 'Выполняется'),
+        (TaskRunStatus.SUCCESS.value, 'Успешно'),
+        (TaskRunStatus.FAILURE.value, 'Ошибка'),
+        (TaskRunStatus.STOPPED.value, 'Остановлено'),
     ]
 
     command = models.CharField(max_length=255)
     arguments = models.CharField(max_length=255, blank=True, null=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='QUEUED')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=TaskRunStatus.QUEUED)
     output = models.TextField(blank=True, null=True)
     error_message = models.TextField(blank=True, null=True)
     celery_task_id = models.CharField(max_length=255, blank=True, null=True)

@@ -10,7 +10,7 @@ from app.management.base import LoggableBaseCommand
 from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew
 from app.services.poiskkino_client import PoiskkinoClient
 from app.tasks import get_kp_mapping
-from shared.constants import SHOW_STATUS_MAPPING
+from shared.constants import SHOW_STATUS_MAPPING, RedisQueue
 
 
 class Command(LoggableBaseCommand):
@@ -41,7 +41,7 @@ class Command(LoggableBaseCommand):
         priority_show_ids = set()
         try:
             r = Redis.from_url(settings.CELERY_BROKER_URL)
-            priority_raw = r.spop('queue:priority_ratings_sync', count=limit)
+            priority_raw = r.spop(RedisQueue.PRIORITY_RATINGS_SYNC, count=limit)
             if priority_raw:
                 priority_show_ids = {int(x) for x in priority_raw}
                 logging.info(f'Found {len(priority_show_ids)} priority shows in Redis queue.')

@@ -290,27 +290,37 @@ const metricGroups = ref([
     title: 'Сводка', icon: 'chart', color: 'var(--info)',
     metrics: [
       { key: 'total_shows', icon: 'tv', color: '#9b59b6', label: 'Всего шоу', centerLabel: 'ВСЕГО ШОУ', valField: 'value', severity: 'info', desc: 'Общее количество фильмов, сериалов и других типов шоу в базе данных.', showDesc: false },
-      { key: 'missing_imdb_id', icon: 'globe', color: '#388bfd', label: 'KinoPub без IMDb ID', centerLabel: 'БЕЗ IMDB ID', valField: 'value', severity: 'info', desc: 'Шоу из Кинопаба, у которых отсутствует привязка к идентификатору IMDb.', showDesc: false },
-      { key: 'missing_tmdb_id', icon: 'globe', color: '#388bfd', label: 'KinoPub без TMDB ID', centerLabel: 'БЕЗ TMDB ID', valField: 'value', severity: 'info', desc: 'Шоу из Кинопаба, у которых отсутствует привязка к идентификатору TMDB.', showDesc: false },
-      { key: 'tmdb_only_shows', icon: 'globe', color: '#388bfd', label: 'TMDB Без KinoPub ID', centerLabel: 'ТОЛЬКО TMDB', valField: 'value', severity: 'info', desc: 'Шоу, импортированные из TMDB дампов, но отсутствующие в Кинопабе.', showDesc: false },
-      { key: 'tmdb_no_kp', icon: 'globe', color: '#388bfd', label: 'TMDB без Кинопоиска', centerLabel: 'БЕЗ КИНОПОИСКА', valField: 'value', severity: 'info', desc: 'Шоу с TMDB ID, но без ссылки на Кинопоиск.', showDesc: false }
+      { key: 'missing_imdb_id', icon: 'globe', color: '#388bfd', label: 'KinoPub: Без IMDb ID', centerLabel: 'БЕЗ IMDB ID', valField: 'value', severity: 'info', desc: 'Шоу из KinoPub, у которых отсутствует привязка к идентификатору IMDb.', showDesc: false },
+      { key: 'missing_tmdb_id', icon: 'globe', color: '#388bfd', label: 'KinoPub: Без TMDB ID', centerLabel: 'БЕЗ TMDB ID', valField: 'value', severity: 'info', desc: 'Шоу из KinoPub, у которых отсутствует привязка к идентификатору TMDB.', showDesc: false },
+      { key: 'tmdb_only_shows', icon: 'globe', color: '#388bfd', label: 'TMDB: Без KinoPub ID', centerLabel: 'ТОЛЬКО TMDB', valField: 'value', severity: 'info', desc: 'Шоу, импортированные из TMDB, но отсутствующие в KinoPub.', showDesc: false },
+      { key: 'tmdb_no_kp', icon: 'globe', color: '#388bfd', label: 'TMDB: Без Кинопоиска', centerLabel: 'БЕЗ КИНОПОИСКА', valField: 'value', severity: 'info', desc: 'Шоу из TMDB без ссылки на Кинопоиск.', showDesc: false }
     ]
   },
   {
-    title: 'Метаданные', icon: 'star', color: 'var(--info)',
+    title: 'Метаданные KinoPub', icon: 'list', color: '#e67e22',
     metrics: [
-      { key: 'missing_year', icon: 'cal', color: '#e67e22', label: 'Год не указан', centerLabel: 'БЕЗ ГОДА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе не заполнен год выхода.', showDesc: false },
-      { key: 'missing_status', icon: 'target', color: '#ef1960', label: 'Статус не указан', centerLabel: 'БЕЗ СТАТУСА', valField: 'value', severity: 'critical', desc: 'Сериалы и ТВ-шоу, у которых в базе отсутствует статус (Завершен/В эфире).', showDesc: false },
-      { key: 'title_collision', icon: 'edit', color: 'var(--info)', label: 'Коллизии названий', centerLabel: 'КОЛЛИЗИЙ', valField: 'collisions', severity: 'critical', desc: 'Случаи, когда основное название шоу содержит в себе оригинальное (например, "Интерстеллар Interstellar").', showDesc: false },
-      { key: 'missing_durations', icon: 'time', color: '#6887ff', label: 'Без хронометража', centerLabel: 'БЕЗ ХРОНО', valField: 'value', severity: 'critical', desc: 'Шоу, для которых в базе нет данных о времени (секундах) эпизодов или фильма.', showDesc: false }, 
-      { key: 'missing_plot', icon: 'list', color: '#1abc9c', label: 'Нет описания', centerLabel: 'БЕЗ ОПИСАНИЯ', valField: 'value', severity: 'info', desc: 'Шоу, у которых в базе отсутствует или пустое текстовое описание.', showDesc: false }
+      { key: 'missing_year', icon: 'cal', color: '#e67e22', label: 'Без года', centerLabel: 'БЕЗ ГОДА', valField: 'value', severity: 'critical', desc: 'Шоу из KinoPub, у которых в базе не заполнен год выхода.', showDesc: false },
+      { key: 'missing_status', icon: 'target', color: '#ef1960', label: 'Без статуса', centerLabel: 'БЕЗ СТАТУСА', valField: 'value', severity: 'critical', desc: 'Сериалы и ТВ-шоу из KinoPub, у которых в базе отсутствует статус.', showDesc: false },
+      { key: 'missing_durations', icon: 'time', color: '#6887ff', label: 'Без хронометража', centerLabel: 'БЕЗ ХРОНО', valField: 'value', severity: 'critical', desc: 'Шоу из KinoPub, для которых в базе нет данных о хронометраже.', showDesc: false },
+      { key: 'missing_plot', icon: 'list', color: '#1abc9c', label: 'Без описания', centerLabel: 'БЕЗ ОПИСАНИЯ', valField: 'value', severity: 'info', desc: 'Шоу из KinoPub, у которых в базе отсутствует описание.', showDesc: false },
+      { key: 'title_collision', icon: 'edit', color: 'var(--info)', label: 'Коллизии названий', centerLabel: 'КОЛЛИЗИЙ', valField: 'collisions', severity: 'critical', desc: 'Случаи, когда основное название шоу содержит в себе оригинальное.', showDesc: false }
+    ]
+  },
+  {
+    title: 'Метаданные TMDB', icon: 'list', color: '#e67e22',
+    metrics: [
+      { key: 'tmdb_missing_year', icon: 'cal', color: '#60a5fa', label: 'Без года', centerLabel: 'БЕЗ ГОДА', valField: 'value', severity: 'info', desc: 'Шоу из TMDB, у которых в базе не заполнен год выхода.', showDesc: false },
+      { key: 'tmdb_missing_status', icon: 'target', color: '#60a5fa', label: 'Без статуса', centerLabel: 'БЕЗ СТАТУСА', valField: 'value', severity: 'info', desc: 'Сериалы и ТВ-шоу из TMDB, у которых в базе отсутствует статус.', showDesc: false },
+      { key: 'tmdb_missing_durations', icon: 'time', color: '#60a5fa', label: 'Без хронометража', centerLabel: 'БЕЗ ХРОНО', valField: 'value', severity: 'info', desc: 'Шоу из TMDB, для которых в базе нет данных о хронометраже.', showDesc: false },
+      { key: 'tmdb_missing_plot', icon: 'list', color: '#60a5fa', label: 'Без описания', centerLabel: 'БЕЗ ОПИСАНИЯ', valField: 'value', severity: 'info', desc: 'Шоу из TMDB, у которых в базе отсутствует описание.', showDesc: false },
     ]
   },
   {
     title: 'Жанры', icon: 'masks', color: '#f1c40f',
     metrics: [
       { key: 'total_genres', icon: 'masks', color: 'var(--info)', label: 'Всего жанров', centerLabel: 'ЖАНРОВ', valField: 'value', severity: 'info', desc: 'Общее количество уникальных жанров в базе.', showDesc: false },
-      { key: 'no_genres', icon: 'frown', color: '#f1c40f', label: 'Нет жанра', centerLabel: 'БЕЗ ЖАНРА', valField: 'value', severity: 'critical', desc: 'Шоу, к которым не привязан ни один жанр.', showDesc: false },
+      { key: 'tmdb_no_genres', icon: 'frown', color: '#60a5fa', label: 'TMDB: Без жанров', centerLabel: 'БЕЗ ЖАНРОВ', valField: 'value', severity: 'info', desc: 'Шоу из TMDB, к которым не привязан ни один жанр.', showDesc: false },
+      { key: 'no_genres', icon: 'frown', color: '#f1c40f', label: 'KinoPub: Без жанров', centerLabel: 'БЕЗ ЖАНРОВ', valField: 'value', severity: 'critical', desc: 'Шоу из KinoPub, к которым не привязан ни один жанр.', showDesc: false },
       { key: 'unmapped_genres', icon: 'skull', color: 'var(--danger)', label: 'Нераспознанные жанры', centerLabel: 'НЕ РАСПОЗНАНО', valField: 'value', severity: 'critical', desc: 'Жанры, которые не были найдены в маппинге констант.', showDesc: false }
     ]
   },
@@ -320,14 +330,15 @@ const metricGroups = ref([
       { key: 'has_kp', icon: 'smile', color: 'var(--info)', label: 'Есть рейтинг KP', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг Кинопоиска.', showDesc: false },
       { key: 'has_imdb', icon: 'smile', color: 'var(--accent)', label: 'Есть рейтинг IMDb', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг IMDb.', showDesc: false },
       { key: 'missing_kp', icon: 'frown', color: 'var(--danger)', label: 'Нет рейтинга KP', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.', showDesc: false },
-      { key: 'missing_imdb', icon: 'frown', color: '#f1c40f', label: 'Нет рейтинга IMDb', centerLabel: 'БЕЗ IMDB', valField: 'value', severity: 'critical', desc: 'Шоу, у которых указана ссылка на IMDb, но в таблице внешних рейтингов данные отсутствуют.', showDesc: false },
+      { key: 'missing_imdb', icon: 'frown', color: '#f1c40f', label: 'Нет рейтинга IMDb', centerLabel: 'БЕЗ IMDB', valField: 'value', severity: 'critical', desc: 'Шоу, у которых указана ссылка на IMDb, но в таблице внешних рейтингов данные отсутствуют.', showDesc: false }
     ]
   },
   {
     title: 'География', icon: 'globe', color: '#388bfd',
     metrics: [
       { key: 'total_countries', icon: 'globe', color: '#388bfd', label: 'Всего стран', centerLabel: 'СТРАН', valField: 'value', severity: 'info', desc: 'Статистика базы стран.', showDesc: false },
-      { key: 'no_countries', icon: 'minus', color: '#2ea043', label: 'Нет страны', centerLabel: 'БЕЗ СТРАНЫ', valField: 'value', severity: 'critical', desc: 'Шоу, к которым не привязна ни одна страна производства.', showDesc: false },
+      { key: 'tmdb_no_countries', icon: 'minus', color: '#60a5fa', label: 'TMDB: Без стран', centerLabel: 'БЕЗ СТРАН', valField: 'value', severity: 'info', desc: 'Шоу из TMDB, к которым не привязана ни одна страна.', showDesc: false },
+      { key: 'no_countries', icon: 'minus', color: '#2ea043', label: 'KinoPub: Без стран', centerLabel: 'БЕЗ СТРАН', valField: 'value', severity: 'critical', desc: 'Шоу из KinoPub, к которым не привязана ни одна страна.', showDesc: false },
       { key: 'missing_country_meta', icon: 'target', color: 'var(--danger)', label: 'Страны без ISO кода', centerLabel: 'БЕЗ ISO', valField: 'value', severity: 'critical', desc: 'Страны, для которых не заполнен ISO код или отсутствует флаг Эмодзи.', showDesc: false }
     ]
   },

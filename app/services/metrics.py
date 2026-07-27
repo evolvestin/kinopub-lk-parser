@@ -207,6 +207,25 @@ def get_tmdb_no_kp_list(show_type: str):
     )
 
 
+def calculate_tmdb_missing_status_metric():
+    stats = (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False, type__in=SERIES_TYPES)
+        .filter(Q(status__isnull=True) | Q(status=''))
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_tmdb_missing_status_list(show_type: str):
+    return (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type)
+        .filter(Q(status__isnull=True) | Q(status=''))
+        .values('id', 'title', 'original_title')
+    )
+
+
 def generate_global_metrics_snapshot() -> dict:
     return {
         'missing_kp': calculate_missing_kp_metric(),
@@ -235,6 +254,12 @@ def generate_global_metrics_snapshot() -> dict:
         'en_professions_stats': calculate_en_professions_stats_metric(),
         'duplicate_photo_urls': calculate_duplicate_photo_urls_metric(),
         'unused_persons': calculate_unused_persons_metric(),
+        'tmdb_missing_year': calculate_tmdb_missing_year_metric(),
+        'tmdb_missing_status': calculate_tmdb_missing_status_metric(),
+        'tmdb_missing_plot': calculate_tmdb_missing_plot_metric(),
+        'tmdb_missing_durations': calculate_tmdb_missing_durations_metric(),
+        'tmdb_no_genres': calculate_tmdb_no_genres_metric(),
+        'tmdb_no_countries': calculate_tmdb_no_countries_metric(),
     }
 
 
@@ -342,7 +367,7 @@ def get_title_collision_list(show_type: str):
 
 def calculate_missing_year_metric():
     stats = (
-        Show.objects.filter(year__isnull=True)
+        Show.objects.filter(kinopub_id__isnull=False, year__isnull=True)
         .values('type')
         .annotate(total=Count('id'))
         .order_by('-total')
@@ -351,14 +376,31 @@ def calculate_missing_year_metric():
 
 
 def get_missing_year_list(show_type: str):
-    return Show.objects.filter(type=show_type, year__isnull=True).values(
+    return Show.objects.filter(kinopub_id__isnull=False, type=show_type, year__isnull=True).values(
         'id', 'title', 'original_title'
     )
 
 
+def calculate_tmdb_missing_year_metric():
+    stats = (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False, year__isnull=True)
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_tmdb_missing_year_list(show_type: str):
+    return Show.objects.filter(
+        kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type, year__isnull=True
+    ).values('id', 'title', 'original_title')
+
+
 def calculate_missing_plot_metric():
     stats = (
-        Show.objects.filter(Q(plot__isnull=True) | Q(plot=''))
+        Show.objects.filter(kinopub_id__isnull=False)
+        .filter(Q(plot__isnull=True) | Q(plot=''))
         .values('type')
         .annotate(total=Count('id'))
         .order_by('-total')
@@ -368,7 +410,26 @@ def calculate_missing_plot_metric():
 
 def get_missing_plot_list(show_type: str):
     return (
-        Show.objects.filter(type=show_type)
+        Show.objects.filter(kinopub_id__isnull=False, type=show_type)
+        .filter(Q(plot__isnull=True) | Q(plot=''))
+        .values('id', 'title', 'original_title')
+    )
+
+
+def calculate_tmdb_missing_plot_metric():
+    stats = (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False)
+        .filter(Q(plot__isnull=True) | Q(plot=''))
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
+    )
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_tmdb_missing_plot_list(show_type: str):
+    return (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type)
         .filter(Q(plot__isnull=True) | Q(plot=''))
         .values('id', 'title', 'original_title')
     )
@@ -376,7 +437,7 @@ def get_missing_plot_list(show_type: str):
 
 def calculate_no_genres_metric():
     stats = (
-        Show.objects.filter(genres__isnull=True)
+        Show.objects.filter(kinopub_id__isnull=False, genres__isnull=True)
         .values('type')
         .annotate(total=Count('id'))
         .order_by('-total')
@@ -385,14 +446,30 @@ def calculate_no_genres_metric():
 
 
 def get_no_genres_list(show_type: str):
-    return Show.objects.filter(type=show_type, genres__isnull=True).values(
-        'id', 'title', 'original_title'
+    return Show.objects.filter(
+        kinopub_id__isnull=False, type=show_type, genres__isnull=True
+    ).values('id', 'title', 'original_title')
+
+
+def calculate_tmdb_no_genres_metric():
+    stats = (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False, genres__isnull=True)
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
     )
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_tmdb_no_genres_list(show_type: str):
+    return Show.objects.filter(
+        kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type, genres__isnull=True
+    ).values('id', 'title', 'original_title')
 
 
 def calculate_no_countries_metric():
     stats = (
-        Show.objects.filter(countries__isnull=True)
+        Show.objects.filter(kinopub_id__isnull=False, countries__isnull=True)
         .values('type')
         .annotate(total=Count('id'))
         .order_by('-total')
@@ -401,9 +478,25 @@ def calculate_no_countries_metric():
 
 
 def get_no_countries_list(show_type: str):
-    return Show.objects.filter(type=show_type, countries__isnull=True).values(
-        'id', 'title', 'original_title'
+    return Show.objects.filter(
+        kinopub_id__isnull=False, type=show_type, countries__isnull=True
+    ).values('id', 'title', 'original_title')
+
+
+def calculate_tmdb_no_countries_metric():
+    stats = (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False, countries__isnull=True)
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
     )
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_tmdb_no_countries_list(show_type: str):
+    return Show.objects.filter(
+        kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type, countries__isnull=True
+    ).values('id', 'title', 'original_title')
 
 
 def calculate_total_persons_by_show_type_metric():
@@ -508,14 +601,16 @@ def calculate_professions_stats_metric():
 
 
 def calculate_missing_status_metric():
-    qs = Show.objects.filter(type__in=SERIES_TYPES).filter(Q(status__isnull=True) | Q(status=''))
+    qs = Show.objects.filter(kinopub_id__isnull=False, type__in=SERIES_TYPES).filter(
+        Q(status__isnull=True) | Q(status='')
+    )
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
     return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
 
 
 def get_missing_status_list(show_type: str):
     return (
-        Show.objects.filter(type=show_type)
+        Show.objects.filter(kinopub_id__isnull=False, type=show_type)
         .filter(Q(status__isnull=True) | Q(status=''))
         .values('id', 'title', 'original_title')
     )
@@ -741,7 +836,7 @@ def get_unmapped_genres_list():
 
 def calculate_missing_durations_metric():
     stats = (
-        Show.objects.filter(showduration__isnull=True)
+        Show.objects.filter(kinopub_id__isnull=False, showduration__isnull=True)
         .values('type')
         .annotate(total=Count('id'))
         .order_by('-total')
@@ -750,9 +845,27 @@ def calculate_missing_durations_metric():
 
 
 def get_missing_durations_list(show_type: str):
-    return Show.objects.filter(type=show_type, showduration__isnull=True).values(
-        'id', 'title', 'original_title'
+    return Show.objects.filter(
+        kinopub_id__isnull=False, type=show_type, showduration__isnull=True
+    ).values('id', 'title', 'original_title')
+
+
+def calculate_tmdb_missing_durations_metric():
+    stats = (
+        Show.objects.filter(
+            kinopub_id__isnull=True, tmdb_id__isnull=False, showduration__isnull=True
+        )
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
     )
+    return [{'name': _format_type(item['type']), 'value': item['total']} for item in stats]
+
+
+def get_tmdb_missing_durations_list(show_type: str):
+    return Show.objects.filter(
+        kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type, showduration__isnull=True
+    ).values('id', 'title', 'original_title')
 
 
 def calculate_unused_persons_metric():

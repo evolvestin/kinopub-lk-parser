@@ -6,6 +6,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.models import Country, Genre, Person, Show, ShowCrew, ShowDuration
+from shared.constants import SERIES_TYPES, SHOW_TYPE_MAPPING, ShowType
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,7 @@ def sync_show_from_tmdb(
     target_tmdb_id = tmdb_id or (show.tmdb_id if show else None)
     target_imdb_id = imdb_id or (show.imdb_id if show else None)
 
-    if show and show.type in ['Series', 'Documentary Series', 'TV Show']:
+    if show and show.type in SERIES_TYPES:
         media_type = 'tv'
 
     if not target_tmdb_id and target_imdb_id:
@@ -172,7 +173,11 @@ def sync_show_from_tmdb(
         show.status = TMDB_STATUS_MAPPING.get(status_str, status_str)
 
     if not show.type or show.type == 'Unknown':
-        show.type = 'Series' if media_type == 'tv' else 'Movie'
+        show.type = (
+            SHOW_TYPE_MAPPING[ShowType.SERIES]
+            if media_type == 'tv'
+            else SHOW_TYPE_MAPPING[ShowType.MOVIE]
+        )
 
     show.save()
 

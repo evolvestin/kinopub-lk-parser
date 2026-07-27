@@ -7,6 +7,7 @@ from redis import Redis
 from app.management.base import LoggableBaseCommand
 from app.models import TaskRun
 from kinopub_parser import celery_app
+from shared.constants import TaskRunStatus
 
 
 class Command(LoggableBaseCommand):
@@ -36,12 +37,13 @@ class Command(LoggableBaseCommand):
                         f'Key "{key.decode() if isinstance(key, bytes) else key}" deleted.'
                     )
 
-            # Сбрасываем все зависшие TaskRun
-            stuck_tasks = TaskRun.objects.filter(status__in=['RUNNING', 'QUEUED'])
+            stuck_tasks = TaskRun.objects.filter(
+                status__in=[TaskRunStatus.RUNNING, TaskRunStatus.QUEUED]
+            )
             stuck_count = stuck_tasks.count()
             if stuck_count > 0:
                 stuck_tasks.update(
-                    status='FAILURE',
+                    status=TaskRunStatus.FAILURE,
                     error_message='Forced reset via resetlocks. Check logs for TimeLimitExceeded.',
                 )
                 logging.info(f'Marked {stuck_count} tasks as FAILURE.')

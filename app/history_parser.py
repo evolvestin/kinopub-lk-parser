@@ -39,6 +39,7 @@ from shared.constants import (
     SERIES_TYPES,
     SHOW_STATUS_MAPPING,
     SHOW_TYPE_MAPPING,
+    ParserSessionType,
 )
 from shared.formatters import format_se
 
@@ -96,9 +97,11 @@ def _extract_int_from_string(text):
     return int(digits)
 
 
-def update_show_details(driver, kinopub_id, force=False, session_type='main'):
+def update_show_details(driver, kinopub_id, force=False, session_type=ParserSessionType.MAIN):
     target_path = f'item/view/{kinopub_id}'
-    base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
+    base_url = (
+        settings.SITE_URL if session_type == ParserSessionType.MAIN else settings.SITE_AUX_URL
+    )
 
     try:
         driver = open_url_safe(
@@ -322,7 +325,7 @@ def get_chrome_major_version():
     return None
 
 
-def setup_driver(headless=True, profile_key='main', randomize=False):
+def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=False):
     if headless:
         try:
             subprocess.run(
@@ -576,10 +579,10 @@ def do_login(driver, login, password, cookie_path, base_url):
         return False
 
 
-def initialize_driver_session(headless=True, session_type='main'):
+def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN):
     logging.info(f'Initializing Selenium driver session (Type: {session_type})...')
 
-    if session_type == 'aux':
+    if session_type == ParserSessionType.AUX:
         target_url = settings.SITE_AUX_URL
         login = settings.KINOPUB_AUX_LOGIN
         password = settings.KINOPUB_AUX_PASSWORD
@@ -984,7 +987,7 @@ def get_latest_view_date_orm(mode: str):
         return None
 
 
-def open_url_safe(driver, url, headless=True, session_type='main'):
+def open_url_safe(driver, url, headless=True, session_type=ParserSessionType.MAIN):
     driver.get(url)
     try:
         if is_cloudflare_page(driver):
@@ -1005,18 +1008,26 @@ def open_url_safe(driver, url, headless=True, session_type='main'):
         if '/user/login' in driver.current_url and '/user/login' not in url:
             logging.warning('Сессия истекла (редирект на логин). Попытка повторной авторизации...')
 
-            login = settings.KINOPUB_LOGIN if session_type == 'main' else settings.KINOPUB_AUX_LOGIN
+            login = (
+                settings.KINOPUB_LOGIN
+                if session_type == ParserSessionType.MAIN
+                else settings.KINOPUB_AUX_LOGIN
+            )
             password = (
                 settings.KINOPUB_PASSWORD
-                if session_type == 'main'
+                if session_type == ParserSessionType.MAIN
                 else settings.KINOPUB_AUX_PASSWORD
             )
             cookie_path = (
                 settings.COOKIES_FILE_PATH_MAIN
-                if session_type == 'main'
+                if session_type == ParserSessionType.MAIN
                 else settings.COOKIES_FILE_PATH_AUX
             )
-            base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
+            base_url = (
+                settings.SITE_URL
+                if session_type == ParserSessionType.MAIN
+                else settings.SITE_AUX_URL
+            )
 
             if do_login(driver, login, password, cookie_path, base_url):
                 logging.info('Авторизация восстановлена. Переход к целевому URL.')

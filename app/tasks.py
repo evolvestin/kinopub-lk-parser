@@ -30,9 +30,7 @@ from app.models import (
     ViewUser,
 )
 from app.services.error_aggregator import ErrorAggregator
-from app.services.metrics import (
-    generate_global_metrics_snapshot,
-)
+from app.services.metrics import generate_global_metrics_snapshot
 from app.services.stats_calculator import generate_user_stats
 from app.services.tmdb_client import sync_show_from_tmdb
 from app.telegram_bot import TelegramSender
@@ -42,6 +40,8 @@ from shared.constants import (
     ParserSessionType,
     RedisLock,
     RedisQueue,
+    TaskRunStatus,
+    UserRole,
 )
 from shared.formatters import format_se
 
@@ -214,7 +214,7 @@ def backup_cookies():
 
 
 def _execute_admin_command_process(celery_task_id, task_run):
-    task_run.status = 'RUNNING'
+    task_run.status = TaskRunStatus.RUNNING
     task_run.celery_task_id = celery_task_id
     task_run.save()
 
@@ -233,7 +233,7 @@ def _execute_admin_command_process(celery_task_id, task_run):
         try:
             while True:
                 task_run.refresh_from_db()
-                if task_run.status == 'STOPPED':
+                if task_run.status == TaskRunStatus.STOPPED:
                     process.terminate()
                     try:
                         process.wait(timeout=10)
@@ -257,9 +257,9 @@ def _execute_admin_command_process(celery_task_id, task_run):
                     task_run.output = (out_text + '\n' + err_text).strip()
 
                     if retcode == 0:
-                        task_run.status = 'SUCCESS'
+                        task_run.status = TaskRunStatus.SUCCESS
                     else:
-                        task_run.status = 'FAILURE'
+                        task_run.status = TaskRunStatus.FAILURE
                         task_run.error_message = f'Exit code: {retcode}'
 
                         full_log = err_text.strip() or out_text.strip() or 'No output captured'
@@ -287,7 +287,7 @@ def _execute_admin_command_process(celery_task_id, task_run):
             logging.error(
                 f'Internal error executing command {task_run.command}: {e}', exc_info=True
             )
-            task_run.status = 'FAILURE'
+            task_run.status = TaskRunStatus.FAILURE
             task_run.error_message = f'Worker exception: {str(e)}'
             task_run.save()
 
@@ -315,9 +315,9 @@ def run_admin_command(self, task_run_id):
     }
 
     if task_run.command in selenium_commands:
-        with _redis_lock('selenium_global_lock', timeout=14400) as acquired:
+        with _redis_lock(RedisLock.SELENIUM_GLOBAL, timeout=14400) as acquired:
             if not acquired:
-                task_run.status = 'FAILURE'
+                task_run.status = TaskRunStatus.FAILURE
                 task_run.output = (
                     '[System] Отменено: другая задача парсинга (Selenium) уже выполняется.'
                 )
@@ -496,7 +496,9 @@ def precalculate_user_stats(user_id, year=None):
 @safe_execution
 def precalculate_all_stats():
     current_year = timezone.now().year
-    active_users = ViewUser.objects.filter(role__in=['viewer', 'admin'], is_bot_active=True)
+    active_users = ViewUser.objects.filter(
+        role__in=[UserRole.VIEWER, UserRole.ADMIN], is_bot_active=True
+    )
     for user in active_users:
         precalculate_user_stats.delay(user.id, year=current_year)
         precalculate_user_stats.delay(user.id, year=None)
@@ -634,7 +636,7 @@ def sync_tmdb_metadata_task(
     if show:
         try:
             r = Redis.from_url(settings.CELERY_BROKER_URL)
-            r.sadd('queue:priority_ratings_sync', show.id)
+            r.sadd(RedisQueue.PRIORITY_RATINGS_SYNC, show.id)
         except Exception as e:
             logging.error(f'Failed to enqueue priority ratings sync for show {show.id}: {e}')
 

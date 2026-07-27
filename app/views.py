@@ -62,6 +62,12 @@ from app.services.metrics import (
     get_no_countries_list,
     get_no_genres_list,
     get_title_collision_list,
+    get_tmdb_missing_durations_list,
+    get_tmdb_missing_plot_list,
+    get_tmdb_missing_status_list,
+    get_tmdb_missing_year_list,
+    get_tmdb_no_countries_list,
+    get_tmdb_no_genres_list,
     get_tmdb_no_kp_list,
     get_tmdb_only_shows_list,
     get_total_genres_list,
@@ -86,6 +92,8 @@ from shared.constants import (
     RAW_TO_NORMALIZED_RU,
     SHOW_STATUS_DISPLAY_RU,
     SHOW_TYPE_DISPLAY_RU,
+    DatePrecision,
+    RedisQueue,
     UserRole,
 )
 from shared.formatters import format_precision_date, format_se
@@ -328,7 +336,7 @@ def check_bot_user(request, telegram_id):
             }
         )
     except ViewUser.DoesNotExist:
-        return JsonResponse({'exists': False, 'role': UserRole.GUEST})
+        return JsonResponse({'exists': False, 'role': UserRole.GUEST.value})
 
 
 @csrf_exempt
@@ -1013,7 +1021,7 @@ def bot_assign_group_view(request):
 
 def webapp_index(request):
     view_user = get_webapp_user(request)
-    user_role = view_user.role if view_user else 'guest'
+    user_role = view_user.role if view_user else UserRole.GUEST.value
     context = {
         'is_debug': settings.ENVIRONMENT == 'DEV',
         'user_role': user_role,
@@ -1841,8 +1849,8 @@ def get_metric_details(request, key):
     is_person_metric = any(
         x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo', 'unused_persons']
     )
-    is_country_metric = 'country' in key
-    is_genre_metric = 'genre' in key
+    is_country_metric = 'country' in key and key != 'tmdb_no_countries'
+    is_genre_metric = 'genre' in key and key != 'tmdb_no_genres'
 
     if is_person_metric:
         admin_base_url = reverse('admin:app_person_changelist')
@@ -1901,27 +1909,100 @@ def get_metric_details(request, key):
         query_params['type'] = db_show_type
     elif key == 'missing_year':
         items = list(get_missing_year_list(db_show_type))
-        query_params.update({'type': db_show_type, 'year__isnull': 'True'})
+        query_params.update(
+            {'type': db_show_type, 'kinopub_id__isnull': 'False', 'year__isnull': 'True'}
+        )
+    elif key == 'tmdb_missing_year':
+        items = list(get_tmdb_missing_year_list(db_show_type))
+        query_params.update(
+            {
+                'type': db_show_type,
+                'kinopub_id__isnull': 'True',
+                'tmdb_id__isnull': 'False',
+                'year__isnull': 'True',
+            }
+        )
     elif key == 'missing_status':
         items = list(get_missing_status_list(db_show_type))
-        query_params.update({'type': db_show_type, 'status__isnull': 'True'})
+        query_params.update(
+            {'type': db_show_type, 'kinopub_id__isnull': 'False', 'status__isnull': 'True'}
+        )
+    elif key == 'tmdb_missing_status':
+        items = list(get_tmdb_missing_status_list(db_show_type))
+        query_params.update(
+            {
+                'type': db_show_type,
+                'kinopub_id__isnull': 'True',
+                'tmdb_id__isnull': 'False',
+                'status__isnull': 'True',
+            }
+        )
     elif key == 'missing_plot':
         items = list(get_missing_plot_list(db_show_type))
-        query_params.update({'type': db_show_type, 'plot__isnull': 'True'})
+        query_params.update(
+            {'type': db_show_type, 'kinopub_id__isnull': 'False', 'plot__isnull': 'True'}
+        )
+    elif key == 'tmdb_missing_plot':
+        items = list(get_tmdb_missing_plot_list(db_show_type))
+        query_params.update(
+            {
+                'type': db_show_type,
+                'kinopub_id__isnull': 'True',
+                'tmdb_id__isnull': 'False',
+                'plot__isnull': 'True',
+            }
+        )
     elif key == 'missing_durations':
         items = list(get_missing_durations_list(db_show_type))
-        query_params.update({'type': db_show_type, 'showduration__isnull': 'True'})
+        query_params.update(
+            {'type': db_show_type, 'kinopub_id__isnull': 'False', 'showduration__isnull': 'True'}
+        )
+        target_task = 'durations'
+    elif key == 'tmdb_missing_durations':
+        items = list(get_tmdb_missing_durations_list(db_show_type))
+        query_params.update(
+            {
+                'type': db_show_type,
+                'kinopub_id__isnull': 'True',
+                'tmdb_id__isnull': 'False',
+                'showduration__isnull': 'True',
+            }
+        )
         target_task = 'durations'
     elif key == 'no_genres':
         items = list(get_no_genres_list(db_show_type))
-        query_params.update({'type': db_show_type, 'genres__isnull': 'True'})
+        query_params.update(
+            {'type': db_show_type, 'kinopub_id__isnull': 'False', 'genres__isnull': 'True'}
+        )
+    elif key == 'tmdb_no_genres':
+        items = list(get_tmdb_no_genres_list(db_show_type))
+        query_params.update(
+            {
+                'type': db_show_type,
+                'kinopub_id__isnull': 'True',
+                'tmdb_id__isnull': 'False',
+                'genres__isnull': 'True',
+            }
+        )
     elif key == 'total_genres':
         is_genre, items = True, list(get_total_genres_list(db_show_type))
     elif key == 'unmapped_genres':
         is_genre, items = True, list(get_unmapped_genres_list())
     elif key == 'no_countries':
         items = list(get_no_countries_list(db_show_type))
-        query_params.update({'type': db_show_type, 'countries__isnull': 'True'})
+        query_params.update(
+            {'type': db_show_type, 'kinopub_id__isnull': 'False', 'countries__isnull': 'True'}
+        )
+    elif key == 'tmdb_no_countries':
+        items = list(get_tmdb_no_countries_list(db_show_type))
+        query_params.update(
+            {
+                'type': db_show_type,
+                'kinopub_id__isnull': 'True',
+                'tmdb_id__isnull': 'False',
+                'countries__isnull': 'True',
+            }
+        )
     elif key == 'has_kp':
         is_summary = True
         query_params.update({'type': db_show_type, 'ext_rating__kp__isnull': 'False'})
@@ -1980,9 +2061,9 @@ def get_metric_details(request, key):
     try:
         r = Redis.from_url(settings.CELERY_BROKER_URL)
         all_queued = (
-            {int(x) for x in r.smembers('queue:update_details')}
-            | {int(x) for x in r.smembers('queue:priority_ratings_sync')}
-            | {int(x) for x in r.smembers('queue:update_durations')}
+            {int(x) for x in r.smembers(RedisQueue.UPDATE_DETAILS)}
+            | {int(x) for x in r.smembers(RedisQueue.PRIORITY_RATINGS_SYNC)}
+            | {int(x) for x in r.smembers(RedisQueue.UPDATE_DURATIONS)}
         )
     except Exception:
         all_queued = set()
@@ -2025,7 +2106,7 @@ def get_metric_details(request, key):
                 }
             )
         else:
-            kinopub_id = item.get('kinopub_id') or item['id']
+            kinopub_id = item.get('kinopub_id')
             item.update(
                 {
                     'in_queue': item['id'] in all_queued,
@@ -2064,11 +2145,11 @@ def queue_update_details(request):
             return JsonResponse({'status': 'ok', 'added': 0})
 
         if target == 'priority_sync':
-            redis_key = 'queue:priority_ratings_sync'
+            redis_key = RedisQueue.PRIORITY_RATINGS_SYNC
         elif target == 'durations':
-            redis_key = 'queue:update_durations'
+            redis_key = RedisQueue.UPDATE_DURATIONS
         else:
-            redis_key = 'queue:update_details'
+            redis_key = RedisQueue.UPDATE_DETAILS
 
         r = Redis.from_url(settings.CELERY_BROKER_URL)
         added = r.sadd(redis_key, *ids)
@@ -2469,11 +2550,11 @@ def admin_get_folder_content(request, folder_id):
 def _parse_date_by_mode(date_mode: str, date_val: str | None):
     if not date_val:
         return None
-    if date_mode == 'exact':
+    if date_mode == DatePrecision.EXACT:
         return datetime.strptime(str(date_val), '%Y-%m-%d').date()
-    elif date_mode == 'month':
+    elif date_mode == DatePrecision.MONTH:
         return datetime.strptime(str(date_val), '%Y-%m').date()
-    elif date_mode == 'year':
+    elif date_mode == DatePrecision.YEAR:
         return datetime.strptime(str(date_val), '%Y').date()
     return None
 
@@ -2490,7 +2571,7 @@ def webapp_add_view(request):
         show_id = body.get('show_id')
         season = int(body.get('season') or 0)
         episode = int(body.get('episode') or 0)
-        date_mode = body.get('date_mode', 'exact')
+        date_mode = body.get('date_mode', DatePrecision.EXACT)
         date_val = body.get('date_val')
         target_me = body.get('target_me', True)
         target_group = body.get('target_group', True)
@@ -2563,7 +2644,7 @@ def webapp_remove_view(request):
             show_id = body.get('show_id')
             season = int(body.get('season') or 0)
             episode = int(body.get('episode') or 0)
-            date_mode = body.get('date_mode', 'exact')
+            date_mode = body.get('date_mode', DatePrecision.EXACT)
             date_val = body.get('date_val')
 
             view_date = _parse_date_by_mode(date_mode, date_val)
