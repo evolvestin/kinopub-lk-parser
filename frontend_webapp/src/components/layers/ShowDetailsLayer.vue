@@ -50,7 +50,7 @@
       <div class="show-meta-tags">
         <div v-if="show.year" class="sm-tag clickable" @click="uiStore.openLayer('year', show.year)">{{ show.year }}</div>
         <div v-if="show.type" class="sm-tag clickable" style="color:var(--info)" @click="uiStore.openLayer('show_type', show.type)">{{ showTypeRu }}</div>
-        <div v-if="show.status" class="sm-tag clickable" @click="uiStore.openLayer('status', show.status)">{{ showStatusRu }}</div>
+        <div v-if="shouldShowStatus" class="sm-tag clickable" @click="uiStore.openLayer('status', show.status)">{{ showStatusRu }}</div>
       </div>
 
       <div class="show-meta-tags">
@@ -327,6 +327,12 @@ const showStatusRu = computed(() => {
     'Pre Production': 'Препродакшен'
   }
   return mapping[show.value.status] || show.value.status || ''
+})
+
+const shouldShowStatus = computed(() => {
+  if (!show.value || !show.value.status) return false
+  if (!isSeries.value && ['Finished', 'Ongoing'].includes(show.value.status)) return false
+  return true
 })
 
 const lastViewDisplay = computed(() => {

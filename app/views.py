@@ -110,6 +110,25 @@ ALLOWED_PROXY_DOMAINS = (
 )
 
 
+def _get_normalized_countries_strings(countries_iterable, country_dict=None):
+    if country_dict is None:
+        country_dict = dict(Country.objects.values_list('name', 'emoji_flag'))
+    norm_countries = []
+    seen = set()
+    for c in countries_iterable:
+        norm_name = RAW_TO_NORMALIZED_COUNTRY.get(c.name, c.name)
+        if norm_name in seen:
+            continue
+        seen.add(norm_name)
+        
+        emoji = country_dict.get(norm_name) or country_dict.get(c.name)
+        if emoji:
+            norm_countries.append(f'{emoji} {norm_name}')
+        else:
+            norm_countries.append(norm_name)
+    return sorted(norm_countries)
+
+
 def redirect_index(request):
     return render(request, 'redirect.html', {'site_url': settings.SITE_AUX_URL})
 
@@ -262,16 +281,7 @@ def _serialize_show_details(show, user=None):
             }
         )
 
-    normalized_countries = []
-    for country in show.countries.all():
-        norm_name = RAW_TO_NORMALIZED_COUNTRY.get(country.name, country.name)
-        if norm_name != country.name:
-            target = Country.objects.filter(name=norm_name).first()
-            if target:
-                normalized_countries.append(str(target))
-                continue
-        normalized_countries.append(str(country))
-    normalized_countries = sorted(list(set(normalized_countries)))
+    normalized_countries = _get_normalized_countries_strings(show.countries.all())
 
     return {
         'id': show.id,
@@ -565,6 +575,8 @@ def bot_search_shows(request):
     show_ids = [s.id for s in shows]
     user_ratings = _get_user_ratings_for_shows(user, show_ids)
 
+    country_dict = dict(Country.objects.values_list('name', 'emoji_flag'))
+
     results = []
     for show in shows:
         poster_url = get_poster_url(show.id)
@@ -583,7 +595,7 @@ def bot_search_shows(request):
                 'kinopoisk_rating': show.kinopoisk_rating,
                 'imdb_url': show.imdb_url,
                 'kinopoisk_url': show.kinopoisk_url,
-                'countries': [str(c) for c in show.countries.all()[:3]],
+                'countries': _get_normalized_countries_strings(show.countries.all(), country_dict)[:3],
                 'genres': show.display_genres[:3],
                 'internal_rating': internal_rating,
                 'user_ratings': user_ratings_list,
@@ -1543,6 +1555,9 @@ def webapp_get_show_full(request, show_id):
                     countries_data.append(
                         {'id': target.id, 'name': target.name, 'emoji': target.emoji_flag}
                     )
+                    continue
+                else:
+                    countries_data.append({'id': c.id, 'name': norm_name, 'emoji': None})
                     continue
             countries_data.append({'id': c.id, 'name': c.name, 'emoji': c.emoji_flag})
 

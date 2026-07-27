@@ -50,7 +50,8 @@ def get_show_card_text(
     if show_type:
         meta_data.append(f'🎭 {SHOW_TYPE_DISPLAY_RU.get(show_type, show_type)}')
     if status:
-        meta_data.append(SHOW_STATUS_DISPLAY_RU.get(status, status))
+        if show_type in SERIES_TYPES or status not in ('Finished', 'Ongoing'):
+            meta_data.append(SHOW_STATUS_DISPLAY_RU.get(status, status))
 
     if meta_data:
         lines.append(' | '.join(meta_data))
