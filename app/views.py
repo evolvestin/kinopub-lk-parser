@@ -120,7 +120,7 @@ def _get_normalized_countries_strings(countries_iterable, country_dict=None):
         if norm_name in seen:
             continue
         seen.add(norm_name)
-        
+
         emoji = country_dict.get(norm_name) or country_dict.get(c.name)
         if emoji:
             norm_countries.append(f'{emoji} {norm_name}')
@@ -595,7 +595,9 @@ def bot_search_shows(request):
                 'kinopoisk_rating': show.kinopoisk_rating,
                 'imdb_url': show.imdb_url,
                 'kinopoisk_url': show.kinopoisk_url,
-                'countries': _get_normalized_countries_strings(show.countries.all(), country_dict)[:3],
+                'countries': _get_normalized_countries_strings(show.countries.all(), country_dict)[
+                    :3
+                ],
                 'genres': show.display_genres[:3],
                 'internal_rating': internal_rating,
                 'user_ratings': user_ratings_list,
