@@ -45,8 +45,7 @@ def _aggregate_by_display_type(stats_qs, type_field='type', count_field='total')
         display_name = _format_type(raw_type)
         merged[display_name] += item.get(count_field, 0)
     return [
-        {'name': k, 'value': v}
-        for k, v in sorted(merged.items(), key=lambda x: x[1], reverse=True)
+        {'name': k, 'value': v} for k, v in sorted(merged.items(), key=lambda x: x[1], reverse=True)
     ]
 
 

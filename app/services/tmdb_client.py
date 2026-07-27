@@ -74,8 +74,12 @@ class TMDBClient:
             response = self.session.get(endpoint, headers=headers, params=params, timeout=10)
             if response.status_code == 200:
                 return response.json()
+            elif response.status_code == 404:
+                return None
+            response.raise_for_status()
         except requests.RequestException as e:
-            logger.error(f'TMDB get_details error for {media_type}/{tmdb_id}: {e}')
+            logger.warning(f'TMDB get_details network issue for {media_type}/{tmdb_id}: {e}')
+            raise
         return None
 
     def find_by_imdb_id(self, imdb_id: str) -> tuple[dict | None, str | None]:
@@ -95,8 +99,12 @@ class TMDBClient:
                 tv_results = data.get('tv_results', [])
                 if tv_results:
                     return tv_results[0], 'tv'
+            elif response.status_code == 404:
+                return None, None
+            response.raise_for_status()
         except requests.RequestException as e:
-            logger.error(f'TMDB find_by_imdb_id error for {imdb_id}: {e}')
+            logger.warning(f'TMDB find_by_imdb_id network issue for {imdb_id}: {e}')
+            raise
         return None, None
 
 
