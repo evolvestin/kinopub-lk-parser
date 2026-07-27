@@ -1,6 +1,7 @@
 import gzip
 import json
 import logging
+import os
 import tempfile
 import time
 from datetime import timedelta
@@ -61,24 +62,18 @@ class Command(LoggableBaseCommand):
         total_already_existed = 0
         start_time = time.time()
 
-        self.stdout.write(self.style.NOTICE(f'Initial shows count in DB: {initial_db_count}'))
-        self.stdout.write(self.style.NOTICE(f'Existing TMDB IDs in DB: {len(existing_tmdb_ids)}'))
+        logging.info(f'Initial shows count in DB: {initial_db_count}')
+        logging.info(f'Existing TMDB IDs in DB: {len(existing_tmdb_ids)}')
 
         for m_type in types_to_process:
-            self.stdout.write(
-                self.style.MIGRATE_HEADING(f'\n--- Processing {m_type.upper()} dump ---')
-            )
+            logging.info(f'--- Processing {m_type.upper()} dump ---')
 
             dump_file_path, used_date = self._download_dump(m_type, target_dates)
             if not dump_file_path:
-                self.stdout.write(
-                    self.style.ERROR(f'Failed to download dump for {m_type}. Skipping.')
-                )
+                logging.error(f'Failed to download dump for {m_type}. Skipping.')
                 continue
 
-            self.stdout.write(
-                self.style.SUCCESS(f'Successfully downloaded {m_type} dump for date {used_date}')
-            )
+            logging.info(f'Successfully downloaded {m_type} dump for date {used_date}')
 
             processed, added, existed = self._process_dump_file(
                 dump_file_path=dump_file_path,
@@ -94,16 +89,12 @@ class Command(LoggableBaseCommand):
         final_db_count = Show.objects.count()
         elapsed_time = round(time.time() - start_time, 2)
 
-        self.stdout.write(self.style.MIGRATE_HEADING('\n========================================'))
-        self.stdout.write(self.style.MIGRATE_HEADING('         IMPORT SUMMARY REPORT          '))
-        self.stdout.write(self.style.MIGRATE_HEADING('========================================'))
-        self.stdout.write(f'Execution Time:           {elapsed_time} seconds')
-        self.stdout.write(f'Initial Shows in DB:      {initial_db_count}')
-        self.stdout.write(f'Total Read from Dump:     {total_processed_dump}')
-        self.stdout.write(f'Already Existed (TMDB):   {total_already_existed}')
-        self.stdout.write(f'New Shows Added:          {total_added}')
-        self.stdout.write(f'Final Shows in DB:        {final_db_count}')
-        self.stdout.write(self.style.MIGRATE_HEADING('========================================\n'))
+        logging.info(
+            f'IMPORT SUMMARY REPORT | Execution Time: {elapsed_time}s | '
+            f'Initial Shows: {initial_db_count} | Read from Dump: {total_processed_dump} | '
+            f'Already Existed: {total_already_existed} | New Added: {total_added} | '
+            f'Final Shows: {final_db_count}'
+        )
 
     def _resolve_dump_dates(self, custom_date_str: str | None) -> list[str]:
         if custom_date_str:
@@ -119,7 +110,7 @@ class Command(LoggableBaseCommand):
 
         for d_str in dates:
             url = f'http://files.tmdb.org/p/exports/{file_prefix}_{d_str}.json.gz'
-            self.stdout.write(f'Attempting download: {url}')
+            logging.info(f'Attempting download: {url}')
 
             try:
                 response = requests.get(url, stream=True, timeout=30)
@@ -191,7 +182,7 @@ class Command(LoggableBaseCommand):
                         added_count += len(created)
                         batch_to_create.clear()
 
-                        self.stdout.write(
+                        logging.info(
                             f'Progress ({media_type}): Processed {processed_count} | '
                             f'Added {added_count} | Already in DB {already_existed_count}'
                         )
@@ -202,8 +193,6 @@ class Command(LoggableBaseCommand):
                 batch_to_create.clear()
 
         finally:
-            import os
-
             if os.path.exists(dump_file_path):
                 os.remove(dump_file_path)
 

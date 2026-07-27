@@ -111,7 +111,7 @@ ALLOWED_PROXY_DOMAINS = (
 
 
 def redirect_index(request):
-    return render(request, 'redirect.html', {'site_url': settings.SITE_URL})
+    return render(request, 'redirect.html', {'site_url': settings.SITE_AUX_URL})
 
 
 def metrics(request):

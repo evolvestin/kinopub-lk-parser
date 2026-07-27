@@ -55,10 +55,10 @@ class Command(LoggableBaseCommand):
         ids_to_scan = sorted(list(set(ids_to_scan)))
 
         if not ids_to_scan:
-            self.stdout.write(self.style.ERROR('No valid IDs provided for scanning.'))
+            logging.error('No valid IDs provided for scanning.')
             return
 
-        self.stdout.write(self.style.NOTICE(f'Found {len(ids_to_scan)} IDs to process.'))
+        logging.info(f'Found {len(ids_to_scan)} IDs to process.')
 
         driver = None
         processed_count = 0
@@ -69,7 +69,7 @@ class Command(LoggableBaseCommand):
                     logging.info('Initializing Selenium driver (aux account)...')
                     driver = initialize_driver_session(session_type='aux')
                     if not driver:
-                        self.stdout.write(self.style.ERROR('Failed to initialize driver.'))
+                        logging.error('Failed to initialize driver.')
                         return
 
                 logging.info(f'[{index}/{len(ids_to_scan)}] Processing KinoPub ID: {kinopub_id}')
@@ -103,12 +103,10 @@ class Command(LoggableBaseCommand):
                     continue
 
             if processed_count > 0:
-                self.stdout.write(
-                    self.style.SUCCESS(f'Successfully processed {processed_count} shows.')
-                )
+                logging.info(f'Successfully processed {processed_count} shows.')
                 BackupManager().schedule_backup()
             else:
-                self.stdout.write(self.style.WARNING('No shows were successfully processed.'))
+                logging.warning('No shows were successfully processed.')
 
         finally:
             close_driver(driver)

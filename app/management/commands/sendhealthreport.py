@@ -87,7 +87,7 @@ class Command(LoggableBaseCommand):
         chat_id = settings.DEV_CHANNEL_ID
 
         if not bot_token or not chat_id:
-            self.stdout.write(self.style.ERROR('BOT_TOKEN or DEV_CHANNEL_ID is not configured.'))
+            logging.error('BOT_TOKEN or DEV_CHANNEL_ID is not configured.')
             return
 
         now = timezone.now()
@@ -313,6 +313,6 @@ class Command(LoggableBaseCommand):
 
         success = _send_telegram_report(bot_token, chat_id, message_text)
         if success:
-            self.stdout.write(self.style.SUCCESS('Health report sent successfully.'))
+            logging.info('Health report sent successfully.')
         else:
-            self.stdout.write(self.style.ERROR('Failed to send health report after retries.'))
+            logging.error('Failed to send health report after retries.')

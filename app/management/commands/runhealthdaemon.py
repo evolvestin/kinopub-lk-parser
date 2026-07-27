@@ -15,7 +15,7 @@ class Command(LoggableBaseCommand):
     help = 'Runs a lightweight background loop to send health reports at a specific time.'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS('Health monitor daemon started.'))
+        logging.info('Health monitor daemon started.')
         last_run_date = None
 
         while True:
@@ -24,7 +24,7 @@ class Command(LoggableBaseCommand):
                 now = timezone.now()
 
                 if now.hour == 15 and now.date() != last_run_date:
-                    self.stdout.write(
+                    logging.info(
                         f'[{now.strftime("%Y-%m-%d %H:%M:%S")}] Triggering health report...'
                     )
                     threading.Thread(
@@ -33,7 +33,6 @@ class Command(LoggableBaseCommand):
                     last_run_date = now.date()
 
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f'Error in health daemon loop: {e}'))
-                logger.error(f'Error in health daemon loop: {e}', exc_info=True)
+                logging.error(f'Error in health daemon loop: {e}', exc_info=True)
 
             time.sleep(30)
