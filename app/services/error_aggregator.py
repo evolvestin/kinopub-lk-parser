@@ -6,9 +6,11 @@ import time
 from django.conf import settings
 from redis import Redis
 
+from shared.constants import RedisQueue
+
 
 class ErrorAggregator:
-    REDIS_KEY_QUEUE = 'queue:errors'
+    REDIS_KEY_QUEUE = RedisQueue.ERRORS
     REDIS_KEY_LAST_SENT = 'errors:last_sent'
     REDIS_PREFIX_DEDUP = 'dedup:error:'
 

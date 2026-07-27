@@ -40,6 +40,7 @@ from shared.constants import (
     SHOW_STATUS_MAPPING,
     SHOW_TYPE_MAPPING,
     ParserSessionType,
+    ShowType,
 )
 from shared.formatters import format_se
 
@@ -821,7 +822,11 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
                 original_title = title
 
             season, episode = 0, 0
-            item_type = 'Movie' if mode == 'movies' else 'Series'
+            item_type = (
+                SHOW_TYPE_MAPPING[ShowType.MOVIE]
+                if mode == 'movies'
+                else SHOW_TYPE_MAPPING[ShowType.SERIES]
+            )
 
             if mode == 'episodes':
                 try:
@@ -837,7 +842,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
                         if season == 0:
                             continue
                 except NoSuchElementException:
-                    item_type = 'Movie'
+                    item_type = SHOW_TYPE_MAPPING[ShowType.MOVIE]
 
             views_on_page.append(
                 {
@@ -936,7 +941,7 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
     unique_movie_ids_to_fetch = set()
     for item in views_on_page:
         show_id, season, episode = item['show_id'], item['season'], item['episode']
-        is_movie = item['type'] == 'Movie'
+        is_movie = item['type'] == SHOW_TYPE_MAPPING[ShowType.MOVIE]
 
         key = (show_id, None, None) if is_movie else (show_id, season, episode)
         updated_at = duration_map.get(key)

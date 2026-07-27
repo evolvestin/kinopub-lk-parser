@@ -64,6 +64,10 @@
                 <div style="color:var(--text-muted);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Нет данных</div>
                 <div style="font-size:12px;color:var(--text-muted);margin-top:4px;opacity:0.7;">Метрика еще не рассчитывалась</div>
               </template>
+              <template v-else-if="metric.severity === 'info'">
+                <div style="font-size:36px;margin-bottom:8px;opacity:0.6;">📭</div>
+                <div style="color:var(--text-muted);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Нет записей</div>
+              </template>
               <template v-else>
                 <div style="font-size:36px;margin-bottom:8px;filter:drop-shadow(0 0 8px rgba(46, 204, 113, 0.3));">✅</div>
                 <div style="color:var(--accent);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:0.5px;">Проблем не найдено</div>
