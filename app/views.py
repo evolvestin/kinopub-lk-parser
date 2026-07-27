@@ -16,7 +16,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Avg, Case, F, IntegerField, Max, Prefetch, Q, Sum, Value, When
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
@@ -74,6 +74,7 @@ from app.services.stats_calculator import (
     generate_user_stats,
 )
 from app.services.telegram_auth import validate_telegram_init_data
+from app.services.tmdb_client import get_tmdb_session
 from app.tasks import send_view_confirmation_task
 from app.telegram_bot import TelegramSender
 from app.utils import format_user_for_rating
@@ -91,6 +92,14 @@ from shared.formatters import format_precision_date, format_se
 from shared.media import get_poster_url
 
 logger = logging.getLogger('app')
+
+ALLOWED_PROXY_DOMAINS = (
+    'image.tmdb.org',
+    'kinopoisk.ru',
+    'avatars.mds.yandex.net',
+    'st.kp.yandex.net',
+    'hd.kinopoisk.ru',
+)
 
 
 def redirect_index(request):
@@ -3036,3 +3045,42 @@ def reject_person_photo_api(request):
         return JsonResponse({'error': 'Person not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def proxy_image_view(request):
+    image_url = request.GET.get('url')
+    if not image_url:
+        return HttpResponseBadRequest('Missing url parameter')
+
+    parsed = urllib.parse.urlparse(image_url)
+    if not parsed.netloc or not any(domain in parsed.netloc for domain in ALLOWED_PROXY_DOMAINS):
+        return HttpResponseBadRequest('Domain not allowed')
+
+    cache_key = f'img_proxy:{hashlib.md5(image_url.encode()).hexdigest()}'
+    cached_data = cache.get(cache_key)
+    if cached_data:
+        content, content_type = cached_data
+        response = HttpResponse(content, content_type=content_type)
+        response['Cache-Control'] = 'public, max-age=604800'
+        return response
+
+    try:
+        if 'tmdb.org' in parsed.netloc:
+            session = get_tmdb_session()
+        else:
+            session = requests.Session()
+
+        res = session.get(image_url, timeout=10)
+        if res.status_code == 200:
+            content_type = res.headers.get('Content-Type', 'image/jpeg')
+            content = res.content
+            cache.set(cache_key, (content, content_type), timeout=86400 * 7)
+            response = HttpResponse(content, content_type=content_type)
+            response['Cache-Control'] = 'public, max-age=604800'
+            return response
+        return HttpResponseNotFound('Image not found')
+    except Exception as e:
+        logger.error(f'Image proxy error for {image_url}: {e}')
+        return HttpResponseBadRequest('Proxy request failed')

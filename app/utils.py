@@ -1,5 +1,6 @@
 import logging
 import os
+import urllib.parse
 from datetime import timedelta
 
 from django.conf import settings
@@ -10,6 +11,14 @@ from redis import Redis
 from shared.constants import DATETIME_FORMAT, RedisQueue, UserRole
 
 logger = logging.getLogger(__name__)
+
+
+def get_proxied_image_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    if url.startswith('/api/image_proxy/'):
+        return url
+    return f'/api/image_proxy/?url={urllib.parse.quote(url, safe="")}'
 
 
 def format_user_for_rating(rater, current_user, override_public_user_id=None):

@@ -16,6 +16,7 @@ from app.models import (
     ShowCrew,
     SiteMetric,
 )
+from app.utils import get_proxied_image_url
 from kinopub_parser import celery_app
 from shared.constants import (
     GENRES_MAPPING,
@@ -580,8 +581,8 @@ def get_duplicate_photo_urls_list(source_type: str):
                 'id': p['id'],
                 'name': p['name'],
                 'en_name': p['en_name'],
-                'tmdb_photo_url': p['tmdb_photo_url'],
-                'kp_photo_url': p['kp_photo_url'],
+                'tmdb_photo_url': get_proxied_image_url(p['tmdb_photo_url']),
+                'kp_photo_url': get_proxied_image_url(p['kp_photo_url']),
                 'tmdb_id': p['tmdb_id'],
             }
         )
@@ -624,13 +625,15 @@ def get_duplicate_photo_urls_list(source_type: str):
             else:
                 tmdb_status = 'different'
 
+        proxied_main_url = get_proxied_image_url(url)
+
         results.append(
             {
                 'id': 0,
                 'title': f'Группа дубликатов ({url_counts[url]})',
                 'persons': persons_list,
-                'tmdb_photo_url': url if field == 'tmdb_photo_url' else None,
-                'kp_photo_url': url if field == 'kp_photo_url' else None,
+                'tmdb_photo_url': proxied_main_url if field == 'tmdb_photo_url' else None,
+                'kp_photo_url': proxied_main_url if field == 'kp_photo_url' else None,
                 'kp_status': kp_status,
                 'tmdb_status': tmdb_status,
                 'admin_url': f'/admin/app/person/?q={url}',

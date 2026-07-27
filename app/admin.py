@@ -55,6 +55,7 @@ from app.models import (
 )
 from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender
+from app.utils import get_proxied_image_url
 from app.views import sync_user_permissions
 from shared.constants import (
     ACTOR_ROLES,
@@ -788,10 +789,11 @@ class ViewUserAdmin(admin.ModelAdmin):
     @admin.display(description='Avatar Preview')
     def get_avatar_preview(self, obj):
         if obj.photo_url:
+            proxied_url = get_proxied_image_url(obj.photo_url)
             return format_html(
                 '<img src="{}" style="width: 50px; height: 50px; '
                 'border-radius: 50%; object-fit: cover;" />',
-                obj.photo_url,
+                proxied_url,
             )
         return '-'
 
@@ -1484,6 +1486,7 @@ class PersonAdmin(BaseNameAdmin):
         def _render_photo(url, label):
             if not url:
                 return ''
+            proxied_url = get_proxied_image_url(url)
             return format_html(
                 '<div style="text-align: center; margin-right: 15px;">'
                 '<img src="{}" style="width: 60px; height: 60px; border-radius: 50%; '
@@ -1491,7 +1494,7 @@ class PersonAdmin(BaseNameAdmin):
                 '<div style="font-size: 9px; font-weight: bold; margin-top: 3px; '
                 'color: var(--body-fg, #666); text-transform: uppercase;">{}</div>'
                 '</div>',
-                url,
+                proxied_url,
                 label,
             )
 
