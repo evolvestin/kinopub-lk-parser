@@ -346,6 +346,8 @@ def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=Fa
     options.add_argument('--disable-setuid-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--remote-debugging-host=127.0.0.1')
+    options.add_argument('--ignore-certificate-errors')
+    options.add_argument('--ignore-ssl-errors=yes')
 
     options.add_argument('--disable-blink-features=AutomationControlled')
     options.add_argument('--disable-infobars')
