@@ -433,7 +433,7 @@ if ENVIRONMENT == 'PROD':
             },
             'enrich_tmdb_shows': {
                 'task': 'app.tasks.enrich_tmdb_shows_task',
-                'schedule': crontab(minute=35, hour='*/2'),
+                'schedule': crontab(minute=35),
             },
         }
     )

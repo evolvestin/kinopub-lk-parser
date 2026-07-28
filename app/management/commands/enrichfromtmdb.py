@@ -5,6 +5,7 @@ import requests
 from celery.exceptions import SoftTimeLimitExceeded
 from django import db
 from django.db.models import Q
+from django.utils import timezone
 
 from app.management.base import LoggableBaseCommand
 from app.models import Show
@@ -66,6 +67,8 @@ class Command(LoggableBaseCommand):
 
                     if updated_show:
                         success_count += 1
+                    else:
+                        Show.objects.filter(id=show_id).update(updated_at=timezone.now())
 
                     processed_count += 1
                     consecutive_errors = 0
