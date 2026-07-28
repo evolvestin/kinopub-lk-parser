@@ -84,7 +84,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useTelegram } from '../../composables/useTelegram'
 import { icons } from '../../utils/icons'
-import { getUserColor, getRatingClass } from '../../utils/helpers'
+import { getUserColor, getRatingClass, getResizedPosterUrl } from '../../utils/helpers'
 
 const props = defineProps({
   show: { type: Object, required: true },
@@ -125,7 +125,7 @@ const rating = computed(() => {
 const currentPosterUrl = computed(() => {
   const url = props.show.poster_url || ''
   if (!url) return ''
-  return props.viewMode === 'grid' ? url.replace('/small/', '/medium/') : url
+  return props.viewMode === 'grid' ? getResizedPosterUrl(url, 'medium') : url
 })
 
 import { useWishlistStore } from '../../stores/wishlistStore'

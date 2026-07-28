@@ -89,7 +89,6 @@ from shared.constants import (
     PROFESSIONS_PLURAL_MAP_RU,
     RAW_TO_NORMALIZED_COUNTRY,
     RAW_TO_NORMALIZED_GENRE,
-    RAW_TO_NORMALIZED_RU,
     SHOW_STATUS_DISPLAY_RU,
     SHOW_TYPE_DISPLAY_RU,
     DatePrecision,
@@ -107,6 +106,13 @@ ALLOWED_PROXY_DOMAINS = (
     'avatars.mds.yandex.net',
     'st.kp.yandex.net',
     'hd.kinopoisk.ru',
+    'telegram.org',
+    't.me',
+    'kinopub.me',
+    'kinopub.net',
+    'kinopub.org',
+    'kinopub.cc',
+    'google.com',
 )
 
 
@@ -1495,8 +1501,8 @@ def webapp_get_show_full(request, show_id):
 
         for crew_member in show.showcrew_set.all():
             person = crew_member.person.canonical
-            norm_ru = RAW_TO_NORMALIZED_RU.get(crew_member.profession, crew_member.profession)
-            if not norm_ru:
+            norm_ru = crew_member.normalized_profession
+            if not norm_ru or norm_ru == '-':
                 norm_ru = 'Другое'
 
             if person.id in seen_canonical_by_prof[norm_ru]:
@@ -1708,13 +1714,16 @@ def webapp_get_collection(request, collection_type, item_id):
             shows = shows.filter(showcrew__person__id__in=target_ids)
             title = person.name
 
-            professions = (
-                ShowCrew.objects.filter(person_id__in=target_ids)
-                .exclude(profession__isnull=True)
-                .values_list('profession', flat=True)
-                .distinct()
+            crew_qs = ShowCrew.objects.filter(person_id__in=target_ids)
+            norm_profs = sorted(
+                list(
+                    {
+                        sc.normalized_profession
+                        for sc in crew_qs
+                        if sc.normalized_profession and sc.normalized_profession != '-'
+                    }
+                )
             )
-            norm_profs = sorted(list({RAW_TO_NORMALIZED_RU.get(p, p) for p in professions if p}))
 
             person_info = {
                 'photo_url': person.photo_url,
@@ -3153,7 +3162,13 @@ def proxy_image_view(request):
         return HttpResponseBadRequest('Missing url parameter')
 
     parsed = urllib.parse.urlparse(image_url)
-    if not parsed.netloc or not any(domain in parsed.netloc for domain in ALLOWED_PROXY_DOMAINS):
+    allowed_domains = ALLOWED_PROXY_DOMAINS
+    if settings.POSTER_BASE_URL:
+        poster_netloc = urllib.parse.urlparse(settings.POSTER_BASE_URL).netloc
+        if poster_netloc and poster_netloc not in allowed_domains:
+            allowed_domains = allowed_domains + (poster_netloc,)
+
+    if not parsed.netloc or not any(domain in parsed.netloc for domain in allowed_domains):
         return HttpResponseBadRequest('Domain not allowed')
 
     cache_key = f'img_proxy:{hashlib.md5(image_url.encode()).hexdigest()}'

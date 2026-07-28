@@ -395,6 +395,7 @@ RAW_TO_NORMALIZED_COUNTRY = {
     'Slovakia': 'Словакия',
     'Slovenia': 'Словения',
     'Solomon Islands': 'Соломоновы Острова',
+    'Somalia': 'Сомали',
     'South Africa': 'ЮАР',
     'South Georgia and the South Sandwich Islands': 'Южная Георгия и Южные Сандвичевы Острова',
     'South Korea': 'Южная Корея',

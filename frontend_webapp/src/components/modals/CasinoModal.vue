@@ -69,7 +69,7 @@
         <!-- Кулдаун (активный результат) -->
         <div v-else-if="state === 'cooldown' && activeSpin" class="casino-slot-container active">
           <div class="casino-slot-window">
-            <img :src="activeSpin.show.poster_url?.replace('/small/', '/medium/')" alt="" @error="handleImgFallback" />
+            <img :src="getResizedPosterUrl(activeSpin.show.poster_url, 'medium')" alt="" @error="handleImgFallback" />
             <div v-if="activeSpin.show.user_rating" class="grid-badges">
               <span class="rating-badge" :class="getRatingClass(activeSpin.show.user_rating)">
                 <span v-html="icons.star"></span>{{ activeSpin.show.user_rating }}
@@ -142,7 +142,7 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
-import { getRatingClass } from '../../utils/helpers'
+import { getRatingClass, getResizedPosterUrl } from '../../utils/helpers'
 
 const uiStore = useUIStore()
 const wishlistStore = useWishlistStore()
@@ -438,7 +438,7 @@ const selectFolder = async (folderId) => {
 
     const tick = () => {
       const rnd = pool[Math.floor(Math.random() * pool.length)]
-      currentPoster.value = rnd.poster_url?.replace('/small/', '/medium/') || ''
+      currentPoster.value = getResizedPosterUrl(rnd.poster_url, 'medium')
       
       const progress = elapsed / duration
       dimOpacity.value = progress * 0.7
@@ -487,7 +487,7 @@ const runMysteryPhase = (expiresMs) => {
 
 const runReveal = (expiresMs) => {
   if (winner.value) {
-    currentPoster.value = winner.value.poster_url?.replace('/small/', '/medium/') || ''
+    currentPoster.value = getResizedPosterUrl(winner.value.poster_url, 'medium')
   }
   state.value = 'reveal'
   dimOpacity.value = 0

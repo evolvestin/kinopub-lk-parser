@@ -5,9 +5,10 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import JSONField
 
-from app.utils import format_user_for_rating
+from app.utils import format_user_for_rating, get_proxied_image_url
 from shared.constants import (
     DATETIME_FORMAT,
+    PROFESSION_TRANS_MAP,
     RATING_VALUES,
     RAW_TO_NORMALIZED_EN,
     RAW_TO_NORMALIZED_GENRE,
@@ -88,7 +89,7 @@ class Person(BaseModel):
     @property
     def photo_url(self):
         target = self.canonical
-        return target.tmdb_photo_url or target.kp_photo_url
+        return get_proxied_image_url(target.tmdb_photo_url or target.kp_photo_url)
 
     def auto_resolve_kp_duplicate(self):
         if not self.kp_photo_url:
@@ -167,17 +168,23 @@ class ShowCrew(BaseModel):
 
     @property
     def normalized_profession(self):
-        return (
-            RAW_TO_NORMALIZED_RU.get(self.profession, self.profession) if self.profession else '-'
-        )
+        if self.profession and self.profession in RAW_TO_NORMALIZED_RU:
+            return RAW_TO_NORMALIZED_RU[self.profession]
+        if self.en_profession and self.en_profession in RAW_TO_NORMALIZED_EN:
+            norm_en = RAW_TO_NORMALIZED_EN[self.en_profession]
+            for ru_role, en_role in PROFESSION_TRANS_MAP.items():
+                if en_role == norm_en:
+                    return ru_role
+        return self.profession if self.profession else '-'
 
     @property
     def normalized_en_profession(self):
-        return (
-            RAW_TO_NORMALIZED_EN.get(self.en_profession, self.en_profession)
-            if self.en_profession
-            else '-'
-        )
+        if self.en_profession and self.en_profession in RAW_TO_NORMALIZED_EN:
+            return RAW_TO_NORMALIZED_EN[self.en_profession]
+        if self.profession and self.profession in RAW_TO_NORMALIZED_RU:
+            norm_ru = RAW_TO_NORMALIZED_RU[self.profession]
+            return PROFESSION_TRANS_MAP.get(norm_ru, norm_ru)
+        return self.en_profession if self.en_profession else '-'
 
     def __str__(self):
         return f'{self.person.name} - {self.normalized_profession}'

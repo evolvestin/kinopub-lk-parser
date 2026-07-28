@@ -97,3 +97,11 @@ export function handleImageFallback(primaryUrl, fallbackUrl, stateRef) {
     stateRef.value = null;
   }
 }
+
+
+export function getResizedPosterUrl(url, targetSize = 'medium') {
+  if (!url) return ''
+  return url
+    .replace(/\/(small|medium|big)\//g, `/${targetSize}/`)
+    .replace(/%2F(small|medium|big)%2F/gi, `%2F${targetSize}%2F`)
+}
