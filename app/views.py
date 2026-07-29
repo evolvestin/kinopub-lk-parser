@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 import requests
 from django.conf import settings
+from requests.adapters import HTTPAdapter
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
 from django.core.cache import cache
@@ -2915,6 +2916,19 @@ def merge_persons_api(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+_vite_session = None
+
+
+def _get_vite_session():
+    global _vite_session
+    if _vite_session is None:
+        _vite_session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=100, pool_maxsize=100, max_retries=2)
+        _vite_session.mount('http://', adapter)
+        _vite_session.mount('https://', adapter)
+    return _vite_session
+
+
 @csrf_exempt
 def vite_proxy_view(request, path=''):
     query_string = request.META.get('QUERY_STRING', '')
@@ -2925,9 +2939,10 @@ def vite_proxy_view(request, path=''):
 
     try:
         headers = {k: v for k, v in request.headers.items() if k.lower() != 'host'}
+        session = _get_vite_session()
 
-        proxy_response = requests.get(
-            upstream_url, headers=headers, stream=False, timeout=(3.0, 10.0)
+        proxy_response = session.get(
+            upstream_url, headers=headers, stream=False, timeout=(5.0, 30.0)
         )
 
         response = HttpResponse(
@@ -2955,7 +2970,7 @@ def vite_proxy_view(request, path=''):
 
     except Exception as e:
         logger.error(f'[ViteProxy] FAILED {upstream_url}: {str(e)}')
-        return HttpResponse(status=502)
+        return HttpResponse(status=504)
 
 
 @csrf_exempt

@@ -1,7 +1,7 @@
 <template>
   <div 
     v-if="viewMode === 'grid'" 
-    v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge, isAnimated]"
+    v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge, isAnimated, isBroken]"
     class="grid-item-wrap" 
     :class="{ 'anim-item': isAnimated, 'history-mode': isHistory, 'wiggle': isWiggling }"
     :data-id="show.id || show.show_id"
@@ -13,7 +13,7 @@
     </div>
 
     <div class="grid-item">
-      <div v-if="isBroken" class="grid-poster is-placeholder" v-html="icons.person_placeholder"></div>
+      <div v-if="isBroken" class="grid-poster is-placeholder" v-html="icons.film"></div>
       <img v-else :src="currentPosterUrl" class="grid-poster" loading="lazy" decoding="async" @load="validateImage" @error="handleError">
       
       <div class="grid-badges">
@@ -45,7 +45,7 @@
 
   <div 
     v-else 
-    v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge, isAnimated]" 
+    v-memo="[show.id || show.show_id, isHistory, isWiggling, showDeleteBadge, isAnimated, isBroken]" 
     class="hist-item clickable" 
     :class="{ 'anim-item': isAnimated, 'wiggle': isWiggling }" 
     :data-id="show.id || show.show_id" 
@@ -56,7 +56,7 @@
       <span v-html="icons.minus"></span>
     </div>
 
-    <div v-if="isBroken" class="hist-poster is-placeholder" v-html="icons.person_placeholder"></div>
+    <div v-if="isBroken" class="hist-poster is-placeholder" v-html="icons.film"></div>
     <img v-else :src="currentPosterUrl" class="hist-poster" loading="lazy" decoding="async" @load="validateImage" @error="handleError">
     <div class="hist-info">
       <div class="hist-title">{{ show.show__title || show.title }}</div>
@@ -79,12 +79,13 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
+import { useWishlistStore } from '../../stores/wishlistStore'
 import { useTelegram } from '../../composables/useTelegram'
 import { icons } from '../../utils/icons'
-import { getUserColor, getRatingClass, getResizedPosterUrl } from '../../utils/helpers'
+import { getUserColor, getRatingClass, getResizedPosterUrl, isImageBroken, markImageAsBroken } from '../../utils/helpers'
 
 const props = defineProps({
   show: { type: Object, required: true },
@@ -96,8 +97,27 @@ const props = defineProps({
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const { showConfirm } = useTelegram()
-const isBroken = ref(false)
 const isAnimated = ref(true)
+
+const wishlistStoreActive = computed(() => {
+  try {
+    return useWishlistStore()
+  } catch (e) {
+    return null
+  }
+})
+
+const currentPosterUrl = computed(() => {
+  const url = props.show.poster_url || ''
+  if (!url || isImageBroken(url)) return ''
+  return props.viewMode === 'grid' ? getResizedPosterUrl(url, 'medium') : url
+})
+
+const isBroken = ref(!currentPosterUrl.value)
+
+watch(() => currentPosterUrl.value, (newUrl) => {
+  isBroken.value = !newUrl || isImageBroken(newUrl)
+}, { immediate: true })
 
 const isHistory = computed(() => props.context === 'history' || props.context === 'wishlist')
 const isWiggling = computed(() => {
@@ -122,32 +142,20 @@ const rating = computed(() => {
   return props.show.user_rating || props.show.rating || props.show.user_show_rating
 })
 
-const currentPosterUrl = computed(() => {
-  const url = props.show.poster_url || ''
-  if (!url) return ''
-  return props.viewMode === 'grid' ? getResizedPosterUrl(url, 'medium') : url
-})
-
-import { useWishlistStore } from '../../stores/wishlistStore'
-const wishlistStoreActive = computed(() => {
-  try {
-    return useWishlistStore()
-  } catch (e) {
-    return null
-  }
-})
-
 const handleAnimationEnd = () => {
   isAnimated.value = false
 }
 
 const validateImage = (e) => {
   if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {
-    isBroken.value = true
+    handleError()
   }
 }
 
 const handleError = () => {
+  if (currentPosterUrl.value) {
+    markImageAsBroken(currentPosterUrl.value)
+  }
   isBroken.value = true
 }
 
@@ -166,7 +174,7 @@ const onDelete = (event) => {
 
   const el = event?.currentTarget?.closest('.grid-item-wrap, .hist-item')
 
-  showConfirm("Удалить эту запись?", (ok) => {
+  showConfirm('Удалить эту запись?', (ok) => {
     if (ok) {
       const itemId = props.historyId === 'wishlist_watched' 
           ? props.show.wl_item_id 

@@ -9,11 +9,12 @@
 
     <div class="unsub-content-wrap">
       <div class="hero-container unsub-hero-container" :style="{ height: posterHeight }">
-        <div class="hero-bg" :style="{ backgroundImage: activeBg ? `url(${activeBg})` : 'none' }"></div>
+        <div class="hero-bg" :style="{ backgroundImage: (activeBg && !isPosterBroken) ? `url(${activeBg})` : 'none' }"></div>
         <div class="hero-gradient"></div>
         
         <div style="position: relative; z-index: 3; height: 95%; max-width: 85%; aspect-ratio: 2/3; display: flex; align-items: flex-end;">
-          <img :src="activePoster" class="hero-poster" style="margin: 0; box-shadow: none;" alt="poster">
+          <div v-if="isPosterBroken" class="hero-poster is-placeholder" v-html="icons.film"></div>
+          <img v-else :src="activePoster" class="hero-poster" style="margin: 0; box-shadow: none;" alt="poster" @load="validatePoster" @error="handlePosterError">
         </div>
       </div>
 
@@ -303,6 +304,21 @@ watch(show, (newVal) => {
     })
   }
 })
+
+const isPosterBroken = ref(false)
+
+const handlePosterError = () => {
+  if (activePoster.value) {
+    markImageAsBroken(activePoster.value)
+  }
+  isPosterBroken.value = true
+}
+
+const validatePoster = (e) => {
+  if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {
+    handlePosterError()
+  }
+}
 </script>
 
 <style scoped>

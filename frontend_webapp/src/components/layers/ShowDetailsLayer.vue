@@ -8,12 +8,13 @@
     </div>
 
     <div class="hero-container">
-      <div class="hero-bg" :style="{ backgroundImage: activeBg ? `url(${activeBg})` : 'none' }"></div>
+      <div class="hero-bg" :style="{ backgroundImage: (activeBg && !isPosterBroken) ? `url(${activeBg})` : 'none' }"></div>
       <div class="hero-gradient"></div>
       
       <div style="position: relative; z-index: 3; height: 95%; max-width: 85%; aspect-ratio: 2/3; display: flex; align-items: flex-end;">
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: flex-end;">
-          <img :src="activePoster" class="hero-poster" style="margin: 0; box-shadow: none;" alt="poster">
+          <div v-if="isPosterBroken" class="hero-poster is-placeholder" v-html="icons.film"></div>
+          <img v-else :src="activePoster" class="hero-poster" style="margin: 0; box-shadow: none;" alt="poster" @load="validatePoster" @error="handlePosterError">
           
           <div class="grid-badges" style="position: absolute; top: 12px; left: 12px; right: auto; align-items: flex-start; z-index: 10;">
             <span v-if="currentPersonalRating" class="rating-badge" :class="getRatingClass(currentPersonalRating)" style="font-size: 20px; padding: 4px 10px; border-radius: 10px; gap: 5px; display: inline-flex; align-items: center; font-weight: 800; text-shadow: none;">
@@ -564,6 +565,22 @@ const openShowHistory = () => {
 const openRatingsDetails = (ratingType) => {
   uiStore.openModal('details', { showId: props.showId, ratingType })
 }
+
+const isPosterBroken = ref(false)
+
+const handlePosterError = () => {
+  if (activePoster.value) {
+    markImageAsBroken(activePoster.value)
+  }
+  isPosterBroken.value = true
+}
+
+const validatePoster = (e) => {
+  if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {
+    handlePosterError()
+  }
+}
+
 </script>
 
 <style scoped>
