@@ -33,7 +33,7 @@ def get_tmdb_session():
         if proxy:
             _tmdb_session.proxies = {
                 'http': proxy,
-                'style': proxy,
+                'https': proxy,
             }
         retry_strategy = Retry(
             total=3,

@@ -95,15 +95,11 @@ class ViteHMRConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         requested_protocols = self.scope.get('subprotocols', [])
 
-        if await cache.aget('vite_frontend_alive') is False:
-            await self.close()
-            return
-
         try:
             self.vite_ws = await websockets.connect(
                 'ws://frontend:5173/__vite__/hmr',
                 subprotocols=requested_protocols,
-                open_timeout=1.0,
+                open_timeout=3.0,
             )
 
             await self.accept(subprotocol=self.vite_ws.subprotocol)
@@ -111,7 +107,6 @@ class ViteHMRConsumer(AsyncWebsocketConsumer):
             self.proxy_task = asyncio.create_task(self._forward_vite_to_client())
         except Exception as e:
             print(f'[ViteHMR] Connection to Vite failed: {e}')
-            await cache.aset('vite_frontend_alive', False, timeout=10)
             await self.close()
 
     async def disconnect(self, close_code):

@@ -2923,14 +2923,11 @@ def vite_proxy_view(request, path=''):
     if query_string:
         upstream_url += f'?{query_string}'
 
-    if cache.get('vite_frontend_alive') is False:
-        return HttpResponse(status=502)
-
     try:
         headers = {k: v for k, v in request.headers.items() if k.lower() != 'host'}
 
         proxy_response = requests.get(
-            upstream_url, headers=headers, stream=False, timeout=(0.5, 5.0)
+            upstream_url, headers=headers, stream=False, timeout=(3.0, 10.0)
         )
 
         response = HttpResponse(
@@ -2954,12 +2951,10 @@ def vite_proxy_view(request, path=''):
                 response[key] = value
 
         response['Access-Control-Allow-Origin'] = '*'
-        cache.set('vite_frontend_alive', True, timeout=30)
         return response
 
     except Exception as e:
         logger.error(f'[ViteProxy] FAILED {upstream_url}: {str(e)}')
-        cache.set('vite_frontend_alive', False, timeout=10)
         return HttpResponse(status=502)
 
 
@@ -3180,12 +3175,14 @@ def proxy_image_view(request):
         return response
 
     try:
-        if 'tmdb.org' in parsed.netloc:
-            session = get_tmdb_session()
-        else:
-            session = requests.Session()
+        session = requests.Session()
+        if 'tmdb.org' in parsed.netloc and settings.TMDB_PROXY:
+            session.proxies = {
+                'http': settings.TMDB_PROXY,
+                'https': settings.TMDB_PROXY,
+            }
 
-        res = session.get(image_url, timeout=10)
+        res = session.get(image_url, timeout=(2.0, 3.5))
         if res.status_code == 200:
             content_type = res.headers.get('Content-Type', 'image/jpeg')
             content = res.content
@@ -3195,5 +3192,8 @@ def proxy_image_view(request):
             return response
         return HttpResponseNotFound('Image not found')
     except Exception as e:
-        logger.error(f'Image proxy error for {image_url}: {e}')
+        if settings.ENVIRONMENT == 'DEV' or settings.DEBUG or settings.LOCAL_RUN:
+            logger.warning(f'Image proxy error for {image_url}: {e}')
+        else:
+            logger.error(f'Image proxy error for {image_url}: {e}')
         return HttpResponseBadRequest('Proxy request failed')

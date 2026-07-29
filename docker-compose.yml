@@ -100,16 +100,9 @@ services:
       - ./data:/data
     environment:
       - VITE_DEV_SERVER_HOST=frontend
-    command: >
-      sh -c "
-        if [ \"$DJANGO_DEBUG\" = \"true\" ] || [ \"$DJANGO_DEBUG\" = \"True\" ]; then
-          python manage.py runserver 0.0.0.0:8001;
-        else
-          daphne -b 0.0.0.0 -p 8001 kinopub_parser.asgi:application;
-        fi
-      "
+    command: daphne -b 0.0.0.0 -p 8001 kinopub_parser.asgi:application
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/ && python manage.py healthcheck --touch"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/ || python manage.py healthcheck --touch"]
       interval: 30s
       timeout: 10s
       retries: 3

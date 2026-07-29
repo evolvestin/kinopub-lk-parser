@@ -1603,30 +1603,91 @@ class TelegramLogChatIdFilter(admin.SimpleListFilter):
             .order_by('_chat_id_sort')
         )
 
+        known_channels = {}
+        for setting_name, label in [
+            ('HISTORY_CHANNEL_ID', 'Kinopub Views'),
+            ('USER_MANAGEMENT_CHANNEL_ID', 'Kinopub Viewers'),
+            ('CODES_CHANNEL_ID', 'Kinopub Codes'),
+            ('DEV_CHANNEL_ID', 'Kinopub Dev Logs'),
+        ]:
+            val = getattr(settings, setting_name, None)
+            if val is not None:
+                known_channels[str(val)] = label
+
+        int_chat_ids = []
+        for cid in chat_ids:
+            try:
+                int_chat_ids.append(int(cid))
+            except (ValueError, TypeError):
+                pass
+
+        view_users = {
+            str(u.telegram_id): u
+            for u in ViewUser.objects.filter(telegram_id__in=int_chat_ids)
+        }
+
+        unresolved = [
+            str(cid)
+            for cid in chat_ids
+            if str(cid) not in known_channels and str(cid) not in view_users
+        ]
+
+        incoming_logs = {}
+        if unresolved:
+            inc_qs = (
+                qs.filter(_chat_id_sort__in=unresolved, raw_data__has_key='update_id')
+                .order_by('created_at')
+            )
+            for log in inc_qs:
+                cid_str = str(log._chat_id_sort)
+                if cid_str not in incoming_logs:
+                    incoming_logs[cid_str] = log
+
         result = []
 
         for chat_id in chat_ids:
-            log = qs.filter(_chat_id_sort=chat_id).first()
-            display_name = '-'
+            cid_str = str(chat_id)
+            display_name = None
 
-            if log:
+            if cid_str in known_channels:
+                display_name = known_channels[cid_str]
+
+            elif cid_str in view_users:
+                user_obj = view_users[cid_str]
+                if user_obj.username:
+                    display_name = f'@{user_obj.username}'
+                elif user_obj.name:
+                    display_name = user_obj.name
+
+            if not display_name and cid_str in incoming_logs:
+                log = incoming_logs[cid_str]
                 user = model_admin._get_from_user(log)
                 if user:
                     if user.get('username'):
                         display_name = f'@{user["username"]}'
-                    else:
-                        if first_name := user.get('first_name'):
-                            display_name = first_name
-                        if title := user.get('title'):
-                            display_name = title
-            result.append((str(chat_id), f'{display_name} ({chat_id})'))
+                    elif user.get('first_name'):
+                        display_name = user['first_name']
+                    elif user.get('title'):
+                        display_name = user['title']
+
+            if not display_name:
+                log = qs.filter(_chat_id_sort=chat_id).first()
+                if log:
+                    user = model_admin._get_from_user(log)
+                    if user:
+                        if user.get('username'):
+                            display_name = f'@{user["username"]}'
+                        elif user.get('first_name'):
+                            display_name = user['first_name']
+                        elif user.get('title'):
+                            display_name = user['title']
+
+            if not display_name:
+                display_name = '-'
+
+            result.append((cid_str, f'{display_name} ({cid_str})'))
 
         return result
-
-    def queryset(self, request, queryset):
-        if self.value():
-            return queryset.filter(_chat_id_sort=self.value())
-        return queryset
 
 
 @admin.register(TelegramLog, site=admin_site)
