@@ -197,7 +197,7 @@ import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { icons } from '../../utils/icons'
-import { preloadImage, getRatingClass } from '../../utils/helpers'
+import { preloadImage, getRatingClass, isImageBroken, markImageAsBroken } from '../../utils/helpers'
 import PersonPill from '../shared/PersonPill.vue'
 
 const props = defineProps(['showId'])
@@ -212,6 +212,29 @@ const activeBg = ref('')
 const activeSeasonStr = ref(null)
 const isMuted = ref(false)
 const hasAnyMuted = ref(false)
+
+const isPosterBroken = ref(false)
+
+watch(() => activePoster.value, (newUrl) => {
+  if (newUrl) {
+    isPosterBroken.value = isImageBroken(newUrl)
+  } else {
+    isPosterBroken.value = false
+  }
+})
+
+const validatePoster = (e) => {
+  if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {
+    handlePosterError()
+  }
+}
+
+const handlePosterError = () => {
+  if (activePoster.value) {
+    markImageAsBroken(activePoster.value)
+  }
+  isPosterBroken.value = true
+}
 
 const cacheKey = computed(() => {
   return statsStore.isShared ? `${props.showId}_shared_${statsStore.sharedId}` : `${props.showId}`
@@ -565,22 +588,6 @@ const openShowHistory = () => {
 const openRatingsDetails = (ratingType) => {
   uiStore.openModal('details', { showId: props.showId, ratingType })
 }
-
-const isPosterBroken = ref(false)
-
-const handlePosterError = () => {
-  if (activePoster.value) {
-    markImageAsBroken(activePoster.value)
-  }
-  isPosterBroken.value = true
-}
-
-const validatePoster = (e) => {
-  if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {
-    handlePosterError()
-  }
-}
-
 </script>
 
 <style scoped>

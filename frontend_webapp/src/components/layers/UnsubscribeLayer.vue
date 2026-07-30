@@ -79,7 +79,7 @@ import { useRouter } from 'vue-router'
 import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { icons } from '../../utils/icons'
-import { preloadImage } from '../../utils/helpers'
+import { preloadImage, isImageBroken, markImageAsBroken } from '../../utils/helpers'
 
 const props = defineProps({
   showId: {
@@ -97,6 +97,29 @@ const activePoster = ref('')
 const activeBg = ref('')
 const isMuted = ref(false)
 const isToggling = ref(false)
+
+const isPosterBroken = ref(false)
+
+watch(() => activePoster.value, (newUrl) => {
+  if (newUrl) {
+    isPosterBroken.value = isImageBroken(newUrl)
+  } else {
+    isPosterBroken.value = false
+  }
+})
+
+const validatePoster = (e) => {
+  if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {
+    handlePosterError()
+  }
+}
+
+const handlePosterError = () => {
+  if (activePoster.value) {
+    markImageAsBroken(activePoster.value)
+  }
+  isPosterBroken.value = true
+}
 
 const containerRef = ref(null)
 const headerRef = ref(null)
@@ -147,52 +170,7 @@ const calculatePosterHeight = () => {
   const finalHeight = Math.max(140, available)
 
   posterHeight.value = `${finalHeight}px`
-
-  console.log('calculate', {
-    containerHeight,
-    headerHeight,
-    infoHeight,
-    card1Height,
-    card2Height,
-    gap,
-    paddingTop,
-    paddingBottom,
-    nonPosterHeight,
-    available,
-    finalHeight,
-    scrollHeight: containerRef.value.scrollHeight,
-    clientHeight: containerRef.value.clientHeight,
-  })
 }
-
-requestAnimationFrame(() => {
-  const elems = [
-    ['header', headerRef.value],
-    ['poster', containerRef.value.querySelector('.hero-container')],
-    ['info', infoRef.value],
-    ['card1', card1Ref.value],
-    ['card2', card2Ref.value],
-  ]
-
-  let sum = 0
-
-  elems.forEach(([name, el]) => {
-    const h = el.getBoundingClientRect().height
-    console.log(name, h)
-    sum += h
-  })
-
-  const wrap = containerRef.value.querySelector('.unsub-content-wrap')
-  const style = getComputedStyle(wrap)
-
-  console.log('gap', style.gap)
-  console.log('paddingTop', style.paddingTop)
-  console.log('paddingBottom', style.paddingBottom)
-
-  console.log('sum', sum)
-  console.log('client', containerRef.value.clientHeight)
-  console.log('scroll', containerRef.value.scrollHeight)
-})
 
 const loadNotificationStatus = async () => {
   uiStore.setLoading(true)
@@ -304,21 +282,6 @@ watch(show, (newVal) => {
     })
   }
 })
-
-const isPosterBroken = ref(false)
-
-const handlePosterError = () => {
-  if (activePoster.value) {
-    markImageAsBroken(activePoster.value)
-  }
-  isPosterBroken.value = true
-}
-
-const validatePoster = (e) => {
-  if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {
-    handlePosterError()
-  }
-}
 </script>
 
 <style scoped>
