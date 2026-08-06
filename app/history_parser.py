@@ -360,6 +360,7 @@ def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=Fa
     options.add_argument('--ignore-certificate-errors')
     options.add_argument('--ignore-ssl-errors=yes')
     options.add_argument('--no-zygote')
+    options.add_argument('--disable-async-dns')
     options.add_argument('--js-flags=--max-old-space-size=256')
     options.add_argument('--disk-cache-size=1')
     options.add_argument('--media-cache-size=1')
