@@ -1622,8 +1622,7 @@ class TelegramLogChatIdFilter(admin.SimpleListFilter):
                 pass
 
         view_users = {
-            str(u.telegram_id): u
-            for u in ViewUser.objects.filter(telegram_id__in=int_chat_ids)
+            str(u.telegram_id): u for u in ViewUser.objects.filter(telegram_id__in=int_chat_ids)
         }
 
         unresolved = [
@@ -1634,10 +1633,9 @@ class TelegramLogChatIdFilter(admin.SimpleListFilter):
 
         incoming_logs = {}
         if unresolved:
-            inc_qs = (
-                qs.filter(_chat_id_sort__in=unresolved, raw_data__has_key='update_id')
-                .order_by('created_at')
-            )
+            inc_qs = qs.filter(
+                _chat_id_sort__in=unresolved, raw_data__has_key='update_id'
+            ).order_by('created_at')
             for log in inc_qs:
                 cid_str = str(log._chat_id_sort)
                 if cid_str not in incoming_logs:

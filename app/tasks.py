@@ -367,7 +367,20 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
 
     processed_count = 0
     try:
-        for show_id in show_ids:
+        for idx, show_id in enumerate(show_ids, start=1):
+            if idx > 1 and idx % 15 == 0:
+                logging.info('Recycling Chrome driver to release memory...')
+                history_parser.close_driver(driver)
+                driver = history_parser.initialize_driver_session(
+                    headless=True, session_type=session_type
+                )
+                if not driver:
+                    logging.error(
+                        'Failed to re-init driver during recycling. Re-queueing remaining items.'
+                    )
+                    redis_client.sadd(queue_name, *show_ids[idx - 1 :])
+                    break
+
             try:
                 _ = driver.current_url
 

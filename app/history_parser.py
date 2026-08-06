@@ -113,7 +113,18 @@ def update_show_details(driver, kinopub_id, force=False, session_type=ParserSess
         logging.error(f'Error navigating to show page {kinopub_id}: {e}')
         return
 
-    if '/user/login' in driver.current_url:
+    current_url = driver.current_url
+    if (
+        'chrome-error://' in current_url
+        or 'ERR_NAME_NOT_RESOLVED' in current_url
+        or 'ERR_NAME_NOT_RESOLVED' in driver.page_source
+    ):
+        logging.error(
+            f'Failed to fetch show {kinopub_id}: Network/DNS error (ERR_NAME_NOT_RESOLVED).'
+        )
+        return
+
+    if '/user/login' in current_url:
         logging.error(f'Failed to fetch show {kinopub_id}: Stuck on login page.')
         return
 
@@ -348,6 +359,10 @@ def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=Fa
     options.add_argument('--remote-debugging-host=127.0.0.1')
     options.add_argument('--ignore-certificate-errors')
     options.add_argument('--ignore-ssl-errors=yes')
+    options.add_argument('--no-zygote')
+    options.add_argument('--js-flags=--max-old-space-size=256')
+    options.add_argument('--disk-cache-size=1')
+    options.add_argument('--media-cache-size=1')
 
     options.add_argument('--disable-blink-features=AutomationControlled')
     options.add_argument('--disable-infobars')

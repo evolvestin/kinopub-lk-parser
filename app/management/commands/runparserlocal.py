@@ -117,37 +117,60 @@ class Command(BaseCommand):
         def mock_add_relation(*args):
             print(f'   [MockDB] Added Relation: {args}')
 
-        mock_show_instance = MagicMock()
-        mock_show_instance.year = None
-        # Use timezone-aware datetime for comparison compatibility
-        mock_show_instance.updated_at = timezone.now() - timedelta(days=3650)
-        mock_show_instance.countries.add = MagicMock(side_effect=mock_add_relation)
-        mock_show_instance.genres.add = MagicMock(side_effect=mock_add_relation)
-        mock_show_instance.directors.add = MagicMock(side_effect=mock_add_relation)
-        mock_show_instance.actors.add = MagicMock(side_effect=mock_add_relation)
+        def mock_show_get(*args, **kwargs):
+            item_id = kwargs.get('id') or kwargs.get('kinopub_id') or kwargs.get('pk') or 1
+            if isinstance(item_id, MagicMock):
+                item_id = 1
+            s = MagicMock()
+            s.id = item_id
+            s.kinopub_id = item_id
+            s.year = None
+            s.type = 'Series'
+            s.updated_at = timezone.now() - timedelta(days=3650)
+            s.countries.add = MagicMock(side_effect=mock_add_relation)
+            s.genres.add = MagicMock(side_effect=mock_add_relation)
+            s.directors.add = MagicMock(side_effect=mock_add_relation)
+            s.actors.add = MagicMock(side_effect=mock_add_relation)
+            s.save = MagicMock(side_effect=save_side_effect)
+            return s
 
         def save_side_effect(*args, **kwargs):
-            fields = vars(mock_show_instance)
-            useful_fields = {
-                k: v for k, v in fields.items() if not k.startswith('_') and not callable(v)
-            }
-            print(f'   [MockDB] Saving Show: {useful_fields}')
-
-        mock_show_instance.save = MagicMock(side_effect=save_side_effect)
+            print('   [MockDB] Saving Show')
 
         def mock_update_or_create_show(**kwargs):
             print(f'   [MockDB] Show update_or_create: {kwargs}')
-            return (mock_show_instance, True)
+            show_obj = mock_show_get(**kwargs)
+            return (show_obj, True)
 
         def mock_bulk_create_shows(objs, **kwargs):
             print(f'   [MockDB] Bulk create Shows: {len(objs)} items')
 
+        def mock_show_filter(*args, **kwargs):
+            mock_qs = MagicMock()
+            mock_qs.exists.return_value = False
+
+            item_ids = []
+            if 'kinopub_id__in' in kwargs:
+                item_ids = list(kwargs['kinopub_id__in'])
+            elif 'kinopub_id' in kwargs:
+                item_ids = [kwargs['kinopub_id']]
+            elif 'id__in' in kwargs:
+                item_ids = list(kwargs['id__in'])
+            elif 'id' in kwargs:
+                item_ids = [kwargs['id']]
+
+            shows = [mock_show_get(id=item_id) for item_id in item_ids]
+
+            mock_qs.__iter__ = lambda self_qs: iter(shows)
+            mock_qs.first.side_effect = lambda: shows[0] if shows else mock_show_get()
+            mock_qs.values_list.return_value = [(s.id,) for s in shows]
+            return mock_qs
+
         mock_show_model = MagicMock()
         # CRITICAL: Fix for TypeError (catching non-exception class)
         mock_show_model.DoesNotExist = ObjectDoesNotExist
-        mock_show_model.objects.get.return_value = mock_show_instance
-        mock_show_model.objects.filter.return_value.exists.return_value = False
-        mock_show_model.objects.filter.return_value.first.return_value = mock_show_instance
+        mock_show_model.objects.get.side_effect = mock_show_get
+        mock_show_model.objects.filter.side_effect = mock_show_filter
         mock_show_model.objects.update_or_create.side_effect = mock_update_or_create_show
         mock_show_model.objects.bulk_create.side_effect = mock_bulk_create_shows
 

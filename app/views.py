@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 
 import requests
 from django.conf import settings
-from requests.adapters import HTTPAdapter
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import Permission, User
 from django.core.cache import cache
@@ -24,6 +23,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from redis import Redis
+from requests.adapters import HTTPAdapter
 
 from app.admin_site import admin_site
 from app.models import (
@@ -81,7 +81,6 @@ from app.services.stats_calculator import (
     generate_user_stats,
 )
 from app.services.telegram_auth import validate_telegram_init_data
-from app.services.tmdb_client import get_tmdb_session
 from app.tasks import send_view_confirmation_task
 from app.telegram_bot import TelegramSender
 from app.utils import format_user_for_rating
