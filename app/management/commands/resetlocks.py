@@ -2,6 +2,7 @@ import logging
 import subprocess
 
 from django.conf import settings
+from django.core.cache import cache
 from redis import Redis
 
 from app.management.base import LoggableBaseCommand
@@ -22,20 +23,27 @@ class Command(LoggableBaseCommand):
 
     def handle(self, *args, **options):
         try:
-            r = Redis.from_url(settings.CELERY_BROKER_URL)
+            r_broker = Redis.from_url(settings.CELERY_BROKER_URL)
             removed_locks_count = 0
 
             # Ищем ВООБЩЕ ВСЕ ключи блокировок по паттернам
             all_keys = set()
             for p in ['*lock*', '*queue*']:
-                all_keys.update(r.keys(p))
+                all_keys.update(r_broker.keys(p))
 
             for key in all_keys:
-                if r.delete(key):
+                if r_broker.delete(key):
                     removed_locks_count += 1
                     logging.info(
-                        f'Key "{key.decode() if isinstance(key, bytes) else key}" deleted.'
+                        f'Key "{key.decode() if isinstance(key, bytes) else key}" '
+                        f'deleted from broker.'
                     )
+
+            try:
+                cache.clear()
+                logging.info('Django cache (Redis DB 1) cleared successfully.')
+            except Exception as cache_err:
+                logging.warning(f'Failed to clear Django cache: {cache_err}')
 
             stuck_tasks = TaskRun.objects.filter(
                 status__in=[TaskRunStatus.RUNNING, TaskRunStatus.QUEUED]

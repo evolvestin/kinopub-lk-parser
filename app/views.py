@@ -16,7 +16,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Avg, Case, F, IntegerField, Max, Prefetch, Q, Sum, Value, When
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound, JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils import timezone
@@ -3168,7 +3168,7 @@ def reject_person_photo_api(request):
 def proxy_image_view(request):
     image_url = request.GET.get('url')
     if not image_url:
-        return HttpResponseBadRequest('Missing url parameter')
+        return HttpResponse(status=204)
 
     parsed = urllib.parse.urlparse(image_url)
     allowed_domains = ALLOWED_PROXY_DOMAINS
@@ -3178,7 +3178,7 @@ def proxy_image_view(request):
             allowed_domains = allowed_domains + (poster_netloc,)
 
     if not parsed.netloc or not any(domain in parsed.netloc for domain in allowed_domains):
-        return HttpResponseBadRequest('Domain not allowed')
+        return HttpResponse(status=204)
 
     cache_key = f'img_proxy:{hashlib.md5(image_url.encode()).hexdigest()}'
     cached_data = cache.get(cache_key)
@@ -3204,10 +3204,10 @@ def proxy_image_view(request):
             response = HttpResponse(content, content_type=content_type)
             response['Cache-Control'] = 'public, max-age=604800'
             return response
-        return HttpResponseNotFound('Image not found')
+        return HttpResponse(status=204)
     except Exception as e:
         if settings.ENVIRONMENT == 'DEV' or settings.DEBUG or settings.LOCAL_RUN:
             logger.warning(f'Image proxy error for {image_url}: {e}')
         else:
             logger.error(f'Image proxy error for {image_url}: {e}')
-        return HttpResponseBadRequest('Proxy request failed')
+        return HttpResponse(status=204)

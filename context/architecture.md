@@ -161,3 +161,8 @@ Any code generating new database records must follow this "Save-As-Is" architect
 1. **Implementation**:
     * Keyboards built for inline query search results must pass `is_inline=True`.
     * `keyboards.get_show_card_keyboard` accepts `is_inline: bool = False`. When `is_inline=True`, `webapp_url` is automatically omitted, ensuring only standard callback/URL buttons are sent.
+
+
+## Image Proxy Timeout Policy
+
+**RULE**: The maximum allowed HTTP request timeout for proxying external images (e.g., TMDB/Kinopoisk in `/api/image_proxy/`) MUST NOT exceed 3.5 seconds total (connect: 2.0s, read: 3.5s). If an image fails to load within this window, the proxy MUST fail fast immediately without holding worker threads.
