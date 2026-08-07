@@ -550,6 +550,7 @@ def sync_poiskkino_ratings_task():
 
 
 @shared_task
+@single_instance_task(lock_name='update_site_metrics_lock', timeout=300)
 @safe_execution
 def update_site_metrics_task():
     data = generate_global_metrics_snapshot()

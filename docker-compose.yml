@@ -116,15 +116,36 @@ services:
 
   celery:
     build: .
-    command: celery -A kinopub_parser worker -l INFO --concurrency=4 --max-tasks-per-child=10 -Q celery,metrics
+    command: celery -A kinopub_parser worker -l INFO --concurrency=4 --max-tasks-per-child=10 -Q celery
     restart: unless-stopped
     shm_size: '2gb'
     env_file: .env
     volumes:
       - .:/app:delegated
-      - /app/frontend_webapp/dist # Сохраняем билд фронта
+      - /app/frontend_webapp/dist
       - ./data:/data
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    networks:
+      - kinopub-net
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep -f 'celery worker' && python manage.py healthcheck --touch" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  celery-metrics:
+    build: .
+    command: celery -A kinopub_parser worker -l INFO --concurrency=1 --max-tasks-per-child=10 -Q metrics
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - .:/app:delegated
+      - ./data:/data
     depends_on:
       app-init:
         condition: service_completed_successfully
