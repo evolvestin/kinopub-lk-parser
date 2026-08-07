@@ -25,6 +25,7 @@ class Command(LoggableBaseCommand):
         try:
             r_broker = Redis.from_url(settings.CELERY_BROKER_URL)
             removed_locks_count = 0
+            revoked_tasks_count = 0
 
             try:
                 i = celery_app.control.inspect()
@@ -34,24 +35,20 @@ class Command(LoggableBaseCommand):
                         task_id = task.get('id')
                         if task_id:
                             celery_app.control.revoke(task_id, terminate=True, signal='SIGKILL')
-                            logging.info(f'Revoked active Celery task {task_id} on {worker_name}')
+                            revoked_tasks_count += 1
             except Exception:
                 pass
 
             all_keys = set()
-            for p in ['*lock*', '*queue*', 'celery*']:
+            for p in ['lock:*', 'queue:*']:
                 all_keys.update(r_broker.keys(p))
 
             for key in all_keys:
                 if r_broker.delete(key):
                     removed_locks_count += 1
-                    logging.info(
-                        f'Key "{key.decode() if isinstance(key, bytes) else key}" deleted from broker.'
-                    )
 
             try:
                 cache.clear()
-                logging.info('Django cache (Redis DB 1) cleared successfully.')
             except Exception:
                 pass
 
@@ -64,21 +61,19 @@ class Command(LoggableBaseCommand):
                     status=TaskRunStatus.FAILURE,
                     error_message='Forced reset via resetlocks.',
                 )
-                logging.info(f'Marked {stuck_count} tasks as FAILURE.')
 
             if options.get('purge'):
                 try:
                     celery_app.control.purge()
-                    logging.info('Celery queues purged.')
                 except Exception:
                     pass
 
-            # Очистка зомби-процессов Chrome
             subprocess.run(['pkill', '-f', 'chromium'], stderr=subprocess.DEVNULL)
             subprocess.run(['pkill', '-f', 'chromedriver'], stderr=subprocess.DEVNULL)
 
             logging.info(
-                f'Cleanup finished. Keys reset: {removed_locks_count}. Tasks: {stuck_count}.'
+                f'Resetlocks completed. Keys deleted: {removed_locks_count}, '
+                f'Revoked tasks: {revoked_tasks_count}, DB tasks reset: {stuck_count}.'
             )
 
         except Exception as e:

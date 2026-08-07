@@ -116,7 +116,7 @@ services:
 
   celery:
     build: .
-    command: celery -A kinopub_parser worker -l INFO --concurrency=1 --max-tasks-per-child=10 -Q celery,metrics
+    command: celery -A kinopub_parser worker -l INFO --concurrency=4 --max-tasks-per-child=10 -Q celery,metrics
     restart: unless-stopped
     shm_size: '2gb'
     env_file: .env
