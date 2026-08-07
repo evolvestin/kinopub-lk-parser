@@ -26,24 +26,34 @@ class Command(LoggableBaseCommand):
             r_broker = Redis.from_url(settings.CELERY_BROKER_URL)
             removed_locks_count = 0
 
-            # Ищем ВООБЩЕ ВСЕ ключи блокировок по паттернам
+            try:
+                i = celery_app.control.inspect()
+                active_tasks = i.active() or {}
+                for worker_name, tasks in active_tasks.items():
+                    for task in tasks:
+                        task_id = task.get('id')
+                        if task_id:
+                            celery_app.control.revoke(task_id, terminate=True, signal='SIGKILL')
+                            logging.info(f'Revoked active Celery task {task_id} on {worker_name}')
+            except Exception:
+                pass
+
             all_keys = set()
-            for p in ['*lock*', '*queue*']:
+            for p in ['*lock*', '*queue*', 'celery*']:
                 all_keys.update(r_broker.keys(p))
 
             for key in all_keys:
                 if r_broker.delete(key):
                     removed_locks_count += 1
                     logging.info(
-                        f'Key "{key.decode() if isinstance(key, bytes) else key}" '
-                        f'deleted from broker.'
+                        f'Key "{key.decode() if isinstance(key, bytes) else key}" deleted from broker.'
                     )
 
             try:
                 cache.clear()
                 logging.info('Django cache (Redis DB 1) cleared successfully.')
-            except Exception as cache_err:
-                logging.warning(f'Failed to clear Django cache: {cache_err}')
+            except Exception:
+                pass
 
             stuck_tasks = TaskRun.objects.filter(
                 status__in=[TaskRunStatus.RUNNING, TaskRunStatus.QUEUED]
@@ -52,13 +62,16 @@ class Command(LoggableBaseCommand):
             if stuck_count > 0:
                 stuck_tasks.update(
                     status=TaskRunStatus.FAILURE,
-                    error_message='Forced reset via resetlocks. Check logs for TimeLimitExceeded.',
+                    error_message='Forced reset via resetlocks.',
                 )
                 logging.info(f'Marked {stuck_count} tasks as FAILURE.')
 
             if options.get('purge'):
-                celery_app.control.purge()
-                logging.info('Celery queues purged.')
+                try:
+                    celery_app.control.purge()
+                    logging.info('Celery queues purged.')
+                except Exception:
+                    pass
 
             # Очистка зомби-процессов Chrome
             subprocess.run(['pkill', '-f', 'chromium'], stderr=subprocess.DEVNULL)

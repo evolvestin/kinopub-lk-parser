@@ -166,3 +166,8 @@ Any code generating new database records must follow this "Save-As-Is" architect
 ## Image Proxy Timeout Policy
 
 **RULE**: The maximum allowed HTTP request timeout for proxying external images (e.g., TMDB/Kinopoisk in `/api/image_proxy/`) MUST NOT exceed 3.5 seconds total (connect: 2.0s, read: 3.5s). If an image fails to load within this window, the proxy MUST fail fast immediately without holding worker threads.
+
+
+## Celery Task Concurrency & Locking Policy
+
+**RULE**: Celery tasks are protected by explicit distributed Redis locks (e.g., `RedisLock.SELENIUM_GLOBAL`, `RedisLock.BACKUP`, `RedisLock.PROCESS_QUEUES`) and scheduled across time using Celery Beat. Worker concurrency is configured to 4 because task-level locks safely prevent race conditions and duplicate executions of resource-intensive operations (such as Selenium scraping or database backups).
