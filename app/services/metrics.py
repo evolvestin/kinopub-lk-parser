@@ -3,7 +3,8 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Count, F, Q
+from django.db import connection
+from django.db.models import Case, CharField, Count, F, Q, Value, When
 from django.db.models.functions import Coalesce, Lower, StrIndex
 from django.db.utils import ProgrammingError
 from django.utils import timezone
@@ -21,6 +22,8 @@ from kinopub_parser import celery_app
 from shared.constants import (
     GENRES_MAPPING,
     PROFESSION_TRANS_MAP,
+    PROFESSIONS_MAPPING_EN,
+    PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_COUNTRY,
     RAW_TO_NORMALIZED_EN,
     RAW_TO_NORMALIZED_GENRE,
@@ -239,7 +242,10 @@ def get_tmdb_missing_status_list(show_type: str):
     )
 
 
-def generate_global_metrics_snapshot() -> dict:
+def generate_global_metrics_snapshot(profession_stats=None) -> dict:
+    if profession_stats is None:
+        profession_stats = _calculate_profession_stats_canonical()
+    professions_stats, en_professions_stats = profession_stats
     return {
         'missing_kp': calculate_missing_kp_metric(),
         'missing_imdb': calculate_missing_imdb_metric(),
@@ -263,8 +269,8 @@ def generate_global_metrics_snapshot() -> dict:
         'total_countries': calculate_total_countries_metric(),
         'total_persons_by_show_type': calculate_total_persons_by_show_type_metric(),
         'persons_avatar_stats': calculate_persons_avatar_stats_metric(),
-        'professions_stats': calculate_professions_stats_metric(),
-        'en_professions_stats': calculate_en_professions_stats_metric(),
+        'professions_stats': professions_stats,
+        'en_professions_stats': en_professions_stats,
         'duplicate_photo_urls': calculate_duplicate_photo_urls_metric(),
         'unused_persons': calculate_unused_persons_metric(),
         'tmdb_missing_year': calculate_tmdb_missing_year_metric(),
@@ -513,13 +519,28 @@ def get_tmdb_no_countries_list(show_type: str):
 
 
 def calculate_total_persons_by_show_type_metric():
-    stats = (
-        ShowCrew.objects.annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
-        .values('show__type')
-        .annotate(total=Count('canonical_id', distinct=True))
-        .order_by('-total')
-    )
-    return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
+    canonical_id = _canonical_person_id_expression()
+    with connection.cursor() as cursor:
+        cursor.execute('SET enable_sort TO off')
+    try:
+        stats = (
+            ShowCrew.objects.filter(show__type__isnull=False)
+            .exclude(show__type='')
+            .annotate(canonical_id=canonical_id)
+            .values('show__type')
+            .annotate(total=Count('canonical_id', distinct=True))
+            .order_by('-total')
+        )
+        return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute('SET enable_sort TO on')
+
+
+def _canonical_person_id_expression():
+    if ShowCrew.objects.filter(canonical_person__isnull=True).exists():
+        return Coalesce('canonical_person_id', 'person__master_person_id', 'person_id')
+    return F('canonical_person_id')
 
 
 def calculate_persons_avatar_stats_metric():
@@ -527,13 +548,16 @@ def calculate_persons_avatar_stats_metric():
     has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
     tmdb_done = Q(is_photo_fetched=True)
 
-    invalid_url = Q(showcrew__show__kinopoisk_url__endswith='/film/0')
-    kp_waiting = (
-        Q(showcrew__show__kinopoisk_url__isnull=False)
-        & ~Q(showcrew__show__kinopoisk_url='')
-        & ~invalid_url
-        & Q(showcrew__show__ext_rating__isnull=True)
+    waiting_shows = (
+        Show.objects.filter(
+            kinopoisk_url__isnull=False,
+            ext_rating__isnull=True,
+        )
+        .exclude(kinopoisk_url='')
+        .exclude(kinopoisk_url__endswith='/film/0')
     )
+    kp_waiting_ids = ShowCrew.objects.filter(show__in=waiting_shows).values('person_id')
+    kp_wait_filter = Q(id__in=kp_waiting_ids)
 
     data = [
         {'name': 'Есть фото (TMDB)', 'value': Person.objects.filter(has_tmdb).count()},
@@ -547,65 +571,294 @@ def calculate_persons_avatar_stats_metric():
         },
         {
             'name': 'KP не найдено',
-            'value': Person.objects.exclude(has_kp).exclude(kp_waiting).distinct().count(),
+            'value': Person.objects.exclude(has_kp).exclude(kp_wait_filter).count(),
         },
         {'name': 'В ожидании TMDB', 'value': Person.objects.exclude(tmdb_done | has_tmdb).count()},
         {
             'name': 'В ожидании KP',
-            'value': Person.objects.filter(kp_waiting).exclude(has_kp).distinct().count(),
+            'value': Person.objects.filter(kp_wait_filter).exclude(has_kp).count(),
         },
         {
             'name': 'Не найдено вообще',
             'value': Person.objects.filter(tmdb_done)
             .exclude(has_tmdb | has_kp)
-            .exclude(kp_waiting)
-            .distinct()
+            .exclude(kp_wait_filter)
             .count(),
         },
     ]
     return sorted(data, key=lambda x: x['value'], reverse=True)
 
 
-def calculate_professions_stats_metric():
-    # Собираем всех людей, у которых есть хоть какая-то привязка к ролям
-    # Считаем их по нормализованным RU ролям, используя кросс-маппинг
-
-    # Инвертированный маппинг EN -> RU для кросс-чека
-    en_to_ru_map = {v: k for k, v in PROFESSION_TRANS_MAP.items()}
-
-    # Получаем все записи, где заполнено хотя бы одно поле
-    crew_qs = (
-        ShowCrew.objects.exclude(
-            Q(profession__isnull=True, en_profession__isnull=True)
-            | Q(profession='', en_profession='')
-        )
-        .annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
-        .values('profession', 'en_profession', 'canonical_id')
-    )
-
-    merged = defaultdict(set)  # {NormName: {person_ids}}
-
-    for row in crew_qs:
-        norm_ru = RAW_TO_NORMALIZED_RU.get(row['profession'])
-        if not norm_ru and row['en_profession']:
-            norm_en = RAW_TO_NORMALIZED_EN.get(row['en_profession'])
-            norm_ru = en_to_ru_map.get(norm_en)
-
-        if norm_ru:
-            merged[norm_ru].add(row['canonical_id'])
-
-    result = [{'name': k, 'value': len(v)} for k, v in merged.items()]
-
-    # Неизвестно — это те, у кого вообще нет распознанных ролей
-    unknown_count = (
-        Person.objects.filter(master_person__isnull=True)
-        .exclude(
-            Q(showcrew__profession__in=RAW_TO_NORMALIZED_RU.keys())
-            | Q(showcrew__en_profession__in=RAW_TO_NORMALIZED_EN.keys())
-        )
+def _get_crew_profession_tuples():
+    return list(
+        ShowCrew.objects.exclude(profession__isnull=True, en_profession__isnull=True)
+        .values('profession', 'en_profession')
+        .annotate(master_id=Coalesce('person__master_person_id', 'person__id'))
+        .values('profession', 'en_profession', 'master_id')
         .distinct()
-        .count()
     )
+
+
+def _get_alias_map():
+    return dict(
+        Person.objects.filter(master_person__isnull=False).values_list('id', 'master_person_id')
+    )
+
+
+def _calculate_profession_stats_db():
+    canonical_id = Coalesce('person__master_person_id', 'person_id')
+    total_masters = Person.objects.filter(master_person__isnull=True).count()
+
+    def calculate(mapping, raw_to_normalized, fallback_mapping):
+        whens = []
+        known_filter = Q()
+        for normalized, raw_values in mapping.items():
+            whens.append(When(profession__in=raw_values, then=Value(normalized)))
+            known_filter |= Q(profession__in=raw_values)
+            fallback_values = fallback_mapping.get(normalized, [])
+            if fallback_values:
+                whens.append(When(en_profession__in=fallback_values, then=Value(normalized)))
+                known_filter |= Q(en_profession__in=fallback_values)
+
+        role_case = Case(*whens, output_field=CharField())
+        stats = (
+            ShowCrew.objects.filter(known_filter)
+            .annotate(normalized=role_case, canonical_id=canonical_id)
+            .values('normalized')
+            .annotate(value=Count('canonical_id', distinct=True))
+            .order_by('-value')
+        )
+        result = [
+            {'name': row['normalized'], 'value': row['value']} for row in stats if row['normalized']
+        ]
+        known_count = (
+            ShowCrew.objects.filter(known_filter)
+            .annotate(canonical_id=canonical_id)
+            .values('canonical_id')
+            .distinct()
+            .count()
+        )
+        unknown_count = max(0, total_masters - known_count)
+        if unknown_count:
+            result.append(
+                {
+                    'name': '\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e',
+                    'value': unknown_count,
+                }
+            )
+        return result
+
+    ru_to_en = PROFESSION_TRANS_MAP
+    ru_result = calculate(
+        PROFESSIONS_MAPPING_RU,
+        RAW_TO_NORMALIZED_RU,
+        {ru: PROFESSIONS_MAPPING_EN.get(en, []) for ru, en in ru_to_en.items()},
+    )
+    en_result = calculate(
+        PROFESSIONS_MAPPING_EN,
+        RAW_TO_NORMALIZED_EN,
+        {en: PROFESSIONS_MAPPING_RU.get(ru, []) for ru, en in ru_to_en.items()},
+    )
+    return ru_result, en_result
+
+
+def _calculate_profession_stats_indexed():
+    """Use role indexes while keeping all person IDs inside the database."""
+    canonical_id = Coalesce('person__master_person_id', 'person_id')
+    total_masters = Person.objects.filter(master_person__isnull=True).count()
+    ru_to_en = PROFESSION_TRANS_MAP
+
+    def calculate(mapping, fallback_mapping):
+        result = []
+        known_filter = Q()
+        for normalized, raw_values in mapping.items():
+            fallback_values = fallback_mapping.get(normalized, [])
+            role_filter = Q(profession__in=raw_values)
+            known_filter |= role_filter
+            if fallback_values:
+                role_filter |= Q(en_profession__in=fallback_values)
+                known_filter |= Q(en_profession__in=fallback_values)
+            value = (
+                ShowCrew.objects.filter(role_filter)
+                .annotate(canonical_id=canonical_id)
+                .values('canonical_id')
+                .distinct()
+                .count()
+            )
+            if value:
+                result.append({'name': normalized, 'value': value})
+
+        known_count = (
+            ShowCrew.objects.filter(known_filter)
+            .annotate(canonical_id=canonical_id)
+            .values('canonical_id')
+            .distinct()
+            .count()
+        )
+        unknown_count = max(0, total_masters - known_count)
+        if unknown_count:
+            result.append(
+                {
+                    'name': '\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e',
+                    'value': unknown_count,
+                }
+            )
+        return sorted(result, key=lambda x: x['value'], reverse=True)
+
+    ru_fallback = {ru: PROFESSIONS_MAPPING_EN.get(en, []) for ru, en in ru_to_en.items()}
+    en_fallback = {en: PROFESSIONS_MAPPING_RU.get(ru, []) for ru, en in ru_to_en.items()}
+    return calculate(PROFESSIONS_MAPPING_RU, ru_fallback), calculate(
+        PROFESSIONS_MAPPING_EN, en_fallback
+    )
+
+
+def _calculate_profession_stats():
+    """Calculate RU and EN profession metrics from one database pass."""
+    ru_to_en = PROFESSION_TRANS_MAP
+    en_to_ru = {en: ru for ru, en in ru_to_en.items()}
+    ru_raw_to_norm = RAW_TO_NORMALIZED_RU
+    en_raw_to_norm = RAW_TO_NORMALIZED_EN
+    known_ru_raw = set(ru_raw_to_norm)
+    known_en_raw = set(en_raw_to_norm)
+
+    rows = (
+        ShowCrew.objects.filter(Q(profession__in=known_ru_raw) | Q(en_profession__in=known_en_raw))
+        .values_list('profession', 'en_profession', 'person_id', 'person__master_person_id')
+        .iterator(chunk_size=10000)
+    )
+    ru_persons = defaultdict(set)
+    en_persons = defaultdict(set)
+    known_masters = set()
+
+    for profession, en_profession, person_id, master_person_id in rows:
+        canonical_id = master_person_id or person_id
+        norm_ru = ru_raw_to_norm.get(profession)
+        if not norm_ru:
+            norm_ru = en_to_ru.get(en_raw_to_norm.get(en_profession))
+        if norm_ru:
+            ru_persons[norm_ru].add(canonical_id)
+            known_masters.add(canonical_id)
+
+        norm_en = en_raw_to_norm.get(en_profession)
+        if not norm_en:
+            norm_en = ru_to_en.get(ru_raw_to_norm.get(profession))
+        if norm_en:
+            en_persons[norm_en].add(canonical_id)
+            known_masters.add(canonical_id)
+
+    unknown_count = max(
+        0,
+        Person.objects.filter(master_person__isnull=True).count() - len(known_masters),
+    )
+
+    def make_result(persons_by_profession):
+        result = [
+            {'name': name, 'value': len(person_ids)}
+            for name, person_ids in persons_by_profession.items()
+            if person_ids
+        ]
+        if unknown_count > 0:
+            result.append(
+                {
+                    'name': '\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e',
+                    'value': unknown_count,
+                }
+            )
+        return sorted(result, key=lambda x: x['value'], reverse=True)
+
+    return make_result(ru_persons), make_result(en_persons)
+
+
+def _calculate_profession_stats_canonical():
+    ru_to_en = PROFESSION_TRANS_MAP
+    canonical_id = _canonical_person_id_expression()
+
+    def calculate(primary_raw_to_normalized, fallback_raw_to_normalized):
+        whens = [
+            When(profession=raw, then=Value(normalized))
+            for raw, normalized in primary_raw_to_normalized.items()
+        ]
+        whens.extend(
+            When(en_profession=raw, then=Value(normalized))
+            for raw, normalized in fallback_raw_to_normalized.items()
+        )
+        known_filter = Q(profession__in=primary_raw_to_normalized) | Q(
+            en_profession__in=fallback_raw_to_normalized
+        )
+
+        role_case = Case(*whens, output_field=CharField())
+        result = [
+            {'name': row['normalized'], 'value': row['value']}
+            for row in (
+                ShowCrew.objects.filter(known_filter)
+                .annotate(normalized=role_case, canonical_id=canonical_id)
+                .values('normalized')
+                .annotate(value=Count('canonical_id', distinct=True))
+                .order_by('-value')
+            )
+            if row['normalized']
+        ]
+        unknown_count = (
+            Person.objects.filter(master_person__isnull=True)
+            .exclude(showcrew__profession__in=primary_raw_to_normalized)
+            .exclude(showcrew__en_profession__in=fallback_raw_to_normalized)
+            .count()
+        )
+        if unknown_count:
+            result.append(
+                {
+                    'name': '\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e',
+                    'value': unknown_count,
+                }
+            )
+        return result
+
+    en_to_ru = {en: ru for ru, en in ru_to_en.items()}
+    ru_to_en_raw = {
+        raw: ru_to_en[normalized]
+        for raw, normalized in RAW_TO_NORMALIZED_RU.items()
+        if normalized in ru_to_en
+    }
+    en_to_ru_raw = {
+        raw: en_to_ru[normalized]
+        for raw, normalized in RAW_TO_NORMALIZED_EN.items()
+        if normalized in en_to_ru
+    }
+    with connection.cursor() as cursor:
+        cursor.execute('SET enable_sort TO off')
+    try:
+        return calculate(RAW_TO_NORMALIZED_RU, en_to_ru_raw), calculate(
+            RAW_TO_NORMALIZED_EN, ru_to_en_raw
+        )
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute('SET enable_sort TO on')
+
+
+def calculate_professions_stats_metric():
+    return _calculate_profession_stats_canonical()[0]
+    alias_map = _get_alias_map()
+    result = []
+    all_known_masters = set()
+
+    for norm_ru, raw_ru_list in PROFESSIONS_MAPPING_RU.items():
+        norm_en = PROFESSION_TRANS_MAP.get(norm_ru)
+        raw_en_list = PROFESSIONS_MAPPING_EN.get(norm_en, []) if norm_en else []
+
+        q_filter = Q(profession__in=raw_ru_list)
+        if raw_en_list:
+            q_filter |= Q(en_profession__in=raw_en_list)
+
+        person_ids = set(ShowCrew.objects.filter(q_filter).values_list('person_id', flat=True))
+        if person_ids:
+            master_ids = {alias_map.get(pid, pid) for pid in person_ids}
+            all_known_masters.update(master_ids)
+            cnt = len(master_ids)
+            if cnt > 0:
+                result.append({'name': norm_ru, 'value': cnt})
+
+    total_master_persons = Person.objects.filter(master_person__isnull=True).count()
+    unknown_count = max(0, total_master_persons - len(all_known_masters))
 
     if unknown_count > 0:
         result.append({'name': 'Неизвестно', 'value': unknown_count})
@@ -751,38 +1004,32 @@ def get_duplicate_photo_urls_list(source_type: str):
 
 
 def calculate_en_professions_stats_metric():
-    # Аналогичная логика для английских метрик
-    crew_qs = (
-        ShowCrew.objects.exclude(
-            Q(profession__isnull=True, en_profession__isnull=True)
-            | Q(profession='', en_profession='')
-        )
-        .annotate(canonical_id=Coalesce('person__master_person_id', 'person__id'))
-        .values('profession', 'en_profession', 'canonical_id')
-    )
+    return _calculate_profession_stats_canonical()[1]
 
-    merged = defaultdict(set)
+    alias_map = _get_alias_map()
+    ru_to_en_map = PROFESSION_TRANS_MAP
 
-    for row in crew_qs:
-        norm_en = RAW_TO_NORMALIZED_EN.get(row['en_profession'])
-        if not norm_en and row['profession']:
-            norm_ru = RAW_TO_NORMALIZED_RU.get(row['profession'])
-            norm_en = PROFESSION_TRANS_MAP.get(norm_ru)
+    result = []
+    all_known_masters = set()
 
-        if norm_en:
-            merged[norm_en].add(row['canonical_id'])
+    for norm_en, raw_en_list in PROFESSIONS_MAPPING_EN.items():
+        norm_ru = next((k for k, v in ru_to_en_map.items() if v == norm_en), None)
+        raw_ru_list = PROFESSIONS_MAPPING_RU.get(norm_ru, []) if norm_ru else []
 
-    result = [{'name': k, 'value': len(v)} for k, v in merged.items()]
+        q_filter = Q(en_profession__in=raw_en_list)
+        if raw_ru_list:
+            q_filter |= Q(profession__in=raw_ru_list)
 
-    unknown_count = (
-        Person.objects.filter(master_person__isnull=True)
-        .exclude(
-            Q(showcrew__profession__in=RAW_TO_NORMALIZED_RU.keys())
-            | Q(showcrew__en_profession__in=RAW_TO_NORMALIZED_EN.keys())
-        )
-        .distinct()
-        .count()
-    )
+        person_ids = set(ShowCrew.objects.filter(q_filter).values_list('person_id', flat=True))
+        if person_ids:
+            master_ids = {alias_map.get(pid, pid) for pid in person_ids}
+            all_known_masters.update(master_ids)
+            cnt = len(master_ids)
+            if cnt > 0:
+                result.append({'name': norm_en, 'value': cnt})
+
+    total_master_persons = Person.objects.filter(master_person__isnull=True).count()
+    unknown_count = max(0, total_master_persons - len(all_known_masters))
 
     if unknown_count > 0:
         result.append({'name': 'Неизвестно', 'value': unknown_count})
@@ -882,5 +1129,18 @@ def get_tmdb_missing_durations_list(show_type: str):
 
 
 def calculate_unused_persons_metric():
-    count = Person.objects.filter(showcrew__isnull=True).count()
+    return [
+        {
+            'name': 'Р‘РµР· СЂРѕР»РµР№',
+            'value': Person.objects.filter(
+                master_person__isnull=True, showcrew__isnull=True
+            ).count(),
+        }
+    ]
+
+    alias_map = _get_alias_map()
+    used_person_ids = set(ShowCrew.objects.values_list('person_id', flat=True))
+    used_master_ids = {alias_map.get(pid, pid) for pid in used_person_ids}
+    total_master_persons = Person.objects.filter(master_person__isnull=True).count()
+    count = max(0, total_master_persons - len(used_master_ids))
     return [{'name': 'Без ролей', 'value': count}]

@@ -152,6 +152,13 @@ class Person(BaseModel):
 class ShowCrew(BaseModel):
     show = models.ForeignKey('Show', on_delete=models.CASCADE)
     person = models.ForeignKey('Person', on_delete=models.CASCADE)
+    canonical_person = models.ForeignKey(
+        'Person',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='canonical_crew_rows',
+    )
     profession = models.CharField(max_length=500, null=True, blank=True, db_index=True)
     en_profession = models.CharField(max_length=500, null=True, blank=True, db_index=True)
 
@@ -162,6 +169,11 @@ class ShowCrew(BaseModel):
         indexes = [
             models.Index(fields=['profession', 'show'], name='idx_crew_prof_show'),
             models.Index(fields=['en_profession', 'show'], name='idx_crew_enprof_show'),
+            models.Index(fields=['profession', 'canonical_person'], name='idx_crew_prof_canonical'),
+            models.Index(
+                fields=['en_profession', 'canonical_person'], name='idx_crew_enprof_canonical'
+            ),
+            models.Index(fields=['show', 'canonical_person'], name='idx_crew_show_canonical'),
             models.Index(fields=['person', 'profession'], name='idx_crew_person_prof'),
             models.Index(fields=['person', 'en_profession'], name='idx_crew_person_enprof'),
         ]
@@ -317,7 +329,11 @@ class Show(BaseModel):
     countries = models.ManyToManyField(Country, blank=True)
     genres = models.ManyToManyField(Genre, blank=True)
     crew = models.ManyToManyField(
-        Person, through='ShowCrew', related_name='shows_as_crew', blank=True
+        Person,
+        through='ShowCrew',
+        through_fields=('show', 'person'),
+        related_name='shows_as_crew',
+        blank=True,
     )
     ignore_collision = models.BooleanField(
         default=False, verbose_name='Игнорировать коллизию в названии'

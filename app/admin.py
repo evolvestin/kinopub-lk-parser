@@ -1129,6 +1129,7 @@ class PhotoSourceFilter(admin.SimpleListFilter):
 
 class PersonShowCrewInline(BaseReadonlyInline):
     model = ShowCrew
+    fk_name = 'person'
     verbose_name = 'Acted / Directed In Show'
     verbose_name_plural = 'Shows Roles'
     autocomplete_fields = ('show',)

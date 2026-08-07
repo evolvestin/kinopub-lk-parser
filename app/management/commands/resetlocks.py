@@ -30,7 +30,7 @@ class Command(LoggableBaseCommand):
             try:
                 i = celery_app.control.inspect()
                 active_tasks = i.active() or {}
-                for worker_name, tasks in active_tasks.items():
+                for _, tasks in active_tasks.items():
                     for task in tasks:
                         task_id = task.get('id')
                         if task_id:
