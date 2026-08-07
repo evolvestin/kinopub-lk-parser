@@ -71,6 +71,7 @@ def is_fatal_selenium_error(e):
         or 'remote end closed connection' in err_str
         or 'remotedisconnected' in err_str
         or 'protocolerror' in err_str
+        or 'err_name_not_resolved' in err_str
     )
 
 
