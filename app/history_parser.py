@@ -152,22 +152,34 @@ def update_show_details(driver, kinopub_id, force=False, session_type=ParserSess
             return
 
         try:
-            h3_elem = driver.find_element(By.TAG_NAME, 'h3')
+            # KinoPub currently renders the item title as h1.iv-title-ru.
+            # Keep h3/h1 fallbacks for older or alternate page layouts.
+            title_elem = None
+            for selector in ('h1.iv-title-ru', 'h3', 'h1'):
+                elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                if elements:
+                    title_elem = elements[0]
+                    break
+
+            if title_elem is None:
+                raise NoSuchElementException('Item title element not found')
+
             title_text = driver.execute_script(
                 'return Array.from(arguments[0].childNodes)'
                 '.filter(n => n.nodeType === Node.TEXT_NODE)'
                 ".map(n => n.textContent).join('').trim();",
-                h3_elem,
+                title_elem,
             )
             if not title_text:
-                full_h3_text = h3_elem.text
+                full_title_text = title_elem.text
                 try:
-                    small_text = h3_elem.find_element(By.TAG_NAME, 'small').text
-                    title_text = full_h3_text.replace(small_text, '').strip()
+                    small_text = title_elem.find_element(By.TAG_NAME, 'small').text
+                    title_text = full_title_text.replace(small_text, '').strip()
                 except NoSuchElementException:
-                    title_text = full_h3_text.split('\n')[0].strip()
+                    title_text = full_title_text.split('\n')[0].strip()
         except NoSuchElementException:
             title_text = ''
+            title_elem = None
 
         forbidden_titles = {
             'Авторизация',
@@ -206,15 +218,20 @@ def update_show_details(driver, kinopub_id, force=False, session_type=ParserSess
             show.title = title_text
 
         try:
-            small_elem = h3_elem.find_element(By.TAG_NAME, 'small')
+            small_elem = title_elem.find_element(By.TAG_NAME, 'small')
             raw_orig = small_elem.text
+        except NoSuchElementException:
+            original_title_elements = driver.find_elements(By.CSS_SELECTOR, '.iv-title-orig')
+            raw_orig = original_title_elements[0].text if original_title_elements else ''
+
+        try:
             clean_orig = re.sub(
                 r'\+?\s*(?:HD|4K|UHD|3D|AC3|5\.1|7\.1)\b', '', raw_orig, flags=re.IGNORECASE
             )
             clean_orig = ' '.join(clean_orig.split()).strip()
             if clean_orig:
                 show.original_title = clean_orig
-        except NoSuchElementException:
+        except Exception:
             pass
 
         try:

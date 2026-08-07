@@ -4,6 +4,7 @@ import sys
 import time
 import winreg
 from datetime import timedelta
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
@@ -59,6 +60,12 @@ class Command(BaseCommand):
             type=str,
             dest='type',
             help='Filter shows by type (e.g. serial, movie).',
+        )
+        parser.add_argument(
+            '--id',
+            type=int,
+            dest='kinopub_id',
+            help='Process one specific KinoPub ID (for details/durations tasks).',
         )
         parser.add_argument(
             '--headless',
@@ -232,6 +239,7 @@ class Command(BaseCommand):
         headless = options.get('headless', False)
 
         show_type_arg = options.get('type')
+        specific_id = options.get('kinopub_id')
         url_type = 'serial'
 
         if show_type_arg:
@@ -285,14 +293,31 @@ class Command(BaseCommand):
 
                 elif task == 'details':
                     logging.info('Running Details Updater (Mock Mode)...')
-                    ids = self._get_live_ids(driver, base_url, account, url_type)
+                    ids = (
+                        [specific_id]
+                        if specific_id is not None
+                        else self._get_live_ids(driver, base_url, account, url_type)
+                    )
                     for show_id in ids:
                         logging.info(f'Processing details for ID {show_id}...')
-                        update_show_details(driver, show_id)
+                        try:
+                            update_show_details(driver, show_id)
+                        finally:
+                            if specific_id is not None:
+                                debug_path = Path('data') / f'runparserlocal_{show_id}.html'
+                                debug_path.write_text(driver.page_source, encoding='utf-8')
+                                logging.info(
+                                    f'Saved debug HTML for KinoPub ID {show_id} to '
+                                    f'{debug_path.resolve()}'
+                                )
 
                 elif task == 'durations':
                     logging.info('Running Durations Updater (Mock Mode)...')
-                    ids = self._get_live_ids(driver, base_url, account, url_type)
+                    ids = (
+                        [specific_id]
+                        if specific_id is not None
+                        else self._get_live_ids(driver, base_url, account, url_type)
+                    )
                     for show_id in ids:
                         logging.info(f'Processing durations for ID {show_id}...')
                         mock_show = mock_show_model.objects.get()
