@@ -14,8 +14,7 @@ def get_poster_url(show_id: int, size: str = 'small') -> str:
     if show and not show.kinopub_id and show.tmdb_poster_path:
         tmdb_sizes = {'small': 'w200', 'medium': 'w342', 'big': 'w500'}
         tmdb_url = (
-            f"https://image.tmdb.org/t/p/{tmdb_sizes.get(size, 'w342')}"
-            f"{show.tmdb_poster_path}"
+            f'https://image.tmdb.org/t/p/{tmdb_sizes.get(size, "w342")}{show.tmdb_poster_path}'
         )
         return get_proxied_image_url(tmdb_url)
 

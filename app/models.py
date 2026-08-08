@@ -454,7 +454,13 @@ class ShowDuration(BaseModel):
     )
 
     class Meta:
-        unique_together = [['show', 'season_number', 'episode_number']]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['show', 'season_number', 'episode_number'],
+                name='uniq_show_duration_position',
+                nulls_distinct=False,
+            ),
+        ]
         verbose_name = 'Show duration'
         verbose_name_plural = 'Show durations'
 

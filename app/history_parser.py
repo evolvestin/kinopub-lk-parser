@@ -30,6 +30,7 @@ from app.models import (
     ShowDuration,
     ViewHistory,
 )
+from app.services.show_duration import upsert_show_duration
 from app.signals import view_history_created
 from app.utils import enqueue_show_update
 from kinopub_parser import celery_app
@@ -760,11 +761,12 @@ def get_movie_duration_and_save(driver, show, session_type='main'):
                 break
 
         if duration_sec:
-            ShowDuration.objects.update_or_create(
+            upsert_show_duration(
                 show=show,
                 season_number=None,
                 episode_number=None,
-                defaults={'duration_seconds': duration_sec, 'is_estimated': False},
+                duration_seconds=duration_sec,
+                is_estimated=False,
             )
             logging.info('Cached duration for movie id%d: %d seconds.', show.id, duration_sec)
         else:
@@ -795,11 +797,12 @@ def get_season_durations_and_save(driver, show, season, session_type='main'):
         duration_sec = item.get('duration')
 
         if item_season == season and item_episode is not None and duration_sec is not None:
-            ShowDuration.objects.update_or_create(
+            upsert_show_duration(
                 show=show,
                 season_number=item_season,
                 episode_number=item_episode,
-                defaults={'duration_seconds': duration_sec, 'is_estimated': False},
+                duration_seconds=duration_sec,
+                is_estimated=False,
             )
             updated_count += 1
 

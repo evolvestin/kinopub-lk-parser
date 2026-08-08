@@ -5,7 +5,8 @@ from django.conf import settings
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from app.models import Country, Genre, Person, Show, ShowCrew, ShowDuration
+from app.models import Country, Genre, Person, Show, ShowCrew
+from app.services.show_duration import upsert_show_duration
 from shared.constants import SHOW_TYPE_MAPPING, ShowType
 
 logger = logging.getLogger(__name__)
@@ -278,18 +279,13 @@ def sync_show_from_tmdb(
     if media_type == 'movie':
         runtime = details.get('runtime')
         if runtime and runtime > 0:
-            has_exact = ShowDuration.objects.filter(
+            upsert_show_duration(
                 show=show,
-                season_number__isnull=True,
-                episode_number__isnull=True,
-                is_estimated=False,
-            ).exists()
-            if not has_exact:
-                ShowDuration.objects.update_or_create(
-                    show=show,
-                    season_number=None,
-                    episode_number=None,
-                    defaults={'duration_seconds': runtime * 60, 'is_estimated': True},
-                )
+                season_number=None,
+                episode_number=None,
+                duration_seconds=runtime * 60,
+                is_estimated=True,
+                preserve_exact=True,
+            )
 
     return show
