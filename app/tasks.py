@@ -396,7 +396,7 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
                             f'Show {show_id} has no kinopub_id, skipping details update.'
                         )
                         continue
-                    process_func(driver, show.kinopub_id, force=False, session_type=session_type)
+                    process_func(driver, show.kinopub_id, force=True, session_type=session_type)
                 else:
                     process_func(driver, show, session_type=session_type)
 

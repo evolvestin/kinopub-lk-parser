@@ -312,12 +312,14 @@ def update_show_details(driver, kinopub_id, force=False, session_type=ParserSess
         ]:
             elements_data = get_row_data(label)
             if elements_data:
+                related_objects = []
                 elements = elements_data.find_elements(By.TAG_NAME, 'a')
                 for el in elements:
                     name = el.get_attribute('textContent').strip()
                     if name:
                         obj, _ = model.objects.update_or_create(name=name)
-                        relation.add(obj)
+                        related_objects.append(obj)
+                relation.set(related_objects)
 
         crew_labels = ['Создатель', 'Режиссёр', 'В ролях']
         for label in crew_labels:
