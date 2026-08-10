@@ -90,7 +90,7 @@
               v-for="s in episodesData" 
               :key="s.season_number" 
               class="rating-grid-btn" 
-              :class="{ active: season === s.season_number }"
+              :class="{ active: isSeasonFullyWatched(s) }"
               @click="selectSeason(s)"
             >
               Сезон {{ s.season_number }}
@@ -232,6 +232,10 @@ const selectedSeason = computed(() => {
 
 const getWatchedCount = (s) => {
   return s.episodes.filter(e => e.watched).length
+}
+
+const isSeasonFullyWatched = (s) => {
+  return s.episodes.length > 0 && getWatchedCount(s) === s.episodes.length
 }
 
 const showHint = computed(() => {
