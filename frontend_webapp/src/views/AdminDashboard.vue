@@ -174,7 +174,12 @@
                 </div>
                 <div class="merge-content">
                   <div class="merge-poster-area">
-                    <img :src="item.tmdb_photo_url || item.kp_photo_url || fallbackIcon" alt="avatar">
+                    <PosterImage
+                      :src="item.tmdb_photo_url || item.kp_photo_url"
+                      :placeholder="icons.person_placeholder"
+                      alt="avatar"
+                      style="width: 100px; height: 120px; border-radius: 12px; object-fit: cover; box-shadow: var(--shadow-sm); border: 1px solid var(--border);"
+                    />
                   </div>
                   <div class="merge-list">
                     <label v-for="p in item.persons" :key="p.id" class="merge-row" :class="{ 'is-master': p.id === mergeSelections[item.persons[0].id] }" @click="mergeSelections[item.persons[0].id] = p.id">
@@ -188,11 +193,11 @@
                         <div v-if="p.en_name" class="person-en-name">{{ p.en_name }}</div>
                         <div style="margin-top: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                           <div v-if="p.tmdb_photo_url && !item.tmdb_photo_url" style="display: flex; align-items: center; gap: 6px;">
-                            <img :src="p.tmdb_photo_url" :style="{ width: item.kp_photo_url ? '50px' : '20px', height: item.kp_photo_url ? '50px' : '20px' }" style="border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="TMDB">
+                            <PosterImage :src="p.tmdb_photo_url" :placeholder="icons.person_placeholder" :style="{ width: item.kp_photo_url ? '50px' : '20px', height: item.kp_photo_url ? '50px' : '20px' }" style="border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="TMDB" />
                             <span style="font-size: 11px; color: var(--text-muted);">TMDB</span>
                           </div>
                           <div v-if="p.kp_photo_url && !item.kp_photo_url" style="display: flex; align-items: center; gap: 6px;">
-                            <img :src="p.kp_photo_url" :style="{ width: item.tmdb_photo_url ? '50px' : '20px', height: item.tmdb_photo_url ? '50px' : '20px' }" style="border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="KP">
+                            <PosterImage :src="p.kp_photo_url" :placeholder="icons.person_placeholder" :style="{ width: item.tmdb_photo_url ? '50px' : '20px', height: item.tmdb_photo_url ? '50px' : '20px' }" style="border-radius: 50%; object-fit: cover; border: 1px solid var(--border);" alt="KP" />
                             <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">KP</span>
                           </div>
                         </div>
@@ -222,7 +227,7 @@
 
               <!-- Обычные Шоу -->
               <template v-else>
-                <img :src="item.poster_url" class="modal-item-poster" alt="poster" loading="lazy">
+                <PosterImage :src="item.poster_url" class="modal-item-poster" alt="poster" loading="lazy" />
                 <div class="modal-item-content">
                   <div class="modal-item-info">
                     <div class="modal-item-title">{{ item.title }}</div>
@@ -255,6 +260,7 @@
 <script setup>
 import { ref, computed, nextTick, onUnmounted, onMounted, watch } from 'vue'
 import BaseChart from '../components/shared/BaseChart.vue'
+import PosterImage from '../components/shared/PosterImage.vue'
 import { icons } from '../utils/icons'
 import ChartDataLabels from 'chartjs-plugin-datalabels'
 

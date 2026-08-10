@@ -2,8 +2,10 @@ import statistics
 import uuid
 
 from django.contrib.auth.models import User
+from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
 from django.db.models import JSONField
+from django.db.models.functions import Upper
 
 from app.utils import format_user_for_rating, get_proxied_image_url
 from shared.constants import (
@@ -147,6 +149,16 @@ class Person(BaseModel):
     class Meta:
         verbose_name = 'Person'
         verbose_name_plural = 'Persons'
+        indexes = [
+            GinIndex(
+                OpClass(Upper('name'), name='gin_trgm_ops'),
+                name='idx_person_name_upper_trgm',
+            ),
+            GinIndex(
+                OpClass(Upper('en_name'), name='gin_trgm_ops'),
+                name='idx_person_en_name_upper_trgm',
+            ),
+        ]
 
 
 class ShowCrew(BaseModel):
@@ -405,6 +417,18 @@ class Show(BaseModel):
         indexes = [
             models.Index(fields=['type', 'year'], name='idx_show_type_year'),
             models.Index(fields=['status', 'year'], name='idx_show_status_year'),
+            GinIndex(
+                OpClass(Upper('title'), name='gin_trgm_ops'),
+                name='idx_show_title_upper_trgm',
+            ),
+            GinIndex(
+                OpClass(Upper('original_title'), name='gin_trgm_ops'),
+                name='idx_show_original_upper_trgm',
+            ),
+            GinIndex(
+                OpClass(Upper('plot'), name='gin_trgm_ops'),
+                name='idx_show_plot_upper_trgm',
+            ),
         ]
 
 

@@ -69,7 +69,7 @@
         <!-- Кулдаун (активный результат) -->
         <div v-else-if="state === 'cooldown' && activeSpin" class="casino-slot-container active">
           <div class="casino-slot-window">
-            <img :src="getResizedPosterUrl(activeSpin.show.poster_url, 'medium')" alt="" @error="handleImgFallback" />
+            <PosterImage :src="getResizedPosterUrl(activeSpin.show.poster_url, 'medium')" alt="poster" style="width: 100%; height: 100%; object-fit: cover;" />
             <div v-if="activeSpin.show.user_rating" class="grid-badges">
               <span class="rating-badge" :class="getRatingClass(activeSpin.show.user_rating)">
                 <span v-html="icons.star"></span>{{ activeSpin.show.user_rating }}
@@ -99,7 +99,7 @@
 
         <div v-else-if="['spinning', 'mystery', 'reveal'].includes(state)" class="casino-slot-container active">
           <div class="casino-slot-window" :class="{ 'casino-win-glow': state === 'reveal' }">
-            <img v-if="state !== 'mystery' && currentPoster" :src="currentPoster" alt="" />
+            <PosterImage v-if="state !== 'mystery'" :src="currentPoster" alt="poster" style="width: 100%; height: 100%; object-fit: cover;" />
             <div v-else-if="state === 'mystery'" style="display:flex; align-items:center; justify-content:center; height:100%; font-size:100px; font-weight:900; color:var(--accent);">?</div>
             <div v-if="state === 'reveal' && winner?.user_rating" class="grid-badges">
               <span class="rating-badge" :class="getRatingClass(winner.user_rating)">
@@ -142,6 +142,7 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
+import PosterImage from '../shared/PosterImage.vue'
 import { getRatingClass, getResizedPosterUrl } from '../../utils/helpers'
 
 const uiStore = useUIStore()
@@ -560,10 +561,6 @@ const goToWinner = (showId) => {
 const goToSearch = () => {
   close()
   uiStore.switchBaseView('search')
-}
-
-const handleImgFallback = (e) => {
-  e.target.style.display = 'none'
 }
 
 const showTypeRu = (type) => {

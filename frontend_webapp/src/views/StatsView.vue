@@ -228,8 +228,7 @@
                 @click="openHistory('binge', { show_id: b.show_id, date: b.date, title: b.show_title })"
               >
                 <div class="li-l">
-                  <img v-if="b.poster_url" :src="b.poster_url" style="width: clamp(36px, 10vw, 44px); height: clamp(54px, 15vw, 66px); border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--bg-input); border: 1px solid var(--border);" />
-                  <div v-else style="width: clamp(36px, 10vw, 44px); height: clamp(54px, 15vw, 66px); border-radius: 6px; flex-shrink: 0; background: var(--bg-input); border: 1px solid var(--border);"></div>
+                  <PosterImage :src="b.poster_url" alt="poster" style="width: clamp(36px, 10vw, 44px); height: clamp(54px, 15vw, 66px); border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--bg-input); border: 1px solid var(--border);" />
                   <div style="min-width: 0;">
                     <div class="li-name">{{ b.show_title }}</div>
                     <div class="li-sub">{{ b.date }}</div>
@@ -306,6 +305,7 @@ import GenreDonut from '../components/stats/GenreDonut.vue'
 import LeaderList from '../components/stats/LeaderList.vue'
 import BaseChart from '../components/shared/BaseChart.vue'
 import BouncyBarChart from '../components/shared/BouncyBarChart.vue'
+import PosterImage from '../components/shared/PosterImage.vue'
 import { useTelegram } from '../composables/useTelegram'
 
 const statsStore = useStatsStore()

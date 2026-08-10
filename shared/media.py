@@ -4,14 +4,17 @@ from app.models import Show
 from app.utils import get_proxied_image_url
 
 
-def get_poster_url(show_id: int, size: str = 'small') -> str:
+def get_poster_url(show_id: int, size: str = 'small') -> str | None:
     """Return a poster URL for both KinoPub-backed and TMDB-only shows.
 
     The poster service is keyed by the local Show id only for records imported
     from KinoPub. TMDB-only records must use their stored TMDB poster path.
     """
     show = Show.objects.filter(id=show_id).only('kinopub_id', 'tmdb_poster_path').first()
-    if show and not show.kinopub_id and show.tmdb_poster_path:
+    if show and not show.kinopub_id:
+        if not show.tmdb_poster_path:
+            return None
+
         tmdb_sizes = {'small': 'w200', 'medium': 'w342', 'big': 'w500'}
         tmdb_url = (
             f'https://image.tmdb.org/t/p/{tmdb_sizes.get(size, "w342")}{show.tmdb_poster_path}'

@@ -12,12 +12,27 @@ from shared.constants import DATETIME_FORMAT, RedisQueue, UserRole
 
 logger = logging.getLogger(__name__)
 
+_BROWSER_ONLY_IMAGE_HOSTS = (
+    'st.kp.yandex.net',
+    'avatars.mds.yandex.net',
+    'avatars.mds.yandex.ru',
+)
+
 
 def get_proxied_image_url(url: str | None) -> str | None:
     if not url:
         return None
     if url.startswith('/api/image_proxy/'):
         return url
+
+    hostname = urllib.parse.urlparse(url).hostname
+    if hostname and any(
+        hostname == host or hostname.endswith(f'.{host}') for host in _BROWSER_ONLY_IMAGE_HOSTS
+    ):
+        # Kinopoisk's legacy image URLs return 403 to server-side clients but
+        # redirect normally in a browser to avatars.mds.yandex.net.
+        return url
+
     return f'/api/image_proxy/?url={urllib.parse.quote(url, safe="")}'
 
 
