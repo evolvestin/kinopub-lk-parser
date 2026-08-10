@@ -100,7 +100,10 @@
       <div class="modal-content" :class="{ 'modal-wide': modalItems.length >= 5 }">
         <div class="modal-header">
           <div class="modal-title">{{ modalTitle }}</div>
-          <button class="modal-close" @click="closeDetails">×</button>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <a v-if="modalDataContext.admin_url" :href="modalDataContext.admin_url" target="_blank" class="nav-btn" style="padding:8px 12px; font-size:12px; height:auto; text-decoration:none;">Админка</a>
+            <button class="modal-close" @click="closeDetails">×</button>
+          </div>
         </div>
         <div v-if="isModalLoading" style="text-align:center; padding: 20px;">
           <div class="spinner" style="width:30px; height:30px; display:inline-block;"></div>
@@ -243,7 +246,9 @@
                 </div>
               </template>
             </div>
-            <div ref="sentinelRef" style="height: 40px; width: 100%; grid-column: 1/-1;"></div>
+            <div ref="sentinelRef" style="height: 40px; width: 100%; grid-column: 1/-1; display:flex; justify-content:center; align-items:center;">
+              <div v-if="isModalPageLoading" class="spinner" style="width:24px; height:24px;"></div>
+            </div>
           </template>
         </div>
         <div class="modal-footer" v-if="modalItems.length && !modalDataContext.is_genre && !modalDataContext.is_country && !modalDataContext.is_person">
@@ -523,25 +528,30 @@ const isModalLoading = ref(false)
 const modalTitle = ref('')
 const modalItems = ref([])
 const modalLimit = ref(50)
+const modalOffset = ref(0)
+const modalHasMore = ref(false)
+const isModalPageLoading = ref(false)
 const modalDataContext = ref({})
 const currentTargetTask = ref('details')
 const isBatchQueuing = ref(false)
 
 const mergeSelections = ref({})
 
-const visibleModalItems = computed(() => modalItems.value.slice(0, modalLimit.value))
+const visibleModalItems = computed(() => modalItems.value)
 const pendingQueueIds = computed(() => modalItems.value.filter(i => !i.in_queue).map(i => i.id))
 
 const sentinelRef = ref(null)
+const modalListRef = ref(null)
 let observer = null
+let modalRequestToken = 0
 
 const setupObserver = () => {
   if (observer) observer.disconnect()
   observer = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting && modalLimit.value < modalItems.value.length) {
-      modalLimit.value += 50
+    if (entries[0].isIntersecting) {
+      loadMoreDetails()
     }
-  }, { root: document.querySelector('.modal-body-list'), rootMargin: '600px' })
+  }, { root: modalListRef.value, rootMargin: '600px' })
   
   if (sentinelRef.value) {
     observer.observe(sentinelRef.value)
@@ -560,17 +570,64 @@ const getMetricName = (key) => {
   return 'Детализация'
 }
 
+const mergeLoadedItems = (items) => {
+  modalItems.value.push(...items)
+  items.forEach(item => {
+    if (item.is_duplicate_group && item.persons && item.persons.length > 0) {
+      const tmdbMatch = item.persons.find(p => p.tmdb_id)
+      const defaultMasterId = tmdbMatch ? tmdbMatch.id : item.persons[0].id
+      mergeSelections.value[item.persons[0].id] = defaultMasterId
+    }
+  })
+}
+
+const loadMoreDetails = async () => {
+  if (!isModalOpen.value || isModalPageLoading.value || !modalHasMore.value) return
+
+  const requestToken = modalRequestToken
+  isModalPageLoading.value = true
+  try {
+    const params = new URLSearchParams({
+      type: modalDataContext.value.request_type,
+      offset: String(modalOffset.value),
+      limit: String(modalLimit.value)
+    })
+    const resp = await fetch(`/api/metrics/details/${modalDataContext.value.request_key}/?${params}`, {
+      credentials: 'same-origin'
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const data = await resp.json()
+    if (requestToken !== modalRequestToken) return
+    mergeLoadedItems(data.items || [])
+    modalOffset.value = data.next_offset ?? (modalOffset.value + (data.items || []).length)
+    modalHasMore.value = Boolean(data.has_more)
+  } catch (e) {
+    console.error(e)
+  } finally {
+    if (requestToken === modalRequestToken) {
+      isModalPageLoading.value = false
+      nextTick(setupObserver)
+    }
+  }
+}
+
 const openDetails = async (key, typeLabel) => {
+  modalRequestToken += 1
+  const requestToken = modalRequestToken
   modalTitle.value = `${getMetricName(key)}: ${typeLabel}`
   isModalOpen.value = true
   isModalLoading.value = true
   modalItems.value = []
   modalLimit.value = 50
+  modalOffset.value = 0
+  modalHasMore.value = false
+  isModalPageLoading.value = false
   mergeSelections.value = {}
 
   try {
     // Добавляем credentials: 'same-origin' для передачи сессионных куки админа
-    const resp = await fetch(`/api/metrics/details/${key}/?type=${encodeURIComponent(typeLabel)}`, {
+    const params = new URLSearchParams({ type: typeLabel, offset: '0', limit: String(modalLimit.value) })
+    const resp = await fetch(`/api/metrics/details/${key}/?${params}`, {
         credentials: 'same-origin'
     })
     
@@ -581,18 +638,16 @@ const openDetails = async (key, typeLabel) => {
     }
 
     const data = await resp.json()
+    if (requestToken !== modalRequestToken) return
     modalDataContext.value = { ...data, is_authenticated: true }
+    modalDataContext.value.request_key = key
+    modalDataContext.value.request_type = typeLabel
     currentTargetTask.value = data.target_task || 'details'
+    modalOffset.value = data.next_offset ?? (data.items || []).length
+    modalHasMore.value = Boolean(data.has_more)
 
     if (data.items && data.items.length) {
-      modalItems.value = data.items
-      data.items.forEach(item => {
-        if (item.is_duplicate_group && item.persons && item.persons.length > 0) {
-          const tmdbMatch = item.persons.find(p => p.tmdb_id)
-          const defaultMasterId = tmdbMatch ? tmdbMatch.id : item.persons[0].id
-          mergeSelections.value[item.persons[0].id] = defaultMasterId
-        }
-      })
+      mergeLoadedItems(data.items)
     }
   } catch (e) {
     console.error(e)
@@ -603,6 +658,7 @@ const openDetails = async (key, typeLabel) => {
 }
 
 const closeDetails = () => {
+  modalRequestToken += 1
   isModalOpen.value = false
   if (observer) observer.disconnect()
 }
@@ -622,11 +678,20 @@ const addToQueue = async (item) => {
 }
 
 const addAllToQueue = async () => {
-  const ids = pendingQueueIds.value
-  if (ids.length === 0) return
-
   isBatchQueuing.value = true
+  if (observer) observer.disconnect()
   try {
+    // The modal is paginated now, so explicitly load the remaining pages before
+    // preserving the old "add all" behavior.
+    while (modalHasMore.value && isModalOpen.value) {
+      const previousOffset = modalOffset.value
+      await loadMoreDetails()
+      if (modalOffset.value === previousOffset) break
+    }
+
+    const ids = pendingQueueIds.value
+    if (ids.length === 0) return
+
     await fetch('/api/metrics/queue_update/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -637,6 +702,7 @@ const addAllToQueue = async () => {
     alert('Ошибка добавления в очередь: ' + e.message)
   } finally {
     isBatchQueuing.value = false
+    nextTick(setupObserver)
   }
 }
 

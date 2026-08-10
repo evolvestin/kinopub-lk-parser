@@ -4,7 +4,7 @@ import uuid
 from django.contrib.auth.models import User
 from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
-from django.db.models import JSONField
+from django.db.models import JSONField, Q
 from django.db.models.functions import Upper
 
 from app.utils import format_user_for_rating, get_proxied_image_url
@@ -150,6 +150,20 @@ class Person(BaseModel):
         verbose_name = 'Person'
         verbose_name_plural = 'Persons'
         indexes = [
+            models.Index(
+                fields=['tmdb_photo_url'],
+                name='idx_person_tmdb_dupe_source',
+                condition=Q(master_person__isnull=True)
+                & Q(tmdb_photo_url__isnull=False)
+                & ~Q(tmdb_photo_url=''),
+            ),
+            models.Index(
+                fields=['kp_photo_url'],
+                name='idx_person_kp_dupe_source',
+                condition=Q(master_person__isnull=True)
+                & Q(kp_photo_url__isnull=False)
+                & ~Q(kp_photo_url=''),
+            ),
             GinIndex(
                 OpClass(Upper('name'), name='gin_trgm_ops'),
                 name='idx_person_name_upper_trgm',
@@ -417,6 +431,73 @@ class Show(BaseModel):
         indexes = [
             models.Index(fields=['type', 'year'], name='idx_show_type_year'),
             models.Index(fields=['status', 'year'], name='idx_show_status_year'),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_kp_type_id',
+                condition=Q(kinopub_id__isnull=False),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_missing_imdb',
+                condition=Q(imdb_url__isnull=False) & ~Q(imdb_url=''),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_tmdb_type_id',
+                condition=Q(tmdb_id__isnull=False) & Q(kinopub_id__isnull=True),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_kp_missing_plot',
+                condition=Q(kinopub_id__isnull=False) & (Q(plot__isnull=True) | Q(plot='')),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_kp_missing_year',
+                condition=Q(kinopub_id__isnull=False) & Q(year__isnull=True),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_kp_missing_status',
+                condition=Q(kinopub_id__isnull=False) & (Q(status__isnull=True) | Q(status='')),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_kp_missing_imdb_id',
+                condition=Q(kinopub_id__isnull=False) & (Q(imdb_id__isnull=True) | Q(imdb_id='')),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_tmdb_missing_year',
+                condition=Q(tmdb_id__isnull=False)
+                & Q(kinopub_id__isnull=True)
+                & Q(year__isnull=True),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_tmdb_missing_status',
+                condition=Q(tmdb_id__isnull=False)
+                & Q(kinopub_id__isnull=True)
+                & (Q(status__isnull=True) | Q(status='')),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_tmdb_missing_plot',
+                condition=Q(tmdb_id__isnull=False)
+                & Q(kinopub_id__isnull=True)
+                & (Q(plot__isnull=True) | Q(plot='')),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_missing_tmdb',
+                condition=Q(kinopub_id__isnull=False) & Q(tmdb_id__isnull=True),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_tmdb_no_kp',
+                condition=Q(tmdb_id__isnull=False)
+                & (Q(kinopoisk_url__isnull=True) | Q(kinopoisk_url='')),
+            ),
             GinIndex(
                 OpClass(Upper('title'), name='gin_trgm_ops'),
                 name='idx_show_title_upper_trgm',

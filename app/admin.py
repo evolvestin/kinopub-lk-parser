@@ -10,6 +10,7 @@ from django.db.models import (
     Case,
     CharField,
     Count,
+    Exists,
     F,
     IntegerField,
     Min,
@@ -20,7 +21,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Lower, StrIndex
 from django.http import HttpResponseRedirect
 from django.template.loader import render_to_string
 from django.urls import path, reverse
@@ -53,12 +54,18 @@ from app.models import (
     WishlistFolder,
     WishlistItem,
 )
+from app.services.metrics import (
+    _canonical_person_id_expression,
+    get_missing_country_meta_list,
+    get_profession_persons_list,
+)
 from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender
 from app.utils import get_proxied_image_url
 from app.views import sync_user_permissions
 from shared.constants import (
     ACTOR_ROLES,
+    GENRES_MAPPING,
     PROFESSION_TRANS_MAP,
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
@@ -324,6 +331,39 @@ class ShowTypeFilter(admin.SimpleListFilter):
         return queryset
 
 
+class MetricParamFilter(admin.SimpleListFilter):
+    title = 'Metric'
+    parameter_name = 'metric'
+
+    def lookups(self, request, model_admin):
+        return ()
+
+    def queryset(self, request, queryset):
+        return queryset
+
+
+class MetricValueParamFilter(admin.SimpleListFilter):
+    title = 'Metric value'
+    parameter_name = 'value'
+
+    def lookups(self, request, model_admin):
+        return ()
+
+    def queryset(self, request, queryset):
+        return queryset
+
+
+class MetricSourceParamFilter(admin.SimpleListFilter):
+    title = 'Metric source'
+    parameter_name = 'source'
+
+    def lookups(self, request, model_admin):
+        return ()
+
+    def queryset(self, request, queryset):
+        return queryset
+
+
 class ShowStatusFilter(admin.SimpleListFilter):
     title = 'Status'
     parameter_name = 'status'
@@ -360,6 +400,7 @@ class ShowAdmin(admin.ModelAdmin):
     )
     list_editable = ('ignore_collision',)
     list_filter = (
+        MetricParamFilter,
         ShowTypeFilter,
         ShowStatusFilter,
         AverageRatingFilter,
@@ -555,6 +596,101 @@ class ShowAdmin(admin.ModelAdmin):
             _total_duration=Subquery(duration_subquery),
             _avg_rating=Avg('ratings__rating'),
         )
+
+        metric = request.GET.get('metric')
+        if metric:
+            queryset = self._apply_metric_filter(queryset, metric, request)
+        return queryset
+
+    def lookup_allowed(self, lookup, value, request):
+        if lookup in {'metric', 'value', 'source'}:
+            return True
+        return super().lookup_allowed(lookup, value, request)
+
+    def _apply_metric_filter(self, queryset, metric, request):
+        if metric == 'missing_kp':
+            return (
+                queryset.filter(kinopoisk_url__isnull=False, ext_rating__isnull=True)
+                .exclude(kinopoisk_url='')
+                .exclude(kinopoisk_url__endswith='/film/0')
+            )
+        if metric == 'missing_imdb':
+            return queryset.filter(imdb_url__isnull=False, ext_rating__isnull=True).exclude(
+                imdb_url=''
+            )
+        if metric == 'missing_imdb_id':
+            return queryset.filter(kinopub_id__isnull=False).filter(
+                Q(imdb_id__isnull=True) | Q(imdb_id='')
+            )
+        if metric == 'tmdb_only_shows':
+            return queryset.filter(tmdb_id__isnull=False, kinopub_id__isnull=True)
+        if metric == 'missing_tmdb_id':
+            return queryset.filter(kinopub_id__isnull=False, tmdb_id__isnull=True)
+        if metric == 'tmdb_no_kp':
+            return queryset.filter(tmdb_id__isnull=False).filter(
+                Q(kinopoisk_url__isnull=True) | Q(kinopoisk_url='')
+            )
+        if metric == 'title_collision':
+            return (
+                queryset.filter(original_title__isnull=False, ignore_collision=False)
+                .exclude(original_title='')
+                .annotate(low_title=Lower('title'), low_orig=Lower('original_title'))
+                .annotate(pos=StrIndex('low_title', F('low_orig')))
+                .filter(pos__gt=0)
+                .exclude(low_title=F('low_orig'))
+            )
+        if metric == 'missing_year':
+            return queryset.filter(kinopub_id__isnull=False, year__isnull=True)
+        if metric == 'tmdb_missing_year':
+            return queryset.filter(
+                tmdb_id__isnull=False, kinopub_id__isnull=True, year__isnull=True
+            )
+        if metric == 'missing_status':
+            return queryset.filter(kinopub_id__isnull=False).filter(
+                Q(status__isnull=True) | Q(status='')
+            )
+        if metric == 'tmdb_missing_status':
+            return queryset.filter(tmdb_id__isnull=False, kinopub_id__isnull=True).filter(
+                Q(status__isnull=True) | Q(status='')
+            )
+        if metric == 'missing_plot':
+            return queryset.filter(kinopub_id__isnull=False).filter(
+                Q(plot__isnull=True) | Q(plot='')
+            )
+        if metric == 'tmdb_missing_plot':
+            return queryset.filter(tmdb_id__isnull=False, kinopub_id__isnull=True).filter(
+                Q(plot__isnull=True) | Q(plot='')
+            )
+        if metric in {'missing_durations', 'tmdb_missing_durations'}:
+            source_filter = (
+                Q(kinopub_id__isnull=False)
+                if metric == 'missing_durations'
+                else Q(tmdb_id__isnull=False, kinopub_id__isnull=True)
+            )
+            duration_exists = ShowDuration.objects.filter(show_id=OuterRef('pk'))
+            return queryset.filter(source_filter).filter(~Exists(duration_exists))
+        if metric in {'no_genres', 'tmdb_no_genres'}:
+            source_filter = (
+                Q(kinopub_id__isnull=False)
+                if metric == 'no_genres'
+                else Q(tmdb_id__isnull=False, kinopub_id__isnull=True)
+            )
+            genre_exists = Show.genres.through.objects.filter(show_id=OuterRef('pk'))
+            return queryset.filter(source_filter).filter(~Exists(genre_exists))
+        if metric in {'no_countries', 'tmdb_no_countries'}:
+            source_filter = (
+                Q(kinopub_id__isnull=False)
+                if metric == 'no_countries'
+                else Q(tmdb_id__isnull=False, kinopub_id__isnull=True)
+            )
+            country_exists = Show.countries.through.objects.filter(show_id=OuterRef('pk'))
+            return queryset.filter(source_filter).filter(~Exists(country_exists))
+        if metric == 'has_kp':
+            return queryset.filter(ext_rating__kp__isnull=False)
+        if metric == 'has_imdb':
+            return queryset.filter(ext_rating__imdb__isnull=False)
+        if metric == 'total_shows':
+            return queryset
         return queryset
 
     @admin.display(description='Type', ordering='type')
@@ -977,6 +1113,12 @@ class BaseNameAdmin(admin.ModelAdmin):
     list_display = ('name', 'created_at', 'updated_at')
     search_fields = ('name',)
     readonly_fields = ('created_at', 'updated_at')
+    list_filter = (MetricParamFilter, MetricValueParamFilter, MetricSourceParamFilter)
+
+    def lookup_allowed(self, lookup, value, request):
+        if lookup in {'metric', 'value', 'source'}:
+            return True
+        return super().lookup_allowed(lookup, value, request)
 
 
 @admin.register(Country, site=admin_site)
@@ -1010,6 +1152,19 @@ class CountryAdmin(BaseNameAdmin):
         ),
     )
 
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        metric = request.GET.get('metric')
+        value = request.GET.get('value')
+        if metric == 'missing_country_meta':
+            valid_ids = [item['id'] for item in get_missing_country_meta_list()]
+            return queryset.filter(id__in=valid_ids)
+        if metric == 'total_countries' and value == 'Неиспользуемые':
+            return queryset.filter(show__isnull=True)
+        if metric == 'total_countries' and value == 'Активные':
+            return queryset.filter(show__isnull=False).distinct()
+        return queryset
+
     @admin.display(description='User Stats (Shows watched)')
     def user_stats(self, obj):
         return _get_user_stats_html(Q(history__show__countries=obj))
@@ -1031,6 +1186,18 @@ class CountryAdmin(BaseNameAdmin):
 class GenreAdmin(BaseNameAdmin):
     inlines = [ShowGenreInline]
     readonly_fields = BaseNameAdmin.readonly_fields + ('related_actors', 'user_stats')
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        metric = request.GET.get('metric')
+        value = request.GET.get('value')
+        if metric == 'unmapped_genres':
+            return queryset.exclude(name__in=RAW_TO_NORMALIZED_GENRE.keys())
+        if metric == 'total_genres' and value == 'Основные жанры':
+            return queryset.filter(name__in=GENRES_MAPPING.keys())
+        if metric == 'total_genres':
+            return queryset.exclude(name__in=GENRES_MAPPING.keys())
+        return queryset
 
     fieldsets = (
         (None, {'fields': ('name',)}),
@@ -1151,6 +1318,66 @@ class PersonShowCrewInline(BaseReadonlyInline):
         return obj.normalized_en_profession
 
 
+def _apply_person_metric_filter(queryset, metric, request):
+    value = request.GET.get('value', '')
+    if metric == 'total_persons_by_show_type':
+        canonical_ids = (
+            ShowCrew.objects.filter(show__type=value)
+            .annotate(canonical_id=_canonical_person_id_expression())
+            .values('canonical_id')
+            .distinct()
+        )
+        return queryset.filter(id__in=canonical_ids)
+
+    if metric == 'unused_persons':
+        return queryset.filter(master_person__isnull=True, showcrew__isnull=True)
+
+    if metric == 'duplicate_photo_urls':
+        field = 'tmdb_photo_url' if 'TMDB' in request.GET.get('source', '') else 'kp_photo_url'
+        duplicate_values = (
+            Person.objects.filter(master_person__isnull=True)
+            .exclude(**{field: ''})
+            .filter(**{f'{field}__isnull': False})
+            .values(field)
+            .annotate(cnt=Count('id'))
+            .filter(cnt__gt=1)
+            .values(field)
+        )
+        return (
+            queryset.filter(master_person__isnull=True, **{f'{field}__in': duplicate_values})
+            .order_by(field, 'id')
+            .distinct(field)
+        )
+
+    if metric == 'persons_avatar_stats':
+        has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
+        has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
+        tmdb_done = Q(is_photo_fetched=True)
+        waiting_shows = (
+            Show.objects.filter(kinopoisk_url__isnull=False, ext_rating__isnull=True)
+            .exclude(kinopoisk_url='')
+            .exclude(kinopoisk_url__endswith='/film/0')
+        )
+        kp_waiting = Q(id__in=ShowCrew.objects.filter(show__in=waiting_shows).values('person_id'))
+        photo_filters = {
+            'has_tmdb': has_tmdb,
+            'kp': has_kp & ~has_tmdb,
+            'tmdb_none': tmdb_done & ~has_tmdb,
+            'kp_none': ~has_kp & ~kp_waiting,
+            'tmdb_wait': ~(tmdb_done | has_tmdb),
+            'kp_wait': kp_waiting & ~has_kp,
+            'all_none': tmdb_done & ~(has_tmdb | has_kp) & ~kp_waiting,
+        }
+        return queryset.filter(photo_filters.get(value, Q(pk__in=[])))
+
+    if metric in {'professions_stats', 'en_professions_stats'}:
+        language = 'en' if metric == 'en_professions_stats' else 'ru'
+        person_ids = get_profession_persons_list(value, language).values('id')
+        return queryset.filter(id__in=person_ids)
+
+    return queryset
+
+
 class PersonProfessionFilter(admin.SimpleListFilter):
     title = 'Profession (RU)'
     parameter_name = 'profession_norm'
@@ -1257,6 +1484,9 @@ class PersonAdmin(BaseNameAdmin):
     )
     list_display_links = ('name',)
     list_filter = (
+        MetricParamFilter,
+        MetricValueParamFilter,
+        MetricSourceParamFilter,
         MasterPersonFilter,
         PhotoSourceFilter,
         'is_photo_fetched',
@@ -1277,6 +1507,12 @@ class PersonAdmin(BaseNameAdmin):
     raw_id_fields = ('master_person',)
     ordering = ('-updated_at',)
     actions = ['action_merge_persons']
+
+    def get_ordering(self, request):
+        if request.GET.get('metric') == 'duplicate_photo_urls':
+            field = 'tmdb_photo_url' if 'TMDB' in request.GET.get('source', '') else 'kp_photo_url'
+            return (field, 'id')
+        return super().get_ordering(request)
 
     fieldsets = (
         (None, {'fields': ('name', 'en_name', 'master_person')}),
@@ -1382,10 +1618,19 @@ class PersonAdmin(BaseNameAdmin):
             .order_by('id')
         )
 
-        return qs.annotate(
+        qs = qs.annotate(
             _primary_ru_prof=Subquery(sc_ru.values('profession')[:1]),
             _primary_en_prof=Subquery(sc_en.values('en_profession')[:1]),
         )
+        metric = request.GET.get('metric')
+        if metric:
+            qs = _apply_person_metric_filter(qs, metric, request)
+        return qs
+
+    def lookup_allowed(self, lookup, value, request):
+        if lookup in {'metric', 'value', 'source'}:
+            return True
+        return super().lookup_allowed(lookup, value, request)
 
     @admin.display(description='Тип / Мастер', ordering='master_person')
     def get_master_link(self, obj):
@@ -1433,7 +1678,9 @@ class PersonAdmin(BaseNameAdmin):
         html += '</ul>'
         return format_html(html)
 
-    def lookup_allowed(self, lookup, value):
+    def lookup_allowed(self, lookup, value, request):
+        if lookup in {'metric', 'value', 'source'}:
+            return True
         allowed_related = [
             'master_person__isnull',
             'showcrew__isnull',
@@ -1446,7 +1693,7 @@ class PersonAdmin(BaseNameAdmin):
         ]
         if lookup in allowed_related:
             return True
-        return super().lookup_allowed(lookup, value)
+        return super().lookup_allowed(lookup, value, request)
 
     @admin.display(description='Основная роль (RU)', ordering='_primary_ru_prof')
     def get_ru_profession(self, obj):

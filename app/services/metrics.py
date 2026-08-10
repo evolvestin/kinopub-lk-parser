@@ -4,17 +4,19 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import Case, CharField, Count, F, Q, Value, When
+from django.db.models import Case, CharField, Count, Exists, F, OuterRef, Q, Value, When
 from django.db.models.functions import Coalesce, Lower, StrIndex
 from django.db.utils import ProgrammingError
 from django.utils import timezone
 
 from app.models import (
     Country,
+    ExternalRating,
     Genre,
     Person,
     Show,
     ShowCrew,
+    ShowDuration,
     SiteMetric,
 )
 from app.utils import get_proxied_image_url
@@ -32,6 +34,8 @@ from shared.constants import (
     SHOW_TYPE_DISPLAY_RU,
     SHOW_TYPE_MAPPING,
 )
+
+DUPLICATE_PHOTO_CACHE_VERSION_KEY = 'metrics:duplicate_photo_urls:cache_version'
 
 
 def _format_type(t):
@@ -143,6 +147,10 @@ def calculate_total_shows_metric():
     return _aggregate_by_display_type(stats)
 
 
+def get_total_shows_list(show_type: str):
+    return Show.objects.filter(type=show_type).values('id', 'title', 'original_title')
+
+
 def calculate_missing_imdb_metric():
     qs = Show.objects.filter(imdb_url__isnull=False, ext_rating__isnull=True).exclude(imdb_url='')
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
@@ -150,9 +158,22 @@ def calculate_missing_imdb_metric():
 
 
 def get_missing_imdb_list(show_type: str):
+    rating_exists = ExternalRating.objects.filter(show_id=OuterRef('pk'))
     return (
-        Show.objects.filter(type=show_type, imdb_url__isnull=False, ext_rating__isnull=True)
+        Show.objects.filter(type=show_type, imdb_url__isnull=False)
         .exclude(imdb_url='')
+        .filter(~Exists(rating_exists))
+        .values('id', 'title', 'original_title')
+    )
+
+
+def get_has_rating_list(show_type: str, source: str):
+    rating_exists = ExternalRating.objects.filter(
+        show_id=OuterRef('pk'), **{f'{source}__isnull': False}
+    )
+    return (
+        Show.objects.filter(type=show_type)
+        .filter(Exists(rating_exists))
         .values('id', 'title', 'original_title')
     )
 
@@ -384,6 +405,22 @@ def get_title_collision_list(show_type: str):
     )
 
 
+def get_title_collision_page(show_type: str, offset: int = 0, limit: int = 50):
+    """Return a cached page because collision detection is a CPU-heavy text scan."""
+    cache_key = f'metrics:title_collision:{show_type}:{offset}:{limit}'
+    cached_page = cache.get(cache_key)
+    if cached_page is not None:
+        return cached_page
+
+    page_items = list(
+        get_title_collision_list(show_type).order_by('id')[offset : offset + limit + 1]
+    )
+    has_more = len(page_items) > limit
+    result = (page_items[:limit], has_more)
+    cache.set(cache_key, result, timeout=300)
+    return result
+
+
 def calculate_missing_year_metric():
     stats = (
         Show.objects.filter(kinopub_id__isnull=False, year__isnull=True)
@@ -465,9 +502,12 @@ def calculate_no_genres_metric():
 
 
 def get_no_genres_list(show_type: str):
-    return Show.objects.filter(
-        kinopub_id__isnull=False, type=show_type, genres__isnull=True
-    ).values('id', 'title', 'original_title')
+    genre_exists = Show.genres.through.objects.filter(show_id=OuterRef('pk'))
+    return (
+        Show.objects.filter(kinopub_id__isnull=False, type=show_type)
+        .filter(~Exists(genre_exists))
+        .values('id', 'title', 'original_title')
+    )
 
 
 def calculate_tmdb_no_genres_metric():
@@ -481,9 +521,12 @@ def calculate_tmdb_no_genres_metric():
 
 
 def get_tmdb_no_genres_list(show_type: str):
-    return Show.objects.filter(
-        kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type, genres__isnull=True
-    ).values('id', 'title', 'original_title')
+    genre_exists = Show.genres.through.objects.filter(show_id=OuterRef('pk'))
+    return (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type)
+        .filter(~Exists(genre_exists))
+        .values('id', 'title', 'original_title')
+    )
 
 
 def calculate_no_countries_metric():
@@ -497,9 +540,12 @@ def calculate_no_countries_metric():
 
 
 def get_no_countries_list(show_type: str):
-    return Show.objects.filter(
-        kinopub_id__isnull=False, type=show_type, countries__isnull=True
-    ).values('id', 'title', 'original_title')
+    country_exists = Show.countries.through.objects.filter(show_id=OuterRef('pk'))
+    return (
+        Show.objects.filter(kinopub_id__isnull=False, type=show_type)
+        .filter(~Exists(country_exists))
+        .values('id', 'title', 'original_title')
+    )
 
 
 def calculate_tmdb_no_countries_metric():
@@ -513,9 +559,103 @@ def calculate_tmdb_no_countries_metric():
 
 
 def get_tmdb_no_countries_list(show_type: str):
-    return Show.objects.filter(
-        kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type, countries__isnull=True
-    ).values('id', 'title', 'original_title')
+    country_exists = Show.countries.through.objects.filter(show_id=OuterRef('pk'))
+    return (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type)
+        .filter(~Exists(country_exists))
+        .values('id', 'title', 'original_title')
+    )
+
+
+def _canonical_person_ids(crew_queryset):
+    return (
+        crew_queryset.annotate(canonical_id=_canonical_person_id_expression())
+        .values('canonical_id')
+        .distinct()
+    )
+
+
+def _person_values_queryset(person_ids):
+    return Person.objects.filter(id__in=person_ids).values(
+        'id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id'
+    )
+
+
+def get_total_persons_list(show_type: str):
+    person_ids = _canonical_person_ids(ShowCrew.objects.filter(show__type=show_type))
+    return _person_values_queryset(person_ids)
+
+
+def get_unused_persons_list():
+    return Person.objects.filter(master_person__isnull=True, showcrew__isnull=True).values(
+        'id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id'
+    )
+
+
+def get_persons_avatar_list(source_type: str):
+    has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
+    has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
+    tmdb_done = Q(is_photo_fetched=True)
+    waiting_shows = (
+        Show.objects.filter(kinopoisk_url__isnull=False, ext_rating__isnull=True)
+        .exclude(kinopoisk_url='')
+        .exclude(kinopoisk_url__endswith='/film/0')
+    )
+    kp_wait_filter = Q(id__in=ShowCrew.objects.filter(show__in=waiting_shows).values('person_id'))
+
+    filters = {
+        'has_tmdb': Q(has_tmdb),
+        'kp': Q(has_kp) & ~Q(has_tmdb),
+        'tmdb_none': Q(tmdb_done) & ~Q(has_tmdb),
+        'kp_none': ~Q(has_kp) & ~Q(kp_wait_filter),
+        'tmdb_wait': ~Q(tmdb_done | has_tmdb),
+        'kp_wait': Q(kp_wait_filter) & ~Q(has_kp),
+        'all_none': Q(tmdb_done) & ~Q(has_tmdb | has_kp) & ~Q(kp_wait_filter),
+    }
+    return Person.objects.filter(filters.get(source_type, Q(pk__in=[]))).values(
+        'id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id'
+    )
+
+
+def get_profession_persons_list(normalized: str, language: str):
+    if language == 'ru':
+        primary_mapping = RAW_TO_NORMALIZED_RU
+        en_to_ru = {en: ru for ru, en in PROFESSION_TRANS_MAP.items()}
+        fallback_mapping = {
+            raw: en_to_ru[value] for raw, value in RAW_TO_NORMALIZED_EN.items() if value in en_to_ru
+        }
+    else:
+        primary_mapping = RAW_TO_NORMALIZED_EN
+        ru_to_en = {ru: en for ru, en in PROFESSION_TRANS_MAP.items()}
+        fallback_mapping = {
+            raw: ru_to_en[value] for raw, value in RAW_TO_NORMALIZED_RU.items() if value in ru_to_en
+        }
+
+    unknown = '\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e'
+    if normalized == unknown:
+        if language == 'ru':
+            known_filter = Q(showcrew__profession__in=primary_mapping) | Q(
+                showcrew__en_profession__in=fallback_mapping
+            )
+        else:
+            known_filter = Q(showcrew__profession__in=primary_mapping) | Q(
+                showcrew__en_profession__in=fallback_mapping
+            )
+        return (
+            Person.objects.filter(master_person__isnull=True)
+            .exclude(known_filter)
+            .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id')
+        )
+
+    role_case = Case(
+        *[When(profession=raw, then=Value(value)) for raw, value in primary_mapping.items()],
+        *[When(en_profession=raw, then=Value(value)) for raw, value in fallback_mapping.items()],
+        output_field=CharField(),
+    )
+    person_ids = _canonical_person_ids(
+        ShowCrew.objects.annotate(normalized_role=role_case).filter(normalized_role=normalized)
+    )
+    return _person_values_queryset(person_ids)
 
 
 def calculate_total_persons_by_show_type_metric():
@@ -910,8 +1050,14 @@ def calculate_duplicate_photo_urls_metric():
     return sorted(data, key=lambda x: x['value'], reverse=True)
 
 
-def get_duplicate_photo_urls_list(source_type: str):
+def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int = 50):
+    """Return one page of duplicate-photo groups without materializing all groups."""
     field = 'tmdb_photo_url' if 'TMDB' in source_type else 'kp_photo_url'
+    version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
+    cache_key = f'metrics:duplicate_photo_urls:{version}:{field}:{offset}:{limit}'
+    cached_page = cache.get(cache_key)
+    if cached_page is not None:
+        return cached_page
 
     dupe_urls_data = (
         Person.objects.filter(master_person__isnull=True)
@@ -920,13 +1066,18 @@ def get_duplicate_photo_urls_list(source_type: str):
         .values(field)
         .annotate(cnt=Count('id'))
         .filter(cnt__gt=1)
-        .order_by('-cnt')
+        .order_by('-cnt', field)
     )
 
-    if not dupe_urls_data:
-        return []
+    group_rows = list(dupe_urls_data[offset : offset + limit + 1])
+    has_more = len(group_rows) > limit
+    group_rows = group_rows[:limit]
+    if not group_rows:
+        result = ([], False)
+        cache.set(cache_key, result, timeout=300)
+        return result
 
-    url_counts = {entry[field]: entry['cnt'] for entry in dupe_urls_data}
+    url_counts = {entry[field]: entry['cnt'] for entry in group_rows}
     urls = list(url_counts.keys())
 
     persons_qs = (
@@ -1000,7 +1151,26 @@ def get_duplicate_photo_urls_list(source_type: str):
                 'admin_url': f'/admin/app/person/?q={url}',
             }
         )
-    return results
+    result = (results, has_more)
+    cache.set(cache_key, result, timeout=300)
+    return result
+
+
+def invalidate_duplicate_photo_urls_cache():
+    version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
+    cache.set(DUPLICATE_PHOTO_CACHE_VERSION_KEY, int(version) + 1, timeout=None)
+
+
+def get_duplicate_photo_urls_list(source_type: str):
+    """Backward-compatible full-list helper for non-HTTP callers."""
+    results = []
+    offset = 0
+    while True:
+        page, has_more = get_duplicate_photo_urls_page(source_type, offset=offset, limit=500)
+        results.extend(page)
+        if not has_more:
+            return results
+        offset += len(page)
 
 
 def calculate_en_professions_stats_metric():
@@ -1105,9 +1275,12 @@ def calculate_missing_durations_metric():
 
 
 def get_missing_durations_list(show_type: str):
-    return Show.objects.filter(
-        kinopub_id__isnull=False, type=show_type, showduration__isnull=True
-    ).values('id', 'title', 'original_title')
+    duration_exists = ShowDuration.objects.filter(show_id=OuterRef('pk'))
+    return (
+        Show.objects.filter(kinopub_id__isnull=False, type=show_type)
+        .filter(~Exists(duration_exists))
+        .values('id', 'title', 'original_title')
+    )
 
 
 def calculate_tmdb_missing_durations_metric():
@@ -1123,9 +1296,12 @@ def calculate_tmdb_missing_durations_metric():
 
 
 def get_tmdb_missing_durations_list(show_type: str):
-    return Show.objects.filter(
-        kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type, showduration__isnull=True
-    ).values('id', 'title', 'original_title')
+    duration_exists = ShowDuration.objects.filter(show_id=OuterRef('pk'))
+    return (
+        Show.objects.filter(kinopub_id__isnull=True, tmdb_id__isnull=False, type=show_type)
+        .filter(~Exists(duration_exists))
+        .values('id', 'title', 'original_title')
+    )
 
 
 def calculate_unused_persons_metric():

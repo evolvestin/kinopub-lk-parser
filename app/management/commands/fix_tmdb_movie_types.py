@@ -55,9 +55,7 @@ class Command(BaseCommand):
             except Exception as exc:
                 errors += 1
                 self.stderr.write(
-                    self.style.WARNING(
-                        f'ID {show.id} ({show.title}): TMDB check failed: {exc}'
-                    )
+                    self.style.WARNING(f'ID {show.id} ({show.title}): TMDB check failed: {exc}')
                 )
                 continue
 
@@ -78,7 +76,6 @@ class Command(BaseCommand):
         action = 'fixed' if options['apply'] else 'would fix'
         self.stdout.write(
             self.style.SUCCESS(
-                f'Checked: {checked}; candidates: {candidates}; {action}: {fixed}; '
-                f'errors: {errors}'
+                f'Checked: {checked}; candidates: {candidates}; {action}: {fixed}; errors: {errors}'
             )
         )

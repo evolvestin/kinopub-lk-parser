@@ -15,16 +15,20 @@ def get_poster_url(show_id: int, size: str = 'small') -> str | None:
     if not show:
         return None
 
-    if show.kinopub_id:
-        poster_base = settings.POSTER_BASE_URL.rstrip('/')
-        url = f'{poster_base}/{size}/{show.kinopub_id}.jpg'
-        return get_proxied_image_url(url)
+    return build_poster_url(show.kinopub_id, show.tmdb_poster_path, size)
 
-    if not show.tmdb_poster_path:
+
+def build_poster_url(
+    kinopub_id: int | None, tmdb_poster_path: str | None, size: str = 'small'
+) -> str | None:
+    """Build a poster URL when the required show fields are already loaded."""
+    if kinopub_id:
+        poster_base = settings.POSTER_BASE_URL.rstrip('/')
+        return get_proxied_image_url(f'{poster_base}/{size}/{kinopub_id}.jpg')
+
+    if not tmdb_poster_path:
         return None
 
     tmdb_sizes = {'small': 'w200', 'medium': 'w342', 'big': 'w500'}
-    tmdb_url = (
-        f'https://image.tmdb.org/t/p/{tmdb_sizes.get(size, "w342")}{show.tmdb_poster_path}'
-    )
+    tmdb_url = f'https://image.tmdb.org/t/p/{tmdb_sizes.get(size, "w342")}{tmdb_poster_path}'
     return get_proxied_image_url(tmdb_url)

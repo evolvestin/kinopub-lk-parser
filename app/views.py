@@ -16,6 +16,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Avg, Case, F, IntegerField, Max, Prefetch, Q, Sum, Value, When
+from django.db.models.query import QuerySet
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
@@ -49,8 +50,9 @@ from app.models import (
 )
 from app.services.metrics import (
     get_active_countries_list,
-    get_duplicate_photo_urls_list,
+    get_duplicate_photo_urls_page,
     get_global_metrics_history,
+    get_has_rating_list,
     get_missing_country_meta_list,
     get_missing_durations_list,
     get_missing_imdb_id_list,
@@ -62,7 +64,10 @@ from app.services.metrics import (
     get_missing_year_list,
     get_no_countries_list,
     get_no_genres_list,
+    get_persons_avatar_list,
+    get_profession_persons_list,
     get_title_collision_list,
+    get_title_collision_page,
     get_tmdb_missing_durations_list,
     get_tmdb_missing_plot_list,
     get_tmdb_missing_status_list,
@@ -72,8 +77,12 @@ from app.services.metrics import (
     get_tmdb_no_kp_list,
     get_tmdb_only_shows_list,
     get_total_genres_list,
+    get_total_persons_list,
+    get_total_shows_list,
     get_unmapped_genres_list,
     get_unused_countries_list,
+    get_unused_persons_list,
+    invalidate_duplicate_photo_urls_cache,
 )
 from app.services.stats_calculator import (
     generate_global_stats,
@@ -96,7 +105,7 @@ from shared.constants import (
     UserRole,
 )
 from shared.formatters import format_precision_date, format_se
-from shared.media import get_poster_url
+from shared.media import build_poster_url, get_poster_url
 
 logger = logging.getLogger('app')
 
@@ -1872,10 +1881,15 @@ def get_metric_details(request, key):
         return JsonResponse({'is_authenticated': False, 'error': 'Forbidden'}, status=403)
 
     show_type = request.GET.get('type')
+    try:
+        offset = max(0, int(request.GET.get('offset', 0)))
+        limit = min(100, max(1, int(request.GET.get('limit', 50))))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Invalid pagination parameters'}, status=400)
     is_person_metric = any(
         x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo', 'unused_persons']
     )
-    is_country_metric = 'country' in key and key != 'tmdb_no_countries'
+    is_country_metric = key in {'missing_country_meta', 'total_countries'}
     is_genre_metric = 'genre' in key and key != 'tmdb_no_genres'
 
     if is_person_metric:
@@ -1890,12 +1904,14 @@ def get_metric_details(request, key):
     query_params = {}
     is_genre = False
     items, is_summary, is_country, is_person, target_task = [], False, False, False, 'details'
+    has_more = False
+    source_type = None
 
     inverse_map = {v: k for k, v in SHOW_TYPE_DISPLAY_RU.items()}
     db_show_type = inverse_map.get(show_type, show_type)
 
     if key == 'missing_kp':
-        items = list(get_missing_kp_list(db_show_type))
+        items = get_missing_kp_list(db_show_type)
         query_params.update(
             {
                 'type': db_show_type,
@@ -1905,41 +1921,41 @@ def get_metric_details(request, key):
         )
         target_task = 'priority_sync'
     elif key == 'missing_imdb':
-        items = list(get_missing_imdb_list(db_show_type))
+        items = get_missing_imdb_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'imdb_url__isnull': 'False', 'ext_rating__imdb__isnull': 'True'}
         )
         target_task = 'priority_sync'
     elif key == 'missing_imdb_id':
-        items = list(get_missing_imdb_id_list(db_show_type))
+        items = get_missing_imdb_id_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'kinopub_id__isnull': 'False', 'imdb_id__isnull': 'True'}
         )
     elif key == 'tmdb_only_shows':
-        items = list(get_tmdb_only_shows_list(db_show_type))
+        items = get_tmdb_only_shows_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'tmdb_id__isnull': 'False', 'kinopub_id__isnull': 'True'}
         )
     elif key == 'missing_tmdb_id':
-        items = list(get_missing_tmdb_id_list(db_show_type))
+        items = get_missing_tmdb_id_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'kinopub_id__isnull': 'False', 'tmdb_id__isnull': 'True'}
         )
     elif key == 'tmdb_no_kp':
-        items = list(get_tmdb_no_kp_list(db_show_type))
+        items = get_tmdb_no_kp_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'tmdb_id__isnull': 'False', 'kinopoisk_url__isnull': 'True'}
         )
     elif key == 'title_collision':
-        items = list(get_title_collision_list(db_show_type))
+        items = get_title_collision_list(db_show_type)
         query_params['type'] = db_show_type
     elif key == 'missing_year':
-        items = list(get_missing_year_list(db_show_type))
+        items = get_missing_year_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'kinopub_id__isnull': 'False', 'year__isnull': 'True'}
         )
     elif key == 'tmdb_missing_year':
-        items = list(get_tmdb_missing_year_list(db_show_type))
+        items = get_tmdb_missing_year_list(db_show_type)
         query_params.update(
             {
                 'type': db_show_type,
@@ -1949,12 +1965,12 @@ def get_metric_details(request, key):
             }
         )
     elif key == 'missing_status':
-        items = list(get_missing_status_list(db_show_type))
+        items = get_missing_status_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'kinopub_id__isnull': 'False', 'status__isnull': 'True'}
         )
     elif key == 'tmdb_missing_status':
-        items = list(get_tmdb_missing_status_list(db_show_type))
+        items = get_tmdb_missing_status_list(db_show_type)
         query_params.update(
             {
                 'type': db_show_type,
@@ -1964,12 +1980,12 @@ def get_metric_details(request, key):
             }
         )
     elif key == 'missing_plot':
-        items = list(get_missing_plot_list(db_show_type))
+        items = get_missing_plot_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'kinopub_id__isnull': 'False', 'plot__isnull': 'True'}
         )
     elif key == 'tmdb_missing_plot':
-        items = list(get_tmdb_missing_plot_list(db_show_type))
+        items = get_tmdb_missing_plot_list(db_show_type)
         query_params.update(
             {
                 'type': db_show_type,
@@ -1979,13 +1995,13 @@ def get_metric_details(request, key):
             }
         )
     elif key == 'missing_durations':
-        items = list(get_missing_durations_list(db_show_type))
+        items = get_missing_durations_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'kinopub_id__isnull': 'False', 'showduration__isnull': 'True'}
         )
         target_task = 'durations'
     elif key == 'tmdb_missing_durations':
-        items = list(get_tmdb_missing_durations_list(db_show_type))
+        items = get_tmdb_missing_durations_list(db_show_type)
         query_params.update(
             {
                 'type': db_show_type,
@@ -1996,12 +2012,12 @@ def get_metric_details(request, key):
         )
         target_task = 'durations'
     elif key == 'no_genres':
-        items = list(get_no_genres_list(db_show_type))
+        items = get_no_genres_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'kinopub_id__isnull': 'False', 'genres__isnull': 'True'}
         )
     elif key == 'tmdb_no_genres':
-        items = list(get_tmdb_no_genres_list(db_show_type))
+        items = get_tmdb_no_genres_list(db_show_type)
         query_params.update(
             {
                 'type': db_show_type,
@@ -2015,12 +2031,12 @@ def get_metric_details(request, key):
     elif key == 'unmapped_genres':
         is_genre, items = True, list(get_unmapped_genres_list())
     elif key == 'no_countries':
-        items = list(get_no_countries_list(db_show_type))
+        items = get_no_countries_list(db_show_type)
         query_params.update(
             {'type': db_show_type, 'kinopub_id__isnull': 'False', 'countries__isnull': 'True'}
         )
     elif key == 'tmdb_no_countries':
-        items = list(get_tmdb_no_countries_list(db_show_type))
+        items = get_tmdb_no_countries_list(db_show_type)
         query_params.update(
             {
                 'type': db_show_type,
@@ -2030,28 +2046,27 @@ def get_metric_details(request, key):
             }
         )
     elif key == 'has_kp':
-        is_summary = True
-        query_params.update({'type': db_show_type, 'ext_rating__kp__isnull': 'False'})
+        items = get_has_rating_list(db_show_type, 'kp')
+        query_params['type'] = db_show_type
     elif key == 'has_imdb':
-        is_summary = True
-        query_params.update({'type': db_show_type, 'ext_rating__imdb__isnull': 'False'})
+        items = get_has_rating_list(db_show_type, 'imdb')
+        query_params['type'] = db_show_type
     elif key == 'total_shows':
-        is_summary = True
-        if db_show_type:
-            query_params['type'] = db_show_type
+        items = get_total_shows_list(db_show_type)
+        query_params['type'] = db_show_type
     elif key == 'missing_country_meta':
         is_country, items = True, list(get_missing_country_meta_list())
     elif key == 'total_countries':
         is_country = True
         if show_type == 'Неиспользуемые':
-            items = list(get_unused_countries_list())
+            items = get_unused_countries_list()
         else:
-            items = list(get_active_countries_list())
+            items = get_active_countries_list()
     elif key == 'total_persons_by_show_type':
-        is_summary = True
-        query_params['showcrew__show__type'] = db_show_type
+        is_person = True
+        items = get_total_persons_list(db_show_type)
+        query_params['value'] = db_show_type
     elif key == 'persons_avatar_stats':
-        is_summary = True
         mapping = {
             'Есть фото (TMDB)': 'has_tmdb',
             'Есть фото (KP)': 'kp',
@@ -2061,38 +2076,99 @@ def get_metric_details(request, key):
             'В ожидании KP': 'kp_wait',
             'Не найдено вообще': 'all_none',
         }
-        if show_type in mapping:
-            query_params['photo_source'] = mapping[show_type]
+        is_person = True
+        source_type = mapping.get(show_type)
+        items = get_persons_avatar_list(source_type) if source_type else []
+        query_params['value'] = source_type or ''
     elif key == 'professions_stats':
-        is_summary = True
-        query_params['profession_norm'] = show_type
+        is_person = True
+        items = get_profession_persons_list(show_type, 'ru')
+        query_params['value'] = show_type
     elif key == 'en_professions_stats':
-        is_summary = True
-        query_params['en_profession_norm'] = show_type
+        is_person = True
+        items = get_profession_persons_list(show_type, 'en')
+        query_params['value'] = show_type
     elif key == 'duplicate_photo_urls':
-        is_person, items = True, list(get_duplicate_photo_urls_list(show_type))
+        is_person = True
         query_params['q'] = show_type
     elif key == 'unused_persons':
-        is_summary = True
-        query_params['showcrew__isnull'] = 'True'
+        is_person = True
+        items = get_unused_persons_list()
     else:
         return JsonResponse({'error': 'Invalid key'}, status=400)
+
+    # Only expose filters explicitly implemented by the target ModelAdmin.
+    # Copying the detail queryset's ORM predicates here makes Django admin
+    # reject the link as a disallowed lookup.
+    if key == 'duplicate_photo_urls':
+        query_params = {'metric': key, 'source': show_type}
+    elif is_genre or is_country:
+        query_params = {'metric': key}
+        if key in {'total_genres', 'unmapped_genres', 'total_countries'}:
+            query_params['value'] = show_type
+    elif is_person:
+        query_params = {'metric': key}
+        if key in {'total_persons_by_show_type', 'professions_stats', 'en_professions_stats'}:
+            query_params['value'] = (
+                db_show_type if key == 'total_persons_by_show_type' else show_type
+            )
+        elif key == 'persons_avatar_stats':
+            query_params['value'] = source_type or ''
+    else:
+        query_params = {'metric': key}
+        if db_show_type:
+            query_params['type'] = db_show_type
+
+    if is_summary:
+        query_string = urllib.parse.urlencode(query_params)
+        admin_url = f'{admin_base_url}?{query_string}' if query_string else admin_base_url
+        return JsonResponse({'is_summary': True, 'admin_url': admin_url, 'items': []})
+
+    if key == 'duplicate_photo_urls':
+        items, has_more = get_duplicate_photo_urls_page(show_type, offset=offset, limit=limit)
+    elif key == 'title_collision':
+        items, has_more = get_title_collision_page(db_show_type, offset=offset, limit=limit)
+    elif isinstance(items, QuerySet):
+        page_qs = items if items.query.order_by else items.order_by('id')
+        page_items = list(page_qs[offset : offset + limit + 1])
+        has_more = len(page_items) > limit
+        items = page_items[:limit]
+    else:
+        page_items = items[offset : offset + limit + 1]
+        has_more = len(page_items) > limit
+        items = page_items[:limit]
 
     query_string = urllib.parse.urlencode(query_params)
     admin_url = f'{admin_base_url}?{query_string}' if query_string else admin_base_url
 
-    if is_summary:
-        return JsonResponse({'is_summary': True, 'admin_url': admin_url, 'items': []})
+    all_queued = set()
+    show_posters = {}
+    if not is_person and not is_country and not is_genre:
+        try:
+            r = Redis.from_url(settings.CELERY_BROKER_URL)
+            all_queued = (
+                {int(x) for x in r.smembers(RedisQueue.UPDATE_DETAILS)}
+                | {int(x) for x in r.smembers(RedisQueue.PRIORITY_RATINGS_SYNC)}
+                | {int(x) for x in r.smembers(RedisQueue.UPDATE_DURATIONS)}
+            )
+        except Exception:
+            pass
 
-    try:
-        r = Redis.from_url(settings.CELERY_BROKER_URL)
-        all_queued = (
-            {int(x) for x in r.smembers(RedisQueue.UPDATE_DETAILS)}
-            | {int(x) for x in r.smembers(RedisQueue.PRIORITY_RATINGS_SYNC)}
-            | {int(x) for x in r.smembers(RedisQueue.UPDATE_DURATIONS)}
-        )
-    except Exception:
-        all_queued = set()
+        show_ids = [item['id'] for item in items if item.get('id')]
+        show_meta = {
+            row['id']: row
+            for row in Show.objects.filter(id__in=show_ids).values(
+                'id', 'kinopub_id', 'tmdb_poster_path'
+            )
+        }
+        for item in items:
+            meta = show_meta.get(item.get('id'))
+            if meta:
+                item['kinopub_id'] = meta['kinopub_id']
+        show_posters = {
+            show_id: build_poster_url(row['kinopub_id'], row['tmdb_poster_path'])
+            for show_id, row in show_meta.items()
+        }
 
     for item in items:
         if is_genre:
@@ -2136,7 +2212,7 @@ def get_metric_details(request, key):
             item.update(
                 {
                     'in_queue': item['id'] in all_queued,
-                    'poster_url': get_poster_url(item['id'], 'small'),
+                    'poster_url': show_posters.get(item['id']),
                     'kinopub_url': f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{kinopub_id}'
                     if kinopub_id
                     else None,
@@ -2147,6 +2223,8 @@ def get_metric_details(request, key):
     return JsonResponse(
         {
             'items': items,
+            'has_more': has_more,
+            'next_offset': offset + len(items),
             'admin_url': admin_url,
             'target_task': target_task,
             'is_country': is_country,
@@ -2908,6 +2986,7 @@ def merge_persons_api(request):
                 cache.delete(f'user_stats:person:{aid}')
             cache.delete(f'user_stats:person:{master_id}')
 
+        invalidate_duplicate_photo_urls_cache()
         return JsonResponse({'status': 'ok', 'merged_count': count, 'master_name': master.name})
     except Person.DoesNotExist:
         return JsonResponse({'error': 'Master person not found'}, status=404)
@@ -3156,6 +3235,7 @@ def reject_person_photo_api(request):
 
             cache.delete(f'user_stats:person:{person_id}')
 
+        invalidate_duplicate_photo_urls_cache()
         return JsonResponse({'status': 'ok'})
     except Person.DoesNotExist:
         return JsonResponse({'error': 'Person not found'}, status=404)
