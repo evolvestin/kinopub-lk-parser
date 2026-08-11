@@ -52,8 +52,10 @@ class Command(LoggableBaseCommand):
                 for row in reader:
                     try:
                         target_ids.append(int(row['id']))
-                    except (TypeError, ValueError):
-                        raise ValueError(f'Invalid Person id in --ids-file: {row.get("id")}')
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(
+                            f'Invalid Person id in --ids-file: {row.get("id")}'
+                        ) from exc
             target_ids = sorted(set(target_ids))
             logging.info('Restricting photo fetch to %d Person IDs from CSV.', len(target_ids))
 
@@ -82,8 +84,7 @@ class Command(LoggableBaseCommand):
                 if target_ids is not None:
                     batch_qs = batch_qs.filter(id__in=target_ids)
                 batch = list(
-                    batch_qs.exclude(id__in=failed_ids)
-                    .order_by('id')[:current_batch_limit]
+                    batch_qs.exclude(id__in=failed_ids).order_by('id')[:current_batch_limit]
                 )
 
                 if not batch:

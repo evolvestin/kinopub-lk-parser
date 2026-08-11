@@ -4,18 +4,17 @@ from django.db import connection, transaction
 from app.models import Person
 from app.services.metrics import invalidate_duplicate_photo_urls_cache
 
-
 SOURCE_CONFIG = {
     'tmdb': {
         'source_field': 'tmdb_photo_url',
         'other_field': 'kp_photo_url',
         'group_name': 'lower(trim(name)), lower(trim(en_name))',
         'name_predicate': (
-            "master.name IS NOT NULL AND alias.name IS NOT NULL "
-            "AND master.en_name IS NOT NULL AND alias.en_name IS NOT NULL "
-            "AND length(trim(master.en_name)) > 0 AND length(trim(alias.en_name)) > 0 "
-            "AND lower(trim(master.name)) = lower(trim(alias.name)) "
-            "AND lower(trim(master.en_name)) = lower(trim(alias.en_name))"
+            'master.name IS NOT NULL AND alias.name IS NOT NULL '
+            'AND master.en_name IS NOT NULL AND alias.en_name IS NOT NULL '
+            'AND length(trim(master.en_name)) > 0 AND length(trim(alias.en_name)) > 0 '
+            'AND lower(trim(master.name)) = lower(trim(alias.name)) '
+            'AND lower(trim(master.en_name)) = lower(trim(alias.en_name))'
         ),
     },
     'kp': {
@@ -23,9 +22,9 @@ SOURCE_CONFIG = {
         'other_field': 'tmdb_photo_url',
         'group_name': 'lower(trim(en_name))',
         'name_predicate': (
-            "master.en_name IS NOT NULL AND alias.en_name IS NOT NULL "
-            "AND length(trim(master.en_name)) > 0 AND length(trim(alias.en_name)) > 0 "
-            "AND lower(trim(master.en_name)) = lower(trim(alias.en_name))"
+            'master.en_name IS NOT NULL AND alias.en_name IS NOT NULL '
+            'AND length(trim(master.en_name)) > 0 AND length(trim(alias.en_name)) > 0 '
+            'AND lower(trim(master.en_name)) = lower(trim(alias.en_name))'
         ),
     },
 }
@@ -108,7 +107,7 @@ class Command(BaseCommand):
         group_name = config['group_name']
         name_predicate = config['name_predicate']
 
-        sql = f'''
+        sql = f"""
             WITH candidate_groups AS (
                 SELECT
                     {source_field},
@@ -133,7 +132,11 @@ class Command(BaseCommand):
                     WHERE alias.master_person_id IS NULL
                       AND alias.id <> g.master_id
                       AND alias.{source_field} = g.{source_field}
-                      AND {'lower(trim(alias.name)) = lower(trim(master.name))' if source == 'tmdb' else 'lower(trim(alias.en_name)) = lower(trim(master.en_name))'}
+                      AND {
+            'lower(trim(alias.name)) = lower(trim(master.name))'
+            if source == 'tmdb'
+            else 'lower(trim(alias.en_name)) = lower(trim(master.en_name))'
+        }
                       AND NOT EXISTS (
                           SELECT 1
                           FROM app_showcrew alias_crew
@@ -169,12 +172,12 @@ class Command(BaseCommand):
                      master.tmdb_id, alias.tmdb_id
             HAVING count(DISTINCT alias_crew.show_id) >= %s
             ORDER BY g.master_id, alias.id
-        '''
+        """
 
         with connection.cursor() as cursor:
             cursor.execute(sql, [min_common_shows])
             columns = [column[0] for column in cursor.description]
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+            return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
 
     def _apply_candidates(self, candidates):
         merged = 0
@@ -192,13 +195,15 @@ class Command(BaseCommand):
                 if set(rows) != {master_id, alias_id}:
                     raise CommandError(f'Candidate disappeared: {master_id} <- {alias_id}')
                 if rows[master_id][1] is not None or rows[alias_id][1] is not None:
-                    raise CommandError(f'Candidate is no longer canonical: {master_id} <- {alias_id}')
+                    raise CommandError(
+                        f'Candidate is no longer canonical: {master_id} <- {alias_id}'
+                    )
                 if rows[master_id][2] is None or rows[alias_id][2] is not None:
                     raise CommandError(f'TMDB identity changed: {master_id} <- {alias_id}')
 
-                updated = Person.objects.filter(
-                    id=alias_id, master_person__isnull=True
-                ).update(master_person_id=master_id)
+                updated = Person.objects.filter(id=alias_id, master_person__isnull=True).update(
+                    master_person_id=master_id
+                )
                 if updated != 1:
                     raise CommandError(f'Alias update failed: {master_id} <- {alias_id}')
                 merged += updated
@@ -228,13 +233,13 @@ class Command(BaseCommand):
             # is absent or stale on a restored production copy.
             with connection.cursor() as cursor:
                 cursor.execute(
-                    '''
+                    """
                     UPDATE app_showcrew AS sc
                        SET canonical_person_id = COALESCE(p.master_person_id, p.id)
                       FROM app_person AS p
                      WHERE p.id = sc.person_id
                        AND sc.person_id = ANY(%s)
-                    ''',
+                    """,
                     [list(affected_ids)],
                 )
         return merged
@@ -242,12 +247,12 @@ class Command(BaseCommand):
     def _verify_canonical_crew(self):
         with connection.cursor() as cursor:
             cursor.execute(
-                '''
+                """
                 SELECT count(*)
                 FROM app_showcrew sc
                 JOIN app_person p ON p.id = sc.person_id
                 WHERE sc.canonical_person_id IS DISTINCT FROM COALESCE(p.master_person_id, p.id)
-                '''
+                """
             )
             stale = cursor.fetchone()[0]
         if stale:

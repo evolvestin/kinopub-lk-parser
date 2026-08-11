@@ -36,6 +36,7 @@ from shared.constants import (
 )
 
 DUPLICATE_PHOTO_CACHE_VERSION_KEY = 'metrics:duplicate_photo_urls:cache_version'
+DUPLICATE_PHOTO_CACHE_TIMEOUT = 86400
 
 
 def _format_type(t):
@@ -267,6 +268,8 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     if profession_stats is None:
         profession_stats = _calculate_profession_stats_canonical()
     professions_stats, en_professions_stats = profession_stats
+    duplicate_photo_stats = calculate_duplicate_photo_urls_metric()
+    warm_duplicate_photo_urls_cache()
     return {
         'missing_kp': calculate_missing_kp_metric(),
         'missing_imdb': calculate_missing_imdb_metric(),
@@ -292,7 +295,7 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
         'persons_avatar_stats': calculate_persons_avatar_stats_metric(),
         'professions_stats': professions_stats,
         'en_professions_stats': en_professions_stats,
-        'duplicate_photo_urls': calculate_duplicate_photo_urls_metric(),
+        'duplicate_photo_urls': duplicate_photo_stats,
         'unused_persons': calculate_unused_persons_metric(),
         'tmdb_missing_year': calculate_tmdb_missing_year_metric(),
         'tmdb_missing_status': calculate_tmdb_missing_status_metric(),
@@ -320,6 +323,8 @@ def get_global_metrics_history() -> dict:
 
     if not latest:
         return {}
+
+    queue_duplicate_photo_urls_warmup()
 
     yesterday_cutoff = now - timedelta(days=1)
     yesterday = (
@@ -1074,7 +1079,7 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
     group_rows = group_rows[:limit]
     if not group_rows:
         result = ([], False)
-        cache.set(cache_key, result, timeout=300)
+        cache.set(cache_key, result, timeout=DUPLICATE_PHOTO_CACHE_TIMEOUT)
         return result
 
     url_counts = {entry[field]: entry['cnt'] for entry in group_rows}
@@ -1152,13 +1157,33 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
             }
         )
     result = (results, has_more)
-    cache.set(cache_key, result, timeout=300)
+    cache.set(cache_key, result, timeout=DUPLICATE_PHOTO_CACHE_TIMEOUT)
     return result
+
+
+def queue_duplicate_photo_urls_warmup():
+    """Queue duplicate pages before a user opens the corresponding modal."""
+    version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
+    cache_keys = (
+        f'metrics:duplicate_photo_urls:{version}:kp_photo_url:0:50',
+        f'metrics:duplicate_photo_urls:{version}:tmdb_photo_url:0:50',
+    )
+    if any(cache.get(cache_key) is None for cache_key in cache_keys) and cache.add(
+        'metrics:duplicate_photo_urls:warmup_lock', True, timeout=300
+    ):
+        celery_app.send_task('app.tasks.warm_duplicate_photo_urls_task', queue='metrics')
+
+
+def warm_duplicate_photo_urls_cache():
+    """Populate the first modal page off the request path."""
+    for source_type in ('TMDB', 'KP'):
+        get_duplicate_photo_urls_page(source_type, offset=0, limit=50)
 
 
 def invalidate_duplicate_photo_urls_cache():
     version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
     cache.set(DUPLICATE_PHOTO_CACHE_VERSION_KEY, int(version) + 1, timeout=None)
+    cache.delete('metrics:duplicate_photo_urls:warmup_lock')
 
 
 def get_duplicate_photo_urls_list(source_type: str):

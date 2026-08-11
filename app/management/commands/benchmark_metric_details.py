@@ -18,7 +18,9 @@ class Command(LoggableBaseCommand):
             '--case',
             action='append',
             metavar='KEY=TYPE',
-            help='Metric case to benchmark. May be repeated; defaults to representative heavy cases.',
+            help=(
+                'Metric case to benchmark. May be repeated; defaults to representative heavy cases.'
+            ),
         )
         parser.add_argument(
             '--offsets',

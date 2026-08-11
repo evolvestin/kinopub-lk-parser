@@ -30,7 +30,7 @@ from app.models import (
     ViewUser,
 )
 from app.services.error_aggregator import ErrorAggregator
-from app.services.metrics import generate_global_metrics_snapshot
+from app.services.metrics import generate_global_metrics_snapshot, warm_duplicate_photo_urls_cache
 from app.services.stats_calculator import generate_user_stats
 from app.services.tmdb_client import sync_show_from_tmdb
 from app.telegram_bot import TelegramSender
@@ -557,6 +557,13 @@ def update_site_metrics_task():
     SiteMetric.objects.create(key='global_snapshot', data=data)
     cache.delete('lock:queuing_global_snapshot')
     logging.info('Global site metrics snapshot updated successfully.')
+
+
+@shared_task
+@single_instance_task(lock_name='warm_duplicate_photo_urls', timeout=300)
+@safe_execution
+def warm_duplicate_photo_urls_task():
+    warm_duplicate_photo_urls_cache()
 
 
 @shared_task

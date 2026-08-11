@@ -7,6 +7,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.db import DatabaseError
 
+from app.models import Person
 from app.services.tmdb_client import get_tmdb_session
 
 logger = logging.getLogger(__name__)
@@ -175,9 +176,10 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
                             f'has no filmography evidence. Skipping.'
                         )
 
-        if found_tmdb_id and Person.objects.filter(tmdb_id=found_tmdb_id).exclude(
-            id=person_instance.id
-        ).exists():
+        if (
+            found_tmdb_id
+            and Person.objects.filter(tmdb_id=found_tmdb_id).exclude(id=person_instance.id).exists()
+        ):
             logger.warning(
                 'TMDB person %s is already assigned to another Person row; '
                 'leaving photo empty for %s.',

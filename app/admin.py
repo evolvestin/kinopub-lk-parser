@@ -58,6 +58,7 @@ from app.services.metrics import (
     _canonical_person_id_expression,
     get_missing_country_meta_list,
     get_profession_persons_list,
+    invalidate_duplicate_photo_urls_cache,
 )
 from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender
@@ -70,6 +71,7 @@ from shared.constants import (
     PROFESSIONS_MAPPING_EN,
     PROFESSIONS_MAPPING_RU,
     RAW_TO_NORMALIZED_EN,
+    RAW_TO_NORMALIZED_GENRE,
     RAW_TO_NORMALIZED_RU,
     SERIES_TYPES,
     SHOW_STATUS_DISPLAY_RU,
@@ -1599,6 +1601,8 @@ class PersonAdmin(BaseNameAdmin):
             obj.is_photo_fetched = False
 
         super().save_model(request, obj, form, change)
+        if {'master_person', 'tmdb_photo_url', 'kp_photo_url'} & set(form.changed_data):
+            invalidate_duplicate_photo_urls_cache()
 
     def get_queryset(self, request):
         qs = super().get_queryset(request).select_related('master_person')
@@ -1626,11 +1630,6 @@ class PersonAdmin(BaseNameAdmin):
         if metric:
             qs = _apply_person_metric_filter(qs, metric, request)
         return qs
-
-    def lookup_allowed(self, lookup, value, request):
-        if lookup in {'metric', 'value', 'source'}:
-            return True
-        return super().lookup_allowed(lookup, value, request)
 
     @admin.display(description='Тип / Мастер', ordering='master_person')
     def get_master_link(self, obj):
@@ -1663,6 +1662,9 @@ class PersonAdmin(BaseNameAdmin):
                 p.master_person = master
                 p.save(update_fields=['master_person'])
                 count += 1
+
+        if count:
+            invalidate_duplicate_photo_urls_cache()
 
         self.message_user(request, f'Успешно объединено {count} записей в мастера "{master.name}".')
 

@@ -36,7 +36,8 @@ class Command(BaseCommand):
                      WHERE sc.id > %s
                        AND sc.id <= %s
                        AND p.id = sc.person_id
-                       AND sc.canonical_person_id IS DISTINCT FROM COALESCE(p.master_person_id, p.id)
+                       AND sc.canonical_person_id IS DISTINCT FROM
+                           COALESCE(p.master_person_id, p.id)
                     """,
                     [last_id, upper_id],
                 )

@@ -79,20 +79,86 @@ class Migration(migrations.Migration):
             database_operations=[
                 migrations.RunSQL(
                     sql=[
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_type_id" ON "app_show" ("type", "id") WHERE "kinopub_id" IS NOT NULL;',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_type_id" ON "app_show" ("type", "id") WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL;',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_missing_plot" ON "app_show" ("type", "id") WHERE "kinopub_id" IS NOT NULL AND ("plot" IS NULL OR "plot" = \'\');',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_missing_year" ON "app_show" ("type", "id") WHERE "kinopub_id" IS NOT NULL AND "year" IS NULL;',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_missing_status" ON "app_show" ("type", "id") WHERE "kinopub_id" IS NOT NULL AND ("status" IS NULL OR "status" = \'\');',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_missing_imdb_id" ON "app_show" ("type", "id") WHERE "kinopub_id" IS NOT NULL AND ("imdb_id" IS NULL OR "imdb_id" = \'\');',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_missing_year" ON "app_show" ("type", "id") WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL AND "year" IS NULL;',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_missing_status" ON "app_show" ("type", "id") WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL AND ("status" IS NULL OR "status" = \'\');',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_missing_plot" ON "app_show" ("type", "id") WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL AND ("plot" IS NULL OR "plot" = \'\');',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_only" ON "app_show" ("type", "id") WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL;',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_missing_tmdb" ON "app_show" ("type", "id") WHERE "kinopub_id" IS NOT NULL AND "tmdb_id" IS NULL;',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_no_kp" ON "app_show" ("type", "id") WHERE "tmdb_id" IS NOT NULL AND ("kinopoisk_url" IS NULL OR "kinopoisk_url" = \'\');',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_person_tmdb_dupe_source" ON "app_person" ("tmdb_photo_url") WHERE "master_person_id" IS NULL AND "tmdb_photo_url" IS NOT NULL AND "tmdb_photo_url" <> \'\';',
-                        'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_person_kp_dupe_source" ON "app_person" ("kp_photo_url") WHERE "master_person_id" IS NULL AND "kp_photo_url" IS NOT NULL AND "kp_photo_url" <> \'\';',
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_type_id" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "kinopub_id" IS NOT NULL;'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_type_id" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL;'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_missing_plot" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "kinopub_id" IS NOT NULL '
+                            'AND ("plot" IS NULL OR "plot" = \'\');'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_missing_year" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "kinopub_id" IS NOT NULL AND "year" IS NULL;'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_missing_status" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "kinopub_id" IS NOT NULL '
+                            'AND ("status" IS NULL OR "status" = \'\');'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_kp_missing_imdb_id" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "kinopub_id" IS NOT NULL '
+                            'AND ("imdb_id" IS NULL OR "imdb_id" = \'\');'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_missing_year" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL '
+                            'AND "year" IS NULL;'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS '
+                            '"idx_show_tmdb_missing_status" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL '
+                            'AND ("status" IS NULL OR "status" = \'\');'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_missing_plot" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL '
+                            'AND ("plot" IS NULL OR "plot" = \'\');'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_only" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "tmdb_id" IS NOT NULL AND "kinopub_id" IS NULL;'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_missing_tmdb" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "kinopub_id" IS NOT NULL AND "tmdb_id" IS NULL;'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_show_tmdb_no_kp" '
+                            'ON "app_show" ("type", "id") '
+                            'WHERE "tmdb_id" IS NOT NULL '
+                            'AND ("kinopoisk_url" IS NULL OR "kinopoisk_url" = \'\');'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_person_tmdb_dupe_source" '
+                            'ON "app_person" ("tmdb_photo_url") '
+                            'WHERE "master_person_id" IS NULL '
+                            'AND "tmdb_photo_url" IS NOT NULL AND "tmdb_photo_url" <> \'\';'
+                        ),
+                        (
+                            'CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_person_kp_dupe_source" '
+                            'ON "app_person" ("kp_photo_url") '
+                            'WHERE "master_person_id" IS NULL '
+                            'AND "kp_photo_url" IS NOT NULL AND "kp_photo_url" <> \'\';'
+                        ),
                     ],
                     reverse_sql=migrations.RunSQL.noop,
                 )

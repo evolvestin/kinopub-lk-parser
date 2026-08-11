@@ -64,7 +64,8 @@ class Command(LoggableBaseCommand):
                 admin_response = client.get(admin_url)
                 if admin_response.status_code != 200:
                     failures.append(
-                        f'{key}={metric_type}: admin HTTP {admin_response.status_code} ({admin_url})'
+                        f'{key}={metric_type}: admin HTTP {admin_response.status_code} '
+                        f'({admin_url})'
                     )
                     continue
 
@@ -78,7 +79,8 @@ class Command(LoggableBaseCommand):
                 actual = changelist.result_count
                 if actual != expected:
                     failures.append(
-                        f'{key}={metric_type}: expected {expected}, admin has {actual} ({admin_url})'
+                        f'{key}={metric_type}: expected {expected}, admin has {actual} '
+                        f'({admin_url})'
                     )
                 else:
                     self.stdout.write(f'OK {key}={metric_type}: {actual}')
