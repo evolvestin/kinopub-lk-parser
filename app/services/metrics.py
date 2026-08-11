@@ -40,6 +40,7 @@ DUPLICATE_PHOTO_CACHE_VERSION_KEY = 'metrics:duplicate_photo_urls:cache_version'
 DUPLICATE_PHOTO_CACHE_TIMEOUT = 86400
 PERSON_DETAIL_CACHE_VERSION_KEY = 'metrics:person_detail:cache_version'
 PERSON_DETAIL_CACHE_TIMEOUT = 86400
+TITLE_COLLISION_CACHE_VERSION_KEY = 'metrics:title_collision:cache_version'
 PERSON_DETAIL_WARM_KEYS = {
     'total_persons_by_show_type',
     'persons_avatar_stats',
@@ -423,7 +424,8 @@ def get_title_collision_list(show_type: str):
 
 def get_title_collision_page(show_type: str, offset: int = 0, limit: int = 50):
     """Return a cached page because collision detection is a CPU-heavy text scan."""
-    cache_key = f'metrics:title_collision:{show_type}:{offset}:{limit}'
+    cache_version = cache.get(TITLE_COLLISION_CACHE_VERSION_KEY, 1)
+    cache_key = f'metrics:title_collision:{cache_version}:{show_type}:{offset}:{limit}'
     cached_page = cache.get(cache_key)
     if cached_page is not None:
         return cached_page
@@ -435,6 +437,15 @@ def get_title_collision_page(show_type: str, offset: int = 0, limit: int = 50):
     result = (page_items[:limit], has_more)
     cache.set(cache_key, result, timeout=300)
     return result
+
+
+def invalidate_title_collision_cache():
+    """Invalidate all cached collision pages after a collision is allowed."""
+    cache.set(
+        TITLE_COLLISION_CACHE_VERSION_KEY,
+        int(cache.get(TITLE_COLLISION_CACHE_VERSION_KEY, 1)) + 1,
+        timeout=86400,
+    )
 
 
 def calculate_missing_year_metric():

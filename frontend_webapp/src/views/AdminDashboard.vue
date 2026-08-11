@@ -101,14 +101,14 @@
         <div class="modal-header">
           <div class="modal-title">{{ modalTitle }}</div>
           <div style="display:flex; align-items:center; gap:10px;">
-            <a v-if="modalDataContext.admin_url" :href="modalDataContext.admin_url" target="_blank" class="nav-btn" style="padding:8px 12px; font-size:12px; height:auto; text-decoration:none;">Админка</a>
-            <button class="modal-close" @click="closeDetails">×</button>
+            <a v-if="modalDataContext.admin_url" :href="modalDataContext.admin_url" target="_blank" class="modal-admin-btn">Админка</a>
+            <button class="modal-close" @click="closeDetails" aria-label="Закрыть"><span class="modal-close-icon" aria-hidden="true">×</span></button>
           </div>
         </div>
         <div v-if="isModalLoading" style="text-align:center; padding: 20px;">
           <div class="spinner" style="width:30px; height:30px; display:inline-block;"></div>
         </div>
-        <div v-else class="modal-body-list" ref="modalListRef">
+        <div v-else class="modal-body-list" :class="{ 'is-empty': !modalItems.length }" ref="modalListRef">
           <div v-if="!ctx.is_authenticated" class="empty" style="grid-column: 1/-1; padding: 40px 20px;">
             <div style="font-size: 48px; margin-bottom: 16px;">🔒</div>
             <div style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">
@@ -123,7 +123,7 @@
             <div style="font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">
               Открыть полный список
             </div>
-            <a :href="modalDataContext.admin_url" target="_blank" class="add-all-btn" style="text-decoration: none; display: inline-flex; justify-content: center; align-items: center; width: auto; margin: 0 auto;">
+            <a v-if="modalDataContext.admin_url" :href="modalDataContext.admin_url" target="_blank" class="add-all-btn modal-summary-btn" style="text-decoration: none; display: inline-flex; justify-content: center; align-items: center; width: auto; margin: 0 auto;">
               Открыть список в админке
             </a>
           </div>
@@ -240,8 +240,11 @@
                     <button class="queue-btn" :disabled="item.in_queue" @click="addToQueue(item)">
                       <span>{{ item.in_queue ? 'В очереди' : (currentTargetTask === 'priority_sync' ? 'Синхронизировать' : (currentTargetTask === 'durations' ? 'Обновить время' : 'Обновить детали')) }}</span>
                     </button>
-                    <a :href="item.kinopub_url" target="_blank" class="admin-link-btn" style="color: var(--accent); border-right: 1px solid var(--border);" title="Открыть на Кинопабе">На Кинопабе</a>
-                    <a :href="item.admin_url" target="_blank" class="admin-link-btn" title="Открыть в админке">В админке</a>
+                    <a v-if="item.kinopub_url" :href="item.kinopub_url" target="_blank" class="admin-link-btn external-link-btn kinopub-link" title="Открыть на Кинопабе">На Кинопабе</a>
+                    <a v-if="item.kinopoisk_url" :href="item.kinopoisk_url" target="_blank" class="admin-link-btn external-link-btn kinopoisk-link" title="Открыть на Кинопоиске">Кинопоиск</a>
+                    <a v-if="item.imdb_url" :href="item.imdb_url" target="_blank" class="admin-link-btn external-link-btn imdb-link" title="Открыть на IMDb">IMDb</a>
+                    <button v-if="modalDataContext.request_key === 'title_collision'" type="button" class="admin-link-btn collision-allow-btn" @click="allowTitleCollision(item)">Разрешить коллизию</button>
+                    <a v-if="item.admin_url" :href="item.admin_url" target="_blank" class="admin-link-btn admin-link" title="Открыть в админке">В админке</a>
                   </div>
                 </div>
               </template>
@@ -669,6 +672,28 @@ const closeDetails = () => {
   if (observer) observer.disconnect()
 }
 
+const allowTitleCollision = async (item) => {
+  if (!item?.id || item.is_collision_updating) return
+
+  item.is_collision_updating = true
+  try {
+    const response = await fetch('/api/metrics/title_collision/allow/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ show_id: item.id })
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+    modalItems.value = modalItems.value.filter((currentItem) => currentItem.id !== item.id)
+  } catch (e) {
+    console.error(e)
+    alert('Не удалось разрешить коллизию: ' + e.message)
+  } finally {
+    item.is_collision_updating = false
+  }
+}
+
 const addToQueue = async (item) => {
   item.in_queue = true
   try {
@@ -887,6 +912,9 @@ onUnmounted(() => {
     width: 90vw;
     max-width: 550px;
     max-height: 92vh;
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     border-radius: 24px !important;
@@ -899,14 +927,20 @@ onUnmounted(() => {
 }
 .modal-content.modal-wide {
     width: 90vw;
-    max-width: 95vw;
+    max-width: 980px;
 }
 .modal-overlay.show .modal-content { transform: scale(1); opacity: 1; }
-.modal-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--border); }
-.modal-title { font-size: 20px; font-weight: 800; color: var(--text-primary); }
-.modal-close { background: var(--bg-input); border: none; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
+.modal-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.modal-title { min-width: 0; font-size: 20px; font-weight: 800; color: var(--text-primary); line-height: 1.2; word-break: break-word; }
+.modal-admin-btn { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-height: 34px; padding: 7px 12px; border: 1px solid rgba(96, 165, 250, 0.55); border-radius: 9px; background: rgba(56, 139, 253, 0.18); color: var(--info); font-size: 12px; font-weight: 800; text-decoration: none; transition: background 0.2s, border-color 0.2s, transform 0.2s; }
+.modal-admin-btn:hover { background: var(--info); border-color: var(--info); color: #fff; transform: translateY(-1px); }
+.modal-content .nav-btn { background: rgba(56, 139, 253, 0.14) !important; border: 1px solid rgba(96, 165, 250, 0.45); color: var(--info); }
+.modal-content .nav-btn:hover { background: var(--info) !important; border-color: var(--info); color: #fff; }
+.modal-close { flex-shrink: 0; padding: 0; line-height: 1; background: var(--bg-input); border: 1px solid var(--border); color: var(--text-muted); width: 34px; height: 34px; border-radius: 50%; font-size: 20px; cursor: pointer; display: inline-flex; justify-content: center; align-items: center; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+.modal-close-icon { display: block; line-height: 1; transform: translateY(-1px); }
 .modal-close:hover { background: var(--border); color: var(--text-primary); }
-.modal-body-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 450px)); grid-auto-rows: min-content; align-content: start; justify-content: center; gap: 16px; margin-top: 15px; overflow-y: auto; padding: 5px 10px 30px 5px; flex-grow: 1; min-height: 0; }
+.modal-body-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 450px)); grid-auto-rows: min-content; align-content: start; justify-content: center; gap: 12px; margin: 0; overflow-y: auto; padding: 16px 16px 20px; flex: 0 1 auto; max-height: calc(92vh - 142px); min-height: 0; }
+.modal-body-list.is-empty { min-height: 112px; }
 
 .modal-item { display: flex; flex-direction: row; align-items: stretch; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; transition: all 0.2s; overflow: hidden; width: 100%; max-width: 450px; flex-shrink: 0; transform: translateZ(0); }
 .modal-item-poster { width: 80px; height: auto; object-fit: cover; background: var(--bg-main); flex-shrink: 0; border-right: 1px solid var(--border); }
@@ -914,14 +948,20 @@ onUnmounted(() => {
 .modal-item-info { display: flex; flex-direction: column; justify-content: center; min-width: 0; flex-grow: 1; padding: 12px 14px; }
 .modal-item-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
 .modal-item-orig { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.modal-item-actions { display: flex; border-top: 1px solid var(--border); background: rgba(0,0,0,0.15); flex-wrap: nowrap; }
+.modal-item-actions { display: flex; border-top: 1px solid var(--border); background: rgba(0,0,0,0.15); flex-wrap: wrap; }
 
-.queue-btn { flex-grow: 1; flex-shrink: 0; min-width: 140px; padding: 12px 10px; background: transparent; border: none; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; transition: background 0.2s; border-right: 1px solid var(--border); white-space: nowrap; }
+.queue-btn { flex: 1 1 170px; min-width: 0; padding: 12px 10px; background: transparent; border: none; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; transition: background 0.2s; border-right: 1px solid var(--border); white-space: nowrap; }
 .queue-btn:hover:not(:disabled) { background: rgba(46, 204, 113, 0.1); color: var(--accent); }
 .queue-btn:disabled { color: var(--accent); cursor: default; }
 
-.admin-link-btn { flex-shrink: 0; padding: 12px 12px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; text-decoration: none; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.admin-link-btn { flex: 1 1 auto; min-width: 0; padding: 11px 10px; background: transparent; border: none; border-left: 1px solid var(--border); color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background 0.2s; text-decoration: none; font-size: 13px; font-weight: 800; white-space: nowrap; }
 .admin-link-btn:hover { background: rgba(96, 165, 250, 0.1); color: var(--info); }
+.kinopub-link { color: var(--accent); background: rgba(46, 204, 113, 0.06); }
+.kinopoisk-link { color: #f15a24; background: rgba(241, 90, 36, 0.06); }
+.imdb-link { color: #f5c518; background: rgba(245, 197, 24, 0.06); }
+.admin-link { color: var(--info); background: rgba(56, 139, 253, 0.12); }
+.collision-allow-btn { color: #fff; background: rgba(231, 76, 60, 0.82); }
+.collision-allow-btn:hover { background: var(--danger); color: #fff; }
 
 .modal-footer { padding: 15px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; background: var(--bg-card); border-radius: 0 0 24px 24px; margin: 0; flex-shrink: 0; }
 .add-all-btn { background: var(--accent); color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s; }
@@ -1068,5 +1108,16 @@ onUnmounted(() => {
     color: var(--info);
     padding: 1px 5px;
     border-radius: 4px;
+}
+
+@media (max-width: 600px) {
+    .modal-content,
+    .modal-content.modal-wide { width: calc(100vw - 24px); max-width: none; }
+    .modal-header { padding: 14px 16px; }
+    .modal-title { font-size: 17px; }
+    .modal-body-list { grid-template-columns: minmax(0, 1fr); padding: 12px 12px 16px; max-height: calc(92vh - 122px); }
+    .modal-item { max-width: none; }
+    .modal-item-actions > * { flex: 1 1 50%; }
+    .queue-btn { flex-basis: 100%; border-right: 0; border-bottom: 1px solid var(--border); }
 }
 </style>

@@ -84,6 +84,7 @@ from app.services.metrics import (
     get_unused_countries_list,
     get_unused_persons_list,
     invalidate_duplicate_photo_urls_cache,
+    invalidate_title_collision_cache,
     person_detail_cache_key,
 )
 from app.services.stats_calculator import (
@@ -2173,13 +2174,25 @@ def get_metric_details(request, key):
         show_meta = {
             row['id']: row
             for row in Show.objects.filter(id__in=show_ids).values(
-                'id', 'kinopub_id', 'tmdb_poster_path'
+                'id',
+                'kinopub_id',
+                'tmdb_poster_path',
+                'kinopoisk_url',
+                'imdb_id',
+                'imdb_url',
             )
         }
         for item in items:
             meta = show_meta.get(item.get('id'))
             if meta:
-                item['kinopub_id'] = meta['kinopub_id']
+                item.update(
+                    {
+                        'kinopub_id': meta['kinopub_id'],
+                        'kinopoisk_url': meta['kinopoisk_url'],
+                        'imdb_id': meta['imdb_id'],
+                        'imdb_url': meta['imdb_url'],
+                    }
+                )
         show_posters = {
             show_id: build_poster_url(row['kinopub_id'], row['tmdb_poster_path'])
             for show_id, row in show_meta.items()
@@ -2224,13 +2237,18 @@ def get_metric_details(request, key):
             )
         else:
             kinopub_id = item.get('kinopub_id')
+            imdb_id = item.get('imdb_id')
+            if imdb_id and not str(imdb_id).startswith('tt'):
+                imdb_id = f'tt{imdb_id}'
             item.update(
                 {
                     'in_queue': item['id'] in all_queued,
                     'poster_url': show_posters.get(item['id']),
                     'kinopub_url': f'{settings.SITE_AUX_URL.rstrip("/")}/item/view/{kinopub_id}'
-                    if kinopub_id
+                    if kinopub_id and settings.SITE_AUX_URL
                     else None,
+                    'imdb_url': item.get('imdb_url')
+                    or (f'https://www.imdb.com/title/{imdb_id}/' if imdb_id else None),
                     'admin_url': reverse('admin:app_show_change', args=[item['id']]),
                 }
             )
@@ -2249,6 +2267,27 @@ def get_metric_details(request, key):
     if person_page_cache_key:
         cache.set(person_page_cache_key, payload, timeout=PERSON_DETAIL_CACHE_TIMEOUT)
     return JsonResponse(payload)
+
+
+@csrf_exempt
+@staff_member_required
+@require_http_methods(['POST'])
+def allow_title_collision_api(request):
+    """Mark a show collision as reviewed so it is removed from the metric."""
+    try:
+        data = json.loads(request.body)
+        show_id = data.get('show_id')
+        if not show_id:
+            return JsonResponse({'error': 'Show ID is required'}, status=400)
+
+        updated = Show.objects.filter(id=show_id).update(ignore_collision=True)
+        if not updated:
+            return JsonResponse({'error': 'Show not found'}, status=404)
+
+        invalidate_title_collision_cache()
+        return JsonResponse({'status': 'ok', 'show_id': int(show_id)})
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
 @csrf_exempt

@@ -641,7 +641,7 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 .modal-overlay.show .modal-content { transform: scale(1); opacity: 1; }
 .modal-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--border); }
 .modal-title { font-size: 20px; font-weight: 800; color: var(--text-primary); }
-.modal-close { background: var(--bg-input); border: none; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
+.modal-close { padding: 0; line-height: 1; background: var(--bg-input); border: none; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
 .modal-close:hover { background: var(--border); color: var(--text-primary); }
 
 /* Custom Scrollbar for inner modal contents */
@@ -666,7 +666,7 @@ svg { width: 1em; height: 1em; vertical-align: -0.125em; display: inline-block; 
 .modal-overlay.show .modal-content { transform: translateY(0); }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .modal-title { font-size: 20px; font-weight: 800; color: var(--text-primary); }
-.modal-close { background: var(--bg-input); border: none; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
+.modal-close { padding: 0; line-height: 1; background: var(--bg-input); border: none; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: background 0.2s; }
 .modal-close:hover { background: var(--border); color: var(--text-primary); }
 .share-section-title { font-size: 14px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin: 20px 0 10px; letter-spacing: 0.5px; }
 .share-opts { display: flex; flex-direction: column; gap: 12px; }
