@@ -2,6 +2,7 @@ import logging
 
 import requests
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -108,6 +109,51 @@ class TMDBClient:
             logger.warning(f'TMDB find_by_imdb_id network issue for {imdb_id}: {e}')
             raise
         return None, None
+
+
+def _save_tmdb_person(person: Person, person_data: dict) -> Person:
+    """Apply TMDB data without breaking the unique person identity mapping."""
+    p_tmdb_id = person_data.get('id')
+    if p_tmdb_id:
+        # A matching row may have appeared after the initial lookup, or may be
+        # an alias whose canonical parent was returned by name matching.
+        existing = Person.objects.filter(tmdb_id=p_tmdb_id).first()
+        if existing:
+            person = existing
+        elif not person.tmdb_id:
+            person.tmdb_id = p_tmdb_id
+
+    p_en_name = person_data.get('original_name')
+    if p_en_name and not person.en_name:
+        person.en_name = p_en_name
+
+    profile_path = person_data.get('profile_path')
+    if profile_path and not person.tmdb_photo_url:
+        person.tmdb_photo_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
+        person.is_photo_fetched = True
+
+    try:
+        with transaction.atomic():
+            person.save()
+    except IntegrityError as exc:
+        constraint_name = getattr(getattr(exc.__cause__, 'diag', None), 'constraint_name', None)
+        if constraint_name != 'app_person_tmdb_id_key' or not p_tmdb_id:
+            raise
+
+        # Another worker won the race between the lookup and save.  Reuse the
+        # winner so this show can still be enriched successfully.
+        existing = Person.objects.filter(tmdb_id=p_tmdb_id).first()
+        if not existing:
+            raise
+        person = existing
+        if p_en_name and not person.en_name:
+            person.en_name = p_en_name
+        if profile_path and not person.tmdb_photo_url:
+            person.tmdb_photo_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
+            person.is_photo_fetched = True
+        person.save()
+
+    return person
 
 
 def sync_show_from_tmdb(
@@ -222,19 +268,7 @@ def sync_show_from_tmdb(
             person, _ = Person.objects.get_or_create(name=p_name)
             person = person.canonical
 
-        if p_tmdb_id and not person.tmdb_id:
-            person.tmdb_id = p_tmdb_id
-
-        p_en_name = person_data.get('original_name')
-        if p_en_name and not person.en_name:
-            person.en_name = p_en_name
-
-        profile_path = person_data.get('profile_path')
-        if profile_path and not person.tmdb_photo_url:
-            person.tmdb_photo_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
-            person.is_photo_fetched = True
-
-        person.save()
+        person = _save_tmdb_person(person, person_data)
 
         character = person_data.get('character') or 'Актёр'
         ShowCrew.objects.get_or_create(
@@ -264,19 +298,7 @@ def sync_show_from_tmdb(
             person, _ = Person.objects.get_or_create(name=p_name)
             person = person.canonical
 
-        if p_tmdb_id and not person.tmdb_id:
-            person.tmdb_id = p_tmdb_id
-
-        p_en_name = person_data.get('original_name')
-        if p_en_name and not person.en_name:
-            person.en_name = p_en_name
-
-        profile_path = person_data.get('profile_path')
-        if profile_path and not person.tmdb_photo_url:
-            person.tmdb_photo_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
-            person.is_photo_fetched = True
-
-        person.save()
+        person = _save_tmdb_person(person, person_data)
 
         ShowCrew.objects.get_or_create(
             show=show,

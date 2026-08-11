@@ -47,7 +47,11 @@ def find_person_for_tmdb(*, name, en_name=None, tmdb_id=None, show=None):
     if tmdb_id:
         person = Person.objects.filter(tmdb_id=tmdb_id).select_related('master_person').first()
         if person:
-            return person.canonical
+            # The TMDB row is the authoritative identity.  Returning its
+            # canonical parent here can lose the ID when an older/partially
+            # merged alias still owns it, and the caller would then try to
+            # assign the same unique ID to the parent.
+            return person
 
     candidates = _canonical_people_queryset(name, en_name).filter(tmdb_id__isnull=True)
     if show is not None:
