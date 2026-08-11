@@ -49,6 +49,7 @@ from app.models import (
     WishlistItem,
 )
 from app.services.metrics import (
+    PERSON_DETAIL_CACHE_TIMEOUT,
     get_active_countries_list,
     get_duplicate_photo_urls_page,
     get_global_metrics_history,
@@ -65,7 +66,6 @@ from app.services.metrics import (
     get_no_countries_list,
     get_no_genres_list,
     get_persons_avatar_list,
-    person_detail_cache_key,
     get_profession_persons_list,
     get_title_collision_list,
     get_title_collision_page,
@@ -84,7 +84,7 @@ from app.services.metrics import (
     get_unused_countries_list,
     get_unused_persons_list,
     invalidate_duplicate_photo_urls_cache,
-    PERSON_DETAIL_CACHE_TIMEOUT,
+    person_detail_cache_key,
 )
 from app.services.stats_calculator import (
     generate_global_stats,

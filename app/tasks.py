@@ -580,9 +580,7 @@ def warm_person_metric_pages_task():
 
     from app.views import get_metric_details
 
-    snapshot = (
-        SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
-    )
+    snapshot = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
     staff_user = get_user_model().objects.filter(is_staff=True).first()
     if not snapshot or not staff_user:
         return

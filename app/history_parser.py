@@ -30,6 +30,7 @@ from app.models import (
     ShowDuration,
     ViewHistory,
 )
+from app.services.person_matching import find_person_for_kinopub
 from app.services.show_duration import upsert_show_duration
 from app.signals import view_history_created
 from app.utils import enqueue_show_update
@@ -329,7 +330,10 @@ def update_show_details(driver, kinopub_id, force=False, session_type=ParserSess
                 for link_element in elements:
                     name = link_element.get_attribute('textContent').strip()
                     if name:
-                        person, _ = Person.objects.update_or_create(name=name)
+                        person = find_person_for_kinopub(name=name, show=show)
+                        if not person:
+                            person, _ = Person.objects.get_or_create(name=name)
+                            person = person.canonical
                         ShowCrew.objects.update_or_create(
                             show=show, person=person, profession=label
                         )

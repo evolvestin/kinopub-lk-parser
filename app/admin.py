@@ -1621,9 +1621,7 @@ class PersonAdmin(BaseNameAdmin):
 
     @staticmethod
     def _metric_expected_count(request, metric):
-        snapshot = (
-            SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
-        )
+        snapshot = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
         if not snapshot:
             return None
 

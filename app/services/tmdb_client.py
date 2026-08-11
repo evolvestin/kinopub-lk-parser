@@ -6,6 +6,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.models import Country, Genre, Person, Show, ShowCrew
+from app.services.person_matching import find_person_for_tmdb
 from app.services.show_duration import upsert_show_duration
 from shared.constants import SHOW_TYPE_MAPPING, ShowType
 
@@ -211,11 +212,15 @@ def sync_show_from_tmdb(
         if not p_name:
             continue
 
-        person = None
-        if p_tmdb_id:
-            person = Person.objects.filter(tmdb_id=p_tmdb_id).first()
+        person = find_person_for_tmdb(
+            name=p_name,
+            en_name=person_data.get('original_name'),
+            tmdb_id=p_tmdb_id,
+            show=show,
+        )
         if not person:
             person, _ = Person.objects.get_or_create(name=p_name)
+            person = person.canonical
 
         if p_tmdb_id and not person.tmdb_id:
             person.tmdb_id = p_tmdb_id
@@ -249,11 +254,15 @@ def sync_show_from_tmdb(
         if not p_name:
             continue
 
-        person = None
-        if p_tmdb_id:
-            person = Person.objects.filter(tmdb_id=p_tmdb_id).first()
+        person = find_person_for_tmdb(
+            name=p_name,
+            en_name=person_data.get('original_name'),
+            tmdb_id=p_tmdb_id,
+            show=show,
+        )
         if not person:
             person, _ = Person.objects.get_or_create(name=p_name)
+            person = person.canonical
 
         if p_tmdb_id and not person.tmdb_id:
             person.tmdb_id = p_tmdb_id

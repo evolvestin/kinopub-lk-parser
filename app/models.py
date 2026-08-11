@@ -100,7 +100,9 @@ class Person(BaseModel):
         def clean(s):
             if not s:
                 return ''
-            return ' '.join(s.replace('\xa0', ' ').split()).lower().replace('ё', 'е')
+            return (
+                ' '.join(s.replace('\xa0', ' ').split()).lower().replace('ё', 'е').replace('э', 'е')
+            )
 
         cleaned_name = clean(self.name)
         if not cleaned_name:
