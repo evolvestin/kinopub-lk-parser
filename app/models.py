@@ -338,6 +338,18 @@ class Show(BaseModel):
     tmdb_id = models.IntegerField(
         null=True, blank=True, unique=True, db_index=True, verbose_name='TMDB ID'
     )
+    tmdb_enrichment_checked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='TMDB enrichment checked at',
+    )
+    poiskkino_backfill_checked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Poiskkino backfill checked at',
+    )
     imdb_id = models.CharField(
         max_length=20, null=True, blank=True, unique=True, db_index=True, verbose_name='IMDb ID'
     )

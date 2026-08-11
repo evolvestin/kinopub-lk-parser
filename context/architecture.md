@@ -171,3 +171,33 @@ Any code generating new database records must follow this "Save-As-Is" architect
 ## Celery Task Concurrency & Locking Policy
 
 **RULE**: Celery tasks are protected by explicit distributed Redis locks (e.g., `RedisLock.SELENIUM_GLOBAL`, `RedisLock.BACKUP`, `RedisLock.PROCESS_QUEUES`) and scheduled across time using Celery Beat. Worker concurrency is configured to 4 because task-level locks safely prevent race conditions and duplicate executions of resource-intensive operations (such as Selenium scraping or database backups).
+
+
+## Poiskkino Ratings Synchronization Policy
+
+**RULE**: Poiskkino synchronization must separate daily changes, finite historical backfill, and recurring refreshes. A record that has been checked and has no rating in Poiskkino must not be returned to the historical backfill indefinitely.
+
+1. **Free-tier request budget**:
+   * The free Poiskkino tariff allows 200 API requests per day. The official limits and tariff are documented at `https://poiskkino.dev/documentation` and `https://poiskkino.dev/`.
+   * Daily updates may use a bounded portion of the budget so historical backfill still gets a chance to run.
+   * Historical selection may be larger than the remaining calculated request budget. The API client must stop on the actual API response (`403` limit response) or a real network failure, rather than under-filling the day based only on an estimated request count.
+   * Successful chunks are persisted before stopping. Chunks not reached because of a limit or network failure remain eligible for a later run.
+
+2. **Backfill priority**:
+   * Shows with no ratings at all are selected first.
+   * Other missing or stale external-rating records are selected next.
+   * The selection must remain bounded by the maximum free-tier capacity (`200 * 250` records) to avoid materializing the entire database into one task.
+
+3. **Terminal backfill marker**:
+   * `Show.poiskkino_backfill_checked_at` records that a historical Poiskkino lookup completed for the show.
+   * A successful empty response is a terminal result: absence of a rating in Poiskkino is valid data and must not cause an infinite retry loop.
+   * A `403`, timeout, connection error, or other incomplete request must not mark the unprocessed IDs as checked.
+   * Daily `updatedAt` synchronization remains the mechanism for discovering ratings that appear later in Poiskkino.
+
+4. **KinoPub priority**:
+   * A missing `kinopub_id` must never be used to exclude a show from Poiskkino synchronization.
+   * In the recurring weekly stale refresh, records with a non-null `kinopub_id` are ordered before TMDB-only records. Within each group, the oldest `ExternalRating.updated_at` is processed first.
+
+5. **Queue semantics**:
+   * The historical backfill queue is finite and drains through `poiskkino_backfill_checked_at`.
+   * The weekly stale refresh is intentionally recurring for records that have ratings; it is not a historical backfill and must not be used as the completion metric for the initial migration.

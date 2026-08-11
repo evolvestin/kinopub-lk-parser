@@ -31,6 +31,7 @@ class Command(LoggableBaseCommand):
 
         candidates = list(
             Show.objects.filter(tmdb_id__isnull=False)
+            .filter(tmdb_enrichment_checked_at__isnull=True)
             .filter(
                 Q(plot__isnull=True)
                 | Q(plot='')
@@ -50,6 +51,7 @@ class Command(LoggableBaseCommand):
 
         processed_count = 0
         success_count = 0
+        no_data_count = 0
         consecutive_errors = 0
         error_threshold = 10
 
@@ -68,7 +70,15 @@ class Command(LoggableBaseCommand):
                     if updated_show:
                         success_count += 1
                     else:
+                        no_data_count += 1
                         Show.objects.filter(id=show_id).update(updated_at=timezone.now())
+
+                    # A successful TMDB request is terminal for this enrichment pass:
+                    # fields absent from the response are genuine missing data and must
+                    # not cause the same show to be selected on every hourly run.
+                    Show.objects.filter(id=show_id).update(
+                        tmdb_enrichment_checked_at=timezone.now()
+                    )
 
                     processed_count += 1
                     consecutive_errors = 0
@@ -106,5 +116,5 @@ class Command(LoggableBaseCommand):
 
         logging.info(
             f'TMDB enrichment completed. Processed: {processed_count}, '
-            f'Successfully updated: {success_count}'
+            f'Successfully updated: {success_count}, No data from TMDB: {no_data_count}'
         )

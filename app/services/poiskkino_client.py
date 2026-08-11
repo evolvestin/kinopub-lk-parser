@@ -1,10 +1,19 @@
 import logging
+from dataclasses import dataclass
 from datetime import date
 
 import requests
 from django.conf import settings
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
+
+@dataclass
+class PoiskkinoFetchResult:
+    data: list[dict]
+    checked_values: list[int | str]
+    completed: bool
+    requests_made: int
 
 
 class PoiskkinoClient:
@@ -37,9 +46,11 @@ class PoiskkinoClient:
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
 
-    def fetch_updated_ratings(self, start_date: date, end_date: date) -> list[dict]:
+    def fetch_updated_ratings(
+        self, start_date: date, end_date: date, max_requests: int = 150
+    ) -> PoiskkinoFetchResult:
         if not self.api_key:
-            return []
+            return PoiskkinoFetchResult([], [], False, 0)
 
         date_str = f'{start_date.strftime("%d.%m.%Y")}-{end_date.strftime("%d.%m.%Y")}'
         headers = {'X-API-KEY': self.api_key}
@@ -48,8 +59,8 @@ class PoiskkinoClient:
 
         results = []
         next_cursor = None
-        max_requests = 190
         request_count = 0
+        completed = False
 
         while request_count < max_requests:
             if next_cursor:
@@ -74,20 +85,23 @@ class PoiskkinoClient:
 
                 next_cursor = data.get('next')
                 if not data.get('hasNext') or not next_cursor:
+                    completed = True
                     break
             except requests.RequestException as e:
                 logging.error(f'Poiskkino fetch_updated_ratings error: {e}')
                 break
 
-        return results
+        return PoiskkinoFetchResult(results, [], completed, request_count)
 
-    def fetch_ratings_by_ids(self, show_ids: list[int]) -> list[dict]:
+    def fetch_ratings_by_ids(self, show_ids: list[int]) -> PoiskkinoFetchResult:
         if not self.api_key or not show_ids:
-            return []
+            return PoiskkinoFetchResult([], [], False, 0)
 
         headers = {'X-API-KEY': self.api_key}
         results = []
+        checked_values = []
         chunk_size = 250
+        requests_made = 0
 
         for i in range(0, len(show_ids), chunk_size):
             chunk = show_ids[i : i + chunk_size]
@@ -109,19 +123,28 @@ class PoiskkinoClient:
                 response.raise_for_status()
                 data = response.json()
                 results.extend(data.get('docs', []))
+                checked_values.extend(chunk)
+                requests_made += 1
             except requests.RequestException as e:
                 logging.error(f'Poiskkino fetch_ratings_by_ids error: {e}')
                 break
 
-        return results
+        return PoiskkinoFetchResult(
+            results,
+            checked_values,
+            len(checked_values) == len(show_ids),
+            requests_made,
+        )
 
-    def fetch_ratings_by_imdb_ids(self, imdb_ids: list[str]) -> list[dict]:
+    def fetch_ratings_by_imdb_ids(self, imdb_ids: list[str]) -> PoiskkinoFetchResult:
         if not self.api_key or not imdb_ids:
-            return []
+            return PoiskkinoFetchResult([], [], False, 0)
 
         headers = {'X-API-KEY': self.api_key}
         results = []
+        checked_values = []
         chunk_size = 250
+        requests_made = 0
 
         for i in range(0, len(imdb_ids), chunk_size):
             chunk = imdb_ids[i : i + chunk_size]
@@ -145,8 +168,15 @@ class PoiskkinoClient:
                 response.raise_for_status()
                 data = response.json()
                 results.extend(data.get('docs', []))
+                checked_values.extend(chunk)
+                requests_made += 1
             except requests.RequestException as e:
                 logging.error(f'Poiskkino fetch_ratings_by_imdb_ids error: {e}')
                 break
 
-        return results
+        return PoiskkinoFetchResult(
+            results,
+            checked_values,
+            len(checked_values) == len(imdb_ids),
+            requests_made,
+        )

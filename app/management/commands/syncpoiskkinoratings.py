@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, When
 from django.utils import timezone
 from redis import Redis
 
@@ -12,6 +12,10 @@ from app.services.poiskkino_client import PoiskkinoClient
 from app.tasks import get_kp_mapping
 from shared.constants import SHOW_STATUS_MAPPING, RedisQueue
 
+FREE_DAILY_REQUEST_LIMIT = 200
+DAILY_UPDATE_REQUEST_BUDGET = 150
+POISKKINO_BATCH_SIZE = 250
+
 
 class Command(LoggableBaseCommand):
     help = 'Syncs ratings, genres, and countries with Poiskkino API.'
@@ -20,12 +24,12 @@ class Command(LoggableBaseCommand):
         parser.add_argument(
             '--limit',
             type=int,
-            default=10000,
-            help='Limit for fetching missing show ratings.',
+            default=None,
+            help='Optional cap for historical/stale shows; otherwise uses the daily API budget.',
         )
 
     def handle(self, *args, **options):
-        limit = options.get('limit')
+        requested_limit = options.get('limit')
         client = PoiskkinoClient()
         now = timezone.now()
         today = now.date()
@@ -34,11 +38,27 @@ class Command(LoggableBaseCommand):
         logging.info('Fetching daily rating updates from Poiskkino...')
         kp_mapping = get_kp_mapping()
 
-        data = client.fetch_updated_ratings(yesterday, today)
-        logging.info(f'Fetched {len(data)} daily updates.')
+        daily_result = client.fetch_updated_ratings(
+            yesterday, today, max_requests=DAILY_UPDATE_REQUEST_BUDGET
+        )
+        data = daily_result.data
+        logging.info(f'Fetched {len(data)} daily updates in {daily_result.requests_made} requests.')
+
+        # Select enough records to use the full free-tier capacity. The client
+        # itself stops on the API's 403 response, so transient network failures
+        # do not make us permanently underfill the next day's attempt.
+        selection_limit = FREE_DAILY_REQUEST_LIMIT * POISKKINO_BATCH_SIZE
+        limit = (
+            selection_limit if requested_limit is None else min(requested_limit, selection_limit)
+        )
+        logging.info(
+            f'Poiskkino backfill selection cap: {limit} shows; '
+            'actual stopping is controlled by API response/403.'
+        )
 
         # Извлечение приоритетных ID из Redis
         priority_show_ids = set()
+        r = None
         try:
             r = Redis.from_url(settings.CELERY_BROKER_URL)
             priority_raw = r.spop(RedisQueue.PRIORITY_RATINGS_SYNC, count=limit)
@@ -49,15 +69,80 @@ class Command(LoggableBaseCommand):
             logging.error(f'Redis priority queue error: {e}')
 
         stale_cutoff = now - timedelta(days=7)
+        no_show_rating = Q(kinopoisk_rating__isnull=True, imdb_rating__isnull=True)
+        no_external_rating = Q(ext_rating__isnull=True)
+        for field in (
+            'kp',
+            'imdb',
+            'tmdb',
+            'film_critics',
+            'russian_film_critics',
+            'await_rating',
+        ):
+            no_external_rating &= Q(**{f'ext_rating__{field}__isnull': True})
+        no_ratings_at_all = no_show_rating & no_external_rating
 
-        missing_show_ids = set(
-            Show.objects.filter(
-                Q(ext_rating__isnull=True) | Q(ext_rating__updated_at__lt=stale_cutoff)
-            ).values_list('id', flat=True)[:limit]
+        # Backfill is finite: first inspect shows with no ratings at all, then
+        # inspect other missing/stale records. A successful lookup, including an
+        # empty API result, marks the show as checked and removes it from backfill.
+        backfill_base = Show.objects.filter(poiskkino_backfill_checked_at__isnull=True)
+        no_rating_ids = list(
+            backfill_base.filter(no_ratings_at_all)
+            .order_by('id')
+            .values_list('id', flat=True)[:limit]
         )
 
-        # Объединяем приоритетные и плановые ID, сохраняя лимит
-        combined_show_ids = list(priority_show_ids | missing_show_ids)[:limit]
+        remaining_limit = max(0, limit - len(no_rating_ids))
+        other_backfill_ids = list(
+            backfill_base.exclude(id__in=no_rating_ids)
+            .filter(Q(ext_rating__isnull=True) | Q(ext_rating__updated_at__lt=stale_cutoff))
+            .order_by('id')
+            .values_list('id', flat=True)[:remaining_limit]
+        )
+
+        selected_ids = no_rating_ids + other_backfill_ids
+        remaining_limit = max(0, limit - len(selected_ids))
+        if remaining_limit:
+            stale_refresh_ids = list(
+                Show.objects.filter(ext_rating__updated_at__lt=stale_cutoff)
+                .exclude(no_ratings_at_all)
+                .annotate(
+                    kinopub_priority=Case(
+                        When(kinopub_id__isnull=False, then=0),
+                        default=1,
+                        output_field=IntegerField(),
+                    )
+                )
+                .order_by('kinopub_priority', 'ext_rating__updated_at', 'id')
+                .values_list('id', flat=True)[:remaining_limit]
+            )
+            selected_ids.extend(stale_refresh_ids)
+
+        priority_ids = list(
+            Show.objects.filter(id__in=priority_show_ids).values_list('id', flat=True)
+        )
+        selected_set = set(selected_ids)
+        for sid in priority_ids:
+            if len(selected_ids) >= limit:
+                break
+            if sid not in selected_set:
+                selected_ids.append(sid)
+                selected_set.add(sid)
+
+        unselected_priorities = set(priority_ids) - selected_set
+        if unselected_priorities and r is not None:
+            try:
+                r.sadd(RedisQueue.PRIORITY_RATINGS_SYNC, *unselected_priorities)
+            except Exception as e:
+                logging.error(f'Failed to restore unselected priority ratings: {e}')
+
+        combined_show_ids = selected_ids
+        logging.info(
+            f'Selected {len(combined_show_ids)} shows: '
+            f'{len(no_rating_ids)} with no ratings, '
+            f'{len(other_backfill_ids)} backfill, '
+            f'{max(0, len(combined_show_ids) - len(no_rating_ids) - len(other_backfill_ids))} stale.'
+        )
 
         reverse_kp_mapping = {sid: kp for kp, sid in kp_mapping.items()}
 
@@ -73,6 +158,7 @@ class Command(LoggableBaseCommand):
         missing_kp_ids = []
         missing_imdb_ids = []
         invalid_url_sids = []
+        backfill_checked_ids = set()
 
         for sid in combined_show_ids:
             kp_id = reverse_kp_mapping.get(sid)
@@ -86,6 +172,7 @@ class Command(LoggableBaseCommand):
                     invalid_url_sids.append(sid)
 
         if invalid_url_sids:
+            backfill_checked_ids.update(invalid_url_sids)
             blank_ratings = [
                 ExternalRating(show_id=sid, updated_at=now) for sid in invalid_url_sids
             ]
@@ -102,13 +189,39 @@ class Command(LoggableBaseCommand):
 
         if missing_kp_ids:
             logging.info(f'Fetching {len(missing_kp_ids)} missing/stale records by KP IDs...')
-            catchup_data = client.fetch_ratings_by_ids(missing_kp_ids)
-            data.extend(catchup_data)
+            kp_result = client.fetch_ratings_by_ids(missing_kp_ids)
+            data.extend(kp_result.data)
+            backfill_checked_ids.update(
+                reverse_kp_mapping[kp_id]
+                for kp_id in kp_result.checked_values
+                if kp_id in reverse_kp_mapping
+            )
+            logging.info(
+                f'Poiskkino KP catch-up: {kp_result.requests_made} requests, '
+                f'{len(kp_result.checked_values)} IDs checked, '
+                f'completed={kp_result.completed}.'
+            )
 
         if missing_imdb_ids:
             logging.info(f'Fetching {len(missing_imdb_ids)} records by IMDb IDs from Poiskkino...')
-            imdb_catchup_data = client.fetch_ratings_by_imdb_ids(missing_imdb_ids)
-            data.extend(imdb_catchup_data)
+            imdb_result = client.fetch_ratings_by_imdb_ids(missing_imdb_ids)
+            data.extend(imdb_result.data)
+            backfill_checked_ids.update(
+                imdb_mapping[imdb_id]
+                for imdb_id in imdb_result.checked_values
+                if imdb_id in imdb_mapping
+            )
+            logging.info(
+                f'Poiskkino IMDb catch-up: {imdb_result.requests_made} requests, '
+                f'{len(imdb_result.checked_values)} IDs checked, '
+                f'completed={imdb_result.completed}.'
+            )
+
+        if backfill_checked_ids:
+            Show.objects.filter(id__in=backfill_checked_ids).update(
+                poiskkino_backfill_checked_at=now
+            )
+            logging.info(f'Marked {len(backfill_checked_ids)} shows as Poiskkino-checked.')
 
         if not data:
             logging.info('No data to process.')
