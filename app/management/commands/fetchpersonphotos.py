@@ -1,10 +1,11 @@
+import csv
 import logging
 
 import requests
 from celery.exceptions import SoftTimeLimitExceeded
 from django import db
+from django.core.management.base import CommandError
 from django.db import DatabaseError
-from django.db.models import Count
 
 from app.management.base import LoggableBaseCommand
 from app.models import Person
@@ -26,33 +27,36 @@ class Command(LoggableBaseCommand):
             action='store_true',
             help='Remove TMDB photos that belong to multiple different persons',
         )
+        parser.add_argument(
+            '--ids-file',
+            help='CSV file with an id column; restrict refetching to those Person IDs.',
+        )
 
     def handle(self, *args, **options):
         if options.get('purge_dupes'):
-            logging.info('Finding duplicate TMDB photo URLs to purge...')
-            duplicate_urls_qs = (
-                Person.objects.exclude(tmdb_photo_url__isnull=True)
-                .exclude(tmdb_photo_url='')
-                .values('tmdb_photo_url')
-                .annotate(cnt=Count('id'))
-                .filter(cnt__gt=1)
+            raise CommandError(
+                'Disabled because it clears verified and aliased rows. '
+                'Use reset_unverified_duplicate_photos instead.'
             )
 
-            urls_to_purge = [item['tmdb_photo_url'] for item in duplicate_urls_qs]
-
-            if urls_to_purge:
-                purged_count = Person.objects.filter(tmdb_photo_url__in=urls_to_purge).update(
-                    tmdb_photo_url=None, is_photo_fetched=False
-                )
-                logging.info(
-                    f'Successfully purged {purged_count} persons '
-                    f'sharing {len(urls_to_purge)} duplicate URLs.'
-                )
-            else:
-                logging.info('No duplicate TMDB photos found.')
-            return
-
         limit = options.get('limit')
+        target_ids = None
+        if options.get('ids_file'):
+            if options.get('force'):
+                raise ValueError('--ids-file cannot be combined with --force')
+            target_ids = []
+            with open(options['ids_file'], newline='', encoding='utf-8') as stream:
+                reader = csv.DictReader(stream)
+                if 'id' not in (reader.fieldnames or []):
+                    raise ValueError('--ids-file must contain an id column')
+                for row in reader:
+                    try:
+                        target_ids.append(int(row['id']))
+                    except (TypeError, ValueError):
+                        raise ValueError(f'Invalid Person id in --ids-file: {row.get("id")}')
+            target_ids = sorted(set(target_ids))
+            logging.info('Restricting photo fetch to %d Person IDs from CSV.', len(target_ids))
+
         if options.get('force'):
             logging.info('Force flag detected. Resetting is_photo_fetched for missing photos.')
             Person.objects.filter(tmdb_photo_url__isnull=True, kp_photo_url__isnull=True).update(
@@ -74,9 +78,11 @@ class Command(LoggableBaseCommand):
             while processed_count < limit:
                 current_batch_limit = min(batch_size, limit - processed_count)
 
+                batch_qs = Person.objects.filter(is_photo_fetched=False)
+                if target_ids is not None:
+                    batch_qs = batch_qs.filter(id__in=target_ids)
                 batch = list(
-                    Person.objects.filter(is_photo_fetched=False)
-                    .exclude(id__in=failed_ids)
+                    batch_qs.exclude(id__in=failed_ids)
                     .order_by('id')[:current_batch_limit]
                 )
 

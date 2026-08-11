@@ -94,6 +94,7 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
 
     base_url = f'{settings.TMDB_API_BASE_URL}/search/person'
     found_path = None
+    found_tmdb_id = None
     session = get_tmdb_session()
 
     api_key = settings.TMDB_API_KEY
@@ -166,21 +167,35 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
 
                     if best_candidate['score'] > 0:
                         found_path = best_candidate['data'].get('profile_path')
-                        break
-                    elif len(valid_candidates) == 1:
-                        found_path = best_candidate['data'].get('profile_path')
+                        found_tmdb_id = best_candidate['data'].get('id')
                         break
                     else:
                         logger.info(
-                            f'Ambiguous match for {person_instance.name} (query: {query}) '
-                            f'with no filmography match. Skipping.'
+                            f'Unverified match for {person_instance.name} (query: {query}) '
+                            f'has no filmography evidence. Skipping.'
                         )
+
+        if found_tmdb_id and Person.objects.filter(tmdb_id=found_tmdb_id).exclude(
+            id=person_instance.id
+        ).exists():
+            logger.warning(
+                'TMDB person %s is already assigned to another Person row; '
+                'leaving photo empty for %s.',
+                found_tmdb_id,
+                person_instance.name,
+            )
+            found_path = None
+            found_tmdb_id = None
 
         person_instance.tmdb_photo_url = (
             f'https://image.tmdb.org/t/p/w200{found_path}' if found_path else None
         )
         person_instance.is_photo_fetched = True
-        person_instance.save(update_fields=['tmdb_photo_url', 'is_photo_fetched', 'updated_at'])
+        update_fields = ['tmdb_photo_url', 'is_photo_fetched', 'updated_at']
+        if found_tmdb_id and not person_instance.tmdb_id:
+            person_instance.tmdb_id = found_tmdb_id
+            update_fields.append('tmdb_id')
+        person_instance.save(update_fields=update_fields)
 
         if found_path:
             logger.info(f'Fetched photo for {person_instance.name}')
