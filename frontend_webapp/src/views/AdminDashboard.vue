@@ -84,9 +84,9 @@
               :height="280" 
             />
             <div class="legend-grid" v-if="getMetricData(metric.key).length > 1">
-              <div v-for="(item, i) in getMetricData(metric.key)" :key="i" class="legend-item clickable" @click="openDetails(metric.key, item.name || item.type)">
+              <div v-for="(item, i) in getMetricData(metric.key)" :key="i" class="legend-item clickable" @click="openDetails(metric.key, normalizeMetricLabel(item.name || item.type))">
                 <div class="legend-dot" :style="{ background: getPaletteColor(metric.severity, i) }"></div>
-                <div class="legend-name">{{ item.name || item.type }}</div>
+                <div class="legend-name">{{ normalizeMetricLabel(item.name || item.type) }}</div>
                 <div class="legend-val">{{ item[metric.valField].toLocaleString('ru-RU') }} ({{ formatPercentage(metric.key, item.name || item.type, item[metric.valField]) }})</div>
               </div>
             </div>
@@ -374,6 +374,12 @@ const getMetricData = (key) => {
   return allMetrics[key]?.[activePeriod.value]?.data?.filter(i => i[getMetricField(key)] > 0) || []
 }
 
+// Older snapshots may contain the double-encoded label; keep them readable
+// until the next metrics snapshot is generated.
+const normalizeMetricLabel = (value) => ({
+  'Р‘РµР· СЂРѕР»РµР№': 'Без ролей'
+}[value] || value)
+
 const getMetricTimestamp = (key) => {
   return allMetrics[key]?.[activePeriod.value]?.timestamp || null
 }
@@ -422,7 +428,7 @@ const getChartData = (metric) => {
   const bgColors = rawData.map((_, i) => getPaletteColor(metric.severity, i))
   
   return {
-    labels: rawData.map(i => i.name || i.type),
+    labels: rawData.map(i => normalizeMetricLabel(i.name || i.type)),
     datasets: [{
       data: rawData.map(i => i[metric.valField]),
       backgroundColor: bgColors,

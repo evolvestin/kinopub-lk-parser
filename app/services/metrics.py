@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import timedelta
+from hashlib import sha1
 
 from django.conf import settings
 from django.core.cache import cache
@@ -37,6 +38,15 @@ from shared.constants import (
 
 DUPLICATE_PHOTO_CACHE_VERSION_KEY = 'metrics:duplicate_photo_urls:cache_version'
 DUPLICATE_PHOTO_CACHE_TIMEOUT = 86400
+PERSON_DETAIL_CACHE_VERSION_KEY = 'metrics:person_detail:cache_version'
+PERSON_DETAIL_CACHE_TIMEOUT = 86400
+PERSON_DETAIL_WARM_KEYS = {
+    'total_persons_by_show_type',
+    'persons_avatar_stats',
+    'professions_stats',
+    'en_professions_stats',
+    'unused_persons',
+}
 
 
 def _format_type(t):
@@ -325,6 +335,7 @@ def get_global_metrics_history() -> dict:
         return {}
 
     queue_duplicate_photo_urls_warmup()
+    queue_person_detail_warmup()
 
     yesterday_cutoff = now - timedelta(days=1)
     yesterday = (
@@ -572,12 +583,14 @@ def get_tmdb_no_countries_list(show_type: str):
     )
 
 
-def _canonical_person_ids(crew_queryset):
-    return (
+def _canonical_person_ids(crew_queryset, max_items=None):
+    person_ids = (
         crew_queryset.annotate(canonical_id=_canonical_person_id_expression())
         .values('canonical_id')
         .distinct()
+        .order_by('canonical_id')
     )
+    return person_ids[:max_items] if max_items is not None else person_ids
 
 
 def _person_values_queryset(person_ids):
@@ -586,8 +599,10 @@ def _person_values_queryset(person_ids):
     )
 
 
-def get_total_persons_list(show_type: str):
-    person_ids = _canonical_person_ids(ShowCrew.objects.filter(show__type=show_type))
+def get_total_persons_list(show_type: str, max_items=None):
+    person_ids = _canonical_person_ids(
+        ShowCrew.objects.filter(show__type=show_type), max_items=max_items
+    )
     return _person_values_queryset(person_ids)
 
 
@@ -622,7 +637,7 @@ def get_persons_avatar_list(source_type: str):
     )
 
 
-def get_profession_persons_list(normalized: str, language: str):
+def get_profession_persons_list(normalized: str, language: str, max_items=None):
     if language == 'ru':
         primary_mapping = RAW_TO_NORMALIZED_RU
         en_to_ru = {en: ru for ru, en in PROFESSION_TRANS_MAP.items()}
@@ -657,8 +672,17 @@ def get_profession_persons_list(normalized: str, language: str):
         *[When(en_profession=raw, then=Value(value)) for raw, value in fallback_mapping.items()],
         output_field=CharField(),
     )
+    primary_known = Q(profession__in=primary_mapping)
+    target_primary = Q(
+        profession__in=[raw for raw, value in primary_mapping.items() if value == normalized]
+    )
+    target_fallback = Q(
+        en_profession__in=[raw for raw, value in fallback_mapping.items() if value == normalized]
+    )
+    role_filter = target_primary | (~primary_known & target_fallback)
     person_ids = _canonical_person_ids(
-        ShowCrew.objects.annotate(normalized_role=role_case).filter(normalized_role=normalized)
+        ShowCrew.objects.filter(role_filter).annotate(normalized_role=role_case),
+        max_items=max_items,
     )
     return _person_values_queryset(person_ids)
 
@@ -1174,6 +1198,17 @@ def queue_duplicate_photo_urls_warmup():
         celery_app.send_task('app.tasks.warm_duplicate_photo_urls_task', queue='metrics')
 
 
+def person_detail_cache_key(key, value, offset, limit):
+    version = cache.get(PERSON_DETAIL_CACHE_VERSION_KEY, 1)
+    digest = sha1(f'{key}|{value}|{offset}|{limit}'.encode()).hexdigest()
+    return f'metrics:person_detail:{version}:{digest}'
+
+
+def queue_person_detail_warmup():
+    if cache.add('metrics:person_detail:warmup_lock', True, timeout=900):
+        celery_app.send_task('app.tasks.warm_person_metric_pages_task', queue='metrics')
+
+
 def warm_duplicate_photo_urls_cache():
     """Populate the first modal page off the request path."""
     for source_type in ('TMDB', 'KP'):
@@ -1332,7 +1367,7 @@ def get_tmdb_missing_durations_list(show_type: str):
 def calculate_unused_persons_metric():
     return [
         {
-            'name': 'Р‘РµР· СЂРѕР»РµР№',
+            'name': 'Без ролей',
             'value': Person.objects.filter(
                 master_person__isnull=True, showcrew__isnull=True
             ).count(),

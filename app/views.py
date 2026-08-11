@@ -65,6 +65,7 @@ from app.services.metrics import (
     get_no_countries_list,
     get_no_genres_list,
     get_persons_avatar_list,
+    person_detail_cache_key,
     get_profession_persons_list,
     get_title_collision_list,
     get_title_collision_page,
@@ -83,6 +84,7 @@ from app.services.metrics import (
     get_unused_countries_list,
     get_unused_persons_list,
     invalidate_duplicate_photo_urls_cache,
+    PERSON_DETAIL_CACHE_TIMEOUT,
 )
 from app.services.stats_calculator import (
     generate_global_stats,
@@ -1910,6 +1912,19 @@ def get_metric_details(request, key):
     inverse_map = {v: k for k, v in SHOW_TYPE_DISPLAY_RU.items()}
     db_show_type = inverse_map.get(show_type, show_type)
 
+    person_page_cache_key = None
+    if key in {
+        'total_persons_by_show_type',
+        'persons_avatar_stats',
+        'professions_stats',
+        'en_professions_stats',
+        'unused_persons',
+    }:
+        person_page_cache_key = person_detail_cache_key(key, show_type or '', offset, limit)
+        cached_payload = cache.get(person_page_cache_key)
+        if cached_payload is not None:
+            return JsonResponse(cached_payload)
+
     if key == 'missing_kp':
         items = get_missing_kp_list(db_show_type)
         query_params.update(
@@ -2064,7 +2079,7 @@ def get_metric_details(request, key):
             items = get_active_countries_list()
     elif key == 'total_persons_by_show_type':
         is_person = True
-        items = get_total_persons_list(db_show_type)
+        items = get_total_persons_list(db_show_type, max_items=offset + limit + 1)
         query_params['value'] = db_show_type
     elif key == 'persons_avatar_stats':
         mapping = {
@@ -2082,11 +2097,11 @@ def get_metric_details(request, key):
         query_params['value'] = source_type or ''
     elif key == 'professions_stats':
         is_person = True
-        items = get_profession_persons_list(show_type, 'ru')
+        items = get_profession_persons_list(show_type, 'ru', max_items=offset + limit + 1)
         query_params['value'] = show_type
     elif key == 'en_professions_stats':
         is_person = True
-        items = get_profession_persons_list(show_type, 'en')
+        items = get_profession_persons_list(show_type, 'en', max_items=offset + limit + 1)
         query_params['value'] = show_type
     elif key == 'duplicate_photo_urls':
         is_person = True
@@ -2220,19 +2235,20 @@ def get_metric_details(request, key):
                 }
             )
 
-    return JsonResponse(
-        {
-            'items': items,
-            'has_more': has_more,
-            'next_offset': offset + len(items),
-            'admin_url': admin_url,
-            'target_task': target_task,
-            'is_country': is_country,
-            'is_person': is_person,
-            'is_genre': is_genre,
-            'is_authenticated': True,
-        }
-    )
+    payload = {
+        'items': items,
+        'has_more': has_more,
+        'next_offset': offset + len(items),
+        'admin_url': admin_url,
+        'target_task': target_task,
+        'is_country': is_country,
+        'is_person': is_person,
+        'is_genre': is_genre,
+        'is_authenticated': True,
+    }
+    if person_page_cache_key:
+        cache.set(person_page_cache_key, payload, timeout=PERSON_DETAIL_CACHE_TIMEOUT)
+    return JsonResponse(payload)
 
 
 @csrf_exempt

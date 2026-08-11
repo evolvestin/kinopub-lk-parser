@@ -30,7 +30,11 @@ from app.models import (
     ViewUser,
 )
 from app.services.error_aggregator import ErrorAggregator
-from app.services.metrics import generate_global_metrics_snapshot, warm_duplicate_photo_urls_cache
+from app.services.metrics import (
+    PERSON_DETAIL_WARM_KEYS,
+    generate_global_metrics_snapshot,
+    warm_duplicate_photo_urls_cache,
+)
 from app.services.stats_calculator import generate_user_stats
 from app.services.tmdb_client import sync_show_from_tmdb
 from app.telegram_bot import TelegramSender
@@ -555,6 +559,7 @@ def sync_poiskkino_ratings_task():
 def update_site_metrics_task():
     data = generate_global_metrics_snapshot()
     SiteMetric.objects.create(key='global_snapshot', data=data)
+    cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
     cache.delete('lock:queuing_global_snapshot')
     logging.info('Global site metrics snapshot updated successfully.')
 
@@ -564,6 +569,39 @@ def update_site_metrics_task():
 @safe_execution
 def warm_duplicate_photo_urls_task():
     warm_duplicate_photo_urls_cache()
+
+
+@shared_task
+@single_instance_task(lock_name='warm_person_metric_pages', timeout=900)
+@safe_execution
+def warm_person_metric_pages_task():
+    from django.contrib.auth import get_user_model
+    from django.test import RequestFactory
+
+    from app.views import get_metric_details
+
+    snapshot = (
+        SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
+    )
+    staff_user = get_user_model().objects.filter(is_staff=True).first()
+    if not snapshot or not staff_user:
+        return
+
+    factory = RequestFactory()
+    for key in PERSON_DETAIL_WARM_KEYS:
+        entries = snapshot.data.get(key, [])
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            value = entry.get('name') or entry.get('type')
+            if not value or not entry.get('value', entry.get('collisions', 0)):
+                continue
+            request = factory.get(
+                f'/api/metrics/details/{key}/',
+                {'type': value, 'offset': 0, 'limit': 50},
+            )
+            request.user = staff_user
+            get_metric_details(request, key)
 
 
 @shared_task

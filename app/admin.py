@@ -5,6 +5,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
+from django.core.paginator import Paginator
 from django.db.models import (
     Avg,
     Case,
@@ -1380,6 +1381,16 @@ def _apply_person_metric_filter(queryset, metric, request):
     return queryset
 
 
+class MetricCountPaginator(Paginator):
+    def __init__(self, object_list, per_page, expected_count, **kwargs):
+        super().__init__(object_list, per_page, **kwargs)
+        self.expected_count = expected_count
+
+    @property
+    def count(self):
+        return self.expected_count
+
+
 class PersonProfessionFilter(admin.SimpleListFilter):
     title = 'Profession (RU)'
     parameter_name = 'profession_norm'
@@ -1580,6 +1591,65 @@ class PersonAdmin(BaseNameAdmin):
             '</div>',
             obj.id,
         )
+
+    def get_paginator(self, request, queryset, per_page, orphans=0, allow_empty_first_page=True):
+        metric = request.GET.get('metric')
+        if metric in {
+            'duplicate_photo_urls',
+            'total_persons_by_show_type',
+            'persons_avatar_stats',
+            'professions_stats',
+            'en_professions_stats',
+            'unused_persons',
+        }:
+            expected_count = self._metric_expected_count(request, metric)
+            if expected_count is not None:
+                return MetricCountPaginator(
+                    queryset,
+                    per_page,
+                    expected_count,
+                    orphans=orphans,
+                    allow_empty_first_page=allow_empty_first_page,
+                )
+        return super().get_paginator(
+            request,
+            queryset,
+            per_page,
+            orphans=orphans,
+            allow_empty_first_page=allow_empty_first_page,
+        )
+
+    @staticmethod
+    def _metric_expected_count(request, metric):
+        snapshot = (
+            SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
+        )
+        if not snapshot:
+            return None
+
+        value = request.GET.get('value', '')
+        if metric == 'total_persons_by_show_type':
+            value = SHOW_TYPE_DISPLAY_RU.get(value, value)
+        elif metric == 'duplicate_photo_urls':
+            value = 'TMDB дубликаты' if 'TMDB' in request.GET.get('source', '') else 'KP дубликаты'
+        elif metric == 'persons_avatar_stats':
+            value = {
+                'has_tmdb': 'Есть фото (TMDB)',
+                'kp': 'Есть фото (KP)',
+                'tmdb_none': 'TMDB не найдено',
+                'kp_none': 'KP не найдено',
+                'tmdb_wait': 'В ожидании TMDB',
+                'kp_wait': 'В ожидании KP',
+                'all_none': 'Не найдено вообще',
+            }.get(value, value)
+        for entry in snapshot.data.get(metric, []):
+            if (entry.get('name') or entry.get('type')) == value:
+                return entry.get('collisions', entry.get('value'))
+        if metric == 'unused_persons' and not request.GET.get('value'):
+            entry = next(iter(snapshot.data.get(metric, [])), None)
+            if entry:
+                return entry.get('collisions', entry.get('value'))
+        return None
 
     def save_model(self, request, obj, form, change):
         if obj.master_person_id == obj.id:
