@@ -428,6 +428,10 @@ if ENVIRONMENT == 'PROD':
                 'task': 'app.tasks.sync_poiskkino_ratings_task',
                 'schedule': crontab(minute=0, hour=5),
             },
+            'backup_database_hourly': {
+                'task': 'app.tasks.backup_database',
+                'schedule': crontab(minute=50),  # hourly, away from the main parser starts
+            },
             'run_new_episodes': {
                 'task': 'app.tasks.run_new_episodes_task',
                 'schedule': crontab(minute=20, hour='8-21'),

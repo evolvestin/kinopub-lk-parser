@@ -206,9 +206,23 @@ def cleanup_old_data_task():
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.BACKUP, timeout=300)
+@single_instance_task(lock_name=RedisLock.BACKUP, timeout=7200)
 def backup_database():
-    BackupManager().perform_backup()
+    # pg_dump competes with Selenium for CPU, memory and disk I/O.  Keep the
+    # existing backup lock and also serialize the dump with browser work.
+    # The task is intentionally delayed instead of being dropped when a
+    # Selenium task is active: Celery Beat invokes it once per hour.
+    for attempt in range(120):
+        with _redis_lock(RedisLock.SELENIUM_GLOBAL, timeout=21600) as acquired:
+            if acquired:
+                BackupManager().perform_backup()
+                return
+
+        if attempt == 0:
+            logging.info('Backup delayed: Selenium resource lock is busy.')
+        time.sleep(30)
+
+    logging.error('Backup was not started after waiting one hour for Selenium lock.')
 
 
 @shared_task

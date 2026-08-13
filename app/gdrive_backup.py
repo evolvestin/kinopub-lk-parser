@@ -21,7 +21,6 @@ from app.models import (
     ViewUser,
     ViewUserGroup,
 )
-from kinopub_parser import celery_app
 
 
 class BackupManager:
@@ -42,8 +41,7 @@ class BackupManager:
         if settings.LOCAL_RUN:
             logging.info('Local run detected, skipping Celery backup task scheduling.')
             return
-        celery_app.send_task('app.tasks.backup_database')
-        logging.info('Database backup scheduled via Celery.')
+        logging.info('Database backup requested; hourly Celery schedule will check it.')
 
     def _get_drive_service(self):
         if not settings.GOOGLE_DRIVE_CREDENTIALS_JSON:
