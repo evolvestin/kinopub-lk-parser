@@ -2,7 +2,6 @@ from collections import defaultdict
 from datetime import timedelta
 from hashlib import sha1
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.db.models import Case, CharField, Count, Exists, F, OuterRef, Q, Value, When
@@ -277,7 +276,7 @@ def get_tmdb_missing_status_list(show_type: str):
 
 def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     if profession_stats is None:
-        profession_stats = _calculate_profession_stats_canonical()
+        profession_stats = _calculate_profession_stats()
     professions_stats, en_professions_stats = profession_stats
     duplicate_photo_stats = calculate_duplicate_photo_urls_metric()
     warm_duplicate_photo_urls_cache()
@@ -901,15 +900,21 @@ def _calculate_profession_stats():
 
     rows = (
         ShowCrew.objects.filter(Q(profession__in=known_ru_raw) | Q(en_profession__in=known_en_raw))
-        .values_list('profession', 'en_profession', 'person_id', 'person__master_person_id')
+        .values_list(
+            'profession',
+            'en_profession',
+            'person_id',
+            'person__master_person_id',
+            'canonical_person_id',
+        )
         .iterator(chunk_size=10000)
     )
     ru_persons = defaultdict(set)
     en_persons = defaultdict(set)
     known_masters = set()
 
-    for profession, en_profession, person_id, master_person_id in rows:
-        canonical_id = master_person_id or person_id
+    for profession, en_profession, person_id, master_person_id, canonical_person_id in rows:
+        canonical_id = canonical_person_id or master_person_id or person_id
         norm_ru = ru_raw_to_norm.get(profession)
         if not norm_ru:
             norm_ru = en_to_ru.get(en_raw_to_norm.get(en_profession))
@@ -1014,7 +1019,7 @@ def _calculate_profession_stats_canonical():
 
 
 def calculate_professions_stats_metric():
-    return _calculate_profession_stats_canonical()[0]
+    return _calculate_profession_stats()[0]
     alias_map = _get_alias_map()
     result = []
     all_known_masters = set()
@@ -1243,7 +1248,7 @@ def get_duplicate_photo_urls_list(source_type: str):
 
 
 def calculate_en_professions_stats_metric():
-    return _calculate_profession_stats_canonical()[1]
+    return _calculate_profession_stats()[1]
 
     alias_map = _get_alias_map()
     ru_to_en_map = PROFESSION_TRANS_MAP

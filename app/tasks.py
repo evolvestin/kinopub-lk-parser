@@ -51,13 +51,13 @@ from shared.formatters import format_se
 
 
 @contextmanager
-def _redis_lock(lock_name, timeout):
+def _redis_lock(lock_name, timeout, warn_on_busy=True):
     redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
     # Используем прямой SET NX EX для гарантии атомарности TTL
     # Если команда прошла успешно, ключ ВЫСТАВИТСЯ сразу с временем жизни
     acquired = redis_client.set(f'lock:{lock_name}', 'locked', ex=timeout, nx=True)
 
-    if not acquired:
+    if not acquired and warn_on_busy:
         logging.warning(f'Lock acquisition failed for "{lock_name}". Resource is busy.')
 
     try:
@@ -68,6 +68,31 @@ def _redis_lock(lock_name, timeout):
                 redis_client.delete(f'lock:{lock_name}')
             except Exception as e:
                 logging.warning(f'Failed to release lock {lock_name}: {e}')
+
+
+@contextmanager
+def _wait_for_redis_lock(lock_name, lock_timeout, wait_timeout, interval=15):
+    """Wait for a shared resource lock without starting competing DB work."""
+    deadline = time.monotonic() + wait_timeout
+    announced = False
+
+    while time.monotonic() < deadline:
+        with _redis_lock(lock_name, lock_timeout, warn_on_busy=False) as acquired:
+            if acquired:
+                yield True
+                return
+
+        if not announced:
+            logging.info('Waiting for shared resource lock "%s".', lock_name)
+            announced = True
+        time.sleep(interval)
+
+    logging.error(
+        'Could not acquire shared resource lock "%s" within %s seconds.',
+        lock_name,
+        wait_timeout,
+    )
+    yield False
 
 
 def single_instance_task(lock_name, timeout):
@@ -568,25 +593,42 @@ def sync_poiskkino_ratings_task():
 
 
 @shared_task
-@single_instance_task(lock_name='update_site_metrics_lock', timeout=300)
+@single_instance_task(lock_name='update_site_metrics_lock', timeout=7200)
 @safe_execution
 def update_site_metrics_task():
-    data = generate_global_metrics_snapshot()
-    SiteMetric.objects.create(key='global_snapshot', data=data)
-    cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
-    cache.delete('lock:queuing_global_snapshot')
-    logging.info('Global site metrics snapshot updated successfully.')
+    # Metrics scan app_showcrew/app_person and must not overlap parser writes.
+    # Wait for the existing global resource lock instead of silently dropping
+    # the hourly snapshot when the parser is still active.
+    with _wait_for_redis_lock(
+        RedisLock.SELENIUM_GLOBAL,
+        lock_timeout=7200,
+        wait_timeout=3600,
+    ) as acquired:
+        if not acquired:
+            return
+
+        data = generate_global_metrics_snapshot()
+        SiteMetric.objects.create(key='global_snapshot', data=data)
+        cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
+        cache.delete('lock:queuing_global_snapshot')
+        logging.info('Global site metrics snapshot updated successfully.')
 
 
 @shared_task
-@single_instance_task(lock_name='warm_duplicate_photo_urls', timeout=300)
+@single_instance_task(lock_name='warm_duplicate_photo_urls', timeout=3600)
 @safe_execution
 def warm_duplicate_photo_urls_task():
-    warm_duplicate_photo_urls_cache()
+    with _wait_for_redis_lock(
+        RedisLock.SELENIUM_GLOBAL,
+        lock_timeout=1800,
+        wait_timeout=1800,
+    ) as acquired:
+        if acquired:
+            warm_duplicate_photo_urls_cache()
 
 
 @shared_task
-@single_instance_task(lock_name='warm_person_metric_pages', timeout=900)
+@single_instance_task(lock_name='warm_person_metric_pages', timeout=3600)
 @safe_execution
 def warm_person_metric_pages_task():
     from django.contrib.auth import get_user_model
@@ -594,26 +636,34 @@ def warm_person_metric_pages_task():
 
     from app.views import get_metric_details
 
-    snapshot = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
-    staff_user = get_user_model().objects.filter(is_staff=True).first()
-    if not snapshot or not staff_user:
-        return
+    with _wait_for_redis_lock(
+        RedisLock.SELENIUM_GLOBAL,
+        lock_timeout=1800,
+        wait_timeout=1800,
+    ) as acquired:
+        if not acquired:
+            return
 
-    factory = RequestFactory()
-    for key in PERSON_DETAIL_WARM_KEYS:
-        entries = snapshot.data.get(key, [])
-        if not isinstance(entries, list):
-            continue
-        for entry in entries:
-            value = entry.get('name') or entry.get('type')
-            if not value or not entry.get('value', entry.get('collisions', 0)):
+        snapshot = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
+        staff_user = get_user_model().objects.filter(is_staff=True).first()
+        if not snapshot or not staff_user:
+            return
+
+        factory = RequestFactory()
+        for key in PERSON_DETAIL_WARM_KEYS:
+            entries = snapshot.data.get(key, [])
+            if not isinstance(entries, list):
                 continue
-            request = factory.get(
-                f'/api/metrics/details/{key}/',
-                {'type': value, 'offset': 0, 'limit': 50},
-            )
-            request.user = staff_user
-            get_metric_details(request, key)
+            for entry in entries:
+                value = entry.get('name') or entry.get('type')
+                if not value or not entry.get('value', entry.get('collisions', 0)):
+                    continue
+                request = factory.get(
+                    f'/api/metrics/details/{key}/',
+                    {'type': value, 'offset': 0, 'limit': 50},
+                )
+                request.user = staff_user
+                get_metric_details(request, key)
 
 
 @shared_task
