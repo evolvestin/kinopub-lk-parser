@@ -76,7 +76,7 @@ services:
         fi
       "
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/admin/login/ && python manage.py healthcheck --touch"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/admin/login/ > /dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -102,7 +102,7 @@ services:
       - VITE_DEV_SERVER_HOST=frontend
     command: daphne -b 0.0.0.0 -p 8001 kinopub_parser.asgi:application
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/ || python manage.py healthcheck --touch"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/ > /dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -133,7 +133,7 @@ services:
     networks:
       - kinopub-net
     healthcheck:
-      test: [ "CMD-SHELL", "pgrep -f 'celery worker' && python manage.py healthcheck --touch" ]
+      test: [ "CMD-SHELL", "pgrep -f 'celery worker' > /dev/null" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -154,7 +154,7 @@ services:
     networks:
       - kinopub-net
     healthcheck:
-      test: [ "CMD-SHELL", "pgrep -f 'celery worker' && python manage.py healthcheck --touch" ]
+      test: [ "CMD-SHELL", "pgrep -f 'celery worker' > /dev/null" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -176,7 +176,7 @@ services:
     networks:
       - kinopub-net
     healthcheck:
-      test: [ "CMD-SHELL", "pgrep -f 'celery' && python manage.py healthcheck --touch" ]
+      test: [ "CMD-SHELL", "pgrep -f 'celery beat' > /dev/null" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -254,7 +254,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: python manage.py runhealthdaemon
     healthcheck:
-      test: [ "CMD", "python", "manage.py", "healthcheck" ]
+      test: [ "CMD-SHELL", "find /data -maxdepth 1 -name 'heartbeat_$${HOSTNAME}' -mmin -3 -print -quit | grep -q ." ]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -56,4 +56,5 @@ ENV PATH=/home/app/bin:$PATH \
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD python /app/manage.py healthcheck
+# Services define lightweight, service-specific healthchecks in docker-compose.yml.
+# Do not start a Django process every 30 seconds from the image-level check.

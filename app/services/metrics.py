@@ -325,12 +325,10 @@ def get_global_metrics_history() -> dict:
     except ProgrammingError:
         return {}
 
-    cache_timeout = 60 if settings.DEBUG else 3600
-    if not latest or (now - latest.created_at).total_seconds() > cache_timeout:
-        lock_key = 'lock:queuing_global_snapshot'
-        if not cache.get(lock_key):
-            cache.set(lock_key, True, timeout=300)
-            celery_app.send_task('app.tasks.update_site_metrics_task', queue='metrics')
+    # Snapshots are refreshed by Celery Beat once per hour.  Do not enqueue a
+    # full database-wide recalculation from a user request when the cache is
+    # stale: several requests arriving together can otherwise create repeated
+    # expensive metric work.
 
     if not latest:
         return {}
