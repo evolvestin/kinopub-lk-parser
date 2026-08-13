@@ -30,6 +30,19 @@ Scope: Top of file
 
 Any code generating new database records must follow this "Save-As-Is" architecture.
 
+### Country Boundary-Whitespace Exception
+
+**RULE**: Leading and trailing whitespace in `Country.name` is invalid and MUST be
+removed before persistence. This is the explicit exception to Raw-First: source
+spelling, case, punctuation, and internal whitespace remain unchanged.
+
+1.  **Single source of truth**: `normalize_country_name()` in `app/utils.py`.
+2.  **All write paths**: KinoPub, TMDB, Poiskkino, admin/model saves, and bulk
+    creation paths MUST apply this rule.
+3.  **Database enforcement**: `Country` has a check constraint requiring
+    `name = Trim(name)`, so a missed write path fails loudly instead of creating
+    a visually duplicated country.
+
 
 ## Display-Level Normalization Policy
 

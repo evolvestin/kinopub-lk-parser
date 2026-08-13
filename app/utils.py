@@ -19,6 +19,15 @@ _BROWSER_ONLY_IMAGE_HOSTS = (
 )
 
 
+def normalize_country_name(name: str) -> str:
+    """Remove only leading/trailing whitespace from a country name.
+
+    Country names otherwise remain source-first: spelling, case, punctuation,
+    and internal whitespace are preserved.
+    """
+    return name.strip()
+
+
 def get_proxied_image_url(url: str | None) -> str | None:
     if not url:
         return None

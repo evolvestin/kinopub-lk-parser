@@ -9,6 +9,7 @@ from urllib3.util.retry import Retry
 from app.models import Country, Genre, Person, Show, ShowCrew
 from app.services.person_matching import find_person_for_tmdb
 from app.services.show_duration import upsert_show_duration
+from app.utils import normalize_country_name
 from shared.constants import SHOW_TYPE_MAPPING, ShowType
 
 logger = logging.getLogger(__name__)
@@ -245,6 +246,7 @@ def sync_show_from_tmdb(
     for c_data in details.get('production_countries', []):
         c_name = c_data.get('name')
         if c_name:
+            c_name = normalize_country_name(c_name)
             country_obj, _ = Country.objects.get_or_create(name=c_name)
             show.countries.add(country_obj)
 

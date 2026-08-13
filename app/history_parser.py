@@ -33,7 +33,7 @@ from app.models import (
 from app.services.person_matching import find_person_for_kinopub
 from app.services.show_duration import upsert_show_duration
 from app.signals import view_history_created
-from app.utils import enqueue_show_update
+from app.utils import enqueue_show_update, normalize_country_name
 from kinopub_parser import celery_app
 from shared.constants import (
     DATE_FORMAT,
@@ -318,6 +318,8 @@ def update_show_details(driver, kinopub_id, force=False, session_type=ParserSess
                 for el in elements:
                     name = el.get_attribute('textContent').strip()
                     if name:
+                        if model is Country:
+                            name = normalize_country_name(name)
                         obj, _ = model.objects.update_or_create(name=name)
                         related_objects.append(obj)
                 relation.set(related_objects)

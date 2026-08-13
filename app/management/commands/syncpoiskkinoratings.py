@@ -10,6 +10,7 @@ from app.management.base import LoggableBaseCommand
 from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew
 from app.services.poiskkino_client import PoiskkinoClient
 from app.tasks import get_kp_mapping
+from app.utils import normalize_country_name
 from shared.constants import SHOW_STATUS_MAPPING, RedisQueue
 
 FREE_DAILY_REQUEST_LIMIT = 200
@@ -267,7 +268,10 @@ class Command(LoggableBaseCommand):
 
         all_genre_names = {g['name'] for item in data_map.values() for g in item.get('genres', [])}
         all_country_names = {
-            c['name'] for item in data_map.values() for c in item.get('countries', [])
+            normalize_country_name(c['name'])
+            for item in data_map.values()
+            for c in item.get('countries', [])
+            if c.get('name')
         }
         all_person_names = {
             p['name']
@@ -367,7 +371,8 @@ class Command(LoggableBaseCommand):
             api_countries = item.get('countries', [])
             if api_countries:
                 for country_data in api_countries:
-                    if country := existing_countries.get(country_data['name']):
+                    country_name = normalize_country_name(country_data.get('name', ''))
+                    if country := existing_countries.get(country_name):
                         show.countries.add(country)
 
             for person_data in item.get('persons', []):

@@ -5,9 +5,9 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
 from django.db.models import JSONField, Q
-from django.db.models.functions import Upper
+from django.db.models.functions import Trim, Upper
 
-from app.utils import format_user_for_rating, get_proxied_image_url
+from app.utils import format_user_for_rating, get_proxied_image_url, normalize_country_name
 from shared.constants import (
     DATETIME_FORMAT,
     PROFESSION_TRANS_MAP,
@@ -48,6 +48,10 @@ class Country(BaseModel):
     )
     emoji_flag = models.CharField(max_length=20, null=True, blank=True, help_text='Emoji flag')
 
+    def save(self, *args, **kwargs):
+        self.name = normalize_country_name(self.name)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         if self.emoji_flag:
             return f'{self.emoji_flag} {self.name}'
@@ -56,6 +60,12 @@ class Country(BaseModel):
     class Meta:
         verbose_name = 'Country'
         verbose_name_plural = 'Countries'
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(name=Trim('name')),
+                name='country_name_no_outer_whitespace',
+            )
+        ]
 
 
 class Genre(BaseModel):
