@@ -25,6 +25,7 @@ class RemoteBrowserDriverTests(TestCase):
             self.response({'status': 'succeeded', 'result': None}),
             self.response({'status': 'succeeded', 'result': {'element_id': 'element-1'}}),
             self.response({'status': 'succeeded', 'result': 'Title'}),
+            self.response({'status': 'succeeded', 'result': True}),
         ]
 
         driver = RemoteBrowserDriver(
@@ -33,7 +34,8 @@ class RemoteBrowserDriverTests(TestCase):
         element = driver.find_element('css selector', '.title')
 
         self.assertEqual(element.text, 'Title')
-        self.assertEqual(http.post.call_count, 3)
+        self.assertTrue(element.is_enabled())
+        self.assertEqual(http.post.call_count, 4)
         self.assertEqual(
             http.post.call_args_list[1].kwargs['json'],
             {

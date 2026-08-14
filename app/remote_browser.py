@@ -243,3 +243,6 @@ class RemoteWebElement:
 
     def is_displayed(self):
         return self.driver._submit('element_is_displayed', {'element_id': self.element_id})
+
+    def is_enabled(self):
+        return self.driver._submit('element_is_enabled', {'element_id': self.element_id})
