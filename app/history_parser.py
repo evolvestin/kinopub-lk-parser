@@ -664,7 +664,7 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
         except TimeoutException:
             logging.warning('Session is invalid or expired. Attempting to log in...')
             driver.get(f'{target_url}user/login')
-            if do_login(driver, login, password, cookie_path, target_url):
+            if do_login(driver, login, password, None, target_url):
                 return driver
             else:
                 logging.error('Login process failed. Unable to establish a session.')
