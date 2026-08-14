@@ -250,12 +250,6 @@ def backup_database():
     logging.error('Backup was not started after waiting one hour for Selenium lock.')
 
 
-@shared_task
-@single_instance_task(lock_name=RedisLock.COOKIES_BACKUP, timeout=60)
-def backup_cookies():
-    BackupManager().perform_cookies_backup()
-
-
 def _execute_admin_command_process(celery_task_id, task_run):
     task_run.status = TaskRunStatus.RUNNING
     task_run.celery_task_id = celery_task_id

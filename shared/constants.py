@@ -15,7 +15,6 @@ class RedisQueue(StrEnum):
 class RedisLock(StrEnum):
     SELENIUM_GLOBAL = 'selenium_global_lock'
     BACKUP = 'backup_lock'
-    COOKIES_BACKUP = 'cookies_backup_lock'
     PROCESS_QUEUES = 'process_queues_lock'
     FETCH_PERSON_PHOTOS = 'fetch_person_photos_lock'
     SYNC_POISKKINO_RATINGS = 'sync_poiskkino_ratings'

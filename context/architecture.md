@@ -125,7 +125,7 @@ spelling, case, punctuation, and internal whitespace remain unchanged.
 
 1. **Implementation**:
     * In `perform_backup`, database upload to Google Drive must be skipped if `settings.ENVIRONMENT` is `'DEV'` or if `settings.LOCAL_RUN` is `True`.
-    * Cookie backups and restores (`perform_cookies_backup` and `restore_from_backup`) remain fully functional across environments to ensure unified session states.
+    * Browser execution and cookie persistence are provided by the AssetHub browser gateway. Kinopub no longer starts Chromium or stores local cookie files; the gateway owns one profile-aware cookie vault.
 
 
 ## Internal Rating Calculation Policy

@@ -254,7 +254,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: python manage.py runhealthdaemon
     healthcheck:
-      test: [ "CMD-SHELL", "find /data -maxdepth 1 -name 'heartbeat_$${HOSTNAME}' -mmin -3 -print -quit | grep -q ." ]
+      test: [ "CMD-SHELL", "find /data -maxdepth 1 -name \"heartbeat_$${HOSTNAME}\" -mmin -3 -print -quit | grep -q ." ]
       interval: 30s
       timeout: 10s
       retries: 3

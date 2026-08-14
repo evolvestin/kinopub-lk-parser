@@ -111,7 +111,7 @@ class BackupManager:
             return False
 
     def perform_backup(self):
-        data_dir = str(settings.COOKIES_FILE_PATH_MAIN.parent)
+        data_dir = str(settings.DB_PATH.parent)
 
         last_timestamp_file = os.path.join(data_dir, 'last_db_backup_ts')
         last_backup_timestamp = 0.0
@@ -206,22 +206,7 @@ class BackupManager:
                 logging.info(f'Removed temporary backup file: {backup_file_path}')
 
     def perform_cookies_backup(self):
-        logging.info('Starting cookies backup process...')
-        drive = self._get_drive_service()
-        if not drive:
-            logging.error('Could not get Google Drive service. Cookies backup aborted.')
-            return
-
-        cookie_files = [
-            (settings.COOKIES_FILE_PATH_MAIN, settings.COOKIES_BACKUP_FILENAME_MAIN),
-            (settings.COOKIES_FILE_PATH_AUX, settings.COOKIES_BACKUP_FILENAME_AUX),
-        ]
-
-        for local_path, remote_name in cookie_files:
-            if os.path.exists(local_path):
-                self._upload_file(drive, local_path, remote_name)
-            else:
-                logging.warning(f'Cookies file {local_path} not found locally. Skipping.')
+        logging.info('Cookie backup skipped: cookies are owned by the AssetHub browser gateway.')
 
     def restore_from_backup(self):
         logging.info('Attempting to download files from Google Drive for restore...')
@@ -230,7 +215,7 @@ class BackupManager:
             logging.error('Could not get Google Drive service. Restore aborted.')
             return None
 
-        data_dir = str(settings.COOKIES_FILE_PATH_MAIN.parent)
+        data_dir = str(settings.DB_PATH.parent)
         os.makedirs(data_dir, exist_ok=True)
         db_backup_path = os.path.join(data_dir, settings.DB_BACKUP_FILENAME)
 
@@ -239,12 +224,5 @@ class BackupManager:
                 'Database backup file not found on Google Drive. Restore cannot proceed.'
             )
             return None
-
-        self._download_file(
-            drive, settings.COOKIES_BACKUP_FILENAME_MAIN, settings.COOKIES_FILE_PATH_MAIN
-        )
-        self._download_file(
-            drive, settings.COOKIES_BACKUP_FILENAME_AUX, settings.COOKIES_FILE_PATH_AUX
-        )
 
         return db_backup_path

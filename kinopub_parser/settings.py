@@ -17,14 +17,9 @@ else:
     data_dir = BASE_DIR / 'data'
 os.makedirs(data_dir, exist_ok=True)
 
-COOKIES_FILE_PATH_MAIN = data_dir / 'cookies_main.json'
-COOKIES_FILE_PATH_AUX = data_dir / 'cookies_aux.json'
-
 GOOGLE_DRIVE_CREDENTIALS_JSON = os.getenv('GOOGLE_DRIVE_CREDENTIALS_JSON')
 GOOGLE_DRIVE_FOLDER_ID = '1mpco3I0v22hTklleYJkZZh0VNlhol9L3'
 DB_BACKUP_FILENAME = os.getenv('DB_BACKUP_FILENAME', 'data.json')
-COOKIES_BACKUP_FILENAME_MAIN = os.getenv('COOKIES_BACKUP_FILENAME_MAIN', 'cookies_main.json')
-COOKIES_BACKUP_FILENAME_AUX = os.getenv('COOKIES_BACKUP_FILENAME_AUX', 'cookies_aux.json')
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760
@@ -272,6 +267,9 @@ SITE_URL = os.getenv('SITE_URL')
 KINOPUB_AUX_LOGIN = os.getenv('KINOPUB_AUX_LOGIN')
 KINOPUB_AUX_PASSWORD = os.getenv('KINOPUB_AUX_PASSWORD')
 SITE_AUX_URL = os.getenv('SITE_AUX_URL')
+BROWSER_GATEWAY_URL = os.getenv('BROWSER_GATEWAY_URL', '').strip()
+BROWSER_GATEWAY_TOKEN = os.getenv('BROWSER_GATEWAY_TOKEN', '').strip()
+BROWSER_GATEWAY_TASK_TIMEOUT_SECONDS = int(os.getenv('BROWSER_GATEWAY_TASK_TIMEOUT_SECONDS', '900'))
 
 POSTER_BASE_URL = os.getenv('POSTER_BASE_URL', 'https://google.com/')
 TMDB_API_KEY = os.getenv('TMDB_API_KEY')

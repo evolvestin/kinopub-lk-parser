@@ -1,5 +1,4 @@
 import logging
-import subprocess
 
 from django.conf import settings
 from django.core.cache import cache
@@ -67,9 +66,6 @@ class Command(LoggableBaseCommand):
                     celery_app.control.purge()
                 except Exception:
                     pass
-
-            subprocess.run(['pkill', '-f', 'chromium'], stderr=subprocess.DEVNULL)
-            subprocess.run(['pkill', '-f', 'chromedriver'], stderr=subprocess.DEVNULL)
 
             logging.info(
                 f'Resetlocks completed. Keys deleted: {removed_locks_count}, '

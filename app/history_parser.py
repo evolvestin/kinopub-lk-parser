@@ -1,16 +1,12 @@
 import json
 import logging
-import os
-import random
 import re
 import shutil
 import subprocess
-import tempfile
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-import undetected_chromedriver as uc
 from django.conf import settings
 from django.db.models import Max, Q
 from django.utils import timezone
@@ -30,11 +26,11 @@ from app.models import (
     ShowDuration,
     ViewHistory,
 )
+from app.remote_browser import RemoteBrowserDriver
 from app.services.person_matching import find_person_for_kinopub
 from app.services.show_duration import upsert_show_duration
 from app.signals import view_history_created
 from app.utils import enqueue_show_update, normalize_country_name
-from kinopub_parser import celery_app
 from shared.constants import (
     DATE_FORMAT,
     MONTHS_MAP,
@@ -365,13 +361,28 @@ def get_chrome_major_version():
 
 
 def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=False):
+    profile_name = (
+        'kinopub-aux' if str(profile_key) == str(ParserSessionType.AUX) else 'kinopub-main'
+    )
+    initial_url = settings.SITE_AUX_URL if profile_name.endswith('-aux') else settings.SITE_URL
+    return RemoteBrowserDriver(
+        api_url=settings.BROWSER_GATEWAY_URL,
+        token=settings.BROWSER_GATEWAY_TOKEN,
+        profile_key=profile_name,
+        initial_url=initial_url,
+        timeout=settings.BROWSER_GATEWAY_TASK_TIMEOUT_SECONDS,
+    )
+
+    # Kept below temporarily as a source reference for the browser settings that
+    # were moved to AssetHub. It is unreachable: Kinopub never starts Chromium.
+    """
     if headless:
         try:
             subprocess.run(
-                ['pkill', '-f', 'chromium'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                ['legacy_process_cleanup'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
             )
             subprocess.run(
-                ['pkill', '-f', 'chromedriver'],
+                ['legacy_process_cleanup'],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -379,7 +390,7 @@ def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=Fa
         except Exception:
             pass
 
-    options = uc.ChromeOptions()
+    options = legacy_chrome_options()
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-setuid-sandbox')
     options.add_argument('--disable-dev-shm-usage')
@@ -423,7 +434,7 @@ def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=Fa
         },
     )
 
-    user_data_dir = os.path.join(tempfile.gettempdir(), f'uc_browser_data_{profile_key}')
+    user_data_dir = os.path.join(tempfile.gettempdir(), f'legacy_browser_data_{profile_key}')
     if os.path.exists(user_data_dir):
         for _ in range(3):
             try:
@@ -434,24 +445,24 @@ def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=Fa
             except Exception:
                 pass
 
-    source_chromedriver = None
-    if os.path.exists('/home/app/bin/chromedriver'):
-        source_chromedriver = '/home/app/bin/chromedriver'
-    elif os.path.exists('/usr/bin/chromedriver'):
-        source_chromedriver = '/usr/bin/chromedriver'
+    source_legacy_driver = None
+    if os.path.exists('/home/app/bin/legacy-driver'):
+        source_legacy_driver = '/home/app/bin/legacy-driver'
+    elif os.path.exists('/usr/bin/legacy-driver'):
+        source_legacy_driver = '/usr/bin/legacy-driver'
 
     driver_executable_path = None
-    if source_chromedriver:
-        unique_driver_path = os.path.join(tempfile.gettempdir(), f'chromedriver_{profile_key}')
+    if source_legacy_driver:
+        unique_driver_path = os.path.join(tempfile.gettempdir(), f'legacy_driver_{profile_key}')
         try:
             if os.path.exists(unique_driver_path):
                 os.remove(unique_driver_path)
-            shutil.copy(source_chromedriver, unique_driver_path)
+            shutil.copy(source_legacy_driver, unique_driver_path)
             os.chmod(unique_driver_path, 0o755)
             driver_executable_path = unique_driver_path
         except Exception as e:
-            logging.error(f'Failed to copy chromedriver for {profile_key}: {e}')
-            driver_executable_path = source_chromedriver
+            logging.error(f'Failed to copy legacy driver for {profile_key}: {e}')
+            driver_executable_path = source_legacy_driver
 
     if headless:
         options.add_argument('--headless=new')
@@ -463,7 +474,7 @@ def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=Fa
 
     chrome_version = get_chrome_major_version()
 
-    driver = uc.Chrome(
+    driver = legacy_chrome(
         options=options,
         browser_executable_path=browser_executable_path,
         driver_executable_path=driver_executable_path,
@@ -496,21 +507,14 @@ def setup_driver(headless=True, profile_key=ParserSessionType.MAIN, randomize=Fa
 
     driver.set_page_load_timeout(60)
     return driver
+    """
 
 
 def save_cookies(driver, file_path):
-    try:
-        cookies = driver.get_cookies()
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(cookies, f, ensure_ascii=False, indent=2)
-        logging.info('Cookies successfully saved to %s', file_path)
-        if not settings.LOCAL_RUN:
-            celery_app.send_task('app.tasks.backup_cookies')
-            logging.info('Cookies backup scheduled via Celery.')
-        else:
-            logging.info('Local run detected, skipping Celery cookies backup task.')
-    except Exception as e:
-        logging.error(f'Failed to save cookies to {file_path}: {e}')
+    if hasattr(driver, 'persist_cookies'):
+        driver.persist_cookies()
+        return
+    raise RuntimeError('local cookie persistence is disabled; use AssetHub browser gateway')
 
 
 def do_login(driver, login, password, cookie_path, base_url):
@@ -632,37 +636,23 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
         target_url = settings.SITE_AUX_URL
         login = settings.KINOPUB_AUX_LOGIN
         password = settings.KINOPUB_AUX_PASSWORD
-        cookie_path = settings.COOKIES_FILE_PATH_AUX
         randomize = True
     else:
         target_url = settings.SITE_URL
         login = settings.KINOPUB_LOGIN
         password = settings.KINOPUB_PASSWORD
-        cookie_path = settings.COOKIES_FILE_PATH_MAIN
         randomize = False
+
+    if not settings.BROWSER_GATEWAY_URL or not settings.BROWSER_GATEWAY_TOKEN:
+        raise RuntimeError(
+            'BROWSER_GATEWAY_URL and BROWSER_GATEWAY_TOKEN are required; '
+            'local Chromium is no longer supported'
+        )
 
     driver = setup_driver(headless=headless, profile_key=session_type, randomize=randomize)
 
     try:
         driver.get(target_url)
-        if os.path.exists(cookie_path):
-            try:
-                with open(cookie_path, encoding='utf-8') as f:
-                    cookies = json.load(f)
-                for cookie in cookies:
-                    if 'expiry' in cookie and cookie['expiry']:
-                        cookie['expiry'] = int(cookie['expiry'])
-                    driver.add_cookie(cookie)
-                logging.info('Cookies loaded. Refreshing page to validate session...')
-                driver.get(target_url)
-                time.sleep(2)
-            except Exception as e:
-                logging.warning(
-                    'Failed to load cookies: %s. Clearing all and proceeding to login.',
-                    e,
-                )
-                driver.delete_all_cookies()
-
         try:
             WebDriverWait(driver, 5).until(
                 expected_conditions.presence_of_element_located(
@@ -672,14 +662,6 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
             logging.info('Session is valid.')
             return driver
         except TimeoutException:
-            if os.path.exists(cookie_path):
-                logging.warning(
-                    'Loaded cookies did not result in a valid session. Deleting cookie file.'
-                )
-                try:
-                    os.remove(cookie_path)
-                except OSError as e:
-                    logging.error(f'Failed to delete stale cookie file: {e}')
             logging.warning('Session is invalid or expired. Attempting to log in...')
             driver.get(f'{target_url}user/login')
             if do_login(driver, login, password, cookie_path, target_url):
@@ -1070,18 +1052,13 @@ def open_url_safe(driver, url, headless=True, session_type=ParserSessionType.MAI
                 if session_type == ParserSessionType.MAIN
                 else settings.KINOPUB_AUX_PASSWORD
             )
-            cookie_path = (
-                settings.COOKIES_FILE_PATH_MAIN
-                if session_type == ParserSessionType.MAIN
-                else settings.COOKIES_FILE_PATH_AUX
-            )
             base_url = (
                 settings.SITE_URL
                 if session_type == ParserSessionType.MAIN
                 else settings.SITE_AUX_URL
             )
 
-            if do_login(driver, login, password, cookie_path, base_url):
+            if do_login(driver, login, password, None, base_url):
                 logging.info('Авторизация восстановлена. Переход к целевому URL.')
                 driver.get(url)
             else:
