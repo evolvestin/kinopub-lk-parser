@@ -66,3 +66,31 @@ class RemoteBrowserDriverTests(TestCase):
 
         with self.assertRaises(NoSuchElementException):
             driver.find_element('id', 'missing')
+
+    @patch('app.remote_browser.requests.Session')
+    def test_inactive_session_is_reopened_and_command_is_retried(self, session_cls):
+        http = session_cls.return_value
+        http.post.side_effect = [
+            self.response(
+                {'session_id': 'session-1', 'task_id': 'task-open-1', 'status': 'queued'}
+            ),
+            self.response({'error': 'browser session is not active'}, status=400),
+            self.response(
+                {'session_id': 'session-2', 'task_id': 'task-open-2', 'status': 'queued'}
+            ),
+            self.response({'task_id': 'task-find', 'status': 'queued'}, status=202),
+        ]
+        http.get.side_effect = [
+            self.response({'status': 'succeeded', 'result': None}),
+            self.response({'status': 'succeeded', 'result': None}),
+            self.response({'status': 'succeeded', 'result': {'element_id': 'element-2'}}),
+        ]
+
+        driver = RemoteBrowserDriver(
+            'http://assethub/', 'secret', 'kinopub-main', 'https://kinopub.example/'
+        )
+        element = driver.find_element('css selector', '.title')
+
+        self.assertEqual(element.element_id, 'element-2')
+        self.assertEqual(driver.session_id, 'session-2')
+        self.assertEqual(http.post.call_count, 4)

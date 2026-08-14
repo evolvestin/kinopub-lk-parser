@@ -1,3 +1,4 @@
+import logging
 import time
 from urllib.parse import urljoin
 
@@ -15,6 +16,9 @@ class RemoteBrowserError(WebDriverException):
     pass
 
 
+logger = logging.getLogger(__name__)
+
+
 class RemoteBrowserDriver:
     """Small Selenium-compatible facade backed by AssetHub's queued browser API."""
 
@@ -26,16 +30,8 @@ class RemoteBrowserDriver:
         self.http = requests.Session()
         self.session_id = None
         self._closed = False
-        response = self.http.post(
-            urljoin(self.api_url, 'api/v1/browser/sessions/'),
-            headers=self._headers(),
-            json={'profile_key': profile_key, 'initial_url': initial_url},
-            timeout=30,
-        )
-        self._raise_http(response)
-        data = response.json()
-        self.session_id = data['session_id']
-        self._wait(data['task_id'])
+        self._last_url = initial_url
+        self._start_session(initial_url)
 
     def _headers(self):
         return {'X-AssetHub-Browser-Token': self.token}
@@ -48,7 +44,32 @@ class RemoteBrowserDriver:
                 message = response.text
             raise RemoteBrowserError(f'AssetHub browser API HTTP {response.status_code}: {message}')
 
-    def _submit(self, command, payload=None):
+    def _start_session(self, initial_url):
+        response = self.http.post(
+            urljoin(self.api_url, 'api/v1/browser/sessions/'),
+            headers=self._headers(),
+            json={'profile_key': self.profile_key, 'initial_url': initial_url},
+            timeout=30,
+        )
+        self._raise_http(response)
+        data = response.json()
+        self.session_id = data['session_id']
+        self._wait(data['task_id'])
+
+    def _reopen_session(self):
+        self._closed = False
+        self._start_session(self._last_url)
+
+    @staticmethod
+    def _is_inactive_response(response):
+        if response.status_code != 400:
+            return False
+        try:
+            return response.json().get('error') == 'browser session is not active'
+        except ValueError:
+            return False
+
+    def _submit(self, command, payload=None, recover=True):
         if self._closed or not self.session_id:
             raise InvalidSessionIdException('remote browser session is closed')
         response = self.http.post(
@@ -57,6 +78,19 @@ class RemoteBrowserDriver:
             json={'command': command, 'payload': payload or {}},
             timeout=30,
         )
+        if recover and command != 'close' and self._is_inactive_response(response):
+            logger.warning(
+                'AssetHub browser session %s is inactive; reopening profile %s',
+                self.session_id,
+                self.profile_key,
+            )
+            self._reopen_session()
+            response = self.http.post(
+                urljoin(self.api_url, f'api/v1/browser/sessions/{self.session_id}/tasks/'),
+                headers=self._headers(),
+                json={'command': command, 'payload': payload or {}},
+                timeout=30,
+            )
         self._raise_http(response)
         return self._wait(response.json()['task_id'])
 
@@ -104,7 +138,9 @@ class RemoteBrowserDriver:
         return self._submit('get_page_source')
 
     def get(self, url):
-        return self._submit('navigate', {'url': url})
+        result = self._submit('navigate', {'url': url})
+        self._last_url = url
+        return result
 
     def refresh(self):
         return self._submit('navigate', {'url': self.current_url})
@@ -147,7 +183,7 @@ class RemoteBrowserDriver:
         if self._closed:
             return
         try:
-            self._submit('close')
+            self._submit('close', recover=False)
         finally:
             self._closed = True
             self.http.close()
