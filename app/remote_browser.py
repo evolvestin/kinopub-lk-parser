@@ -69,6 +69,18 @@ class RemoteBrowserDriver:
         except ValueError:
             return False
 
+    @staticmethod
+    def _uses_element_reference(command, payload):
+        if command.startswith('element_'):
+            return True
+        if isinstance(payload, dict):
+            if '__element_id__' in payload:
+                return True
+            return any(RemoteBrowserDriver._uses_element_reference('', value) for value in payload.values())
+        if isinstance(payload, list):
+            return any(RemoteBrowserDriver._uses_element_reference('', value) for value in payload)
+        return False
+
     def _submit(self, command, payload=None, recover=True):
         if self._closed or not self.session_id:
             raise InvalidSessionIdException('remote browser session is closed')
@@ -85,6 +97,10 @@ class RemoteBrowserDriver:
                 self.profile_key,
             )
             self._reopen_session()
+            if self._uses_element_reference(command, payload or {}):
+                raise StaleElementReferenceException(
+                    'browser element reference was invalidated by session recovery'
+                )
             response = self.http.post(
                 urljoin(self.api_url, f'api/v1/browser/sessions/{self.session_id}/tasks/'),
                 headers=self._headers(),
@@ -123,6 +139,8 @@ class RemoteBrowserDriver:
             raise TimeoutException(message)
         if error_type.endswith('InvalidSessionIdException'):
             raise InvalidSessionIdException(message)
+        if error_type.endswith('RuntimeError') and message == 'browser element reference is stale':
+            raise StaleElementReferenceException(message)
         raise RemoteBrowserError(message)
 
     @property

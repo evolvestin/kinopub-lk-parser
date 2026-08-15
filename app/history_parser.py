@@ -10,7 +10,11 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.db.models import Max, Q
 from django.utils import timezone
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    StaleElementReferenceException,
+    TimeoutException,
+)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
@@ -97,7 +101,13 @@ def _extract_int_from_string(text):
     return int(digits)
 
 
-def update_show_details(driver, kinopub_id, force=False, session_type=ParserSessionType.MAIN):
+def update_show_details(
+    driver,
+    kinopub_id,
+    force=False,
+    session_type=ParserSessionType.MAIN,
+    _stale_retry=True,
+):
     target_path = f'item/view/{kinopub_id}'
     base_url = (
         settings.SITE_URL if session_type == ParserSessionType.MAIN else settings.SITE_AUX_URL
@@ -108,6 +118,28 @@ def update_show_details(driver, kinopub_id, force=False, session_type=ParserSess
             driver, f'{base_url.rstrip("/")}/{target_path}', session_type=session_type
         )
         time.sleep(2)
+    except StaleElementReferenceException as e:
+        if _stale_retry:
+            logging.warning(
+                'Stale browser element while updating show %s; reopening page once.',
+                kinopub_id,
+            )
+            refreshed_driver = open_url_safe(
+                driver,
+                f'{base_url.rstrip("/")}/{target_path}',
+                session_type=session_type,
+            )
+            return update_show_details(
+                refreshed_driver,
+                kinopub_id,
+                force=force,
+                session_type=session_type,
+                _stale_retry=False,
+            )
+        logging.error(
+            f'An error occurred while updating show details for kinopub_id={kinopub_id}: {e}'
+        )
+        raise
     except Exception as e:
         logging.error(f'Error navigating to show page {kinopub_id}: {e}')
         return
