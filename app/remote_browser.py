@@ -16,11 +16,17 @@ class RemoteBrowserError(WebDriverException):
     pass
 
 
+class BrowserSessionReplacedError(RemoteBrowserError):
+    """The gateway discarded this session because another one was opened."""
+
+
 logger = logging.getLogger(__name__)
 
 
 class RemoteBrowserDriver:
     """Small Selenium-compatible facade backed by AssetHub's queued browser API."""
+
+    SESSION_RECOVERY_ATTEMPTS = 3
 
     def __init__(self, api_url, token, profile_key, initial_url, timeout=900):
         self.api_url = api_url.rstrip('/') + '/'
@@ -45,16 +51,35 @@ class RemoteBrowserDriver:
             raise RemoteBrowserError(f'AssetHub browser API HTTP {response.status_code}: {message}')
 
     def _start_session(self, initial_url):
-        response = self.http.post(
-            urljoin(self.api_url, 'api/v1/browser/sessions/'),
-            headers=self._headers(),
-            json={'profile_key': self.profile_key, 'initial_url': initial_url},
-            timeout=30,
-        )
-        self._raise_http(response)
-        data = response.json()
-        self.session_id = data['session_id']
-        self._wait(data['task_id'])
+        self._last_url = initial_url
+        last_error = None
+        for attempt in range(1, self.SESSION_RECOVERY_ATTEMPTS + 1):
+            response = self.http.post(
+                urljoin(self.api_url, 'api/v1/browser/sessions/'),
+                headers=self._headers(),
+                json={'profile_key': self.profile_key, 'initial_url': initial_url},
+                timeout=30,
+            )
+            self._raise_http(response)
+            data = response.json()
+            self.session_id = data['session_id']
+            try:
+                self._wait(data['task_id'])
+                return
+            except BrowserSessionReplacedError as exc:
+                last_error = exc
+                if attempt == self.SESSION_RECOVERY_ATTEMPTS:
+                    raise
+                logger.warning(
+                    'AssetHub replaced session %s while opening profile %s; retrying (%d/%d)',
+                    self.session_id,
+                    self.profile_key,
+                    attempt,
+                    self.SESSION_RECOVERY_ATTEMPTS - 1,
+                )
+                time.sleep(0.2 * attempt)
+        if last_error:
+            raise last_error
 
     def _reopen_session(self):
         self._closed = False
@@ -96,19 +121,51 @@ class RemoteBrowserDriver:
                 self.session_id,
                 self.profile_key,
             )
-            self._reopen_session()
-            if self._uses_element_reference(command, payload or {}):
-                raise StaleElementReferenceException(
-                    'browser element reference was invalidated by session recovery'
-                )
-            response = self.http.post(
-                urljoin(self.api_url, f'api/v1/browser/sessions/{self.session_id}/tasks/'),
-                headers=self._headers(),
-                json={'command': command, 'payload': payload or {}},
-                timeout=30,
+            return self._recover_and_retry(command, payload)
+        self._raise_http(response)
+        try:
+            return self._wait(response.json()['task_id'])
+        except BrowserSessionReplacedError:
+            if not recover or command == 'close':
+                raise
+            logger.warning(
+                'AssetHub replaced session %s while running %s; reopening profile %s',
+                self.session_id,
+                command,
+                self.profile_key,
             )
+            return self._recover_and_retry(command, payload)
+
+    def _recover_and_retry(self, command, payload):
+        self._reopen_session()
+        if self._uses_element_reference(command, payload or {}):
+            raise StaleElementReferenceException(
+                'browser element reference was invalidated by session recovery'
+            )
+        response = self.http.post(
+            urljoin(self.api_url, f'api/v1/browser/sessions/{self.session_id}/tasks/'),
+            headers=self._headers(),
+            json={'command': command, 'payload': payload or {}},
+            timeout=30,
+        )
         self._raise_http(response)
         return self._wait(response.json()['task_id'])
+
+    def _cancel_task(self, task_id):
+        try:
+            response = self.http.delete(
+                urljoin(self.api_url, f'api/v1/browser/tasks/{task_id}/'),
+                headers=self._headers(),
+                timeout=30,
+            )
+            if response.status_code >= 400:
+                logger.warning(
+                    'Could not cancel AssetHub browser task %s: HTTP %s',
+                    task_id,
+                    response.status_code,
+                )
+        except requests.RequestException as exc:
+            logger.warning('Could not cancel AssetHub browser task %s: %s', task_id, exc)
 
     def _wait(self, task_id):
         deadline = time.monotonic() + self.timeout
@@ -124,13 +181,20 @@ class RemoteBrowserDriver:
                 return data.get('result')
             if data['status'] == 'failed':
                 self._raise_remote_task(data)
+            if data['status'] == 'cancelled':
+                raise RemoteBrowserError(
+                    data.get('error', {}).get('message', 'remote browser task cancelled')
+                )
             time.sleep(0.2)
+        self._cancel_task(task_id)
         raise TimeoutException(f'AssetHub browser task {task_id} timed out')
 
     @staticmethod
     def _raise_remote_task(data):
         message = data.get('error', {}).get('message', 'remote browser task failed')
         error_type = data.get('error', {}).get('type', '')
+        if RemoteBrowserDriver._is_session_replaced_error(error_type, message):
+            raise BrowserSessionReplacedError(message)
         if error_type.endswith('NoSuchElementException'):
             raise NoSuchElementException(message)
         if error_type.endswith('StaleElementReferenceException'):
@@ -142,6 +206,18 @@ class RemoteBrowserDriver:
         if error_type.endswith('RuntimeError') and message == 'browser element reference is stale':
             raise StaleElementReferenceException(message)
         raise RemoteBrowserError(message)
+
+    @staticmethod
+    def _is_session_replaced_error(error_type, message):
+        error_type = str(error_type or '')
+        message = str(message or '').lower()
+        return (
+            error_type.endswith('SessionReplaced')
+            or error_type.endswith('SessionRestarted')
+            or 'browser session was replaced by a newer session' in message
+            or 'browser worker restarted; create a new session' in message
+            or 'browser session is not available in this worker' in message
+        )
 
     @property
     def current_url(self):

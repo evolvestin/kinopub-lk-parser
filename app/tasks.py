@@ -6,7 +6,9 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import uuid
 from contextlib import contextmanager
 from datetime import timedelta
 
@@ -50,24 +52,74 @@ from shared.constants import (
 from shared.formatters import format_se
 
 
+_RELEASE_LOCK_SCRIPT = """
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('del', KEYS[1])
+end
+return 0
+"""
+
+_RENEW_LOCK_SCRIPT = """
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('expire', KEYS[1], ARGV[2])
+end
+return 0
+"""
+
+
 @contextmanager
 def _redis_lock(lock_name, timeout, warn_on_busy=True):
     redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
-    # Используем прямой SET NX EX для гарантии атомарности TTL
-    # Если команда прошла успешно, ключ ВЫСТАВИТСЯ сразу с временем жизни
-    acquired = redis_client.set(f'lock:{lock_name}', 'locked', ex=timeout, nx=True)
+    lock_key = f'lock:{lock_name}'
+    lock_token = uuid.uuid4().hex
+    acquired = redis_client.set(lock_key, lock_token, ex=timeout, nx=True)
 
     if not acquired and warn_on_busy:
         logging.warning(f'Lock acquisition failed for "{lock_name}". Resource is busy.')
 
+    heartbeat_stop = threading.Event()
+    heartbeat_thread = None
+    heartbeat_interval = max(1, min(timeout / 3, 30))
+
+    if acquired:
+        def renew_lock():
+            while not heartbeat_stop.wait(heartbeat_interval):
+                try:
+                    renewed = redis_client.eval(
+                        _RENEW_LOCK_SCRIPT,
+                        1,
+                        lock_key,
+                        lock_token,
+                        timeout,
+                    )
+                    if not renewed:
+                        logging.error('Lost ownership of Redis lock "%s".', lock_name)
+                        return
+                except Exception as e:
+                    logging.warning('Failed to renew Redis lock %s: %s', lock_name, e)
+
+        heartbeat_thread = threading.Thread(
+            target=renew_lock,
+            name=f'redis-lock-{lock_name}',
+            daemon=True,
+        )
+        heartbeat_thread.start()
+
     try:
         yield acquired
     finally:
+        if heartbeat_thread is not None:
+            heartbeat_stop.set()
+            heartbeat_thread.join(timeout=min(heartbeat_interval + 1, 5))
         if acquired:
             try:
-                redis_client.delete(f'lock:{lock_name}')
+                redis_client.eval(_RELEASE_LOCK_SCRIPT, 1, lock_key, lock_token)
             except Exception as e:
                 logging.warning(f'Failed to release lock {lock_name}: {e}')
+        try:
+            redis_client.close()
+        except Exception:
+            pass
 
 
 @contextmanager
@@ -139,13 +191,14 @@ def safe_execution(func):
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.SELENIUM_GLOBAL, timeout=7200)
+@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=7200)
 def run_history_parser_task():
     logging.info('Starting periodic history parser task.')
     history_parser.run_parser_session()
 
 
 @shared_task
+@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=14400)
 @safe_execution
 def run_full_scan_task():
     logging.info('Starting quarterly full scan task.')
@@ -233,21 +286,21 @@ def cleanup_old_data_task():
 @shared_task
 @single_instance_task(lock_name=RedisLock.BACKUP, timeout=7200)
 def backup_database():
-    # pg_dump competes with Selenium for CPU, memory and disk I/O.  Keep the
-    # existing backup lock and also serialize the dump with browser work.
+    # Keep the backup lock and serialize the dump with parser work so the
+    # snapshot does not overlap with long-running parser reads/writes.
     # The task is intentionally delayed instead of being dropped when a
-    # Selenium task is active: Celery Beat invokes it once per hour.
+    # parser task is active: Celery Beat invokes it once per hour.
     for attempt in range(120):
-        with _redis_lock(RedisLock.SELENIUM_GLOBAL, timeout=21600) as acquired:
+        with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=21600) as acquired:
             if acquired:
                 BackupManager().perform_backup()
                 return
 
         if attempt == 0:
-            logging.info('Backup delayed: Selenium resource lock is busy.')
+            logging.info('Backup delayed: Kinopub parser lock is busy.')
         time.sleep(30)
 
-    logging.error('Backup was not started after waiting one hour for Selenium lock.')
+    logging.error('Backup was not started after waiting one hour for Kinopub parser lock.')
 
 
 def _execute_admin_command_process(celery_task_id, task_run):
@@ -340,7 +393,7 @@ def run_admin_command(self, task_run_id):
         _execute_admin_command_process(self.request.id, task_run)
         return
 
-    selenium_commands = {
+    parser_commands = {
         'runfullscan',
         'rungapscanner',
         'runhistoryparser',
@@ -351,14 +404,14 @@ def run_admin_command(self, task_run_id):
         'scanbyids',
     }
 
-    if task_run.command in selenium_commands:
-        with _redis_lock(RedisLock.SELENIUM_GLOBAL, timeout=14400) as acquired:
+    if task_run.command in parser_commands:
+        with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=14400) as acquired:
             if not acquired:
                 task_run.status = TaskRunStatus.FAILURE
                 task_run.output = (
-                    '[System] Отменено: другая задача парсинга (Selenium) уже выполняется.'
+                    '[System] Отменено: другая задача Kinopub-парсинга уже выполняется.'
                 )
-                task_run.error_message = 'Selenium lock is busy'
+                task_run.error_message = 'Kinopub parser lock is busy'
                 task_run.save()
                 return
             _execute_admin_command_process(self.request.id, task_run)
@@ -367,14 +420,14 @@ def run_admin_command(self, task_run_id):
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.SELENIUM_GLOBAL, timeout=3600)
+@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=3600)
 def run_new_episodes_task():
     logging.info('Starting new episodes parser task.')
     call_command('runnewepisodes')
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.SELENIUM_GLOBAL, timeout=14400)
+@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=14400)
 def run_daily_sync_task():
     logging.info('Starting Daily Synchronization Task via Celery.')
     call_command('rundailysync')
@@ -477,15 +530,15 @@ def process_queues_task(self):
         logging.error(f'Error checking Redis queues: {e}')
         return
 
-    # 2. Если есть задачи, пытаемся захватить глобальный лок Selenium
+    # 2. Если есть задачи, пытаемся захватить глобальный лок Kinopub-парсера
     logging.info(
         f'Found items in queues (Details: {count_details}, Durations: {count_durations}). '
-        'Acquiring Selenium lock...'
+        'Acquiring Kinopub parser lock...'
     )
 
-    with _redis_lock(RedisLock.SELENIUM_GLOBAL, timeout=3600) as acquired:
+    with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=3600) as acquired:
         if not acquired:
-            logging.warning('Skipping process_queues_task: selenium_global_lock is busy.')
+            logging.warning('Skipping process_queues_task: kinopub_parser_global_lock is busy.')
             return
 
         # 3. Processing Details (Aux account)
@@ -555,7 +608,7 @@ def precalculate_all_stats():
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.SELENIUM_GLOBAL, timeout=21600)
+@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=21600)
 def run_gap_scanner_task():
     logging.info('Starting monthly gap scanner task.')
     call_command('rungapscanner')
@@ -594,7 +647,7 @@ def update_site_metrics_task():
     # Wait for the existing global resource lock instead of silently dropping
     # the hourly snapshot when the parser is still active.
     with _wait_for_redis_lock(
-        RedisLock.SELENIUM_GLOBAL,
+        RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=7200,
         wait_timeout=3600,
     ) as acquired:
@@ -613,7 +666,7 @@ def update_site_metrics_task():
 @safe_execution
 def warm_duplicate_photo_urls_task():
     with _wait_for_redis_lock(
-        RedisLock.SELENIUM_GLOBAL,
+        RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=1800,
         wait_timeout=1800,
     ) as acquired:
@@ -631,7 +684,7 @@ def warm_person_metric_pages_task():
     from app.views import get_metric_details
 
     with _wait_for_redis_lock(
-        RedisLock.SELENIUM_GLOBAL,
+        RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=1800,
         wait_timeout=1800,
     ) as acquired:

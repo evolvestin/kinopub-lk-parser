@@ -183,7 +183,7 @@ spelling, case, punctuation, and internal whitespace remain unchanged.
 
 ## Celery Task Concurrency & Locking Policy
 
-**RULE**: Celery tasks are protected by explicit distributed Redis locks (e.g., `RedisLock.SELENIUM_GLOBAL`, `RedisLock.BACKUP`, `RedisLock.PROCESS_QUEUES`) and scheduled across time using Celery Beat. Worker concurrency is configured to 4 because task-level locks safely prevent race conditions and duplicate executions of resource-intensive operations (such as Selenium scraping or database backups).
+**RULE**: Celery tasks are protected by explicit distributed Redis locks (e.g., `RedisLock.KINOPUB_PARSER_GLOBAL`, `RedisLock.BACKUP`, `RedisLock.PROCESS_QUEUES`) and scheduled across time using Celery Beat. Worker concurrency is configured to 4 because task-level locks safely prevent race conditions and duplicate executions of shared-account parser operations or database backups. Browser execution itself is queued by the AssetHub gateway.
 
 
 ## Poiskkino Ratings Synchronization Policy

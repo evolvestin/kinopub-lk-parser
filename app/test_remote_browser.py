@@ -120,3 +120,70 @@ class RemoteBrowserDriverTests(TestCase):
 
         with self.assertRaises(StaleElementReferenceException):
             driver._submit('element_text', {'element_id': 'old-element'})
+
+    @patch('app.remote_browser.requests.Session')
+    def test_replaced_session_is_reopened_and_command_is_retried(self, session_cls):
+        http = session_cls.return_value
+        http.post.side_effect = [
+            self.response(
+                {'session_id': 'session-1', 'task_id': 'task-open-1', 'status': 'queued'}
+            ),
+            self.response({'task_id': 'task-navigate-1', 'status': 'queued'}, status=202),
+            self.response(
+                {'session_id': 'session-2', 'task_id': 'task-open-2', 'status': 'queued'}
+            ),
+            self.response({'task_id': 'task-navigate-2', 'status': 'queued'}, status=202),
+        ]
+        http.get.side_effect = [
+            self.response({'status': 'succeeded', 'result': None}),
+            self.response(
+                {
+                    'status': 'failed',
+                    'error': {
+                        'type': 'browser_gateway.SessionReplaced',
+                        'message': 'The browser session was replaced by a newer session.',
+                    },
+                }
+            ),
+            self.response({'status': 'succeeded', 'result': None}),
+            self.response({'status': 'succeeded', 'result': None}),
+        ]
+
+        driver = RemoteBrowserDriver(
+            'http://assethub/', 'secret', 'kinopub-main', 'https://kinopub.example/'
+        )
+        driver.get('https://kinopub.example/history')
+
+        self.assertEqual(driver.session_id, 'session-2')
+        self.assertEqual(http.post.call_count, 4)
+
+    @patch('app.remote_browser.requests.Session')
+    def test_replaced_open_is_retried_during_driver_creation(self, session_cls):
+        http = session_cls.return_value
+        http.post.side_effect = [
+            self.response(
+                {'session_id': 'session-1', 'task_id': 'task-open-1', 'status': 'queued'}
+            ),
+            self.response(
+                {'session_id': 'session-2', 'task_id': 'task-open-2', 'status': 'queued'}
+            ),
+        ]
+        http.get.side_effect = [
+            self.response(
+                {
+                    'status': 'failed',
+                    'error': {
+                        'type': 'browser_gateway.SessionReplaced',
+                        'message': 'The browser session was replaced by a newer session.',
+                    },
+                }
+            ),
+            self.response({'status': 'succeeded', 'result': None}),
+        ]
+
+        driver = RemoteBrowserDriver(
+            'http://assethub/', 'secret', 'kinopub-main', 'https://kinopub.example/'
+        )
+
+        self.assertEqual(driver.session_id, 'session-2')
+        self.assertEqual(http.post.call_count, 2)

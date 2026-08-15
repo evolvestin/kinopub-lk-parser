@@ -70,6 +70,8 @@ def is_fatal_selenium_error(e):
         or 'connection refused' in err_str
         or 'max retries exceeded' in err_str
         or 'invalid session' in err_str
+        or 'session was replaced by a newer session' in err_str
+        or 'browser session is not available in this worker' in err_str
         or 'remote end closed connection' in err_str
         or 'remotedisconnected' in err_str
         or 'protocolerror' in err_str
@@ -681,9 +683,9 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
             'local Chromium is no longer supported'
         )
 
-    driver = setup_driver(headless=headless, profile_key=session_type, randomize=randomize)
-
+    driver = None
     try:
+        driver = setup_driver(headless=headless, profile_key=session_type, randomize=randomize)
         driver.get(target_url)
         try:
             WebDriverWait(driver, 5).until(
