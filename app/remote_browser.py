@@ -239,6 +239,10 @@ class RemoteBrowserDriver:
     def refresh(self):
         return self._submit('navigate', {'url': self.current_url})
 
+    def restart(self):
+        self._submit('restart', {'url': self._last_url})
+        return self
+
     def find_element(self, by, value):
         result = self._submit('find_element', {'by': by, 'value': value})
         return RemoteWebElement(self, result['element_id'])

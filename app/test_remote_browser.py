@@ -45,6 +45,36 @@ class RemoteBrowserDriverTests(TestCase):
         )
 
     @patch('app.remote_browser.requests.Session')
+    def test_restart_keeps_the_same_remote_session(self, session_cls):
+        http = session_cls.return_value
+        http.post.side_effect = [
+            self.response(
+                {'session_id': 'session-1', 'task_id': 'task-open', 'status': 'queued'}
+            ),
+            self.response({'task_id': 'task-restart', 'status': 'queued'}, status=202),
+        ]
+        http.get.side_effect = [
+            self.response({'status': 'succeeded', 'result': None}),
+            self.response(
+                {
+                    'status': 'succeeded',
+                    'result': {'current_url': 'https://kinopub.example/'},
+                }
+            ),
+        ]
+
+        driver = RemoteBrowserDriver(
+            'http://assethub/', 'secret', 'kinopub-main', 'https://kinopub.example/'
+        )
+        driver.restart()
+
+        self.assertEqual(driver.session_id, 'session-1')
+        self.assertEqual(
+            http.post.call_args_list[1].kwargs['json'],
+            {'command': 'restart', 'payload': {'url': 'https://kinopub.example/'}},
+        )
+
+    @patch('app.remote_browser.requests.Session')
     def test_remote_no_such_element_is_mapped_to_selenium_exception(self, session_cls):
         http = session_cls.return_value
         http.post.return_value = self.response(

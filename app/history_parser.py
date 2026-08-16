@@ -1060,18 +1060,14 @@ def open_url_safe(driver, url, headless=True, session_type=ParserSessionType.MAI
     try:
         if is_cloudflare_page(driver):
             logging.warning(f'Обнаружена защита Cloudflare на {url}. Перезапуск сессии...')
-            close_driver(driver)
+            driver.restart()
             time.sleep(10)
 
-            new_driver = initialize_driver_session(headless=headless, session_type=session_type)
-            if not new_driver:
-                raise Exception('Не удалось перезапустить драйвер после обнаружения защиты.')
-
-            new_driver.get(url)
-            if is_cloudflare_page(new_driver):
-                close_driver(new_driver)
+            driver.get(url)
+            if is_cloudflare_page(driver):
+                close_driver(driver)
                 raise Exception('Защита Cloudflare срабатывает повторно после перезапуска.')
-            return new_driver
+            return driver
 
         if '/user/login' in driver.current_url and '/user/login' not in url:
             logging.warning('Сессия истекла (редирект на логин). Попытка повторной авторизации...')
