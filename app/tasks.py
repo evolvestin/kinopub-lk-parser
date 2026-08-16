@@ -493,6 +493,15 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
                 logging.error(f'Error processing show {show_id} in batch: {e}')
                 if history_parser.is_fatal_selenium_error(e):
                     logging.critical('Fatal driver error. Stopping batch.')
+                    redis_client.sadd(queue_name, *show_ids[idx - 1 :])
+                    break
+                if history_parser.is_recovery_stale_element_error(e):
+                    logging.warning(
+                        'Browser recovery invalidated elements for show %s. '
+                        'Re-queueing this and remaining shows.',
+                        show_id,
+                    )
+                    redis_client.sadd(queue_name, *show_ids[idx - 1 :])
                     break
 
         if processed_count > 0:

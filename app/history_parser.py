@@ -79,6 +79,14 @@ def is_fatal_selenium_error(e):
     )
 
 
+def is_recovery_stale_element_error(e):
+    """Возвращает True, если WebElement устарел из-за восстановления браузера."""
+    return (
+        isinstance(e, StaleElementReferenceException)
+        or 'browser element reference was invalidated by session recovery' in str(e).lower()
+    )
+
+
 def close_driver(driver):
     if driver:
         logging.info('Closing Selenium driver.')
@@ -103,12 +111,11 @@ def _extract_int_from_string(text):
     return int(digits)
 
 
-def update_show_details(
+def _update_show_details_once(
     driver,
     kinopub_id,
     force=False,
     session_type=ParserSessionType.MAIN,
-    _stale_retry=True,
 ):
     target_path = f'item/view/{kinopub_id}'
     base_url = (
@@ -120,27 +127,7 @@ def update_show_details(
             driver, f'{base_url.rstrip("/")}/{target_path}', session_type=session_type
         )
         time.sleep(2)
-    except StaleElementReferenceException as e:
-        if _stale_retry:
-            logging.warning(
-                'Stale browser element while updating show %s; reopening page once.',
-                kinopub_id,
-            )
-            refreshed_driver = open_url_safe(
-                driver,
-                f'{base_url.rstrip("/")}/{target_path}',
-                session_type=session_type,
-            )
-            return update_show_details(
-                refreshed_driver,
-                kinopub_id,
-                force=force,
-                session_type=session_type,
-                _stale_retry=False,
-            )
-        logging.error(
-            f'An error occurred while updating show details for kinopub_id={kinopub_id}: {e}'
-        )
+    except StaleElementReferenceException:
         raise
     except Exception as e:
         logging.error(f'Error navigating to show page {kinopub_id}: {e}')
@@ -377,6 +364,38 @@ def update_show_details(
             f'An error occurred while updating show details for kinopub_id={kinopub_id}: {e}'
         )
         raise
+
+
+def update_show_details(
+    driver,
+    kinopub_id,
+    force=False,
+    session_type=ParserSessionType.MAIN,
+):
+    """Update one show, reacquiring the whole page after browser recovery.
+
+    A gateway recovery invalidates every remote WebElement ID obtained before
+    the recovery. Retrying only the failed Selenium command is therefore
+    incorrect: the page and all dependent elements must be reacquired.
+    """
+    try:
+        return _update_show_details_once(
+            driver,
+            kinopub_id,
+            force=force,
+            session_type=session_type,
+        )
+    except StaleElementReferenceException:
+        logging.warning(
+            'Browser recovered while updating show %s; reacquiring the page and retrying once.',
+            kinopub_id,
+        )
+        return _update_show_details_once(
+            driver,
+            kinopub_id,
+            force=force,
+            session_type=session_type,
+        )
 
 
 def get_chrome_major_version():
