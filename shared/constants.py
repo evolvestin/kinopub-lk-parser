@@ -18,6 +18,7 @@ class RedisLock(StrEnum):
     PROCESS_QUEUES = 'process_queues_lock'
     FETCH_PERSON_PHOTOS = 'fetch_person_photos_lock'
     SYNC_POISKKINO_RATINGS = 'sync_poiskkino_ratings'
+    SYNC_IMDB_DATA = 'sync_imdb_data'
     ENRICH_TMDB_SHOWS = 'enrich_tmdb_shows_lock'
 
 
@@ -278,6 +279,11 @@ RAW_TO_NORMALIZED_COUNTRY = {
     'Brazil': 'Бразилия',
     'British Indian Ocean Territory': 'Британская территория в Индийском океане',
     'British Virgin Islands': 'Виргинские Острова (Великобритания)',
+    # Display-level aliases. Source country rows remain separate in the DB;
+    # these mappings only prevent the metadata metric and UI from treating
+    # known translations/spellings as different logical countries.
+    'Американские Виргинские острова': 'Виргинские Острова (США)',
+    'Виргинские Острова': 'Виргинские Острова (США)',
     'Brunei Darussalam': 'Бруней',
     'Bulgaria': 'Болгария',
     'Burkina Faso': 'Буркина-Фасо',
@@ -468,6 +474,7 @@ RAW_TO_NORMALIZED_COUNTRY = {
     'Tanzania': 'Танзания',
     'Thailand': 'Таиланд',
     'Timor-Leste': 'Восточный Тимор',
+    'Тимор-Лесте': 'Восточный Тимор',
     'Togo': 'Того',
     'Tokelau': 'Токелау',
     'Tonga': 'Тонга',

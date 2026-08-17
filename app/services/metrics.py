@@ -145,7 +145,7 @@ def calculate_has_kp_metric():
 
 def calculate_has_imdb_metric():
     stats = (
-        Show.objects.filter(ext_rating__imdb__isnull=False)
+        Show.objects.filter(imdb_rating__isnull=False)
         .values('type')
         .annotate(total=Count('id'))
         .order_by('-total')
@@ -163,22 +163,26 @@ def get_total_shows_list(show_type: str):
 
 
 def calculate_missing_imdb_metric():
-    qs = Show.objects.filter(imdb_url__isnull=False, ext_rating__isnull=True).exclude(imdb_url='')
+    qs = Show.objects.filter(imdb_url__isnull=False, imdb_rating__isnull=True).exclude(imdb_url='')
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
     return _aggregate_by_display_type(stats)
 
 
 def get_missing_imdb_list(show_type: str):
-    rating_exists = ExternalRating.objects.filter(show_id=OuterRef('pk'))
     return (
         Show.objects.filter(type=show_type, imdb_url__isnull=False)
         .exclude(imdb_url='')
-        .filter(~Exists(rating_exists))
+        .filter(imdb_rating__isnull=True)
         .values('id', 'title', 'original_title')
     )
 
 
 def get_has_rating_list(show_type: str, source: str):
+    if source == 'imdb':
+        return Show.objects.filter(type=show_type, imdb_rating__isnull=False).values(
+            'id', 'title', 'original_title'
+        )
+
     rating_exists = ExternalRating.objects.filter(
         show_id=OuterRef('pk'), **{f'{source}__isnull': False}
     )

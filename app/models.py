@@ -354,11 +354,11 @@ class Show(BaseModel):
         db_index=True,
         verbose_name='TMDB enrichment checked at',
     )
-    poiskkino_backfill_checked_at = models.DateTimeField(
+    poiskkino_updated_at = models.DateTimeField(
         null=True,
         blank=True,
         db_index=True,
-        verbose_name='Poiskkino backfill checked at',
+        verbose_name='Poiskkino updated at',
     )
     imdb_id = models.CharField(
         max_length=20, null=True, blank=True, unique=True, db_index=True, verbose_name='IMDb ID'

@@ -48,9 +48,7 @@ class RemoteBrowserDriverTests(TestCase):
     def test_restart_keeps_the_same_remote_session(self, session_cls):
         http = session_cls.return_value
         http.post.side_effect = [
-            self.response(
-                {'session_id': 'session-1', 'task_id': 'task-open', 'status': 'queued'}
-            ),
+            self.response({'session_id': 'session-1', 'task_id': 'task-open', 'status': 'queued'}),
             self.response({'task_id': 'task-restart', 'status': 'queued'}, status=202),
         ]
         http.get.side_effect = [

@@ -276,6 +276,7 @@ TMDB_API_KEY = os.getenv('TMDB_API_KEY')
 TMDB_API_BASE_URL = os.getenv('TMDB_API_BASE_URL', 'https://api.themoviedb.org/3').rstrip('/')
 TMDB_PROXY = os.getenv('TMDB_PROXY') or os.getenv('HTTPS_PROXY') or os.getenv('HTTP_PROXY')
 POISKKINO_API_KEY = os.getenv('POISKKINO_API_KEY')
+IMDB_DATASET_BASE_URL = os.getenv('IMDB_DATASET_BASE_URL', 'https://datasets.imdbws.com')
 
 # --- App Core Config ---
 _hostname = socket.gethostname()
@@ -425,6 +426,10 @@ if ENVIRONMENT == 'PROD':
             'sync_poiskkino_ratings': {
                 'task': 'app.tasks.sync_poiskkino_ratings_task',
                 'schedule': crontab(minute=0, hour=5),
+            },
+            'sync_imdb_data': {
+                'task': 'app.tasks.sync_imdb_data_task',
+                'schedule': crontab(minute=0, hour=4),
             },
             'backup_database_hourly': {
                 'task': 'app.tasks.backup_database',

@@ -1586,7 +1586,7 @@ def webapp_get_show_full(request, show_id):
             if hasattr(show, 'ext_rating') and show.ext_rating:
                 ext_rating_data = {
                     'kp': show.ext_rating.kp,
-                    'imdb': show.ext_rating.imdb,
+                    'imdb': show.imdb_rating,
                     'tmdb': show.ext_rating.tmdb,
                     'film_critics': show.ext_rating.film_critics,
                     'russian_film_critics': show.ext_rating.russian_film_critics,
@@ -1939,7 +1939,7 @@ def get_metric_details(request, key):
     elif key == 'missing_imdb':
         items = get_missing_imdb_list(db_show_type)
         query_params.update(
-            {'type': db_show_type, 'imdb_url__isnull': 'False', 'ext_rating__imdb__isnull': 'True'}
+            {'type': db_show_type, 'imdb_url__isnull': 'False', 'imdb_rating__isnull': 'True'}
         )
         target_task = 'priority_sync'
     elif key == 'missing_imdb_id':

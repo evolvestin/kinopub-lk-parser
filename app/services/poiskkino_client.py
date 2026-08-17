@@ -93,7 +93,9 @@ class PoiskkinoClient:
 
         return PoiskkinoFetchResult(results, [], completed, request_count)
 
-    def fetch_ratings_by_ids(self, show_ids: list[int]) -> PoiskkinoFetchResult:
+    def fetch_ratings_by_ids(
+        self, show_ids: list[int], max_requests: int = 200
+    ) -> PoiskkinoFetchResult:
         if not self.api_key or not show_ids:
             return PoiskkinoFetchResult([], [], False, 0)
 
@@ -104,6 +106,8 @@ class PoiskkinoClient:
         requests_made = 0
 
         for i in range(0, len(show_ids), chunk_size):
+            if requests_made >= max_requests:
+                break
             chunk = show_ids[i : i + chunk_size]
             params = {
                 'limit': chunk_size,

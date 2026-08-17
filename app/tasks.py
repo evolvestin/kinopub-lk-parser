@@ -51,7 +51,6 @@ from shared.constants import (
 )
 from shared.formatters import format_se
 
-
 _RELEASE_LOCK_SCRIPT = """
 if redis.call('get', KEYS[1]) == ARGV[1] then
     return redis.call('del', KEYS[1])
@@ -82,6 +81,7 @@ def _redis_lock(lock_name, timeout, warn_on_busy=True):
     heartbeat_interval = max(1, min(timeout / 3, 30))
 
     if acquired:
+
         def renew_lock():
             while not heartbeat_stop.wait(heartbeat_interval):
                 try:
@@ -647,6 +647,12 @@ def sync_poiskkino_ratings_task():
 
 
 @shared_task
+@single_instance_task(lock_name=RedisLock.SYNC_IMDB_DATA, timeout=7200)
+def sync_imdb_data_task():
+    call_command('syncimdbdata')
+
+
+@shared_task
 @single_instance_task(lock_name='update_site_metrics_lock', timeout=7200)
 @safe_execution
 def update_site_metrics_task():
@@ -805,15 +811,7 @@ def auto_enqueue_missing_metadata_task():
 def sync_tmdb_metadata_task(
     show_id: int = None, tmdb_id: int = None, imdb_id: str = None, media_type: str = 'movie'
 ):
-    show = sync_show_from_tmdb(
-        show_id=show_id, tmdb_id=tmdb_id, imdb_id=imdb_id, media_type=media_type
-    )
-    if show:
-        try:
-            r = Redis.from_url(settings.CELERY_BROKER_URL)
-            r.sadd(RedisQueue.PRIORITY_RATINGS_SYNC, show.id)
-        except Exception as e:
-            logging.error(f'Failed to enqueue priority ratings sync for show {show.id}: {e}')
+    sync_show_from_tmdb(show_id=show_id, tmdb_id=tmdb_id, imdb_id=imdb_id, media_type=media_type)
 
 
 @shared_task

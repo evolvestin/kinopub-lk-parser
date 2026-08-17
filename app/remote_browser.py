@@ -101,7 +101,9 @@ class RemoteBrowserDriver:
         if isinstance(payload, dict):
             if '__element_id__' in payload:
                 return True
-            return any(RemoteBrowserDriver._uses_element_reference('', value) for value in payload.values())
+            return any(
+                RemoteBrowserDriver._uses_element_reference('', value) for value in payload.values()
+            )
         if isinstance(payload, list):
             return any(RemoteBrowserDriver._uses_element_reference('', value) for value in payload)
         return False

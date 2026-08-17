@@ -186,31 +186,18 @@ spelling, case, punctuation, and internal whitespace remain unchanged.
 **RULE**: Celery tasks are protected by explicit distributed Redis locks (e.g., `RedisLock.KINOPUB_PARSER_GLOBAL`, `RedisLock.BACKUP`, `RedisLock.PROCESS_QUEUES`) and scheduled across time using Celery Beat. Worker concurrency is configured to 4 because task-level locks safely prevent race conditions and duplicate executions of shared-account parser operations or database backups. Browser execution itself is queued by the AssetHub gateway.
 
 
-## Poiskkino Ratings Synchronization Policy
+## External Ratings Synchronization Policy
 
-**RULE**: Poiskkino synchronization must separate daily changes, finite historical backfill, and recurring refreshes. A record that has been checked and has no rating in Poiskkino must not be returned to the historical backfill indefinitely.
+**RULE**: IMDb and Poiskkino have separate ownership of rating fields. IMDb's daily official datasets own `Show.imdb_rating`, `Show.imdb_votes`, and the IMDb value in an existing `ExternalRating` row. Poiskkino must never overwrite those IMDb fields.
 
-1. **Free-tier request budget**:
-   * The free Poiskkino tariff allows 200 API requests per day. The official limits and tariff are documented at `https://poiskkino.dev/documentation` and `https://poiskkino.dev/`.
-   * Daily updates may use a bounded portion of the budget so historical backfill still gets a chance to run.
-   * Historical selection may be larger than the remaining calculated request budget. The API client must stop on the actual API response (`403` limit response) or a real network failure, rather than under-filling the day based only on an estimated request count.
-   * Successful chunks are persisted before stopping. Chunks not reached because of a limit or network failure remain eligible for a later run.
+1. **IMDb**:
+   * `title.basics.tsv.gz` and `title.ratings.tsv.gz` are downloaded from the official daily IMDb dataset location.
+   * Rated `movie`, `tvSeries`, `tvMiniSeries`, and supported TV title types may be added when they are absent from the catalog.
+   * Matching is done by `Show.imdb_id`; no IMDb API request is needed.
 
-2. **Backfill priority**:
-   * Shows with no ratings at all are selected first.
-   * Other missing or stale external-rating records are selected next.
-   * The selection must remain bounded by the maximum free-tier capacity (`200 * 250` records) to avoid materializing the entire database into one task.
-
-3. **Terminal backfill marker**:
-   * `Show.poiskkino_backfill_checked_at` records that a historical Poiskkino lookup completed for the show.
-   * A successful empty response is a terminal result: absence of a rating in Poiskkino is valid data and must not cause an infinite retry loop.
-   * A `403`, timeout, connection error, or other incomplete request must not mark the unprocessed IDs as checked.
-   * Daily `updatedAt` synchronization remains the mechanism for discovering ratings that appear later in Poiskkino.
-
-4. **KinoPub priority**:
-   * A missing `kinopub_id` must never be used to exclude a show from Poiskkino synchronization.
-   * In the recurring weekly stale refresh, records with a non-null `kinopub_id` are ordered before TMDB-only records. Within each group, the oldest `ExternalRating.updated_at` is processed first.
-
-5. **Queue semantics**:
-   * The historical backfill queue is finite and drains through `poiskkino_backfill_checked_at`.
-   * The weekly stale refresh is intentionally recurring for records that have ratings; it is not a historical backfill and must not be used as the completion metric for the initial migration.
+2. **Poiskkino**:
+   * The free tariff allows 200 API requests per day; one request contains up to 250 IDs.
+   * Only shows with a valid KinoПоиск ID are selected.
+   * `Show.poiskkino_updated_at` is the freshness marker, so an empty successful response is still a completed refresh.
+   * Only records older than three days (or never checked) are eligible, ordered oldest first, with a maximum of `200 * 250` shows per daily run.
+   * A 403, timeout, connection error, or other incomplete request leaves unrequested IDs eligible for the next run.

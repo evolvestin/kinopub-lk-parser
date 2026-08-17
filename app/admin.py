@@ -618,7 +618,7 @@ class ShowAdmin(admin.ModelAdmin):
                 .exclude(kinopoisk_url__endswith='/film/0')
             )
         if metric == 'missing_imdb':
-            return queryset.filter(imdb_url__isnull=False, ext_rating__isnull=True).exclude(
+            return queryset.filter(imdb_url__isnull=False, imdb_rating__isnull=True).exclude(
                 imdb_url=''
             )
         if metric == 'missing_imdb_id':
@@ -691,7 +691,7 @@ class ShowAdmin(admin.ModelAdmin):
         if metric == 'has_kp':
             return queryset.filter(ext_rating__kp__isnull=False)
         if metric == 'has_imdb':
-            return queryset.filter(ext_rating__imdb__isnull=False)
+            return queryset.filter(imdb_rating__isnull=False)
         if metric == 'total_shows':
             return queryset
         return queryset
@@ -711,11 +711,11 @@ class ShowAdmin(admin.ModelAdmin):
             return format_html('<a href="{}"><b>{}</b></a>', url, obj.ext_rating.kp)
         return '-'
 
-    @admin.display(description='IMDb', ordering='ext_rating__imdb')
+    @admin.display(description='IMDb', ordering='imdb_rating')
     def get_ext_imdb_rating(self, obj):
-        if hasattr(obj, 'ext_rating') and obj.ext_rating.imdb is not None:
-            url = reverse('admin:app_externalrating_change', args=[obj.ext_rating.id])
-            return format_html('<a href="{}"><b>{}</b></a>', url, obj.ext_rating.imdb)
+        if obj.imdb_rating is not None:
+            url = reverse('admin:app_show_change', args=[obj.id])
+            return format_html('<a href="{}"><b>{}</b></a>', url, obj.imdb_rating)
         return '-'
 
     @admin.display(description='Views', ordering='_view_count')

@@ -1,307 +1,184 @@
 import logging
 from datetime import timedelta
 
-from django.conf import settings
-from django.db.models import Case, IntegerField, Q, When
+from django.db.models import F, Q
 from django.utils import timezone
-from redis import Redis
 
 from app.management.base import LoggableBaseCommand
 from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew
 from app.services.poiskkino_client import PoiskkinoClient
 from app.tasks import get_kp_mapping
 from app.utils import normalize_country_name
-from shared.constants import SHOW_STATUS_MAPPING, RedisQueue
+from shared.constants import SHOW_STATUS_MAPPING
 
 FREE_DAILY_REQUEST_LIMIT = 200
-DAILY_UPDATE_REQUEST_BUDGET = 150
 POISKKINO_BATCH_SIZE = 250
+POISKKINO_REFRESH_DAYS = 3
 
 
 class Command(LoggableBaseCommand):
-    help = 'Syncs ratings, genres, and countries with Poiskkino API.'
+    help = (
+        'Refreshes Poiskkino data for shows with a KinoPoisk ID. '
+        'The oldest records are processed first.'
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--limit',
             type=int,
             default=None,
-            help='Optional cap for historical/stale shows; otherwise uses the daily API budget.',
+            help='Optional cap for shows in this run (default: 200 * 250).',
         )
 
     def handle(self, *args, **options):
         requested_limit = options.get('limit')
-        client = PoiskkinoClient()
-        now = timezone.now()
-        today = now.date()
-        yesterday = today - timedelta(days=1)
-
-        logging.info('Fetching daily rating updates from Poiskkino...')
-        kp_mapping = get_kp_mapping()
-
-        daily_result = client.fetch_updated_ratings(
-            yesterday, today, max_requests=DAILY_UPDATE_REQUEST_BUDGET
-        )
-        data = daily_result.data
-        logging.info(f'Fetched {len(data)} daily updates in {daily_result.requests_made} requests.')
-
-        # Select enough records to use the full free-tier capacity. The client
-        # itself stops on the API's 403 response, so transient network failures
-        # do not make us permanently underfill the next day's attempt.
         selection_limit = FREE_DAILY_REQUEST_LIMIT * POISKKINO_BATCH_SIZE
-        limit = (
-            selection_limit if requested_limit is None else min(requested_limit, selection_limit)
+        if requested_limit is not None:
+            selection_limit = min(max(requested_limit, 0), selection_limit)
+
+        now = timezone.now()
+        stale_cutoff = now - timedelta(days=POISKKINO_REFRESH_DAYS)
+        kp_mapping = get_kp_mapping()
+        reverse_kp_mapping = {show_id: kp_id for kp_id, show_id in kp_mapping.items()}
+        kp_show_ids = list(reverse_kp_mapping)
+        freshness_filter = Q(poiskkino_updated_at__isnull=True) | Q(
+            poiskkino_updated_at__lt=stale_cutoff
         )
+
+        selected_ids = list(
+            Show.objects.filter(id__in=kp_show_ids)
+            .filter(freshness_filter)
+            .order_by(F('poiskkino_updated_at').asc(nulls_first=True), 'id')
+            .values_list('id', flat=True)[:selection_limit]
+        )
+        kp_ids = [reverse_kp_mapping[show_id] for show_id in selected_ids]
+
         logging.info(
-            f'Poiskkino backfill selection cap: {limit} shows; '
-            'actual stopping is controlled by API response/403.'
+            'Poiskkino refresh selection: %s shows with a KinoPoisk ID, '
+            'cutoff=%s, request budget=%s.',
+            len(selected_ids),
+            stale_cutoff.isoformat(),
+            FREE_DAILY_REQUEST_LIMIT,
         )
 
-        # Извлечение приоритетных ID из Redis
-        priority_show_ids = set()
-        r = None
-        try:
-            r = Redis.from_url(settings.CELERY_BROKER_URL)
-            priority_raw = r.spop(RedisQueue.PRIORITY_RATINGS_SYNC, count=limit)
-            if priority_raw:
-                priority_show_ids = {int(x) for x in priority_raw}
-                logging.info(f'Found {len(priority_show_ids)} priority shows in Redis queue.')
-        except Exception as e:
-            logging.error(f'Redis priority queue error: {e}')
-
-        stale_cutoff = now - timedelta(days=7)
-        no_show_rating = Q(kinopoisk_rating__isnull=True, imdb_rating__isnull=True)
-        no_external_rating = Q(ext_rating__isnull=True)
-        for field in (
-            'kp',
-            'imdb',
-            'tmdb',
-            'film_critics',
-            'russian_film_critics',
-            'await_rating',
-        ):
-            no_external_rating &= Q(**{f'ext_rating__{field}__isnull': True})
-        no_ratings_at_all = no_show_rating & no_external_rating
-
-        # Backfill is finite: first inspect shows with no ratings at all, then
-        # inspect other missing/stale records. A successful lookup, including an
-        # empty API result, marks the show as checked and removes it from backfill.
-        backfill_base = Show.objects.filter(poiskkino_backfill_checked_at__isnull=True)
-        no_rating_ids = list(
-            backfill_base.filter(no_ratings_at_all)
-            .order_by('id')
-            .values_list('id', flat=True)[:limit]
-        )
-
-        remaining_limit = max(0, limit - len(no_rating_ids))
-        other_backfill_ids = list(
-            backfill_base.exclude(id__in=no_rating_ids)
-            .filter(Q(ext_rating__isnull=True) | Q(ext_rating__updated_at__lt=stale_cutoff))
-            .order_by('id')
-            .values_list('id', flat=True)[:remaining_limit]
-        )
-
-        selected_ids = no_rating_ids + other_backfill_ids
-        remaining_limit = max(0, limit - len(selected_ids))
-        if remaining_limit:
-            stale_refresh_ids = list(
-                Show.objects.filter(ext_rating__updated_at__lt=stale_cutoff)
-                .exclude(no_ratings_at_all)
-                .annotate(
-                    kinopub_priority=Case(
-                        When(kinopub_id__isnull=False, then=0),
-                        default=1,
-                        output_field=IntegerField(),
-                    )
-                )
-                .order_by('kinopub_priority', 'ext_rating__updated_at', 'id')
-                .values_list('id', flat=True)[:remaining_limit]
-            )
-            selected_ids.extend(stale_refresh_ids)
-
-        priority_ids = list(
-            Show.objects.filter(id__in=priority_show_ids).values_list('id', flat=True)
-        )
-        selected_set = set(selected_ids)
-        for sid in priority_ids:
-            if len(selected_ids) >= limit:
-                break
-            if sid not in selected_set:
-                selected_ids.append(sid)
-                selected_set.add(sid)
-
-        unselected_priorities = set(priority_ids) - selected_set
-        if unselected_priorities and r is not None:
-            try:
-                r.sadd(RedisQueue.PRIORITY_RATINGS_SYNC, *unselected_priorities)
-            except Exception as e:
-                logging.error(f'Failed to restore unselected priority ratings: {e}')
-
-        combined_show_ids = selected_ids
-        logging.info(
-            f'Selected {len(combined_show_ids)} shows: '
-            f'{len(no_rating_ids)} with no ratings, '
-            f'{len(other_backfill_ids)} backfill, '
-            f'{max(0, len(combined_show_ids) - len(no_rating_ids) - len(other_backfill_ids))} stale.'
-        )
-
-        reverse_kp_mapping = {sid: kp for kp, sid in kp_mapping.items()}
-
-        shows_with_imdb = dict(
-            Show.objects.filter(id__in=combined_show_ids)
-            .exclude(imdb_id__isnull=True)
-            .exclude(imdb_id='')
-            .values_list('id', 'imdb_id')
-        )
-
-        imdb_mapping = {imdb_id: sid for sid, imdb_id in shows_with_imdb.items()}
-
-        missing_kp_ids = []
-        missing_imdb_ids = []
-        invalid_url_sids = []
-        backfill_checked_ids = set()
-
-        for sid in combined_show_ids:
-            kp_id = reverse_kp_mapping.get(sid)
-            if kp_id:
-                missing_kp_ids.append(kp_id)
-            else:
-                imdb_id = shows_with_imdb.get(sid)
-                if imdb_id:
-                    missing_imdb_ids.append(imdb_id)
-                else:
-                    invalid_url_sids.append(sid)
-
-        if invalid_url_sids:
-            backfill_checked_ids.update(invalid_url_sids)
-            blank_ratings = [
-                ExternalRating(show_id=sid, updated_at=now) for sid in invalid_url_sids
-            ]
-            ExternalRating.objects.bulk_create(
-                blank_ratings,
-                update_conflicts=True,
-                unique_fields=['show_id'],
-                update_fields=['updated_at'],
-                batch_size=500,
-            )
-            logging.info(
-                f'Marked {len(invalid_url_sids)} shows without KP URL and IMDb ID as processed.'
-            )
-
-        if missing_kp_ids:
-            logging.info(f'Fetching {len(missing_kp_ids)} missing/stale records by KP IDs...')
-            kp_result = client.fetch_ratings_by_ids(missing_kp_ids)
-            data.extend(kp_result.data)
-            backfill_checked_ids.update(
-                reverse_kp_mapping[kp_id]
-                for kp_id in kp_result.checked_values
-                if kp_id in reverse_kp_mapping
-            )
-            logging.info(
-                f'Poiskkino KP catch-up: {kp_result.requests_made} requests, '
-                f'{len(kp_result.checked_values)} IDs checked, '
-                f'completed={kp_result.completed}.'
-            )
-
-        if missing_imdb_ids:
-            logging.info(f'Fetching {len(missing_imdb_ids)} records by IMDb IDs from Poiskkino...')
-            imdb_result = client.fetch_ratings_by_imdb_ids(missing_imdb_ids)
-            data.extend(imdb_result.data)
-            backfill_checked_ids.update(
-                imdb_mapping[imdb_id]
-                for imdb_id in imdb_result.checked_values
-                if imdb_id in imdb_mapping
-            )
-            logging.info(
-                f'Poiskkino IMDb catch-up: {imdb_result.requests_made} requests, '
-                f'{len(imdb_result.checked_values)} IDs checked, '
-                f'completed={imdb_result.completed}.'
-            )
-
-        if backfill_checked_ids:
-            Show.objects.filter(id__in=backfill_checked_ids).update(
-                poiskkino_backfill_checked_at=now
-            )
-            logging.info(f'Marked {len(backfill_checked_ids)} shows as Poiskkino-checked.')
-
-        if not data:
-            logging.info('No data to process.')
+        if not kp_ids:
+            logging.info('No Poiskkino records are older than three days.')
             return
 
-        unique_data = {item['id']: item for item in data if item.get('id')}.values()
+        client = PoiskkinoClient()
+        result = client.fetch_ratings_by_ids(
+            kp_ids,
+            max_requests=FREE_DAILY_REQUEST_LIMIT,
+        )
+
+        checked_show_ids = {
+            reverse_kp_mapping[kp_id]
+            for kp_id in result.checked_values
+            if kp_id in reverse_kp_mapping
+        }
+
+        logging.info(
+            'Poiskkino checked %s/%s IDs in %s requests; completed=%s.',
+            len(result.checked_values),
+            len(kp_ids),
+            result.requests_made,
+            result.completed,
+        )
+
+        if not result.data:
+            if checked_show_ids:
+                Show.objects.filter(id__in=checked_show_ids).update(poiskkino_updated_at=now)
+            logging.info('Poiskkino returned no records for the selected IDs.')
+            return
+
+        unique_data = {item['id']: item for item in result.data if item.get('id')}.values()
         data_list = list(unique_data)
+        logging.info('Saving %s unique Poiskkino records.', len(data_list))
 
-        logging.info(f'Total unique records to process and save: {len(data_list)}')
-
-        batch_size = 1000
         total_processed = 0
-
-        for i in range(0, len(data_list), batch_size):
-            batch = data_list[i : i + batch_size]
-            self._process_batch(batch, kp_mapping, imdb_mapping, now)
+        for i in range(0, len(data_list), 1000):
+            batch = data_list[i : i + 1000]
+            self._process_batch(batch, kp_mapping, now)
             total_processed += len(batch)
-            logging.info(f'Saved batch {total_processed}/{len(data_list)} to database.')
+            logging.info('Saved batch %s/%s.', total_processed, len(data_list))
 
-        logging.info(f'Successfully synchronized {total_processed} shows in total.')
+        if checked_show_ids:
+            Show.objects.filter(id__in=checked_show_ids).update(poiskkino_updated_at=now)
+        logging.info('Successfully synchronized %s Poiskkino records.', total_processed)
 
-    def _process_batch(self, batch_data, kp_mapping, imdb_mapping, now):
+    def _process_batch(self, batch_data, kp_mapping, now):
         data_map = {}
         for item in batch_data:
             kp_id = item.get('id')
-            ext_ids = item.get('externalId') or {}
-            imdb_id = ext_ids.get('imdb')
-
-            show_id = None
-            if kp_id and kp_id in kp_mapping:
-                show_id = kp_mapping[kp_id]
-            elif imdb_id and imdb_id in imdb_mapping:
-                show_id = imdb_mapping[imdb_id]
-
+            show_id = kp_mapping.get(kp_id)
             if show_id:
                 data_map[show_id] = item
 
         if not data_map:
             return
 
-        show_ids = list(data_map.keys())
+        show_ids = list(data_map)
         existing_shows = Show.objects.filter(id__in=show_ids).in_bulk(field_name='id')
 
-        all_genre_names = {g['name'] for item in data_map.values() for g in item.get('genres', [])}
-        all_country_names = {
-            normalize_country_name(c['name'])
+        all_genre_names = {
+            genre_data['name']
             for item in data_map.values()
-            for c in item.get('countries', [])
-            if c.get('name')
+            for genre_data in item.get('genres', [])
+            if genre_data.get('name')
+        }
+        all_country_names = {
+            normalize_country_name(country_data['name'])
+            for item in data_map.values()
+            for country_data in item.get('countries', [])
+            if country_data.get('name')
         }
         all_person_names = {
-            p['name']
+            person_data['name']
             for item in data_map.values()
-            for p in item.get('persons', [])
-            if p.get('name')
+            for person_data in item.get('persons', [])
+            if person_data.get('name')
         }
 
-        existing_genres = {g.name: g for g in Genre.objects.filter(name__in=all_genre_names)}
-        existing_countries = {c.name: c for c in Country.objects.filter(name__in=all_country_names)}
-        existing_persons = {p.name: p for p in Person.objects.filter(name__in=all_person_names)}
+        existing_genres = {
+            genre.name: genre for genre in Genre.objects.filter(name__in=all_genre_names)
+        }
+        existing_countries = {
+            country.name: country for country in Country.objects.filter(name__in=all_country_names)
+        }
+        existing_persons = {
+            person.name: person for person in Person.objects.filter(name__in=all_person_names)
+        }
 
         new_genres = [Genre(name=name) for name in all_genre_names if name not in existing_genres]
         if new_genres:
-            created_genres = Genre.objects.bulk_create(new_genres, batch_size=500)
-            existing_genres.update({g.name: g for g in created_genres})
+            existing_genres.update(
+                {
+                    genre.name: genre
+                    for genre in Genre.objects.bulk_create(new_genres, batch_size=500)
+                }
+            )
 
         new_countries = [
             Country(name=name) for name in all_country_names if name not in existing_countries
         ]
         if new_countries:
-            created_countries = Country.objects.bulk_create(new_countries, batch_size=500)
-            existing_countries.update({c.name: c for c in created_countries})
+            existing_countries.update(
+                {
+                    country.name: country
+                    for country in Country.objects.bulk_create(new_countries, batch_size=500)
+                }
+            )
 
         new_persons = [
             Person(name=name) for name in all_person_names if name not in existing_persons
         ]
         if new_persons:
-            created_persons = Person.objects.bulk_create(new_persons, batch_size=500)
-            existing_persons.update({p.name: p for p in created_persons})
+            existing_persons.update(
+                {
+                    person.name: person
+                    for person in Person.objects.bulk_create(new_persons, batch_size=500)
+                }
+            )
 
         shows_to_update = []
         ext_ratings_to_update = []
@@ -313,9 +190,8 @@ class Command(LoggableBaseCommand):
             if not show:
                 continue
 
-            r_data = item.get('rating') or {}
-            v_data = item.get('votes') or {}
-
+            rating_data = item.get('rating') or {}
+            votes_data = item.get('votes') or {}
             updated_fields = []
 
             if kp_id := item.get('id'):
@@ -324,81 +200,72 @@ class Command(LoggableBaseCommand):
                     show.kinopoisk_url = kp_url
                     updated_fields.append('kinopoisk_url')
 
-            if kp_r := r_data.get('kp'):
-                show.kinopoisk_rating = kp_r
+            if rating_data.get('kp') is not None:
+                show.kinopoisk_rating = rating_data['kp']
                 updated_fields.append('kinopoisk_rating')
-            if kp_v := v_data.get('kp'):
-                show.kinopoisk_votes = kp_v
+            if votes_data.get('kp') is not None:
+                show.kinopoisk_votes = votes_data['kp']
                 updated_fields.append('kinopoisk_votes')
-            if imdb_r := r_data.get('imdb'):
-                show.imdb_rating = imdb_r
-                updated_fields.append('imdb_rating')
-            if imdb_v := v_data.get('imdb'):
-                show.imdb_votes = imdb_v
-                updated_fields.append('imdb_votes')
-            if yr := item.get('year'):
-                show.year = yr
+            if item.get('year') is not None:
+                show.year = item['year']
                 updated_fields.append('year')
-            if desc := item.get('description'):
-                show.plot = desc
+            if item.get('description'):
+                show.plot = item['description']
                 updated_fields.append('plot')
-            if st := item.get('status'):
-                show.status = SHOW_STATUS_MAPPING.get(st, st)
+            if item.get('status'):
+                show.status = SHOW_STATUS_MAPPING.get(item['status'], item['status'])
                 updated_fields.append('status')
 
             if updated_fields:
                 shows_to_update.append(show)
 
+            # IMDb fields are intentionally omitted: IMDb owns them now.
             ext_ratings_to_update.append(
                 ExternalRating(
                     show_id=show_id,
-                    kp=r_data.get('kp'),
-                    imdb=r_data.get('imdb'),
-                    tmdb=r_data.get('tmdb'),
-                    film_critics=r_data.get('filmCritics'),
-                    russian_film_critics=r_data.get('russianFilmCritics'),
-                    await_rating=r_data.get('await'),
+                    kp=rating_data.get('kp'),
+                    imdb=show.imdb_rating,
+                    tmdb=rating_data.get('tmdb'),
+                    film_critics=rating_data.get('filmCritics'),
+                    russian_film_critics=rating_data.get('russianFilmCritics'),
+                    await_rating=rating_data.get('await'),
                     updated_at=now,
                 )
             )
 
-            api_genres = item.get('genres', [])
-            if api_genres:
-                for genre_data in api_genres:
-                    if genre := existing_genres.get(genre_data['name']):
-                        show.genres.add(genre)
+            for genre_data in item.get('genres', []):
+                genre = existing_genres.get(genre_data.get('name'))
+                if genre:
+                    show.genres.add(genre)
 
-            api_countries = item.get('countries', [])
-            if api_countries:
-                for country_data in api_countries:
-                    country_name = normalize_country_name(country_data.get('name', ''))
-                    if country := existing_countries.get(country_name):
-                        show.countries.add(country)
+            for country_data in item.get('countries', []):
+                country_name = normalize_country_name(country_data.get('name', ''))
+                country = existing_countries.get(country_name)
+                if country:
+                    show.countries.add(country)
 
             for person_data in item.get('persons', []):
-                p_name = person_data.get('name')
-                if not p_name:
-                    continue
-
-                person = existing_persons.get(p_name)
-                if not person:
+                person_name = person_data.get('name')
+                person = existing_persons.get(person_name)
+                if not person_name or not person:
                     continue
 
                 needs_update = False
-                p_en_name = person_data.get('enName')
-                if p_en_name and person.en_name != p_en_name:
-                    person.en_name = p_en_name
+                if person_data.get('enName') and person.en_name != person_data['enName']:
+                    person.en_name = person_data['enName']
                     needs_update = True
 
-                p_photo = person_data.get('photo')
-                if p_photo:
-                    if not any(
-                        s in p_photo
-                        for s in ('iphone360_0.jpeg', 'no-poster', 'no-photo', 'avatar_empty')
-                    ):
-                        if person.kp_photo_url != p_photo:
-                            person.kp_photo_url = p_photo
-                            needs_update = True
+                photo = person_data.get('photo')
+                if (
+                    photo
+                    and not any(
+                        marker in photo
+                        for marker in ('iphone360_0.jpeg', 'no-poster', 'no-photo', 'avatar_empty')
+                    )
+                    and person.kp_photo_url != photo
+                ):
+                    person.kp_photo_url = photo
+                    needs_update = True
 
                 if needs_update:
                     persons_to_update[person.id] = person
@@ -419,8 +286,6 @@ class Command(LoggableBaseCommand):
                     'kinopoisk_url',
                     'kinopoisk_rating',
                     'kinopoisk_votes',
-                    'imdb_rating',
-                    'imdb_votes',
                     'year',
                     'plot',
                     'status',
@@ -438,7 +303,6 @@ class Command(LoggableBaseCommand):
                 unique_fields=['show_id'],
                 update_fields=[
                     'kp',
-                    'imdb',
                     'tmdb',
                     'film_critics',
                     'russian_film_critics',
@@ -449,12 +313,12 @@ class Command(LoggableBaseCommand):
             )
 
         if persons_to_update:
-            for p in persons_to_update.values():
-                p.auto_resolve_kp_duplicate()
+            for person in persons_to_update.values():
+                person.auto_resolve_kp_duplicate()
             Person.objects.bulk_update(
                 persons_to_update.values(),
                 ['en_name', 'kp_photo_url', 'master_person'],
                 batch_size=500,
             )
 
-        logging.info(f'Successfully synchronized {len(shows_to_update)} shows.')
+        logging.info('Successfully synchronized %s shows.', len(shows_to_update))
