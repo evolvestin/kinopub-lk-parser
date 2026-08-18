@@ -2,15 +2,19 @@ import csv
 import gzip
 import logging
 import os
+import re
 import tempfile
+from collections import defaultdict
 
 import requests
 from django.conf import settings
+from django.db.models import Q
 
 from app.management.base import LoggableBaseCommand
 from app.models import ExternalRating, Show
 
 logger = logging.getLogger(__name__)
+IMDB_ID_PATTERN = re.compile(r'(tt\d+)', re.IGNORECASE)
 
 IMDB_DATASETS = {
     'basics': 'title.basics.tsv.gz',
@@ -83,12 +87,17 @@ class Command(LoggableBaseCommand):
                 options['add_missing'],
                 batch_size,
             )
-            rating_stats = self._process_ratings(paths['ratings'], batch_size)
+            imdb_url_map = self._build_imdb_url_map()
+            self._reset_imdb_rating_availability()
+            rating_stats = self._process_ratings(paths['ratings'], batch_size, imdb_url_map)
             logger.info(
-                'IMDb sync complete: basics=%s, new=%s, ratings=%s, external rows=%s.',
+                'IMDb sync complete: basics=%s, new=%s, ratings=%s, URL fallbacks=%s, '
+                'IDs backfilled=%s, external rows=%s.',
                 basics_stats['processed'],
                 basics_stats['created'],
                 rating_stats['updated'],
+                rating_stats['url_fallback'],
+                rating_stats['ids_backfilled'],
                 rating_stats['external_updated'],
             )
         finally:
@@ -119,6 +128,25 @@ class Command(LoggableBaseCommand):
 
     def _collect_rated_ids(self, path):
         return {row['tconst'] for row in self._rows(path) if row.get('tconst')}
+
+    @staticmethod
+    def _extract_imdb_id(value):
+        match = IMDB_ID_PATTERN.search(value or '')
+        return match.group(1).lower() if match else None
+
+    @classmethod
+    def _build_imdb_url_map(cls):
+        url_map = defaultdict(list)
+        rows = (
+            Show.objects.filter(imdb_url__isnull=False)
+            .exclude(imdb_url='')
+            .values_list('id', 'imdb_url')
+        )
+        for show_id, imdb_url in rows.iterator(chunk_size=10000):
+            imdb_id = cls._extract_imdb_id(imdb_url)
+            if imdb_id:
+                url_map[imdb_id].append(show_id)
+        return dict(url_map)
 
     def _process_basics(
         self,
@@ -197,9 +225,11 @@ class Command(LoggableBaseCommand):
         if shows:
             Show.objects.bulk_update(shows, ['year'], batch_size=1000)
 
-    def _process_ratings(self, path, batch_size):
+    def _process_ratings(self, path, batch_size, imdb_url_map):
         rating_rows = []
         updated = 0
+        url_fallback = 0
+        ids_backfilled = 0
         external_updated = 0
 
         for row in self._rows(path):
@@ -211,31 +241,76 @@ class Command(LoggableBaseCommand):
 
             rating_rows.append((imdb_id, rating, votes))
             if len(rating_rows) >= batch_size:
-                counts = self._save_rating_batch(rating_rows)
+                counts = self._save_rating_batch(rating_rows, imdb_url_map)
                 updated += counts['updated']
+                url_fallback += counts['url_fallback']
+                ids_backfilled += counts['ids_backfilled']
                 external_updated += counts['external_updated']
                 rating_rows.clear()
 
         if rating_rows:
-            counts = self._save_rating_batch(rating_rows)
+            counts = self._save_rating_batch(rating_rows, imdb_url_map)
             updated += counts['updated']
+            url_fallback += counts['url_fallback']
+            ids_backfilled += counts['ids_backfilled']
             external_updated += counts['external_updated']
 
-        return {'updated': updated, 'external_updated': external_updated}
+        return {
+            'updated': updated,
+            'url_fallback': url_fallback,
+            'ids_backfilled': ids_backfilled,
+            'external_updated': external_updated,
+        }
 
-    @staticmethod
-    def _save_rating_batch(rows):
+    @classmethod
+    def _save_rating_batch(cls, rows, imdb_url_map):
         ids = [row[0] for row in rows]
         values = {imdb_id: (rating, votes) for imdb_id, rating, votes in rows}
-        shows = list(Show.objects.filter(imdb_id__in=ids).only('id', 'imdb_id'))
+        fallback_show_ids = {
+            show_id for imdb_id in ids for show_id in imdb_url_map.get(imdb_id, ())
+        }
+        shows = list(
+            Show.objects.filter(Q(imdb_id__in=ids) | Q(id__in=fallback_show_ids)).only(
+                'id', 'imdb_id', 'imdb_url', 'imdb_rating', 'imdb_votes'
+            )
+        )
         if not shows:
-            return {'updated': 0, 'external_updated': 0}
+            return {'updated': 0, 'url_fallback': 0, 'ids_backfilled': 0, 'external_updated': 0}
+
+        owned_ids = {show.imdb_id for show in shows if show.imdb_id in values}
+        url_fallback = 0
+        ids_backfilled = 0
+        shows_to_update = []
 
         for show in shows:
-            show.imdb_rating, show.imdb_votes = values[show.imdb_id]
-        Show.objects.bulk_update(shows, ['imdb_rating', 'imdb_votes'], batch_size=1000)
+            direct_value = values.get(show.imdb_id)
+            url_imdb_id = cls._extract_imdb_id(show.imdb_url)
+            url_value = values.get(url_imdb_id)
+            value = direct_value or url_value
+            if value is None:
+                continue
 
-        show_id_to_rating = {show.id: show.imdb_rating for show in shows}
+            if direct_value is None:
+                url_fallback += 1
+
+            show.imdb_rating, show.imdb_votes = value
+            show.imdb_rating_available = True
+            if not show.imdb_id and url_imdb_id and url_imdb_id not in owned_ids:
+                show.imdb_id = url_imdb_id
+                owned_ids.add(url_imdb_id)
+                ids_backfilled += 1
+            shows_to_update.append(show)
+
+        if not shows_to_update:
+            return {'updated': 0, 'url_fallback': 0, 'ids_backfilled': 0, 'external_updated': 0}
+
+        Show.objects.bulk_update(
+            shows_to_update,
+            ['imdb_id', 'imdb_rating', 'imdb_votes', 'imdb_rating_available'],
+            batch_size=1000,
+        )
+
+        show_id_to_rating = {show.id: show.imdb_rating for show in shows_to_update}
         external_rows = list(
             ExternalRating.objects.filter(show_id__in=show_id_to_rating).only(
                 'id', 'show_id', 'imdb'
@@ -246,7 +321,18 @@ class Command(LoggableBaseCommand):
         if external_rows:
             ExternalRating.objects.bulk_update(external_rows, ['imdb'], batch_size=1000)
 
-        return {'updated': len(shows), 'external_updated': len(external_rows)}
+        return {
+            'updated': len(shows_to_update),
+            'url_fallback': url_fallback,
+            'ids_backfilled': ids_backfilled,
+            'external_updated': len(external_rows),
+        }
+
+    @staticmethod
+    def _reset_imdb_rating_availability():
+        Show.objects.filter(
+            Q(imdb_id__isnull=False) | Q(imdb_url__isnull=False, imdb_url__gt='')
+        ).update(imdb_rating_available=False)
 
     @staticmethod
     def _clean_text(value):

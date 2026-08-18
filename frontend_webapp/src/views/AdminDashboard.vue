@@ -348,7 +348,8 @@ const metricGroups = ref([
       { key: 'has_kp', icon: 'smile', color: 'var(--info)', label: 'Есть рейтинг KP', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг Кинопоиска.', showDesc: false },
       { key: 'has_imdb', icon: 'smile', color: 'var(--accent)', label: 'Есть рейтинг IMDb', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг IMDb.', showDesc: false },
       { key: 'missing_kp', icon: 'frown', color: 'var(--danger)', label: 'Нет рейтинга KP', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.', showDesc: false },
-      { key: 'missing_imdb', icon: 'frown', color: '#f1c40f', label: 'Нет рейтинга IMDb', centerLabel: 'БЕЗ IMDB', valField: 'value', severity: 'critical', desc: 'Шоу, у которых указана ссылка на IMDb, но в таблице внешних рейтингов данные отсутствуют.', showDesc: false }
+      { key: 'missing_imdb', icon: 'frown', color: '#e74c3c', label: 'Ошибка синхронизации IMDb', centerLabel: 'ОШИБОК IMDB', valField: 'value', severity: 'critical', desc: 'IMDb публикует рейтинг для этого тайтла, но он отсутствует в нашей базе.', showDesc: false },
+      { key: 'imdb_unrated', icon: 'minus', color: '#f1c40f', label: 'IMDb без опубликованного рейтинга', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'info', desc: 'IMDb ID или ссылка есть, но в текущем официальном IMDb-файле рейтингов для тайтла нет опубликованного рейтинга.', showDesc: false }
     ]
   },
   {

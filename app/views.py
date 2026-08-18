@@ -54,6 +54,7 @@ from app.services.metrics import (
     get_duplicate_photo_urls_page,
     get_global_metrics_history,
     get_has_rating_list,
+    get_imdb_unrated_list,
     get_missing_country_meta_list,
     get_missing_durations_list,
     get_missing_imdb_id_list,
@@ -1939,9 +1940,24 @@ def get_metric_details(request, key):
     elif key == 'missing_imdb':
         items = get_missing_imdb_list(db_show_type)
         query_params.update(
-            {'type': db_show_type, 'imdb_url__isnull': 'False', 'imdb_rating__isnull': 'True'}
+            {
+                'type': db_show_type,
+                'imdb_url__isnull': 'False',
+                'imdb_rating__isnull': 'True',
+                'imdb_rating_available': 'True',
+            }
         )
         target_task = 'priority_sync'
+    elif key == 'imdb_unrated':
+        items = get_imdb_unrated_list(db_show_type)
+        query_params.update(
+            {
+                'type': db_show_type,
+                'imdb_url__isnull': 'False',
+                'imdb_rating__isnull': 'True',
+                'imdb_rating_available': 'False',
+            }
+        )
     elif key == 'missing_imdb_id':
         items = get_missing_imdb_id_list(db_show_type)
         query_params.update(

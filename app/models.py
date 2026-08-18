@@ -374,6 +374,12 @@ class Show(BaseModel):
     imdb_url = models.URLField(max_length=255, null=True, blank=True)
     imdb_rating = models.FloatField(null=True, blank=True)
     imdb_votes = models.IntegerField(null=True, blank=True)
+    imdb_rating_available = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name='IMDb rating available',
+        help_text='IMDb published a rating for the current title in the latest ratings dataset.',
+    )
     tmdb_poster_path = models.CharField(max_length=255, null=True, blank=True)
     plot = models.TextField(null=True, blank=True)
     countries = models.ManyToManyField(Country, blank=True)

@@ -40,6 +40,7 @@ DUPLICATE_PHOTO_CACHE_TIMEOUT = 86400
 PERSON_DETAIL_CACHE_VERSION_KEY = 'metrics:person_detail:cache_version'
 PERSON_DETAIL_CACHE_TIMEOUT = 86400
 TITLE_COLLISION_CACHE_VERSION_KEY = 'metrics:title_collision:cache_version'
+UNRELEASED_IMDB_STATUSES = ('Filming', 'Post Production', 'Pre Production')
 PERSON_DETAIL_WARM_KEYS = {
     'total_persons_by_show_type',
     'persons_avatar_stats',
@@ -162,19 +163,54 @@ def get_total_shows_list(show_type: str):
     return Show.objects.filter(type=show_type).values('id', 'title', 'original_title')
 
 
+def _exclude_unreleased_imdb_titles(queryset):
+    current_year = timezone.localdate().year
+    return queryset.exclude(
+        Q(status__in=UNRELEASED_IMDB_STATUSES)
+        | Q(status__iexact='announced')
+        | Q(year__gt=current_year)
+    )
+
+
 def calculate_missing_imdb_metric():
     qs = Show.objects.filter(imdb_url__isnull=False, imdb_rating__isnull=True).exclude(imdb_url='')
+    qs = _exclude_unreleased_imdb_titles(qs).filter(imdb_rating_available=True)
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
     return _aggregate_by_display_type(stats)
 
 
 def get_missing_imdb_list(show_type: str):
-    return (
+    qs = (
         Show.objects.filter(type=show_type, imdb_url__isnull=False)
         .exclude(imdb_url='')
         .filter(imdb_rating__isnull=True)
+    )
+    return (
+        _exclude_unreleased_imdb_titles(qs)
+        .filter(imdb_rating_available=True)
         .values('id', 'title', 'original_title')
     )
+
+
+def calculate_imdb_unrated_metric():
+    qs = Show.objects.filter(
+        imdb_url__isnull=False,
+        imdb_rating__isnull=True,
+        imdb_rating_available=False,
+    ).exclude(imdb_url='')
+    qs = _exclude_unreleased_imdb_titles(qs)
+    stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
+    return _aggregate_by_display_type(stats)
+
+
+def get_imdb_unrated_list(show_type: str):
+    qs = Show.objects.filter(
+        type=show_type,
+        imdb_url__isnull=False,
+        imdb_rating__isnull=True,
+        imdb_rating_available=False,
+    ).exclude(imdb_url='')
+    return _exclude_unreleased_imdb_titles(qs).values('id', 'title', 'original_title')
 
 
 def get_has_rating_list(show_type: str, source: str):
@@ -287,6 +323,7 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     return {
         'missing_kp': calculate_missing_kp_metric(),
         'missing_imdb': calculate_missing_imdb_metric(),
+        'imdb_unrated': calculate_imdb_unrated_metric(),
         'missing_imdb_id': calculate_missing_imdb_id_metric(),
         'tmdb_only_shows': calculate_tmdb_only_shows_metric(),
         'missing_tmdb_id': calculate_missing_tmdb_id_metric(),

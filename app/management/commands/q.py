@@ -7,6 +7,7 @@ from app.services.metrics import (
     calculate_en_professions_stats_metric,
     calculate_has_imdb_metric,
     calculate_has_kp_metric,
+    calculate_imdb_unrated_metric,
     calculate_missing_country_meta_metric,
     calculate_missing_durations_metric,
     calculate_missing_imdb_id_metric,
@@ -54,6 +55,7 @@ class Command(LoggableBaseCommand):
         metric_funcs = [
             ('missing_kp', calculate_missing_kp_metric),
             ('missing_imdb', calculate_missing_imdb_metric),
+            ('imdb_unrated', calculate_imdb_unrated_metric),
             ('missing_imdb_id', calculate_missing_imdb_id_metric),
             ('tmdb_only_shows', calculate_tmdb_only_shows_metric),
             ('missing_tmdb_id', calculate_missing_tmdb_id_metric),

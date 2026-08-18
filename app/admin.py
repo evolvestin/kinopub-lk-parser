@@ -57,6 +57,7 @@ from app.models import (
 )
 from app.services.metrics import (
     _canonical_person_id_expression,
+    _exclude_unreleased_imdb_titles,
     get_missing_country_meta_list,
     get_profession_persons_list,
     invalidate_duplicate_photo_urls_cache,
@@ -618,8 +619,18 @@ class ShowAdmin(admin.ModelAdmin):
                 .exclude(kinopoisk_url__endswith='/film/0')
             )
         if metric == 'missing_imdb':
-            return queryset.filter(imdb_url__isnull=False, imdb_rating__isnull=True).exclude(
-                imdb_url=''
+            return _exclude_unreleased_imdb_titles(
+                queryset.filter(imdb_url__isnull=False, imdb_rating__isnull=True)
+                .exclude(imdb_url='')
+                .filter(imdb_rating_available=True)
+            )
+        if metric == 'imdb_unrated':
+            return _exclude_unreleased_imdb_titles(
+                queryset.filter(
+                    imdb_url__isnull=False,
+                    imdb_rating__isnull=True,
+                    imdb_rating_available=False,
+                ).exclude(imdb_url='')
             )
         if metric == 'missing_imdb_id':
             return queryset.filter(kinopub_id__isnull=False).filter(
