@@ -55,6 +55,7 @@ from app.services.metrics import (
     get_global_metrics_history,
     get_has_rating_list,
     get_imdb_unrated_list,
+    get_kp_unrated_list,
     get_missing_country_meta_list,
     get_missing_durations_list,
     get_missing_imdb_id_list,
@@ -1933,10 +1934,21 @@ def get_metric_details(request, key):
             {
                 'type': db_show_type,
                 'kinopoisk_url__isnull': 'False',
-                'ext_rating__kp__isnull': 'True',
+                'kinopoisk_rating__isnull': 'True',
+                'kinopoisk_rating_available': 'True',
             }
         )
         target_task = 'priority_sync'
+    elif key == 'kp_unrated':
+        items = get_kp_unrated_list(db_show_type)
+        query_params.update(
+            {
+                'type': db_show_type,
+                'kinopoisk_url__isnull': 'False',
+                'kinopoisk_rating__isnull': 'True',
+                'kinopoisk_rating_available': 'False',
+            }
+        )
     elif key == 'missing_imdb':
         items = get_missing_imdb_list(db_show_type)
         query_params.update(
@@ -2175,14 +2187,17 @@ def get_metric_details(request, key):
 
     all_queued = set()
     show_posters = {}
-    if not is_person and not is_country and not is_genre:
+    if items and not is_person and not is_country and not is_genre:
         try:
             r = Redis.from_url(settings.CELERY_BROKER_URL)
-            all_queued = (
-                {int(x) for x in r.smembers(RedisQueue.UPDATE_DETAILS)}
-                | {int(x) for x in r.smembers(RedisQueue.PRIORITY_RATINGS_SYNC)}
-                | {int(x) for x in r.smembers(RedisQueue.UPDATE_DURATIONS)}
-            )
+            all_queued = {
+                int(x)
+                for x in r.sunion(
+                    RedisQueue.UPDATE_DETAILS,
+                    RedisQueue.PRIORITY_RATINGS_SYNC,
+                    RedisQueue.UPDATE_DURATIONS,
+                )
+            }
         except Exception:
             pass
 

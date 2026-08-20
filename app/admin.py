@@ -22,7 +22,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce, Lower, StrIndex
+from django.db.models.functions import Coalesce
 from django.http import HttpResponseRedirect
 from django.template.loader import render_to_string
 from django.urls import path, reverse
@@ -613,11 +613,18 @@ class ShowAdmin(admin.ModelAdmin):
 
     def _apply_metric_filter(self, queryset, metric, request):
         if metric == 'missing_kp':
-            return (
-                queryset.filter(kinopoisk_url__isnull=False, ext_rating__isnull=True)
-                .exclude(kinopoisk_url='')
-                .exclude(kinopoisk_url__endswith='/film/0')
-            )
+            return queryset.filter(
+                kinopoisk_url__gt='',
+                kinopoisk_rating__isnull=True,
+                kinopoisk_rating_available=True,
+            ).exclude(kinopoisk_url__endswith='/film/0')
+        if metric == 'kp_unrated':
+            return queryset.filter(
+                kinopoisk_url__gt='',
+                kinopoisk_rating__isnull=True,
+                kinopoisk_rating_available=False,
+                poiskkino_updated_at__isnull=False,
+            ).exclude(kinopoisk_url__endswith='/film/0')
         if metric == 'missing_imdb':
             return _exclude_unreleased_imdb_titles(
                 queryset.filter(imdb_url__isnull=False, imdb_rating__isnull=True)
@@ -645,14 +652,11 @@ class ShowAdmin(admin.ModelAdmin):
                 Q(kinopoisk_url__isnull=True) | Q(kinopoisk_url='')
             )
         if metric == 'title_collision':
-            return (
-                queryset.filter(original_title__isnull=False, ignore_collision=False)
-                .exclude(original_title='')
-                .annotate(low_title=Lower('title'), low_orig=Lower('original_title'))
-                .annotate(pos=StrIndex('low_title', F('low_orig')))
-                .filter(pos__gt=0)
-                .exclude(low_title=F('low_orig'))
-            )
+            return queryset.filter(
+                original_title__isnull=False,
+                ignore_collision=False,
+                title=F('original_title'),
+            ).exclude(title='')
         if metric == 'missing_year':
             return queryset.filter(kinopub_id__isnull=False, year__isnull=True)
         if metric == 'tmdb_missing_year':
@@ -1349,12 +1353,10 @@ def _apply_person_metric_filter(queryset, metric, request):
     if metric == 'duplicate_photo_urls':
         field = 'tmdb_photo_url' if 'TMDB' in request.GET.get('source', '') else 'kp_photo_url'
         duplicate_values = (
-            Person.objects.filter(master_person__isnull=True)
-            .exclude(**{field: ''})
-            .filter(**{f'{field}__isnull': False})
+            Person.objects.filter(master_person__isnull=True, **{f'{field}__gt': ''})
             .values(field)
-            .annotate(cnt=Count('id'))
-            .filter(cnt__gt=1)
+            .annotate(cnt=Count('*'), tmdb_id_count=Count('tmdb_id'))
+            .filter(cnt__gt=1, tmdb_id_count__lt=F('cnt'))
             .values(field)
         )
         return (

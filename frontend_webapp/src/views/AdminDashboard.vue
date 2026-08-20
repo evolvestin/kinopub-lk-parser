@@ -321,7 +321,7 @@ const metricGroups = ref([
       { key: 'missing_status', icon: 'target', color: '#ef1960', label: 'Без статуса', centerLabel: 'БЕЗ СТАТУСА', valField: 'value', severity: 'critical', desc: 'Сериалы и ТВ-шоу из KinoPub, у которых в базе отсутствует статус.', showDesc: false },
       { key: 'missing_durations', icon: 'time', color: '#6887ff', label: 'Без хронометража', centerLabel: 'БЕЗ ХРОНО', valField: 'value', severity: 'critical', desc: 'Шоу из KinoPub, для которых в базе нет данных о хронометраже.', showDesc: false },
       { key: 'missing_plot', icon: 'list', color: '#1abc9c', label: 'Без описания', centerLabel: 'БЕЗ ОПИСАНИЯ', valField: 'value', severity: 'info', desc: 'Шоу из KinoPub, у которых в базе отсутствует описание.', showDesc: false },
-      { key: 'title_collision', icon: 'edit', color: 'var(--info)', label: 'Коллизии названий', centerLabel: 'КОЛЛИЗИЙ', valField: 'collisions', severity: 'critical', desc: 'Случаи, когда основное название шоу содержит в себе оригинальное.', showDesc: false }
+      { key: 'title_collision', icon: 'edit', color: 'var(--info)', label: 'Коллизии названий', centerLabel: 'КОЛЛИЗИЙ', valField: 'collisions', severity: 'critical', desc: 'Основное и оригинальное названия совпадают; разные названия не считаются коллизией.', showDesc: false }
     ]
   },
   {
@@ -348,6 +348,7 @@ const metricGroups = ref([
       { key: 'has_kp', icon: 'smile', color: 'var(--info)', label: 'Есть рейтинг KP', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг Кинопоиска.', showDesc: false },
       { key: 'has_imdb', icon: 'smile', color: 'var(--accent)', label: 'Есть рейтинг IMDb', centerLabel: 'С РЕЙТИНГОМ', valField: 'value', severity: 'info', desc: 'Шоу, у которых успешно собран и сохранен рейтинг IMDb.', showDesc: false },
       { key: 'missing_kp', icon: 'frown', color: 'var(--danger)', label: 'Нет рейтинга KP', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'critical', desc: 'Шоу, у которых в нашей базе есть ссылка на Кинопоиск, но отсутствует сам рейтинг.', showDesc: false },
+      { key: 'kp_unrated', icon: 'minus', color: '#f1c40f', label: 'KP без опубликованного рейтинга', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'info', desc: 'Poiskkino успешно проверил тайтл, но Кинопоиск не публикует для него рейтинг.', showDesc: false },
       { key: 'missing_imdb', icon: 'frown', color: '#e74c3c', label: 'Ошибка синхронизации IMDb', centerLabel: 'ОШИБОК IMDB', valField: 'value', severity: 'critical', desc: 'IMDb публикует рейтинг для этого тайтла, но он отсутствует в нашей базе.', showDesc: false },
       { key: 'imdb_unrated', icon: 'minus', color: '#f1c40f', label: 'IMDb без опубликованного рейтинга', centerLabel: 'БЕЗ РЕЙТИНГА', valField: 'value', severity: 'info', desc: 'IMDb ID или ссылка есть, но в текущем официальном IMDb-файле рейтингов для тайтла нет опубликованного рейтинга.', showDesc: false }
     ]
@@ -368,7 +369,7 @@ const metricGroups = ref([
       { key: 'persons_avatar_stats', icon: 'eye', color: '#e67e22', label: 'Наличие фотографий', centerLabel: 'С ФОТО', valField: 'value', severity: 'warning', desc: 'Соотношение загруженных фото для людей.', showDesc: false },
       { key: 'professions_stats', icon: 'rocket', color: '#1abc9c', label: 'Роли в кино', centerLabel: 'РОЛЕЙ', valField: 'value', severity: 'info', desc: 'Топ уникальных профессий.', showDesc: false },
       { key: 'en_professions_stats', icon: 'gear', color: '#a371f7', label: 'Роли в кино (EN)', centerLabel: 'ROLES', valField: 'value', severity: 'info', desc: 'Топ профессий на английском языке.', showDesc: false },
-      { key: 'duplicate_photo_urls', icon: 'users', color: '#ef1960', label: 'Дубликаты людей', centerLabel: 'ДУБЛИКАТОВ', valField: 'value', severity: 'critical', desc: 'Разные записи людей с совпадающими аватарками.', showDesc: false },
+      { key: 'duplicate_photo_urls', icon: 'users', color: '#ef1960', label: 'Кандидаты на дубли людей', centerLabel: 'КАНДИДАТОВ', valField: 'value', severity: 'warning', desc: 'Совпадающие фото, где хотя бы у одной записи ещё нет TMDB-ID. Группы разных подтверждённых TMDB-персон исключены.', showDesc: false },
       { key: 'unused_persons', icon: 'trash', color: 'var(--danger)', label: 'Балласт', centerLabel: 'ПЕРСОН', valField: 'value', severity: 'critical', desc: 'Люди, не привязанные ни к одному шоу.', showDesc: false }
     ]
   }

@@ -8,6 +8,7 @@ from app.services.metrics import (
     calculate_has_imdb_metric,
     calculate_has_kp_metric,
     calculate_imdb_unrated_metric,
+    calculate_kp_unrated_metric,
     calculate_missing_country_meta_metric,
     calculate_missing_durations_metric,
     calculate_missing_imdb_id_metric,
@@ -54,6 +55,7 @@ class Command(LoggableBaseCommand):
         command_start = time.perf_counter()
         metric_funcs = [
             ('missing_kp', calculate_missing_kp_metric),
+            ('kp_unrated', calculate_kp_unrated_metric),
             ('missing_imdb', calculate_missing_imdb_metric),
             ('imdb_unrated', calculate_imdb_unrated_metric),
             ('missing_imdb_id', calculate_missing_imdb_id_metric),

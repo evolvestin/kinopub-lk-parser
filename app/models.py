@@ -176,6 +176,20 @@ class Person(BaseModel):
                 & Q(kp_photo_url__isnull=False)
                 & ~Q(kp_photo_url=''),
             ),
+            models.Index(
+                fields=['tmdb_photo_url', 'tmdb_id'],
+                name='idx_person_tmdb_dupe_identity',
+                condition=Q(master_person__isnull=True)
+                & Q(tmdb_photo_url__isnull=False)
+                & ~Q(tmdb_photo_url=''),
+            ),
+            models.Index(
+                fields=['kp_photo_url', 'tmdb_id'],
+                name='idx_person_kp_dupe_identity',
+                condition=Q(master_person__isnull=True)
+                & Q(kp_photo_url__isnull=False)
+                & ~Q(kp_photo_url=''),
+            ),
             GinIndex(
                 OpClass(Upper('name'), name='gin_trgm_ops'),
                 name='idx_person_name_upper_trgm',
@@ -371,6 +385,14 @@ class Show(BaseModel):
     kinopoisk_url = models.URLField(max_length=255, null=True, blank=True)
     kinopoisk_rating = models.FloatField(null=True, blank=True)
     kinopoisk_votes = models.IntegerField(null=True, blank=True)
+    kinopoisk_rating_available = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name='KinoPoisk rating available',
+        help_text=(
+            'Poiskkino returned this title and currently publishes a KinoPoisk rating for it.'
+        ),
+    )
     imdb_url = models.URLField(max_length=255, null=True, blank=True)
     imdb_rating = models.FloatField(null=True, blank=True)
     imdb_votes = models.IntegerField(null=True, blank=True)
@@ -470,6 +492,23 @@ class Show(BaseModel):
                 fields=['type', 'id'],
                 name='idx_show_missing_imdb',
                 condition=Q(imdb_url__isnull=False) & ~Q(imdb_url=''),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_missing_kp_rating',
+                condition=Q(kinopoisk_url__isnull=False)
+                & ~Q(kinopoisk_url='')
+                & Q(kinopoisk_rating__isnull=True)
+                & Q(kinopoisk_rating_available=True),
+            ),
+            models.Index(
+                fields=['type', 'id'],
+                name='idx_show_kp_unrated',
+                condition=Q(kinopoisk_url__isnull=False)
+                & ~Q(kinopoisk_url='')
+                & Q(kinopoisk_rating__isnull=True)
+                & Q(kinopoisk_rating_available=False)
+                & Q(poiskkino_updated_at__isnull=False),
             ),
             models.Index(
                 fields=['type', 'id'],

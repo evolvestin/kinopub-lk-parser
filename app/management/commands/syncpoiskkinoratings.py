@@ -87,13 +87,27 @@ class Command(LoggableBaseCommand):
 
         if not result.data:
             if checked_show_ids:
-                Show.objects.filter(id__in=checked_show_ids).update(poiskkino_updated_at=now)
+                Show.objects.filter(id__in=checked_show_ids).update(
+                    poiskkino_updated_at=now,
+                    kinopoisk_rating_available=False,
+                    kinopoisk_rating=None,
+                    kinopoisk_votes=None,
+                )
             logging.info('Poiskkino returned no records for the selected IDs.')
             return
 
         unique_data = {item['id']: item for item in result.data if item.get('id')}.values()
         data_list = list(unique_data)
         logging.info('Saving %s unique Poiskkino records.', len(data_list))
+
+        # Start from the authoritative negative state. Returned items with a
+        # rating set the flag back to True in _process_batch below.
+        if checked_show_ids:
+            Show.objects.filter(id__in=checked_show_ids).update(
+                kinopoisk_rating_available=False,
+                kinopoisk_rating=None,
+                kinopoisk_votes=None,
+            )
 
         total_processed = 0
         for i in range(0, len(data_list), 1000):
@@ -202,7 +216,9 @@ class Command(LoggableBaseCommand):
 
             if rating_data.get('kp') is not None:
                 show.kinopoisk_rating = rating_data['kp']
+                show.kinopoisk_rating_available = True
                 updated_fields.append('kinopoisk_rating')
+                updated_fields.append('kinopoisk_rating_available')
             if votes_data.get('kp') is not None:
                 show.kinopoisk_votes = votes_data['kp']
                 updated_fields.append('kinopoisk_votes')
@@ -286,6 +302,7 @@ class Command(LoggableBaseCommand):
                     'kinopoisk_url',
                     'kinopoisk_rating',
                     'kinopoisk_votes',
+                    'kinopoisk_rating_available',
                     'year',
                     'plot',
                     'status',

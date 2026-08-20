@@ -5,7 +5,7 @@ from hashlib import sha1
 from django.core.cache import cache
 from django.db import connection
 from django.db.models import Case, CharField, Count, Exists, F, OuterRef, Q, Value, When
-from django.db.models.functions import Coalesce, Lower, StrIndex
+from django.db.models.functions import Coalesce
 from django.db.utils import ProgrammingError
 from django.utils import timezone
 
@@ -136,7 +136,7 @@ def _format_type(t):
 
 def calculate_has_kp_metric():
     stats = (
-        Show.objects.filter(ext_rating__kp__isnull=False)
+        Show.objects.filter(kinopoisk_rating__isnull=False)
         .values('type')
         .annotate(total=Count('id'))
         .order_by('-total')
@@ -230,11 +230,23 @@ def get_has_rating_list(show_type: str, source: str):
 
 
 def calculate_missing_kp_metric():
-    qs = (
-        Show.objects.filter(kinopoisk_url__isnull=False, ext_rating__isnull=True)
-        .exclude(kinopoisk_url='')
-        .exclude(kinopoisk_url__endswith='/film/0')
-    )
+    qs = Show.objects.filter(
+        kinopoisk_url__gt='',
+        kinopoisk_rating__isnull=True,
+        kinopoisk_rating_available=True,
+    ).exclude(kinopoisk_url__endswith='/film/0')
+    stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
+    return _aggregate_by_display_type(stats)
+
+
+def calculate_kp_unrated_metric():
+    """Titles checked by Poiskkino where KinoPoisk has no published rating."""
+    qs = Show.objects.filter(
+        kinopoisk_url__gt='',
+        kinopoisk_rating__isnull=True,
+        kinopoisk_rating_available=False,
+        poiskkino_updated_at__isnull=False,
+    ).exclude(kinopoisk_url__endswith='/film/0')
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
     return _aggregate_by_display_type(stats)
 
@@ -322,6 +334,7 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     warm_duplicate_photo_urls_cache()
     return {
         'missing_kp': calculate_missing_kp_metric(),
+        'kp_unrated': calculate_kp_unrated_metric(),
         'missing_imdb': calculate_missing_imdb_metric(),
         'imdb_unrated': calculate_imdb_unrated_metric(),
         'missing_imdb_id': calculate_missing_imdb_id_metric(),
@@ -410,52 +423,58 @@ def get_global_metrics_history() -> dict:
 
 
 def calculate_title_collision_metric():
-    qs = Show.objects.filter(original_title__isnull=False, ignore_collision=False).exclude(
-        original_title=''
-    )
-
+    # Different localized and original titles are valid metadata. A collision
+    # exists only when KinoPub supplied the same value in both fields.
     stats = (
-        qs.annotate(low_title=Lower('title'), low_orig=Lower('original_title'))
-        .annotate(pos=StrIndex('low_title', F('low_orig')))
-        .values('type')
-        .annotate(
-            total=Count('id'),
-            contains_orig=Count('id', filter=Q(pos__gt=0) & ~Q(low_title=F('low_orig'))),
-            unique_titles=Count('id', filter=Q(pos=0)),
+        Show.objects.filter(
+            original_title__isnull=False,
+            ignore_collision=False,
+            title=F('original_title'),
         )
-        .order_by('-contains_orig')
+        .exclude(title='')
+        .values('type')
+        .annotate(total=Count('id'))
+        .order_by('-total')
     )
-
-    data = [
-        {
-            'type': _format_type(item['type']),
-            'total': item['total'],
-            'collisions': item['contains_orig'],
-            'unique': item['unique_titles'],
-        }
-        for item in stats
-    ]
-    return data
+    return [{'type': _format_type(item['type']), 'collisions': item['total']} for item in stats]
 
 
 def get_missing_kp_list(show_type: str):
     return (
-        Show.objects.filter(type=show_type, kinopoisk_url__isnull=False, ext_rating__isnull=True)
-        .exclude(kinopoisk_url='')
+        Show.objects.filter(
+            type=show_type,
+            kinopoisk_url__gt='',
+            kinopoisk_rating__isnull=True,
+            kinopoisk_rating_available=True,
+        )
+        .exclude(kinopoisk_url__endswith='/film/0')
+        .values('id', 'title', 'original_title')
+    )
+
+
+def get_kp_unrated_list(show_type: str):
+    return (
+        Show.objects.filter(
+            type=show_type,
+            kinopoisk_url__gt='',
+            kinopoisk_rating__isnull=True,
+            kinopoisk_rating_available=False,
+            poiskkino_updated_at__isnull=False,
+        )
         .exclude(kinopoisk_url__endswith='/film/0')
         .values('id', 'title', 'original_title')
     )
 
 
 def get_title_collision_list(show_type: str):
-    qs = Show.objects.filter(
-        type=show_type, original_title__isnull=False, ignore_collision=False
-    ).exclude(original_title='')
     return (
-        qs.annotate(low_title=Lower('title'), low_orig=Lower('original_title'))
-        .annotate(pos=StrIndex('low_title', F('low_orig')))
-        .filter(pos__gt=0)
-        .exclude(low_title=F('low_orig'))
+        Show.objects.filter(
+            type=show_type,
+            original_title__isnull=False,
+            ignore_collision=False,
+            title=F('original_title'),
+        )
+        .exclude(title='')
         .values('id', 'title', 'original_title')
     )
 
@@ -931,66 +950,8 @@ def _calculate_profession_stats_indexed():
 
 
 def _calculate_profession_stats():
-    """Calculate RU and EN profession metrics from one database pass."""
-    ru_to_en = PROFESSION_TRANS_MAP
-    en_to_ru = {en: ru for ru, en in ru_to_en.items()}
-    ru_raw_to_norm = RAW_TO_NORMALIZED_RU
-    en_raw_to_norm = RAW_TO_NORMALIZED_EN
-    known_ru_raw = set(ru_raw_to_norm)
-    known_en_raw = set(en_raw_to_norm)
-
-    rows = (
-        ShowCrew.objects.filter(Q(profession__in=known_ru_raw) | Q(en_profession__in=known_en_raw))
-        .values_list(
-            'profession',
-            'en_profession',
-            'person_id',
-            'person__master_person_id',
-            'canonical_person_id',
-        )
-        .iterator(chunk_size=10000)
-    )
-    ru_persons = defaultdict(set)
-    en_persons = defaultdict(set)
-    known_masters = set()
-
-    for profession, en_profession, person_id, master_person_id, canonical_person_id in rows:
-        canonical_id = canonical_person_id or master_person_id or person_id
-        norm_ru = ru_raw_to_norm.get(profession)
-        if not norm_ru:
-            norm_ru = en_to_ru.get(en_raw_to_norm.get(en_profession))
-        if norm_ru:
-            ru_persons[norm_ru].add(canonical_id)
-            known_masters.add(canonical_id)
-
-        norm_en = en_raw_to_norm.get(en_profession)
-        if not norm_en:
-            norm_en = ru_to_en.get(ru_raw_to_norm.get(profession))
-        if norm_en:
-            en_persons[norm_en].add(canonical_id)
-            known_masters.add(canonical_id)
-
-    unknown_count = max(
-        0,
-        Person.objects.filter(master_person__isnull=True).count() - len(known_masters),
-    )
-
-    def make_result(persons_by_profession):
-        result = [
-            {'name': name, 'value': len(person_ids)}
-            for name, person_ids in persons_by_profession.items()
-            if person_ids
-        ]
-        if unknown_count > 0:
-            result.append(
-                {
-                    'name': '\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e',
-                    'value': unknown_count,
-                }
-            )
-        return sorted(result, key=lambda x: x['value'], reverse=True)
-
-    return make_result(ru_persons), make_result(en_persons)
+    """Aggregate canonical people in PostgreSQL instead of streaming every crew row to Python."""
+    return _calculate_profession_stats_canonical()
 
 
 def _calculate_profession_stats_canonical():
@@ -1107,25 +1068,8 @@ def get_missing_status_list(show_type: str):
 
 
 def calculate_duplicate_photo_urls_metric():
-    tmdb_qs = (
-        Person.objects.filter(master_person__isnull=True)
-        .exclude(tmdb_photo_url='')
-        .filter(tmdb_photo_url__isnull=False)
-        .values('tmdb_photo_url')
-        .annotate(cnt=Count('id'))
-        .filter(cnt__gt=1)
-    )
-    tmdb_dupes = tmdb_qs.count()
-
-    kp_qs = (
-        Person.objects.filter(master_person__isnull=True)
-        .exclude(kp_photo_url='')
-        .filter(kp_photo_url__isnull=False)
-        .values('kp_photo_url')
-        .annotate(cnt=Count('id'))
-        .filter(cnt__gt=1)
-    )
-    kp_dupes = kp_qs.count()
+    tmdb_dupes = _potential_duplicate_photo_groups('tmdb_photo_url').count()
+    kp_dupes = _potential_duplicate_photo_groups('kp_photo_url').count()
 
     data = [
         {'name': 'TMDB дубликаты', 'value': tmdb_dupes},
@@ -1134,24 +1078,32 @@ def calculate_duplicate_photo_urls_metric():
     return sorted(data, key=lambda x: x['value'], reverse=True)
 
 
+def _potential_duplicate_photo_groups(field: str):
+    """Photo groups that have not already been disproved by TMDB identity.
+
+    A unique TMDB person ID is authoritative. Two rows with different IDs may
+    legitimately share an image, so they are not duplicate people. Only a
+    group containing an unresolved row remains a review candidate.
+    """
+    return (
+        Person.objects.filter(master_person__isnull=True, **{f'{field}__gt': ''})
+        .values(field)
+        .annotate(cnt=Count('*'), tmdb_id_count=Count('tmdb_id'))
+        .filter(cnt__gt=1, tmdb_id_count__lt=F('cnt'))
+    )
+
+
 def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int = 50):
     """Return one page of duplicate-photo groups without materializing all groups."""
     field = 'tmdb_photo_url' if 'TMDB' in source_type else 'kp_photo_url'
     version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
-    cache_key = f'metrics:duplicate_photo_urls:{version}:{field}:{offset}:{limit}'
+    # v2 excludes groups already disproved by distinct TMDB identities.
+    cache_key = f'metrics:duplicate_photo_urls:v2:{version}:{field}:{offset}:{limit}'
     cached_page = cache.get(cache_key)
     if cached_page is not None:
         return cached_page
 
-    dupe_urls_data = (
-        Person.objects.filter(master_person__isnull=True)
-        .exclude(**{field: ''})
-        .filter(**{f'{field}__isnull': False})
-        .values(field)
-        .annotate(cnt=Count('id'))
-        .filter(cnt__gt=1)
-        .order_by('-cnt', field)
-    )
+    dupe_urls_data = _potential_duplicate_photo_groups(field).order_by('-cnt', field)
 
     group_rows = list(dupe_urls_data[offset : offset + limit + 1])
     has_more = len(group_rows) > limit
@@ -1244,8 +1196,8 @@ def queue_duplicate_photo_urls_warmup():
     """Queue duplicate pages before a user opens the corresponding modal."""
     version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
     cache_keys = (
-        f'metrics:duplicate_photo_urls:{version}:kp_photo_url:0:50',
-        f'metrics:duplicate_photo_urls:{version}:tmdb_photo_url:0:50',
+        f'metrics:duplicate_photo_urls:v2:{version}:kp_photo_url:0:50',
+        f'metrics:duplicate_photo_urls:v2:{version}:tmdb_photo_url:0:50',
     )
     if any(cache.get(cache_key) is None for cache_key in cache_keys) and cache.add(
         'metrics:duplicate_photo_urls:warmup_lock', True, timeout=300

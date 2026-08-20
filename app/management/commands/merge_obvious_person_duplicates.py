@@ -46,8 +46,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--min-common-shows',
             type=int,
-            default=1,
-            help='Minimum number of shared shows required for every alias (default: 1).',
+            default=2,
+            help='Minimum number of shared shows required for every alias (default: 2).',
         )
         parser.add_argument(
             '--limit',
