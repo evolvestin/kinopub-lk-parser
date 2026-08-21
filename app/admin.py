@@ -651,12 +651,6 @@ class ShowAdmin(admin.ModelAdmin):
             return queryset.filter(tmdb_id__isnull=False).filter(
                 Q(kinopoisk_url__isnull=True) | Q(kinopoisk_url='')
             )
-        if metric == 'title_collision':
-            return queryset.filter(
-                original_title__isnull=False,
-                ignore_collision=False,
-                title=F('original_title'),
-            ).exclude(title='')
         if metric == 'missing_year':
             return queryset.filter(kinopub_id__isnull=False, year__isnull=True)
         if metric == 'tmdb_missing_year':

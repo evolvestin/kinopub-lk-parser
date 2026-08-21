@@ -39,7 +39,6 @@ DUPLICATE_PHOTO_CACHE_VERSION_KEY = 'metrics:duplicate_photo_urls:cache_version'
 DUPLICATE_PHOTO_CACHE_TIMEOUT = 86400
 PERSON_DETAIL_CACHE_VERSION_KEY = 'metrics:person_detail:cache_version'
 PERSON_DETAIL_CACHE_TIMEOUT = 86400
-TITLE_COLLISION_CACHE_VERSION_KEY = 'metrics:title_collision:cache_version'
 UNRELEASED_IMDB_STATUSES = ('Filming', 'Post Production', 'Pre Production')
 PERSON_DETAIL_WARM_KEYS = {
     'total_persons_by_show_type',
@@ -344,7 +343,6 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
         'has_kp': calculate_has_kp_metric(),
         'has_imdb': calculate_has_imdb_metric(),
         'total_shows': calculate_total_shows_metric(),
-        'title_collision': calculate_title_collision_metric(),
         'missing_year': calculate_missing_year_metric(),
         'missing_status': calculate_missing_status_metric(),
         'missing_plot': calculate_missing_plot_metric(),
@@ -422,23 +420,6 @@ def get_global_metrics_history() -> dict:
     return result
 
 
-def calculate_title_collision_metric():
-    # Different localized and original titles are valid metadata. A collision
-    # exists only when KinoPub supplied the same value in both fields.
-    stats = (
-        Show.objects.filter(
-            original_title__isnull=False,
-            ignore_collision=False,
-            title=F('original_title'),
-        )
-        .exclude(title='')
-        .values('type')
-        .annotate(total=Count('id'))
-        .order_by('-total')
-    )
-    return [{'type': _format_type(item['type']), 'collisions': item['total']} for item in stats]
-
-
 def get_missing_kp_list(show_type: str):
     return (
         Show.objects.filter(
@@ -463,45 +444,6 @@ def get_kp_unrated_list(show_type: str):
         )
         .exclude(kinopoisk_url__endswith='/film/0')
         .values('id', 'title', 'original_title')
-    )
-
-
-def get_title_collision_list(show_type: str):
-    return (
-        Show.objects.filter(
-            type=show_type,
-            original_title__isnull=False,
-            ignore_collision=False,
-            title=F('original_title'),
-        )
-        .exclude(title='')
-        .values('id', 'title', 'original_title')
-    )
-
-
-def get_title_collision_page(show_type: str, offset: int = 0, limit: int = 50):
-    """Return a cached page because collision detection is a CPU-heavy text scan."""
-    cache_version = cache.get(TITLE_COLLISION_CACHE_VERSION_KEY, 1)
-    cache_key = f'metrics:title_collision:{cache_version}:{show_type}:{offset}:{limit}'
-    cached_page = cache.get(cache_key)
-    if cached_page is not None:
-        return cached_page
-
-    page_items = list(
-        get_title_collision_list(show_type).order_by('id')[offset : offset + limit + 1]
-    )
-    has_more = len(page_items) > limit
-    result = (page_items[:limit], has_more)
-    cache.set(cache_key, result, timeout=300)
-    return result
-
-
-def invalidate_title_collision_cache():
-    """Invalidate all cached collision pages after a collision is allowed."""
-    cache.set(
-        TITLE_COLLISION_CACHE_VERSION_KEY,
-        int(cache.get(TITLE_COLLISION_CACHE_VERSION_KEY, 1)) + 1,
-        timeout=86400,
     )
 
 

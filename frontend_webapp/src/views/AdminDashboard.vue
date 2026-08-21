@@ -243,7 +243,6 @@
                     <a v-if="item.kinopub_url" :href="item.kinopub_url" target="_blank" class="admin-link-btn external-link-btn kinopub-link" title="Открыть на Кинопабе">На Кинопабе</a>
                     <a v-if="item.kinopoisk_url" :href="item.kinopoisk_url" target="_blank" class="admin-link-btn external-link-btn kinopoisk-link" title="Открыть на Кинопоиске">Кинопоиск</a>
                     <a v-if="item.imdb_url" :href="item.imdb_url" target="_blank" class="admin-link-btn external-link-btn imdb-link" title="Открыть на IMDb">IMDb</a>
-                    <button v-if="modalDataContext.request_key === 'title_collision'" type="button" class="admin-link-btn collision-allow-btn" @click="allowTitleCollision(item)">Разрешить коллизию</button>
                     <a v-if="item.admin_url" :href="item.admin_url" target="_blank" class="admin-link-btn admin-link" title="Открыть в админке">В админке</a>
                   </div>
                 </div>
@@ -320,8 +319,7 @@ const metricGroups = ref([
       { key: 'missing_year', icon: 'cal', color: '#e67e22', label: 'Без года', centerLabel: 'БЕЗ ГОДА', valField: 'value', severity: 'critical', desc: 'Шоу из KinoPub, у которых в базе не заполнен год выхода.', showDesc: false },
       { key: 'missing_status', icon: 'target', color: '#ef1960', label: 'Без статуса', centerLabel: 'БЕЗ СТАТУСА', valField: 'value', severity: 'critical', desc: 'Сериалы и ТВ-шоу из KinoPub, у которых в базе отсутствует статус.', showDesc: false },
       { key: 'missing_durations', icon: 'time', color: '#6887ff', label: 'Без хронометража', centerLabel: 'БЕЗ ХРОНО', valField: 'value', severity: 'critical', desc: 'Шоу из KinoPub, для которых в базе нет данных о хронометраже.', showDesc: false },
-      { key: 'missing_plot', icon: 'list', color: '#1abc9c', label: 'Без описания', centerLabel: 'БЕЗ ОПИСАНИЯ', valField: 'value', severity: 'info', desc: 'Шоу из KinoPub, у которых в базе отсутствует описание.', showDesc: false },
-      { key: 'title_collision', icon: 'edit', color: 'var(--info)', label: 'Коллизии названий', centerLabel: 'КОЛЛИЗИЙ', valField: 'collisions', severity: 'critical', desc: 'Основное и оригинальное названия совпадают; разные названия не считаются коллизией.', showDesc: false }
+      { key: 'missing_plot', icon: 'list', color: '#1abc9c', label: 'Без описания', centerLabel: 'БЕЗ ОПИСАНИЯ', valField: 'value', severity: 'info', desc: 'Шоу из KinoPub, у которых в базе отсутствует описание.', showDesc: false }
     ]
   },
   {
@@ -672,28 +670,6 @@ const closeDetails = () => {
   modalRequestToken += 1
   isModalOpen.value = false
   if (observer) observer.disconnect()
-}
-
-const allowTitleCollision = async (item) => {
-  if (!item?.id || item.is_collision_updating) return
-
-  item.is_collision_updating = true
-  try {
-    const response = await fetch('/api/metrics/title_collision/allow/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ show_id: item.id })
-    })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-    modalItems.value = modalItems.value.filter((currentItem) => currentItem.id !== item.id)
-  } catch (e) {
-    console.error(e)
-    alert('Не удалось разрешить коллизию: ' + e.message)
-  } finally {
-    item.is_collision_updating = false
-  }
 }
 
 const addToQueue = async (item) => {

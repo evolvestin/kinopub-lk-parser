@@ -9,6 +9,7 @@ from urllib3.util.retry import Retry
 from app.models import Country, Genre, Person, Show, ShowCrew
 from app.services.person_matching import find_person_for_tmdb
 from app.services.show_duration import upsert_show_duration
+from app.services.show_merge import merge_show_records
 from app.utils import normalize_country_name
 from shared.constants import SHOW_TYPE_MAPPING, ShowType
 
@@ -189,8 +190,19 @@ def sync_show_from_tmdb(
     external_ids = details.get('external_ids', {})
     found_imdb_id = external_ids.get('imdb_id') or target_imdb_id
 
-    if not show and found_imdb_id:
-        show = Show.objects.filter(imdb_id=found_imdb_id).first()
+    if found_imdb_id:
+        show_with_imdb = Show.objects.filter(imdb_id=found_imdb_id).first()
+        if show_with_imdb and show and show_with_imdb.id != show.id:
+            if show_with_imdb.kinopub_id and not show.kinopub_id:
+                canonical_id, duplicate_id = show_with_imdb.id, show.id
+            elif show.kinopub_id and not show_with_imdb.kinopub_id:
+                canonical_id, duplicate_id = show.id, show_with_imdb.id
+            else:
+                canonical_id, duplicate_id = show_with_imdb.id, show.id
+            merge_show_records(canonical_id, duplicate_id)
+            show = Show.objects.get(pk=canonical_id)
+        elif not show:
+            show = show_with_imdb
 
     if not show:
         show = Show()

@@ -34,11 +34,6 @@ urlpatterns = proxy_patterns + [
     ),
     path('api/metrics/details/<str:key>/', views.get_metric_details, name='get_metric_details'),
     path('api/metrics/queue_update/', views.queue_update_details, name='queue_update_details'),
-    path(
-        'api/metrics/title_collision/allow/',
-        views.allow_title_collision_api,
-        name='allow_title_collision_api',
-    ),
     path('api/metrics/merge_persons/', views.merge_persons_api, name='merge_persons_api'),
     path(
         'api/metrics/reject_person_photo/',

@@ -69,8 +69,6 @@ from app.services.metrics import (
     get_no_genres_list,
     get_persons_avatar_list,
     get_profession_persons_list,
-    get_title_collision_list,
-    get_title_collision_page,
     get_tmdb_missing_durations_list,
     get_tmdb_missing_plot_list,
     get_tmdb_missing_status_list,
@@ -86,7 +84,6 @@ from app.services.metrics import (
     get_unused_countries_list,
     get_unused_persons_list,
     invalidate_duplicate_photo_urls_cache,
-    invalidate_title_collision_cache,
     person_detail_cache_key,
 )
 from app.services.stats_calculator import (
@@ -1990,9 +1987,6 @@ def get_metric_details(request, key):
         query_params.update(
             {'type': db_show_type, 'tmdb_id__isnull': 'False', 'kinopoisk_url__isnull': 'True'}
         )
-    elif key == 'title_collision':
-        items = get_title_collision_list(db_show_type)
-        query_params['type'] = db_show_type
     elif key == 'missing_year':
         items = get_missing_year_list(db_show_type)
         query_params.update(
@@ -2170,8 +2164,6 @@ def get_metric_details(request, key):
 
     if key == 'duplicate_photo_urls':
         items, has_more = get_duplicate_photo_urls_page(show_type, offset=offset, limit=limit)
-    elif key == 'title_collision':
-        items, has_more = get_title_collision_page(db_show_type, offset=offset, limit=limit)
     elif isinstance(items, QuerySet):
         page_qs = items if items.query.order_by else items.order_by('id')
         page_items = list(page_qs[offset : offset + limit + 1])
@@ -2298,27 +2290,6 @@ def get_metric_details(request, key):
     if person_page_cache_key:
         cache.set(person_page_cache_key, payload, timeout=PERSON_DETAIL_CACHE_TIMEOUT)
     return JsonResponse(payload)
-
-
-@csrf_exempt
-@staff_member_required
-@require_http_methods(['POST'])
-def allow_title_collision_api(request):
-    """Mark a show collision as reviewed so it is removed from the metric."""
-    try:
-        data = json.loads(request.body)
-        show_id = data.get('show_id')
-        if not show_id:
-            return JsonResponse({'error': 'Show ID is required'}, status=400)
-
-        updated = Show.objects.filter(id=show_id).update(ignore_collision=True)
-        if not updated:
-            return JsonResponse({'error': 'Show not found'}, status=404)
-
-        invalidate_title_collision_cache()
-        return JsonResponse({'status': 'ok', 'show_id': int(show_id)})
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
 @csrf_exempt

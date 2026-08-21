@@ -31,7 +31,6 @@ from app.services.metrics import (
     calculate_missing_year_metric,
     calculate_no_countries_metric,
     calculate_no_genres_metric,
-    calculate_title_collision_metric,
     calculate_unmapped_genres_metric,
     calculate_unused_persons_metric,
 )
@@ -178,7 +177,6 @@ class Command(LoggableBaseCommand):
         data_checks = [
             ('Нет рейтинга KP', calculate_missing_kp_metric, 'value'),
             ('Нет рейтинга IMDb', calculate_missing_imdb_metric, 'value'),
-            ('Коллизии названий', calculate_title_collision_metric, 'collisions'),
             ('KinoPub без года', calculate_missing_year_metric, 'value'),
             ('KinoPub без статуса', calculate_missing_status_metric, 'value'),
             ('KinoPub без хронометража', calculate_missing_durations_metric, 'value'),
