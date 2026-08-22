@@ -210,6 +210,7 @@ def sync_show_from_tmdb(
                 canonical_id,
                 duplicate_id,
                 allow_tmdb_conflict=has_tmdb_conflict,
+                preferred_imdb_id=found_imdb_id,
             )
             show = Show.objects.get(pk=canonical_id)
             # The fetched TMDB row may be a duplicate identity. Keep the

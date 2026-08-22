@@ -229,3 +229,46 @@ class ShowMergeTests(TestCase):
         merged.refresh_from_db()
         self.assertEqual(merged.tmdb_id, 270263)
         self.assertEqual(merged.plot, 'Overview')
+
+    @patch('app.services.tmdb_client.TMDBClient')
+    def test_tmdb_sync_keeps_tmdb_confirmed_imdb_when_existing_row_is_stale(self, client_class):
+        canonical = Show.objects.create(
+            kinopub_id=1005,
+            tmdb_id=270264,
+            imdb_id='tt26930830',
+            title='Stale title',
+            original_title='Stale title',
+            type='Series',
+            year=2023,
+        )
+        duplicate = Show.objects.create(
+            tmdb_id=32399,
+            imdb_id='tt15565600',
+            title='Confirmed title',
+            original_title='Confirmed title',
+            type='Series',
+            year=2023,
+        )
+        client_class.return_value.get_details.return_value = {
+            'external_ids': {'imdb_id': 'tt15565600'},
+            'name': 'Confirmed title',
+            'original_name': 'Confirmed title',
+            'first_air_date': '2023-01-01',
+            'overview': 'Overview',
+            'status': 'Ended',
+            'genres': [],
+            'production_countries': [],
+            'credits': {'cast': [], 'crew': []},
+        }
+
+        merged = sync_show_from_tmdb(
+            show_id=canonical.id,
+            tmdb_id=canonical.tmdb_id,
+            media_type='tv',
+        )
+
+        self.assertEqual(merged.id, canonical.id)
+        self.assertFalse(Show.objects.filter(id=duplicate.id).exists())
+        merged.refresh_from_db()
+        self.assertEqual(merged.imdb_id, 'tt15565600')
+        self.assertEqual(merged.tmdb_id, 270264)

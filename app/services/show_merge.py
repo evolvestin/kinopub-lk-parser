@@ -58,7 +58,7 @@ def _same_or_fill(canonical, duplicate, field_name):
     return False
 
 
-def _merge_show_fields(canonical, duplicate, allow_tmdb_conflict=False):
+def _merge_show_fields(canonical, duplicate, allow_tmdb_conflict=False, preferred_imdb_id=None):
     identity_fields = ('kinopub_id', 'tmdb_id', 'imdb_id')
     identity_to_transfer = {}
     for field_name in identity_fields:
@@ -76,6 +76,21 @@ def _merge_show_fields(canonical, duplicate, allow_tmdb_conflict=False):
                 Show.objects.filter(pk=duplicate.id, tmdb_id=duplicate_value).update(tmdb_id=None)
                 duplicate.tmdb_id = None
                 continue
+            if field_name == 'imdb_id' and preferred_imdb_id:
+                if preferred_imdb_id == canonical_value:
+                    # The IMDb ID confirmed by the TMDB response is already
+                    # on the canonical row; discard the stale duplicate ID.
+                    Show.objects.filter(pk=duplicate.id, imdb_id=duplicate_value).update(
+                        imdb_id=None
+                    )
+                    duplicate.imdb_id = None
+                    continue
+                if preferred_imdb_id == duplicate_value:
+                    # Preserve the canonical row (which may contain the
+                    # KinoPub identity), but transfer the TMDB-confirmed IMDb
+                    # ID from the duplicate to it.
+                    identity_to_transfer[field_name] = duplicate_value
+                    continue
             raise ShowMergeConflictError(
                 f'Conflicting {field_name}: {canonical.id}={canonical_value}, '
                 f'{duplicate.id}={duplicate_value}'
@@ -283,7 +298,10 @@ def _merge_simple_relations(canonical_id, duplicate_id, stats):
 
 @transaction.atomic
 def merge_show_records(
-    canonical_id: int, duplicate_id: int, allow_tmdb_conflict=False
+    canonical_id: int,
+    duplicate_id: int,
+    allow_tmdb_conflict=False,
+    preferred_imdb_id=None,
 ) -> ShowMergeStats:
     if canonical_id == duplicate_id:
         raise ShowMergeConflictError('Cannot merge a show into itself')
@@ -299,7 +317,12 @@ def merge_show_records(
     duplicate = shows[duplicate_id]
     stats = ShowMergeStats(canonical_id=canonical_id, duplicate_id=duplicate_id)
 
-    _merge_show_fields(canonical, duplicate, allow_tmdb_conflict=allow_tmdb_conflict)
+    _merge_show_fields(
+        canonical,
+        duplicate,
+        allow_tmdb_conflict=allow_tmdb_conflict,
+        preferred_imdb_id=preferred_imdb_id,
+    )
     canonical.countries.add(*duplicate.countries.all())
     canonical.genres.add(*duplicate.genres.all())
     _merge_crew(canonical_id, duplicate_id, stats)
