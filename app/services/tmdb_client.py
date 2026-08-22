@@ -199,8 +199,22 @@ def sync_show_from_tmdb(
                 canonical_id, duplicate_id = show.id, show_with_imdb.id
             else:
                 canonical_id, duplicate_id = show_with_imdb.id, show.id
-            merge_show_records(canonical_id, duplicate_id)
+            canonical_show = Show.objects.get(pk=canonical_id)
+            duplicate_show = Show.objects.get(pk=duplicate_id)
+            has_tmdb_conflict = (
+                canonical_show.tmdb_id not in (None, '')
+                and duplicate_show.tmdb_id not in (None, '')
+                and canonical_show.tmdb_id != duplicate_show.tmdb_id
+            )
+            merge_show_records(
+                canonical_id,
+                duplicate_id,
+                allow_tmdb_conflict=has_tmdb_conflict,
+            )
             show = Show.objects.get(pk=canonical_id)
+            # The fetched TMDB row may be a duplicate identity. Keep the
+            # canonical row's existing TMDB ID after the merge.
+            target_tmdb_id = show.tmdb_id or target_tmdb_id
         elif not show:
             show = show_with_imdb
 

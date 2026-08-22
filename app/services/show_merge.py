@@ -58,7 +58,7 @@ def _same_or_fill(canonical, duplicate, field_name):
     return False
 
 
-def _merge_show_fields(canonical, duplicate):
+def _merge_show_fields(canonical, duplicate, allow_tmdb_conflict=False):
     identity_fields = ('kinopub_id', 'tmdb_id', 'imdb_id')
     identity_to_transfer = {}
     for field_name in identity_fields:
@@ -69,6 +69,13 @@ def _merge_show_fields(canonical, duplicate):
             and duplicate_value not in (None, '')
             and canonical_value != duplicate_value
         ):
+            if field_name == 'tmdb_id' and allow_tmdb_conflict:
+                # The TMDB details response can prove that two TMDB rows
+                # represent the same IMDb title. Keep the canonical record's
+                # established TMDB identity and discard the duplicate's one.
+                Show.objects.filter(pk=duplicate.id, tmdb_id=duplicate_value).update(tmdb_id=None)
+                duplicate.tmdb_id = None
+                continue
             raise ShowMergeConflictError(
                 f'Conflicting {field_name}: {canonical.id}={canonical_value}, '
                 f'{duplicate.id}={duplicate_value}'
@@ -275,7 +282,9 @@ def _merge_simple_relations(canonical_id, duplicate_id, stats):
 
 
 @transaction.atomic
-def merge_show_records(canonical_id: int, duplicate_id: int) -> ShowMergeStats:
+def merge_show_records(
+    canonical_id: int, duplicate_id: int, allow_tmdb_conflict=False
+) -> ShowMergeStats:
     if canonical_id == duplicate_id:
         raise ShowMergeConflictError('Cannot merge a show into itself')
 
@@ -290,7 +299,7 @@ def merge_show_records(canonical_id: int, duplicate_id: int) -> ShowMergeStats:
     duplicate = shows[duplicate_id]
     stats = ShowMergeStats(canonical_id=canonical_id, duplicate_id=duplicate_id)
 
-    _merge_show_fields(canonical, duplicate)
+    _merge_show_fields(canonical, duplicate, allow_tmdb_conflict=allow_tmdb_conflict)
     canonical.countries.add(*duplicate.countries.all())
     canonical.genres.add(*duplicate.genres.all())
     _merge_crew(canonical_id, duplicate_id, stats)

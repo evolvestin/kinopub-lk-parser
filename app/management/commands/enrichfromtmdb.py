@@ -73,10 +73,12 @@ class Command(LoggableBaseCommand):
                         no_data_count += 1
                         Show.objects.filter(id=show_id).update(updated_at=timezone.now())
 
+                    checked_show_id = updated_show.id if updated_show else show_id
+
                     # A successful TMDB request is terminal for this enrichment pass:
                     # fields absent from the response are genuine missing data and must
                     # not cause the same show to be selected on every hourly run.
-                    Show.objects.filter(id=show_id).update(
+                    Show.objects.filter(id=checked_show_id).update(
                         tmdb_enrichment_checked_at=timezone.now()
                     )
 
