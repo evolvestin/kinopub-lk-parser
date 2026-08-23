@@ -622,10 +622,18 @@ def run_gap_scanner_task():
 
 
 @shared_task(time_limit=3600, soft_time_limit=3300)
-@single_instance_task(lock_name=RedisLock.FETCH_PERSON_PHOTOS, timeout=3600)
+@single_instance_task(lock_name=RedisLock.FETCH_PERSON_PHOTOS, timeout=7200)
 @safe_execution
 def fetch_person_photos_task(limit=2000):
-    call_command('fetchpersonphotos', limit=limit)
+    # Person photo writes share rows with TMDB enrichment and metrics scans.
+    # Serialize them through the same catalog lock as the other DB writers.
+    with _wait_for_redis_lock(
+        RedisLock.KINOPUB_PARSER_GLOBAL,
+        lock_timeout=7200,
+        wait_timeout=7200,
+    ) as acquired:
+        if acquired:
+            call_command('fetchpersonphotos', limit=limit)
 
 
 def get_kp_mapping():
@@ -641,15 +649,39 @@ def get_kp_mapping():
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.SYNC_POISKKINO_RATINGS, timeout=1800)
+@single_instance_task(lock_name=RedisLock.SYNC_POISKKINO_RATINGS, timeout=7200)
 def sync_poiskkino_ratings_task():
-    call_command('syncpoiskkinoratings')
+    with _wait_for_redis_lock(
+        RedisLock.KINOPUB_PARSER_GLOBAL,
+        lock_timeout=14400,
+        wait_timeout=14400,
+    ) as catalog_acquired:
+        if catalog_acquired:
+            with _wait_for_redis_lock(
+                RedisLock.EXTERNAL_RATING_WRITES,
+                lock_timeout=14400,
+                wait_timeout=14400,
+            ) as rating_acquired:
+                if rating_acquired:
+                    call_command('syncpoiskkinoratings')
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.SYNC_IMDB_DATA, timeout=7200)
+@single_instance_task(lock_name=RedisLock.SYNC_IMDB_DATA, timeout=14400)
 def sync_imdb_data_task():
-    call_command('syncimdbdata')
+    with _wait_for_redis_lock(
+        RedisLock.KINOPUB_PARSER_GLOBAL,
+        lock_timeout=21600,
+        wait_timeout=21600,
+    ) as catalog_acquired:
+        if catalog_acquired:
+            with _wait_for_redis_lock(
+                RedisLock.EXTERNAL_RATING_WRITES,
+                lock_timeout=14400,
+                wait_timeout=14400,
+            ) as rating_acquired:
+                if rating_acquired:
+                    call_command('syncimdbdata')
 
 
 @shared_task
@@ -822,8 +854,20 @@ def parse_tmdb_library_task(media_type: str = 'all', batch_size: int = 5000):
 
 
 @shared_task(time_limit=3600, soft_time_limit=3300)
-@single_instance_task(lock_name=RedisLock.ENRICH_TMDB_SHOWS, timeout=3600)
+@single_instance_task(lock_name=RedisLock.ENRICH_TMDB_SHOWS, timeout=7200)
 @safe_execution
 def enrich_tmdb_shows_task(limit: int = 5000):
-    logging.info(f'Starting scheduled TMDB shows enrichment task (limit={limit}).')
-    call_command('enrichfromtmdb', limit=limit)
+    with _wait_for_redis_lock(
+        RedisLock.KINOPUB_PARSER_GLOBAL,
+        lock_timeout=14400,
+        wait_timeout=14400,
+    ) as catalog_acquired:
+        if catalog_acquired:
+            with _wait_for_redis_lock(
+                RedisLock.EXTERNAL_RATING_WRITES,
+                lock_timeout=14400,
+                wait_timeout=14400,
+            ) as rating_acquired:
+                if rating_acquired:
+                    logging.info(f'Starting scheduled TMDB shows enrichment task (limit={limit}).')
+                    call_command('enrichfromtmdb', limit=limit)

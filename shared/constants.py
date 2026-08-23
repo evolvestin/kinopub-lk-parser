@@ -19,6 +19,7 @@ class RedisLock(StrEnum):
     FETCH_PERSON_PHOTOS = 'fetch_person_photos_lock'
     SYNC_POISKKINO_RATINGS = 'sync_poiskkino_ratings'
     SYNC_IMDB_DATA = 'sync_imdb_data'
+    EXTERNAL_RATING_WRITES = 'external_rating_writes'
     ENRICH_TMDB_SHOWS = 'enrich_tmdb_shows_lock'
 
 

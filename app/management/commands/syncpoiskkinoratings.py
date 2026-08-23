@@ -30,6 +30,13 @@ class Command(LoggableBaseCommand):
             help='Optional cap for shows in this run (default: 200 * 250).',
         )
 
+    @staticmethod
+    def _object_list(item, field_name):
+        value = item.get(field_name) if isinstance(item, dict) else None
+        if not isinstance(value, list):
+            return []
+        return [entry for entry in value if isinstance(entry, dict)]
+
     def handle(self, *args, **options):
         requested_limit = options.get('limit')
         selection_limit = FREE_DAILY_REQUEST_LIMIT * POISKKINO_BATCH_SIZE
@@ -137,19 +144,19 @@ class Command(LoggableBaseCommand):
         all_genre_names = {
             genre_data['name']
             for item in data_map.values()
-            for genre_data in item.get('genres', [])
+            for genre_data in self._object_list(item, 'genres')
             if genre_data.get('name')
         }
         all_country_names = {
             normalize_country_name(country_data['name'])
             for item in data_map.values()
-            for country_data in item.get('countries', [])
+            for country_data in self._object_list(item, 'countries')
             if country_data.get('name')
         }
         all_person_names = {
             person_data['name']
             for item in data_map.values()
-            for person_data in item.get('persons', [])
+            for person_data in self._object_list(item, 'persons')
             if person_data.get('name')
         }
 
@@ -249,18 +256,18 @@ class Command(LoggableBaseCommand):
                 )
             )
 
-            for genre_data in item.get('genres', []):
+            for genre_data in self._object_list(item, 'genres'):
                 genre = existing_genres.get(genre_data.get('name'))
                 if genre:
                     show.genres.add(genre)
 
-            for country_data in item.get('countries', []):
+            for country_data in self._object_list(item, 'countries'):
                 country_name = normalize_country_name(country_data.get('name', ''))
                 country = existing_countries.get(country_name)
                 if country:
                     show.countries.add(country)
 
-            for person_data in item.get('persons', []):
+            for person_data in self._object_list(item, 'persons'):
                 person_name = person_data.get('name')
                 person = existing_persons.get(person_name)
                 if not person_name or not person:

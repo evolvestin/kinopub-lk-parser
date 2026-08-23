@@ -407,6 +407,7 @@ if ENVIRONMENT == 'PROD':
         {
             'run_history_parser': {
                 'task': 'app.tasks.run_history_parser_task',
+                # Keep the history checks exactly on the established schedule.
                 'schedule': MultiSchedule(
                     crontab(minute=0, hour='0,5,7,11,14-23'), crontab(minute=30, hour='20-22')
                 ),
@@ -421,15 +422,21 @@ if ENVIRONMENT == 'PROD':
             },
             'fetch_person_photos': {
                 'task': 'app.tasks.fetch_person_photos_task',
+                # A run takes 17-23 minutes in production, so an hourly run
+                # leaves enough room before the next batch.
                 'schedule': crontab(minute=15),
             },
             'sync_poiskkino_ratings': {
                 'task': 'app.tasks.sync_poiskkino_ratings_task',
-                'schedule': crontab(minute=0, hour=5),
+                # Observed runtime is about 37 minutes. Keep it between the
+                # 11:00 and 14:00 history-parser windows.
+                'schedule': crontab(minute=0, hour=12),
             },
             'sync_imdb_data': {
                 'task': 'app.tasks.sync_imdb_data_task',
-                'schedule': crontab(minute=0, hour=4),
+                # Observed runtime is about 2h22m. This avoids the daily sync
+                # and leaves a gap before the 11:00 history-parser run.
+                'schedule': crontab(minute=0, hour=8),
             },
             'backup_database_hourly': {
                 'task': 'app.tasks.backup_database',
@@ -437,11 +444,15 @@ if ENVIRONMENT == 'PROD':
             },
             'run_new_episodes': {
                 'task': 'app.tasks.run_new_episodes_task',
+                # This task sends user notifications; keep checks in daytime.
                 'schedule': crontab(minute=20, hour='8-21'),
             },
             'enrich_tmdb_shows': {
                 'task': 'app.tasks.enrich_tmdb_shows_task',
-                'schedule': crontab(minute=35),
+                # Production runs commonly consume the full 55-minute soft
+                # limit. Five deliberately separated windows prevent hourly
+                # self-overlap and leave room for the other catalog writers.
+                'schedule': crontab(minute=0, hour='1,3,6,9,13'),
             },
         }
     )
