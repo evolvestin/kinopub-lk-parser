@@ -16,6 +16,7 @@ from middlewares import (
     UserSyncMiddleware,
 )
 from services.bot_instance import BotInstance
+from services.telegram_health import TelegramPollingIncidentHandler
 
 
 class RemoteLogHandler(logging.Handler):
@@ -25,6 +26,9 @@ class RemoteLogHandler(logging.Handler):
 
     def emit(self, record):
         try:
+            if getattr(record, '_telegram_incident_handled', False):
+                return
+
             # Игнорируем логи от самого aiohttp, чтобы не получить бесконечный цикл при ошибках сети
             if record.name.startswith('aiohttp'):
                 return
@@ -62,6 +66,10 @@ remote_handler = RemoteLogHandler()
 remote_handler.setLevel(logging.WARNING)
 remote_handler.setFormatter(logging.Formatter('%(message)s'))
 root_logger.addHandler(remote_handler)
+
+# aiogram already retries polling failures. This handler turns a noisy burst
+# into one outage report, periodic summaries, and a recovery notification.
+logging.getLogger('aiogram.dispatcher').addHandler(TelegramPollingIncidentHandler())
 
 
 def register_router() -> Router:

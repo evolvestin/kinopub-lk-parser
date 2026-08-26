@@ -167,7 +167,7 @@ async def log_telegram_event(raw_data: dict):
         pass
 
 
-async def send_log_entry(level: str, module: str, message: str):
+async def send_log_entry(level: str, module: str, message: str, notify: bool = False):
     """
     Отправляет системный лог (ошибку/предупреждение) в базу Django.
     Ошибки при отправке игнорируются или выводятся в stderr, чтобы избежать рекурсии логгера.
@@ -177,6 +177,8 @@ async def send_log_entry(level: str, module: str, message: str):
         'module': module,
         'message': message,
     }
+    if notify:
+        payload['notify'] = True
     url = f'{BACKEND_URL}/api/bot/log_entry/'
     try:
         async with aiohttp.ClientSession() as session:

@@ -287,6 +287,9 @@ _heartbeat_base = os.getenv('HEARTBEAT_FILE', str(data_dir / 'heartbeat'))
 HEARTBEAT_FILE = f'{_heartbeat_base}_{_hostname}'
 HEARTBEAT_DIR = Path(_heartbeat_base).parent
 REQUEST_TIMEOUT = 10
+# Sending a split log may include several Telegram API retries. Keep this
+# timeout separate from ordinary internal API requests to avoid false failures.
+BOT_API_SEND_TIMEOUT = int(os.getenv('BOT_API_SEND_TIMEOUT', '90'))
 IMAP_TIMEOUT = 30
 IDLE_TIMEOUT = 25
 MAX_RETRIES = 5

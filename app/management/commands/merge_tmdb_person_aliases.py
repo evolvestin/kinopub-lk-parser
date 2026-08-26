@@ -56,8 +56,31 @@ class Command(BaseCommand):
                 JOIN app_person alias
                   ON alias.master_person_id IS NULL
                  AND alias.tmdb_id IS NULL
-                 AND lower(trim(replace(replace(replace(replace(alias.name, 'ё', 'е'), 'Ё', 'Е'), 'э', 'е'), 'Э', 'Е')))
-                     = lower(trim(replace(replace(replace(replace(master.name, 'ё', 'е'), 'Ё', 'Е'), 'э', 'е'), 'Э', 'Е')))
+                 AND lower(
+                         trim(
+                             replace(
+                                 replace(
+                                     replace(
+                                         replace(alias.name, 'ё', 'е'), 'Ё', 'Е'
+                                     ),
+                                     'э', 'е'
+                                 ),
+                                 'Э', 'Е'
+                             )
+                         )
+                     ) = lower(
+                         trim(
+                             replace(
+                                 replace(
+                                     replace(
+                                         replace(master.name, 'ё', 'е'), 'Ё', 'Е'
+                                     ),
+                                     'э', 'е'
+                                 ),
+                                 'Э', 'Е'
+                             )
+                         )
+                     )
                  AND lower(trim(coalesce(alias.en_name, '')))
                      = lower(trim(coalesce(master.en_name, '')))
                 JOIN app_showcrew alias_crew ON alias_crew.person_id = alias.id

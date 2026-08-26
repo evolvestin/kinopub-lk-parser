@@ -9,7 +9,7 @@ from app.services.error_aggregator import ErrorAggregator
 from app.utils import get_webapp_base_url
 from shared.card_formatter import get_show_card_text
 from shared.constants import DATE_FORMAT, SHOW_TYPE_DISPLAY_RU, UserRole
-from shared.formatters import format_se
+from shared.formatters import format_country_display_names, format_se
 from shared.html_helper import bold, code, html_secure, italic
 
 logger = logging.getLogger(__name__)
@@ -40,11 +40,16 @@ class TelegramSender:
 
     def _request(self, endpoint: str, payload: dict = None, method: str = 'POST') -> dict | None:
         url = f'{self.service_url}/{endpoint}'
+        timeout = (
+            settings.BOT_API_SEND_TIMEOUT
+            if endpoint == 'send_split_message'
+            else settings.REQUEST_TIMEOUT
+        )
         try:
             if method == 'GET':
-                response = requests.get(url, timeout=settings.REQUEST_TIMEOUT)
+                response = requests.get(url, timeout=timeout)
             else:
-                response = requests.post(url, json=payload, timeout=settings.REQUEST_TIMEOUT)
+                response = requests.post(url, json=payload, timeout=timeout)
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
@@ -164,6 +169,8 @@ class TelegramSender:
 
         show = view_history_obj.show
         internal_rating, user_ratings = show.get_internal_rating_data()
+        countries = list(show.countries.all())
+        country_emoji_by_name = {country.name: country.emoji_flag for country in countries}
 
         show_history = True
 
@@ -177,7 +184,7 @@ class TelegramSender:
                     year=show.year,
                     show_type=show.type,
                     status=show.status,
-                    countries=[str(country) for country in show.countries.all()],
+                    countries=format_country_display_names(countries, country_emoji_by_name),
                     genres=show.display_genres,
                     imdb_rating=show.imdb_rating,
                     imdb_url=show.imdb_url,

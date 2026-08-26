@@ -1,3 +1,27 @@
+from shared.constants import RAW_TO_NORMALIZED_COUNTRY
+
+
+def format_country_display_names(countries, country_emoji_by_name=None):
+    """Return deduplicated, aliased country names suitable for display."""
+    country_emoji_by_name = country_emoji_by_name or {}
+    seen = set()
+    result = []
+
+    for country in countries:
+        raw_name = getattr(country, 'name', country)
+        normalized_name = RAW_TO_NORMALIZED_COUNTRY.get(raw_name, raw_name)
+        if normalized_name in seen:
+            continue
+        seen.add(normalized_name)
+
+        emoji = country_emoji_by_name.get(normalized_name) or country_emoji_by_name.get(raw_name)
+        if emoji is None:
+            emoji = getattr(country, 'emoji_flag', None)
+        result.append(f'{emoji} {normalized_name}' if emoji else normalized_name)
+
+    return sorted(result)
+
+
 def format_duration(seconds: int | float | None) -> str:
     if not seconds or seconds < 0:
         return '0м'

@@ -402,6 +402,9 @@ def run_admin_command(self, task_run_id):
         'updatedetails',
         'updatedurations',
         'scanbyids',
+        'syncpoiskkinoratings',
+        'syncimdbdata',
+        'enrichfromtmdb',
     }
 
     if task_run.command in parser_commands:

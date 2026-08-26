@@ -211,8 +211,10 @@ class ShowCrew(BaseModel):
         blank=True,
         related_name='canonical_crew_rows',
     )
-    profession = models.CharField(max_length=500, null=True, blank=True, db_index=True)
-    en_profession = models.CharField(max_length=500, null=True, blank=True, db_index=True)
+    # TMDB stores the actor's complete character credit here. Some credits
+    # contain a long list of aliases, so a fixed varchar limit is unsafe.
+    profession = models.TextField(null=True, blank=True, db_index=True)
+    en_profession = models.TextField(null=True, blank=True, db_index=True)
 
     class Meta:
         verbose_name = 'Show Crew Member'

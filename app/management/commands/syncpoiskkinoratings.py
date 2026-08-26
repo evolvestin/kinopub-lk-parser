@@ -1,6 +1,8 @@
 import logging
+import time
 from datetime import timedelta
 
+from django.db import OperationalError
 from django.db.models import F, Q
 from django.utils import timezone
 
@@ -14,6 +16,7 @@ from shared.constants import SHOW_STATUS_MAPPING
 FREE_DAILY_REQUEST_LIMIT = 200
 POISKKINO_BATCH_SIZE = 250
 POISKKINO_REFRESH_DAYS = 3
+DEADLOCK_RETRY_ATTEMPTS = 4
 
 
 class Command(LoggableBaseCommand):
@@ -36,6 +39,32 @@ class Command(LoggableBaseCommand):
         if not isinstance(value, list):
             return []
         return [entry for entry in value if isinstance(entry, dict)]
+
+    @staticmethod
+    def _is_deadlock(error):
+        cause = getattr(error, '__cause__', None)
+        sqlstate = getattr(cause, 'sqlstate', None) or getattr(cause, 'pgcode', None)
+        return sqlstate == '40P01' or 'deadlock detected' in str(error).lower()
+
+    @classmethod
+    def _with_deadlock_retry(cls, operation, description):
+        """Retry an idempotent write when another catalog writer wins a race."""
+        for attempt in range(DEADLOCK_RETRY_ATTEMPTS):
+            try:
+                return operation()
+            except OperationalError as error:
+                if not cls._is_deadlock(error) or attempt == DEADLOCK_RETRY_ATTEMPTS - 1:
+                    raise
+
+                delay = 0.5 * (2**attempt)
+                logging.warning(
+                    'Deadlock while %s; retrying in %.1fs (%s/%s).',
+                    description,
+                    delay,
+                    attempt + 1,
+                    DEADLOCK_RETRY_ATTEMPTS - 1,
+                )
+                time.sleep(delay)
 
     def handle(self, *args, **options):
         requested_limit = options.get('limit')
@@ -94,37 +123,53 @@ class Command(LoggableBaseCommand):
 
         if not result.data:
             if checked_show_ids:
-                Show.objects.filter(id__in=checked_show_ids).update(
-                    poiskkino_updated_at=now,
-                    kinopoisk_rating_available=False,
-                    kinopoisk_rating=None,
-                    kinopoisk_votes=None,
+                self._with_deadlock_retry(
+                    lambda: Show.objects.filter(id__in=checked_show_ids).update(
+                        poiskkino_updated_at=now,
+                        kinopoisk_rating_available=False,
+                        kinopoisk_rating=None,
+                        kinopoisk_votes=None,
+                    ),
+                    'clearing empty Poiskkino ratings',
                 )
             logging.info('Poiskkino returned no records for the selected IDs.')
             return
 
-        unique_data = {item['id']: item for item in result.data if item.get('id')}.values()
+        unique_data = {
+            item['id']: item for item in result.data if isinstance(item, dict) and item.get('id')
+        }.values()
         data_list = list(unique_data)
         logging.info('Saving %s unique Poiskkino records.', len(data_list))
 
         # Start from the authoritative negative state. Returned items with a
         # rating set the flag back to True in _process_batch below.
         if checked_show_ids:
-            Show.objects.filter(id__in=checked_show_ids).update(
-                kinopoisk_rating_available=False,
-                kinopoisk_rating=None,
-                kinopoisk_votes=None,
+            self._with_deadlock_retry(
+                lambda: Show.objects.filter(id__in=checked_show_ids).update(
+                    kinopoisk_rating_available=False,
+                    kinopoisk_rating=None,
+                    kinopoisk_votes=None,
+                ),
+                'clearing stale Poiskkino ratings',
             )
 
         total_processed = 0
         for i in range(0, len(data_list), 1000):
             batch = data_list[i : i + 1000]
-            self._process_batch(batch, kp_mapping, now)
+            self._with_deadlock_retry(
+                lambda batch=batch: self._process_batch(batch, kp_mapping, now),
+                'saving a Poiskkino batch',
+            )
             total_processed += len(batch)
             logging.info('Saved batch %s/%s.', total_processed, len(data_list))
 
         if checked_show_ids:
-            Show.objects.filter(id__in=checked_show_ids).update(poiskkino_updated_at=now)
+            self._with_deadlock_retry(
+                lambda: Show.objects.filter(id__in=checked_show_ids).update(
+                    poiskkino_updated_at=now
+                ),
+                'marking Poiskkino records as refreshed',
+            )
         logging.info('Successfully synchronized %s Poiskkino records.', total_processed)
 
     def _process_batch(self, batch_data, kp_mapping, now):
@@ -138,8 +183,13 @@ class Command(LoggableBaseCommand):
         if not data_map:
             return
 
-        show_ids = list(data_map)
-        existing_shows = Show.objects.filter(id__in=show_ids).in_bulk(field_name='id')
+        # Keep lock acquisition and write order deterministic across workers.
+        # This substantially reduces the chance of two bulk updates waiting on
+        # the same app_show rows in opposite orders.
+        show_ids = sorted(data_map)
+        existing_shows = (
+            Show.objects.filter(id__in=show_ids).order_by('id').in_bulk(field_name='id')
+        )
 
         all_genre_names = {
             genre_data['name']
@@ -206,7 +256,8 @@ class Command(LoggableBaseCommand):
         crew_objects = []
         persons_to_update = {}
 
-        for show_id, item in data_map.items():
+        for show_id in show_ids:
+            item = data_map[show_id]
             show = existing_shows.get(show_id)
             if not show:
                 continue

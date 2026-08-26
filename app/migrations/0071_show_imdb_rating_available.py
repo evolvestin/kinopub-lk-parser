@@ -13,7 +13,10 @@ class Migration(migrations.Migration):
             field=models.BooleanField(
                 db_index=True,
                 default=False,
-                help_text='IMDb published a rating for the current title in the latest ratings dataset.',
+                help_text=(
+                    'IMDb published a rating for the current title in the latest ratings '
+                    'dataset.'
+                ),
                 verbose_name='IMDb rating available',
             ),
         ),

@@ -106,7 +106,7 @@ from shared.constants import (
     RedisQueue,
     UserRole,
 )
-from shared.formatters import format_precision_date, format_se
+from shared.formatters import format_country_display_names, format_precision_date, format_se
 from shared.media import build_poster_url, get_poster_url
 
 logger = logging.getLogger('app')
@@ -130,20 +130,7 @@ ALLOWED_PROXY_DOMAINS = (
 def _get_normalized_countries_strings(countries_iterable, country_dict=None):
     if country_dict is None:
         country_dict = dict(Country.objects.values_list('name', 'emoji_flag'))
-    norm_countries = []
-    seen = set()
-    for c in countries_iterable:
-        norm_name = RAW_TO_NORMALIZED_COUNTRY.get(c.name, c.name)
-        if norm_name in seen:
-            continue
-        seen.add(norm_name)
-
-        emoji = country_dict.get(norm_name) or country_dict.get(c.name)
-        if emoji:
-            norm_countries.append(f'{emoji} {norm_name}')
-        else:
-            norm_countries.append(norm_name)
-    return sorted(norm_countries)
+    return format_country_display_names(countries_iterable, country_dict)
 
 
 def redirect_index(request):
@@ -976,6 +963,7 @@ def bot_create_log_entry(request):
         message = data.get('message', '')
 
         traceback_str = data.get('traceback', None)
+        notify = bool(data.get('notify'))
 
         if not module.startswith('bot.'):
             module = f'bot.{module}'
@@ -989,7 +977,7 @@ def bot_create_log_entry(request):
             updated_at=timezone.now(),
         )
 
-        if level in ('ERROR', 'CRITICAL'):
+        if level in ('ERROR', 'CRITICAL') or notify:
             TelegramSender().send_dev_log(level, module, message, traceback_str)
 
         return JsonResponse({'status': 'ok'})
