@@ -1,13 +1,15 @@
 from django.test import TestCase
 from django.utils import timezone
 
-from app.models import Person, Show
+from app.models import Person, Show, ShowCrew
 from app.services.metrics import (
     calculate_duplicate_photo_urls_metric,
+    calculate_en_professions_stats_metric,
     calculate_imdb_unrated_metric,
     calculate_kp_unrated_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
+    get_profession_persons_list,
 )
 
 
@@ -73,3 +75,19 @@ class ImdbMetricSplitTests(TestCase):
             calculate_duplicate_photo_urls_metric(),
             [{'name': 'TMDB дубликаты', 'value': 1}, {'name': 'KP дубликаты', 'value': 0}],
         )
+
+
+class ProfessionMetricTests(TestCase):
+    def test_english_roles_use_the_english_crew_field(self):
+        person = Person.objects.create(name='Known actor', en_name='Known actor')
+        show = Show.objects.create(title='Test movie', original_title='Test movie', type='Movie')
+        ShowCrew.objects.create(
+            show=show,
+            person=person,
+            profession='В ролях',
+            en_profession='Actor',
+        )
+
+        stats = calculate_en_professions_stats_metric()
+        self.assertNotIn({'name': 'Неизвестно', 'value': 1}, stats)
+        self.assertEqual(get_profession_persons_list('Actor', 'en').count(), 1)

@@ -654,23 +654,22 @@ def get_profession_persons_list(normalized: str, language: str, max_items=None):
         fallback_mapping = {
             raw: en_to_ru[value] for raw, value in RAW_TO_NORMALIZED_EN.items() if value in en_to_ru
         }
+        primary_field = 'profession'
+        fallback_field = 'en_profession'
     else:
         primary_mapping = RAW_TO_NORMALIZED_EN
         ru_to_en = {ru: en for ru, en in PROFESSION_TRANS_MAP.items()}
         fallback_mapping = {
             raw: ru_to_en[value] for raw, value in RAW_TO_NORMALIZED_RU.items() if value in ru_to_en
         }
+        primary_field = 'en_profession'
+        fallback_field = 'profession'
 
     unknown = '\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e'
     if normalized == unknown:
-        if language == 'ru':
-            known_filter = Q(showcrew__profession__in=primary_mapping) | Q(
-                showcrew__en_profession__in=fallback_mapping
-            )
-        else:
-            known_filter = Q(showcrew__profession__in=primary_mapping) | Q(
-                showcrew__en_profession__in=fallback_mapping
-            )
+        known_filter = Q(**{f'showcrew__{primary_field}__in': primary_mapping}) | Q(
+            **{f'showcrew__{fallback_field}__in': fallback_mapping}
+        )
         return (
             Person.objects.filter(master_person__isnull=True)
             .exclude(known_filter)
@@ -678,16 +677,30 @@ def get_profession_persons_list(normalized: str, language: str, max_items=None):
         )
 
     role_case = Case(
-        *[When(profession=raw, then=Value(value)) for raw, value in primary_mapping.items()],
-        *[When(en_profession=raw, then=Value(value)) for raw, value in fallback_mapping.items()],
+        *[
+            When(**{primary_field: raw}, then=Value(value))
+            for raw, value in primary_mapping.items()
+        ],
+        *[
+            When(**{fallback_field: raw}, then=Value(value))
+            for raw, value in fallback_mapping.items()
+        ],
         output_field=CharField(),
     )
-    primary_known = Q(profession__in=primary_mapping)
+    primary_known = Q(**{f'{primary_field}__in': primary_mapping})
     target_primary = Q(
-        profession__in=[raw for raw, value in primary_mapping.items() if value == normalized]
+        **{
+            f'{primary_field}__in': [
+                raw for raw, value in primary_mapping.items() if value == normalized
+            ]
+        }
     )
     target_fallback = Q(
-        en_profession__in=[raw for raw, value in fallback_mapping.items() if value == normalized]
+        **{
+            f'{fallback_field}__in': [
+                raw for raw, value in fallback_mapping.items() if value == normalized
+            ]
+        }
     )
     role_filter = target_primary | (~primary_known & target_fallback)
     person_ids = _canonical_person_ids(
@@ -900,17 +913,22 @@ def _calculate_profession_stats_canonical():
     ru_to_en = PROFESSION_TRANS_MAP
     canonical_id = _canonical_person_id_expression()
 
-    def calculate(primary_raw_to_normalized, fallback_raw_to_normalized):
+    def calculate(
+        primary_raw_to_normalized,
+        fallback_raw_to_normalized,
+        primary_field='profession',
+        fallback_field='en_profession',
+    ):
         whens = [
-            When(profession=raw, then=Value(normalized))
+            When(**{primary_field: raw}, then=Value(normalized))
             for raw, normalized in primary_raw_to_normalized.items()
         ]
         whens.extend(
-            When(en_profession=raw, then=Value(normalized))
+            When(**{fallback_field: raw}, then=Value(normalized))
             for raw, normalized in fallback_raw_to_normalized.items()
         )
-        known_filter = Q(profession__in=primary_raw_to_normalized) | Q(
-            en_profession__in=fallback_raw_to_normalized
+        known_filter = Q(**{f'{primary_field}__in': primary_raw_to_normalized}) | Q(
+            **{f'{fallback_field}__in': fallback_raw_to_normalized}
         )
 
         role_case = Case(*whens, output_field=CharField())
@@ -927,8 +945,8 @@ def _calculate_profession_stats_canonical():
         ]
         unknown_count = (
             Person.objects.filter(master_person__isnull=True)
-            .exclude(showcrew__profession__in=primary_raw_to_normalized)
-            .exclude(showcrew__en_profession__in=fallback_raw_to_normalized)
+            .exclude(**{f'showcrew__{primary_field}__in': primary_raw_to_normalized})
+            .exclude(**{f'showcrew__{fallback_field}__in': fallback_raw_to_normalized})
             .count()
         )
         if unknown_count:
@@ -955,7 +973,10 @@ def _calculate_profession_stats_canonical():
         cursor.execute('SET enable_sort TO off')
     try:
         return calculate(RAW_TO_NORMALIZED_RU, en_to_ru_raw), calculate(
-            RAW_TO_NORMALIZED_EN, ru_to_en_raw
+            RAW_TO_NORMALIZED_EN,
+            ru_to_en_raw,
+            primary_field='en_profession',
+            fallback_field='profession',
         )
     finally:
         with connection.cursor() as cursor:

@@ -672,19 +672,17 @@ def sync_poiskkino_ratings_task():
 @shared_task
 @single_instance_task(lock_name=RedisLock.SYNC_IMDB_DATA, timeout=14400)
 def sync_imdb_data_task():
+    # IMDb datasets do not use the Kinopub browser. Keep this task out of the
+    # global parser lock so a daily ratings refresh does not block browser
+    # sessions or queue processing. The dedicated task lock prevents duplicate
+    # IMDb runs, while the ratings lock serializes writes with Poiskkino.
     with _wait_for_redis_lock(
-        RedisLock.KINOPUB_PARSER_GLOBAL,
-        lock_timeout=21600,
-        wait_timeout=21600,
-    ) as catalog_acquired:
-        if catalog_acquired:
-            with _wait_for_redis_lock(
-                RedisLock.EXTERNAL_RATING_WRITES,
-                lock_timeout=14400,
-                wait_timeout=14400,
-            ) as rating_acquired:
-                if rating_acquired:
-                    call_command('syncimdbdata')
+        RedisLock.EXTERNAL_RATING_WRITES,
+        lock_timeout=14400,
+        wait_timeout=14400,
+    ) as rating_acquired:
+        if rating_acquired:
+            call_command('syncimdbdata')
 
 
 @shared_task

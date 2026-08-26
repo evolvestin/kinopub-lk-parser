@@ -314,15 +314,28 @@ def _update_show_details_once(
             try:
                 imdb_link = rating_data.find_element(By.CSS_SELECTOR, "a[href*='imdb.com']")
                 show.imdb_url = imdb_link.get_attribute('href')
-                show.imdb_rating = float(imdb_link.text)
-                votes_element = imdb_link.find_element(By.XPATH, './following-sibling::small')
-                v_val = _extract_int_from_string(votes_element.text)
-                if v_val:
-                    show.imdb_votes = v_val
             except (NoSuchElementException, ValueError):
                 pass
 
-        show.save()
+        show_fields = [
+            'title',
+            'original_title',
+            'plot',
+            'year',
+            'type',
+            'status',
+            'kinopoisk_url',
+            'kinopoisk_rating',
+            'kinopoisk_votes',
+            'imdb_url',
+        ]
+        if show._state.adding:
+            show.save()
+        else:
+            # IMDb ratings and votes are owned by the official dataset sync.
+            # Field-scoped updates prevent a concurrent IMDb batch from being
+            # overwritten by this stale Show instance.
+            show.save(update_fields=[*show_fields, 'updated_at'])
 
         for label, model, relation in [
             ('Страна', Country, show.countries),
@@ -356,8 +369,6 @@ def _update_show_details_once(
                         ShowCrew.objects.update_or_create(
                             show=show, person=person, profession=label
                         )
-
-        show.save()
 
     except Exception as e:
         logging.error(

@@ -183,7 +183,7 @@ spelling, case, punctuation, and internal whitespace remain unchanged.
 
 ## Celery Task Concurrency & Locking Policy
 
-**RULE**: Celery tasks are protected by explicit distributed Redis locks (e.g., `RedisLock.KINOPUB_PARSER_GLOBAL`, `RedisLock.BACKUP`, `RedisLock.PROCESS_QUEUES`) and scheduled across time using Celery Beat. Worker concurrency is configured to 4 because task-level locks safely prevent race conditions and duplicate executions of shared-account parser operations or database backups. Browser execution itself is queued by the AssetHub gateway.
+**RULE**: Celery tasks are protected by explicit distributed Redis locks (e.g., `RedisLock.KINOPUB_PARSER_GLOBAL`, `RedisLock.BACKUP`, `RedisLock.PROCESS_QUEUES`) and scheduled across time using Celery Beat. Worker concurrency is configured to 4 because task-level locks safely prevent race conditions and duplicate executions of shared-account parser operations or database backups. Browser execution itself is queued by the AssetHub gateway. IMDb dataset synchronization uses its dedicated task lock plus the external-ratings lock; it does not acquire `RedisLock.KINOPUB_PARSER_GLOBAL` because it does not use the Kinopub browser.
 
 
 ## External Ratings Synchronization Policy
