@@ -90,6 +90,28 @@ class HistoryParserRecoveryTests(SimpleTestCase):
         self.assertEqual(driver.execute_script.call_count, 2)
         submit_btn.click.assert_called_once_with()
 
+    def test_resend_uses_js_when_remote_element_click_is_unavailable(self):
+        driver = Mock()
+        resend_btn = Mock()
+        resend_btn.is_displayed.return_value = True
+        resend_btn.is_enabled.return_value = False
+        driver.find_elements.return_value = [resend_btn]
+        driver.execute_script.return_value = True
+
+        self.assertTrue(history_parser._click_resend_code_if_available(driver))
+        resend_btn.click.assert_not_called()
+        self.assertIn("button.click()", driver.execute_script.call_args.args[0])
+
+    def test_resend_returns_false_when_button_is_disabled(self):
+        driver = Mock()
+        resend_btn = Mock()
+        resend_btn.is_displayed.return_value = True
+        resend_btn.is_enabled.return_value = False
+        driver.find_elements.return_value = [resend_btn]
+        driver.execute_script.return_value = False
+
+        self.assertFalse(history_parser._click_resend_code_if_available(driver))
+
     @patch('app.history_parser.close_driver')
     @patch('app.history_parser.initialize_driver_session', return_value=None)
     def test_parser_run_fails_when_driver_initialization_fails(self, _initialize, close_driver):

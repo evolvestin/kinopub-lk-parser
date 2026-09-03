@@ -749,15 +749,38 @@ def _submit_two_factor_code(driver, code_input, submit_btn, code):
 
 def _click_resend_code_if_available(driver):
     """Ask Kinopub for one fresh code after a rejected code."""
-    resend_btn = _find_first_element(driver, RESEND_CODE_SELECTORS, visible=True)
+    # The button is rendered by Kinopub's JS and the remote AssetHub worker
+    # can return an element reference whose click does not reach the page's
+    # event handler.  Prefer a fresh DOM lookup and keep a JS fallback.
+    resend_btn = _find_first_element(driver, RESEND_CODE_SELECTORS, visible=False)
     if resend_btn is None:
         return False
     try:
-        if not resend_btn.is_enabled():
-            return False
-        resend_btn.click()
-        return True
+        result = driver.execute_script(
+            """
+            const button = document.querySelector('#resend-code') ||
+                document.querySelector('#login-form button[name="login-form[resend]"]');
+            if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' ||
+                button.offsetParent === null) {
+                return false;
+            }
+            button.click();
+            return true;
+            """
+        )
+        if result is True:
+            return True
+
+        # Compatibility fallback for an older gateway that cannot execute
+        # JavaScript on the current page.
+        if resend_btn.is_displayed() and resend_btn.is_enabled():
+            resend_btn.click()
+            return True
+        return False
     except (NoSuchElementException, StaleElementReferenceException):
+        return False
+    except Exception as exc:
+        logging.debug('Could not click Kinopub 2FA resend button: %s', exc)
         return False
 
 
@@ -811,6 +834,7 @@ def do_login(driver, login, password, cookie_path, base_url):
         password_input.clear()
         password_input.send_keys(password)
         time.sleep(1)
+        login_attempt_started_at = timezone.now()
         submit_btn.click()
 
         state = _wait_for_login_state(driver, login_url)
@@ -829,9 +853,11 @@ def do_login(driver, login, password, cookie_path, base_url):
             max_resend_attempts = 1
             next_resend_at = start_time + 55
             resend_requested = False
+            resend_wait_logged = False
             expiration_threshold = timezone.now() - timedelta(
                 minutes=settings.CODE_LIFETIME_MINUTES
             )
+            code_wait_threshold = max(expiration_threshold, login_attempt_started_at)
 
             while time.time() - start_time < timeout:
                 if not _is_login_url(driver.current_url, login_url):
@@ -842,6 +868,7 @@ def do_login(driver, login, password, cookie_path, base_url):
                         if _click_resend_code_if_available(driver):
                             resend_attempts += 1
                             resend_requested = False
+                            resend_wait_logged = False
                             logging.info(
                                 'Requested a fresh Kinopub 2FA code after rejection.'
                             )
@@ -851,9 +878,21 @@ def do_login(driver, login, password, cookie_path, base_url):
                             # next email arriving so a rejected code cannot
                             # leave the session waiting forever.
                             next_resend_at = time.time() + 5
+                            if not resend_wait_logged:
+                                logging.info(
+                                    'Kinopub 2FA resend button is not ready yet; retrying.'
+                                )
+                                resend_wait_logged = True
 
                 code_obj = (
-                    Code.objects.filter(received_at__gte=expiration_threshold)
+                    Code.objects.filter(
+                        # ``received_at`` is the mail's Date header and can
+                        # lag behind insertion when the listener reconnects.
+                        # ``created_at`` prevents a delayed old message from
+                        # being selected for this login attempt.
+                        created_at__gte=login_attempt_started_at,
+                        received_at__gte=code_wait_threshold,
+                    )
                     .order_by('-received_at')
                     .first()
                 )
