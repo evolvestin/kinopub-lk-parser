@@ -861,13 +861,22 @@ def do_login(driver, login, password, cookie_path, base_url):
                     code_id, code = code_obj.id, code_obj.code
                     logging.info('Found 2FA code %s in database. Attempting to use it.', code)
                     try:
+                        used_code_ids.add(code_id)
                         code_input = _find_first_element(driver, CODE_INPUT_SELECTORS, visible=True)
                         if code_input is None:
                             logging.warning(
                                 '2FA form disappeared before code %s could be submitted.', code
                             )
+                            resend_requested = resend_attempts < max_resend_attempts
+                            try:
+                                driver.refresh()
+                                _wait_for_login_state(driver, login_url, timeout=10)
+                            except Exception as refresh_error:
+                                logging.warning(
+                                    'Could not restore the 2FA form after refresh: %s',
+                                    refresh_error,
+                                )
                             continue
-                        used_code_ids.add(code_id)
                         submit_btn = _find_first_element(driver, SUBMIT_SELECTORS, visible=True)
                         if submit_btn is None:
                             logging.warning('2FA submit button is no longer available.')
@@ -1449,8 +1458,9 @@ def run_parser_session(headless=True, driver_instance=None):
             driver = initialize_driver_session(headless=headless)
 
         if driver is None:
-            logging.error('Failed to initialize or use provided driver. Aborting parser run.')
-            return
+            message = 'Failed to initialize or use provided driver. Aborting parser run.'
+            logging.error(message)
+            raise RuntimeError(message)
 
         episodes_added, driver = _run_parser_for_mode(driver, 'episodes', headless=headless)
         movies_added, driver = _run_parser_for_mode(driver, 'movies', headless=headless)
@@ -1470,6 +1480,7 @@ def run_parser_session(headless=True, driver_instance=None):
 
     except Exception as e:
         logging.error('An unexpected error occurred in the parser session: %s', e)
+        raise
     finally:
         close_driver(driver)
 

@@ -89,3 +89,11 @@ class HistoryParserRecoveryTests(SimpleTestCase):
 
         self.assertEqual(driver.execute_script.call_count, 2)
         submit_btn.click.assert_called_once_with()
+
+    @patch('app.history_parser.close_driver')
+    @patch('app.history_parser.initialize_driver_session', return_value=None)
+    def test_parser_run_fails_when_driver_initialization_fails(self, _initialize, close_driver):
+        with self.assertRaisesRegex(RuntimeError, 'Failed to initialize'):
+            history_parser.run_parser_session()
+
+        close_driver.assert_called_once_with(None)
