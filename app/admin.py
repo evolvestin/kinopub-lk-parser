@@ -13,6 +13,7 @@ from django.db.models import (
     Count,
     Exists,
     F,
+    FloatField,
     IntegerField,
     Min,
     OuterRef,
@@ -594,11 +595,27 @@ class ShowAdmin(admin.ModelAdmin):
             .annotate(total=Sum('duration_seconds'))
             .values('total')
         )
+        view_count_subquery = (
+            ViewHistory.objects.filter(show_id=OuterRef('pk'))
+            .values('show_id')
+            .annotate(total=Count('id'))
+            .values('total')
+        )
+        average_rating_subquery = (
+            UserRating.objects.filter(show_id=OuterRef('pk'))
+            .values('show_id')
+            .annotate(average=Avg('rating'))
+            .values('average')
+        )
 
         queryset = queryset.annotate(
-            _view_count=Count('viewhistory', distinct=True),
+            _view_count=Coalesce(
+                Subquery(view_count_subquery, output_field=IntegerField()),
+                Value(0),
+                output_field=IntegerField(),
+            ),
             _total_duration=Subquery(duration_subquery),
-            _avg_rating=Avg('ratings__rating'),
+            _avg_rating=Subquery(average_rating_subquery, output_field=FloatField()),
         )
 
         metric = request.GET.get('metric')
@@ -745,11 +762,9 @@ class ShowAdmin(admin.ModelAdmin):
 
     @admin.display(description='Avg Rating', ordering='_avg_rating')
     def get_avg_rating(self, obj):
-        ratings = obj.ratings.all()
-        if not ratings:
+        if obj._avg_rating is None:
             return '-'
-        avg = sum(r.rating for r in ratings) / len(ratings)
-        return round(avg, 2)
+        return round(obj._avg_rating, 2)
 
     @admin.display(description='Actions')
     def admin_actions(self, obj):

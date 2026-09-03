@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from typing import Any
@@ -10,27 +11,41 @@ BACKEND_URL = os.getenv('BACKEND_URL')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 HEADERS = {'X-Bot-Token': BOT_TOKEN, 'Content-Type': 'application/json'}
+BACKEND_REQUEST_TIMEOUT = float(os.getenv('BACKEND_REQUEST_TIMEOUT', '15'))
+BACKEND_REQUEST_RETRIES = max(1, int(os.getenv('BACKEND_REQUEST_RETRIES', '2')))
 
 
 async def _execute_request(
     path: str, method: str = 'GET', payload: dict = None, params: dict = None
 ) -> Any | None:
     url = f'{BACKEND_URL}/api/bot/{path}'
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.request(
-                method, url, json=payload, params=params, headers=HEADERS, timeout=5
-            ) as response:
-                if response.status == 200:
-                    return await response.json()
-                elif response.status == 409:
-                    return {'success': False, 'error': 'outdated'}
+    async with aiohttp.ClientSession() as session:
+        for attempt in range(BACKEND_REQUEST_RETRIES):
+            try:
+                async with session.request(
+                    method,
+                    url,
+                    json=payload,
+                    params=params,
+                    headers=HEADERS,
+                    timeout=BACKEND_REQUEST_TIMEOUT,
+                ) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    if response.status == 409:
+                        return {'success': False, 'error': 'outdated'}
 
-                logging.error(f'API Error ({url}): Status {response.status}')
-                return None
-    except Exception as e:
-        logging.error(f'API Connection Error ({url}): {e}')
-        return None
+                    if response.status < 500 or attempt == BACKEND_REQUEST_RETRIES - 1:
+                        logging.warning(f'API request failed ({url}): Status {response.status}')
+                        return None
+            except (aiohttp.ClientError, TimeoutError) as exc:
+                if attempt == BACKEND_REQUEST_RETRIES - 1:
+                    # This client returns None to its callers. Do not report a
+                    # failed error-reporting request as a second ERROR.
+                    logging.warning(f'API temporarily unavailable ({url}): {exc}')
+                    return None
+
+            await asyncio.sleep(0.5 * (attempt + 1))
 
 
 async def register_user(
@@ -179,14 +194,7 @@ async def send_log_entry(level: str, module: str, message: str, notify: bool = F
     }
     if notify:
         payload['notify'] = True
-    url = f'{BACKEND_URL}/api/bot/log_entry/'
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=HEADERS, timeout=5) as response:
-                if response.status != 200:
-                    print(f'Failed to send log entry to backend. Status: {response.status}')
-    except Exception as e:
-        print(f'Connection error while sending log entry: {e}')
+    await _execute_request('log_entry/', method='POST', payload=payload)
 
 
 async def get_user_groups(telegram_id: int) -> list:

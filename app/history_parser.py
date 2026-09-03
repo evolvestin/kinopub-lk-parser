@@ -6,6 +6,7 @@ import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.db.models import Max, Q
@@ -30,7 +31,7 @@ from app.models import (
     ShowDuration,
     ViewHistory,
 )
-from app.remote_browser import RemoteBrowserDriver
+from app.remote_browser import RemoteBrowserDriver, RemoteBrowserError
 from app.services.person_matching import find_person_for_kinopub
 from app.services.show_duration import upsert_show_duration
 from app.signals import view_history_created
@@ -60,6 +61,38 @@ def is_cloudflare_page(driver):
         )
     except Exception:
         return False
+
+
+def is_empty_browser_page(driver):
+    """Detect the tiny empty document returned by a failed remote navigation."""
+    try:
+        source = re.sub(r'\s+', '', driver.page_source or '').lower()
+    except Exception:
+        return False
+    return source.startswith('<html') and '<body></body>' in source and len(source) <= 128
+
+
+def navigate_with_empty_page_recovery(driver, url):
+    """Retry one navigation when Chromium returns an empty document."""
+    driver.get(url)
+    if not is_empty_browser_page(driver):
+        return driver
+
+    logging.warning('AssetHub returned an empty document for %s. Reloading page once.', url)
+    try:
+        driver.refresh()
+    except Exception as exc:
+        logging.warning('Reload failed for empty document %s: %s', url, exc)
+    if not is_empty_browser_page(driver):
+        return driver
+
+    logging.warning('Page reload did not recover %s. Restarting browser once.', url)
+    driver.restart()
+    time.sleep(1)
+    driver.get(url)
+    if is_empty_browser_page(driver):
+        raise RemoteBrowserError(f'AssetHub returned an empty document for {url}')
+    return driver
 
 
 def is_fatal_selenium_error(e):
@@ -581,23 +614,123 @@ def save_cookies(driver, file_path):
     raise RuntimeError('local cookie persistence is disabled; use AssetHub browser gateway')
 
 
+LOGIN_INPUT_SELECTORS = (
+    (By.ID, 'login-form-login'),
+    (By.CSS_SELECTOR, 'form#login-form input[name="login-form[login]"]'),
+)
+PASSWORD_INPUT_SELECTORS = (
+    (By.ID, 'login-form-password'),
+    (By.CSS_SELECTOR, 'form#login-form input[name="login-form[password]"]'),
+)
+CODE_INPUT_SELECTORS = (
+    (By.ID, 'login-form-formcode'),
+    (By.CSS_SELECTOR, 'form#login-form input[name="login-form[formcode]"]'),
+    (By.CSS_SELECTOR, 'form#login-form input[id*="formcode"]'),
+    (By.CSS_SELECTOR, 'form#login-form input[name*="code"]'),
+)
+SUBMIT_SELECTORS = (
+    (By.CSS_SELECTOR, '#login-form button[type="submit"]'),
+    (By.CSS_SELECTOR, 'form#login-form input[type="submit"]'),
+)
+
+
+def _is_login_url(current_url, login_url):
+    """Compare login paths without being fooled by query strings or slashes."""
+    try:
+        return urlparse(current_url).path.rstrip('/') == urlparse(login_url).path.rstrip('/')
+    except (TypeError, ValueError):
+        return login_url.rstrip('/') in str(current_url).rstrip('/')
+
+
+def _find_first_element(driver, selectors, visible=False):
+    for by, selector in selectors:
+        try:
+            elements = driver.find_elements(by, selector)
+            for element in elements:
+                if not visible or element.is_displayed():
+                    return element
+        except (NoSuchElementException, StaleElementReferenceException):
+            continue
+    return None
+
+
+def _login_error_text(driver):
+    """Return a short, non-sensitive validation error from the login page."""
+    texts = []
+    for by, selector in (
+        (By.CSS_SELECTOR, '#login-form .help-block'),
+        (By.CSS_SELECTOR, '#login-form .alert-danger'),
+        (By.CSS_SELECTOR, '#login-form .error-summary'),
+    ):
+        try:
+            for element in driver.find_elements(by, selector):
+                value = ' '.join(element.text.split())
+                if value and value not in texts:
+                    texts.append(value)
+        except (NoSuchElementException, StaleElementReferenceException):
+            continue
+    return ' | '.join(texts)[:500]
+
+
+def _login_diagnostics(driver):
+    """Collect safe diagnostics; never include input values or page HTML."""
+    try:
+        current_url = driver.current_url
+    except Exception as exc:
+        current_url = f'<unavailable: {type(exc).__name__}>'
+    try:
+        title = driver.title
+    except Exception as exc:
+        title = f'<unavailable: {type(exc).__name__}>'
+    error_text = _login_error_text(driver)
+    diagnostics = f'url={current_url!r}, title={title!r}'
+    if error_text:
+        diagnostics += f', form_error={error_text!r}'
+    return diagnostics
+
+
+def _wait_for_login_state(driver, login_url, timeout=20):
+    """Wait for success, a 2FA form, or a server-side form validation error."""
+    def state(_driver):
+        try:
+            current_url = _driver.current_url
+            if not _is_login_url(current_url, login_url):
+                return 'authenticated'
+            if _find_first_element(_driver, CODE_INPUT_SELECTORS, visible=True):
+                return '2fa'
+            if _login_error_text(_driver):
+                return 'rejected'
+        except (NoSuchElementException, StaleElementReferenceException):
+            return False
+        return False
+
+    try:
+        return WebDriverWait(driver, timeout, poll_frequency=1).until(state)
+    except TimeoutException:
+        return 'timeout'
+
+
 def do_login(driver, login, password, cookie_path, base_url):
-    login_url = f'{base_url}user/login'
+    login_url = f'{base_url.rstrip("/")}/user/login'
 
     if is_cloudflare_page(driver):
         logging.warning('Обнаружена защита Cloudflare на странице входа.')
 
     try:
-        wait = WebDriverWait(driver, 30)
-        login_input = wait.until(
-            expected_conditions.presence_of_element_located((By.ID, 'login-form-login'))
-        )
-        password_input = wait.until(
-            expected_conditions.presence_of_element_located((By.ID, 'login-form-password'))
-        )
+        wait = WebDriverWait(driver, 30, poll_frequency=1)
+        login_input = wait.until(lambda d: _find_first_element(d, LOGIN_INPUT_SELECTORS))
+        password_input = wait.until(lambda d: _find_first_element(d, PASSWORD_INPUT_SELECTORS))
         submit_btn = wait.until(
-            expected_conditions.element_to_be_clickable(
-                (By.CSS_SELECTOR, '#login-form button[type="submit"]')
+            lambda d: next(
+                (
+                    element
+                    for element in (
+                        _find_first_element(d, (selector,), visible=True)
+                        for selector in SUBMIT_SELECTORS
+                    )
+                    if element and element.is_enabled()
+                ),
+                None,
             )
         )
 
@@ -608,24 +741,13 @@ def do_login(driver, login, password, cookie_path, base_url):
         time.sleep(1)
         submit_btn.click()
 
-        is_logged_in = False
-        has_2fa = False
+        state = _wait_for_login_state(driver, login_url)
+        if state == 'authenticated':
+            logging.info('Authorization successful.')
+            save_cookies(driver, cookie_path)
+            return True
 
-        for _ in range(10):
-            if login_url not in driver.current_url:
-                is_logged_in = True
-                break
-            try:
-                code_inputs = driver.find_elements(By.ID, 'login-form-formcode')
-                if code_inputs and code_inputs[0].is_displayed():
-                    has_2fa = True
-                    break
-            except Exception:
-                pass
-            time.sleep(1)
-
-        if not is_logged_in and has_2fa:
-            code_input = driver.find_element(By.ID, 'login-form-formcode')
+        if state == '2fa':
             logging.info('2FA code is required. Waiting for code from email processor...')
 
             timeout = 120
@@ -636,7 +758,7 @@ def do_login(driver, login, password, cookie_path, base_url):
             )
 
             while time.time() - start_time < timeout:
-                if login_url not in driver.current_url:
+                if not _is_login_url(driver.current_url, login_url):
                     break
 
                 code_obj = (
@@ -648,16 +770,24 @@ def do_login(driver, login, password, cookie_path, base_url):
                     code_id, code = code_obj.id, code_obj.code
                     logging.info('Found 2FA code %s in database. Attempting to use it.', code)
                     try:
+                        code_input = _find_first_element(driver, CODE_INPUT_SELECTORS, visible=True)
+                        if code_input is None:
+                            logging.warning(
+                                '2FA form disappeared before code %s could be submitted.', code
+                            )
+                            continue
                         code_input.clear()
                         code_input.send_keys(code)
                         used_code_ids.add(code_id)
                         time.sleep(1)
-                        driver.find_element(
-                            By.CSS_SELECTOR, '#login-form button[type="submit"]'
-                        ).click()
-                        time.sleep(3)
+                        submit_btn = _find_first_element(driver, SUBMIT_SELECTORS, visible=True)
+                        if submit_btn is None:
+                            logging.warning('2FA submit button is no longer available.')
+                            continue
+                        submit_btn.click()
+                        state = _wait_for_login_state(driver, login_url, timeout=15)
 
-                        if login_url not in driver.current_url:
+                        if state == 'authenticated':
                             logging.info('Code %s was accepted.', code)
                             break
                         else:
@@ -670,26 +800,36 @@ def do_login(driver, login, password, cookie_path, base_url):
                         )
                 time.sleep(2)
 
-        if login_url in driver.current_url:
+        if _is_login_url(driver.current_url, login_url):
             raise TimeoutException(
-                'Timeout expired while waiting for 2FA code or login confirmation.'
+                'Login did not leave the login page. ' + _login_diagnostics(driver)
             )
 
         logging.info('Authorization successful.')
         save_cookies(driver, cookie_path)
         return True
 
-    except TimeoutException:
-        if 'Один момент' in driver.title or 'Just a moment' in driver.title:
+    except TimeoutException as exc:
+        try:
+            title = driver.title
+        except Exception:
+            title = ''
+        if 'Один момент' in title or 'Just a moment' in title:
             logging.error('Не удалось пройти проверку Cloudflare.')
         else:
             logging.error(
-                'Failed to log in within the allotted time.'
-                ' The page might be inaccessible or changed.'
+                'Login timed out or was rejected: %s. Diagnostics: %s',
+                exc,
+                _login_diagnostics(driver),
             )
         return False
     except Exception as e:
-        logging.error(f'An unexpected error occurred during login: {e}')
+        logging.error(
+            'Unexpected login error: %s. Diagnostics: %s',
+            e,
+            _login_diagnostics(driver),
+            exc_info=True,
+        )
         return False
 
 
@@ -716,7 +856,7 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
     driver = None
     try:
         driver = setup_driver(headless=headless, profile_key=session_type, randomize=randomize)
-        driver.get(target_url)
+        navigate_with_empty_page_recovery(driver, target_url)
         try:
             WebDriverWait(driver, 5).until(
                 expected_conditions.presence_of_element_located(
@@ -727,7 +867,7 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
             return driver
         except TimeoutException:
             logging.warning('Session is invalid or expired. Attempting to log in...')
-            driver.get(f'{target_url}user/login')
+            navigate_with_empty_page_recovery(driver, f'{target_url}user/login')
             if do_login(driver, login, password, None, target_url):
                 return driver
             else:
@@ -1086,14 +1226,14 @@ def get_latest_view_date_orm(mode: str):
 
 
 def open_url_safe(driver, url, headless=True, session_type=ParserSessionType.MAIN):
-    driver.get(url)
+    navigate_with_empty_page_recovery(driver, url)
     try:
         if is_cloudflare_page(driver):
             logging.warning(f'Обнаружена защита Cloudflare на {url}. Перезапуск сессии...')
             driver.restart()
             time.sleep(10)
 
-            driver.get(url)
+            navigate_with_empty_page_recovery(driver, url)
             if is_cloudflare_page(driver):
                 close_driver(driver)
                 raise Exception('Защита Cloudflare срабатывает повторно после перезапуска.')
@@ -1120,7 +1260,7 @@ def open_url_safe(driver, url, headless=True, session_type=ParserSessionType.MAI
 
             if do_login(driver, login, password, None, base_url):
                 logging.info('Авторизация восстановлена. Переход к целевому URL.')
-                driver.get(url)
+                navigate_with_empty_page_recovery(driver, url)
             else:
                 raise Exception('Не удалось восстановить сессию через do_login.')
 

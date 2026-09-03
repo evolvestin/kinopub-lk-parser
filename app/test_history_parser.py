@@ -27,3 +27,39 @@ class HistoryParserRecoveryTests(SimpleTestCase):
         self.assertEqual(result, 'updated')
         self.assertEqual(update_once.call_count, 2)
         self.assertEqual(update_once.call_args_list[0], update_once.call_args_list[1])
+
+    def test_login_url_comparison_ignores_query_and_trailing_slash(self):
+        self.assertTrue(
+            history_parser._is_login_url(
+                'https://kinopub.example/user/login?returnUrl=%2Fhistory',
+                'https://kinopub.example/user/login',
+            )
+        )
+
+    def test_login_state_reports_visible_two_factor_form(self):
+        driver = Mock()
+        driver.current_url = 'https://kinopub.example/user/login'
+
+        def find_elements(by, selector):
+            if selector == 'login-form-formcode':
+                code = Mock()
+                code.is_displayed.return_value = True
+                return [code]
+            return []
+
+        driver.find_elements.side_effect = find_elements
+
+        self.assertEqual(
+            history_parser._wait_for_login_state(
+                driver,
+                'https://kinopub.example/user/login',
+                timeout=1,
+            ),
+            '2fa',
+        )
+
+    def test_empty_remote_document_is_detected(self):
+        driver = Mock()
+        driver.page_source = '<html><head></head><body></body></html>'
+
+        self.assertTrue(history_parser.is_empty_browser_page(driver))

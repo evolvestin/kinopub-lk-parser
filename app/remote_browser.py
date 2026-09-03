@@ -27,6 +27,8 @@ class RemoteBrowserDriver:
     """Small Selenium-compatible facade backed by AssetHub's queued browser API."""
 
     SESSION_RECOVERY_ATTEMPTS = 3
+    POLL_INTERVAL_SECONDS = 0.5
+    SESSION_RETRY_DELAY_SECONDS = 1
 
     def __init__(self, api_url, token, profile_key, initial_url, timeout=900):
         self.api_url = api_url.rstrip('/') + '/'
@@ -54,32 +56,55 @@ class RemoteBrowserDriver:
         self._last_url = initial_url
         last_error = None
         for attempt in range(1, self.SESSION_RECOVERY_ATTEMPTS + 1):
-            response = self.http.post(
-                urljoin(self.api_url, 'api/v1/browser/sessions/'),
-                headers=self._headers(),
-                json={'profile_key': self.profile_key, 'initial_url': initial_url},
-                timeout=30,
-            )
-            self._raise_http(response)
-            data = response.json()
-            self.session_id = data['session_id']
             try:
+                response = self.http.post(
+                    urljoin(self.api_url, 'api/v1/browser/sessions/'),
+                    headers=self._headers(),
+                    json={'profile_key': self.profile_key, 'initial_url': initial_url},
+                    timeout=30,
+                )
+                self._raise_http(response)
+                data = response.json()
+                self.session_id = data['session_id']
                 self._wait(data['task_id'])
                 return
             except BrowserSessionReplacedError as exc:
                 last_error = exc
-                if attempt == self.SESSION_RECOVERY_ATTEMPTS:
+                reason = 'session replaced'
+            except requests.RequestException as exc:
+                last_error = exc
+                reason = 'gateway transport error'
+            except RemoteBrowserError as exc:
+                if not self._is_transient_start_error(exc):
                     raise
-                logger.warning(
-                    'AssetHub replaced session %s while opening profile %s; retrying (%d/%d)',
-                    self.session_id,
-                    self.profile_key,
-                    attempt,
-                    self.SESSION_RECOVERY_ATTEMPTS - 1,
-                )
-                time.sleep(0.2 * attempt)
+                last_error = exc
+                reason = 'browser startup error'
+            if attempt == self.SESSION_RECOVERY_ATTEMPTS:
+                raise last_error
+            logger.warning(
+                'AssetHub failed to open profile %s (%s); retrying (%d/%d): %s',
+                self.profile_key,
+                reason,
+                attempt,
+                self.SESSION_RECOVERY_ATTEMPTS - 1,
+                last_error,
+            )
+            time.sleep(self.SESSION_RETRY_DELAY_SECONDS * attempt)
         if last_error:
             raise last_error
+
+    @staticmethod
+    def _is_transient_start_error(exc):
+        message = str(exc).lower()
+        return any(
+            marker in message
+            for marker in (
+                'session not created',
+                'disconnected',
+                'unable to connect to renderer',
+                'browser is not available',
+            )
+        )
 
     def _reopen_session(self):
         self._closed = False
@@ -171,12 +196,35 @@ class RemoteBrowserDriver:
 
     def _wait(self, task_id):
         deadline = time.monotonic() + self.timeout
+        last_transport_error = None
         while time.monotonic() < deadline:
-            response = self.http.get(
-                urljoin(self.api_url, f'api/v1/browser/tasks/{task_id}/'),
-                headers=self._headers(),
-                timeout=30,
-            )
+            try:
+                response = self.http.get(
+                    urljoin(self.api_url, f'api/v1/browser/tasks/{task_id}/'),
+                    headers=self._headers(),
+                    timeout=30,
+                )
+            except requests.RequestException as exc:
+                if last_transport_error is None:
+                    logger.warning('Temporary error polling AssetHub task %s: %s', task_id, exc)
+                last_transport_error = exc
+                time.sleep(min(self.POLL_INTERVAL_SECONDS, max(0, deadline - time.monotonic())))
+                continue
+
+            if response.status_code >= 500:
+                if last_transport_error is None:
+                    logger.warning(
+                        'AssetHub task %s polling returned HTTP %s; retrying.',
+                        task_id,
+                        response.status_code,
+                    )
+                last_transport_error = RemoteBrowserError(
+                    f'AssetHub polling returned HTTP {response.status_code}'
+                )
+                time.sleep(min(self.POLL_INTERVAL_SECONDS, max(0, deadline - time.monotonic())))
+                continue
+
+            last_transport_error = None
             self._raise_http(response)
             data = response.json()
             if data['status'] == 'succeeded':
@@ -187,9 +235,10 @@ class RemoteBrowserDriver:
                 raise RemoteBrowserError(
                     data.get('error', {}).get('message', 'remote browser task cancelled')
                 )
-            time.sleep(0.2)
+            time.sleep(self.POLL_INTERVAL_SECONDS)
         self._cancel_task(task_id)
-        raise TimeoutException(f'AssetHub browser task {task_id} timed out')
+        suffix = f' Last gateway error: {last_transport_error}' if last_transport_error else ''
+        raise TimeoutException(f'AssetHub browser task {task_id} timed out.{suffix}')
 
     @staticmethod
     def _raise_remote_task(data):

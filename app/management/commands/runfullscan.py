@@ -13,6 +13,7 @@ from app.history_parser import (
     get_total_pages,
     initialize_driver_session,
     is_fatal_selenium_error,
+    open_url_safe,
 )
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
@@ -251,7 +252,7 @@ def run_full_scan_session(headless=True, target_type=None, process_all_pages=Fal
                     logging.error(f'Could not initialize driver for mode {mode}. Skipping.')
                     continue
 
-            driver.get(base_url)
+            driver = open_url_safe(driver, base_url, session_type='aux')
             total_pages = get_total_pages(driver)
             logging.info("Found %d pages for mode '%s'.", total_pages, mode)
 
@@ -273,7 +274,7 @@ def run_full_scan_session(headless=True, target_type=None, process_all_pages=Fal
                     except Exception as e:
                         raise Exception(f'Driver unresponsive: {e}') from e
 
-                    driver.get(page_url)
+                    driver = open_url_safe(driver, page_url, session_type='aux')
                     added_count = parse_and_save_catalog_page(driver, mode)
                     total_added += added_count
 

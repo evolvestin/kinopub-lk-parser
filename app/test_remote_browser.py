@@ -1,6 +1,7 @@
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
+import requests
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 
 from app.remote_browser import RemoteBrowserDriver
@@ -215,3 +216,64 @@ class RemoteBrowserDriverTests(TestCase):
 
         self.assertEqual(driver.session_id, 'session-2')
         self.assertEqual(http.post.call_count, 2)
+
+    @patch('app.remote_browser.time.sleep')
+    @patch('app.remote_browser.requests.Session')
+    def test_transient_browser_startup_error_is_retried(self, session_cls, sleep):
+        http = session_cls.return_value
+        http.post.side_effect = [
+            self.response(
+                {
+                    'session_id': 'session-1',
+                    'task_id': 'task-open-1',
+                    'status': 'queued',
+                }
+            ),
+            self.response(
+                {
+                    'session_id': 'session-2',
+                    'task_id': 'task-open-2',
+                    'status': 'queued',
+                }
+            ),
+        ]
+        http.get.side_effect = [
+            self.response(
+                {
+                    'status': 'failed',
+                    'error': {
+                        'type': 'selenium.common.exceptions.WebDriverException',
+                        'message': 'session not created: unable to connect to renderer',
+                    },
+                }
+            ),
+            self.response({'status': 'succeeded', 'result': None}),
+        ]
+
+        driver = RemoteBrowserDriver(
+            'http://assethub/', 'secret', 'kinopub-main', 'https://kinopub.example/'
+        )
+
+        self.assertEqual(driver.session_id, 'session-2')
+        self.assertEqual(http.post.call_count, 2)
+        self.assertTrue(sleep.called)
+
+    @patch('app.remote_browser.time.sleep')
+    @patch('app.remote_browser.requests.Session')
+    def test_gateway_timeout_while_starting_is_retried(self, session_cls, sleep):
+        http = session_cls.return_value
+        http.post.side_effect = [
+            requests.ReadTimeout('gateway read timeout'),
+            self.response(
+                {'session_id': 'session-2', 'task_id': 'task-open-2', 'status': 'queued'}
+            ),
+        ]
+        http.get.return_value = self.response({'status': 'succeeded', 'result': None})
+
+        driver = RemoteBrowserDriver(
+            'http://assethub/', 'secret', 'kinopub-main', 'https://kinopub.example/'
+        )
+
+        self.assertEqual(driver.session_id, 'session-2')
+        self.assertEqual(http.post.call_count, 2)
+        self.assertTrue(sleep.called)

@@ -20,6 +20,7 @@ from django.core.management import call_command
 from django.db.models import Q
 from django.utils import timezone
 from redis import Redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from app import history_parser
 from app.gdrive_backup import BackupManager
@@ -64,6 +65,10 @@ if redis.call('get', KEYS[1]) == ARGV[1] then
 end
 return 0
 """
+
+# Periodic tasks must not occupy a worker while waiting for a long-running
+# catalog writer. Celery Beat will enqueue them again on the next interval.
+SHARED_LOCK_WAIT_SECONDS = 300
 
 
 @contextmanager
@@ -290,17 +295,15 @@ def backup_database():
     # snapshot does not overlap with long-running parser reads/writes.
     # The task is intentionally delayed instead of being dropped when a
     # parser task is active: Celery Beat invokes it once per hour.
-    for attempt in range(120):
-        with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=21600) as acquired:
-            if acquired:
-                BackupManager().perform_backup()
-                return
+    # Beat runs this task hourly. Waiting here ties up a Celery worker and can
+    # outlive the parser task that currently owns the browser lock. Retry on
+    # the next hourly tick instead.
+    with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=21600) as acquired:
+        if acquired:
+            BackupManager().perform_backup()
+            return
 
-        if attempt == 0:
-            logging.info('Backup delayed: Kinopub parser lock is busy.')
-        time.sleep(30)
-
-    logging.error('Backup was not started after waiting one hour for Kinopub parser lock.')
+    logging.warning('Backup deferred: Kinopub parser lock is busy; the next hourly run will retry.')
 
 
 def _execute_admin_command_process(celery_task_id, task_run):
@@ -587,8 +590,12 @@ def process_errors_task():
     планировщиком чаще для проверки готовности.
     """
 
-    aggregator = ErrorAggregator()
-    batch = aggregator.get_batch_to_send()
+    try:
+        aggregator = ErrorAggregator()
+        batch = aggregator.get_batch_to_send()
+    except RedisConnectionError as exc:
+        logging.warning('Error reporting is temporarily unavailable; will retry next tick: %s', exc)
+        return
 
     if batch:
         logging.info(f'Sending batch of {len(batch)} errors to Telegram.')
@@ -633,7 +640,7 @@ def fetch_person_photos_task(limit=2000):
     with _wait_for_redis_lock(
         RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=7200,
-        wait_timeout=7200,
+        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
     ) as acquired:
         if acquired:
             call_command('fetchpersonphotos', limit=limit)
@@ -657,13 +664,13 @@ def sync_poiskkino_ratings_task():
     with _wait_for_redis_lock(
         RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=14400,
-        wait_timeout=14400,
+        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
     ) as catalog_acquired:
         if catalog_acquired:
             with _wait_for_redis_lock(
                 RedisLock.EXTERNAL_RATING_WRITES,
                 lock_timeout=14400,
-                wait_timeout=14400,
+                wait_timeout=SHARED_LOCK_WAIT_SECONDS,
             ) as rating_acquired:
                 if rating_acquired:
                     call_command('syncpoiskkinoratings')
@@ -679,7 +686,7 @@ def sync_imdb_data_task():
     with _wait_for_redis_lock(
         RedisLock.EXTERNAL_RATING_WRITES,
         lock_timeout=14400,
-        wait_timeout=14400,
+        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
     ) as rating_acquired:
         if rating_acquired:
             call_command('syncimdbdata')
@@ -695,7 +702,7 @@ def update_site_metrics_task():
     with _wait_for_redis_lock(
         RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=7200,
-        wait_timeout=3600,
+        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
     ) as acquired:
         if not acquired:
             return
@@ -714,7 +721,7 @@ def warm_duplicate_photo_urls_task():
     with _wait_for_redis_lock(
         RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=1800,
-        wait_timeout=1800,
+        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
     ) as acquired:
         if acquired:
             warm_duplicate_photo_urls_cache()
@@ -732,7 +739,7 @@ def warm_person_metric_pages_task():
     with _wait_for_redis_lock(
         RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=1800,
-        wait_timeout=1800,
+        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
     ) as acquired:
         if not acquired:
             return
@@ -861,13 +868,13 @@ def enrich_tmdb_shows_task(limit: int = 5000):
     with _wait_for_redis_lock(
         RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=14400,
-        wait_timeout=14400,
+        wait_timeout=300,
     ) as catalog_acquired:
         if catalog_acquired:
             with _wait_for_redis_lock(
                 RedisLock.EXTERNAL_RATING_WRITES,
                 lock_timeout=14400,
-                wait_timeout=14400,
+                wait_timeout=300,
             ) as rating_acquired:
                 if rating_acquired:
                     logging.info(f'Starting scheduled TMDB shows enrichment task (limit={limit}).')
