@@ -632,6 +632,10 @@ SUBMIT_SELECTORS = (
     (By.CSS_SELECTOR, '#login-form button[type="submit"]'),
     (By.CSS_SELECTOR, 'form#login-form input[type="submit"]'),
 )
+RESEND_CODE_SELECTORS = (
+    (By.ID, 'resend-code'),
+    (By.CSS_SELECTOR, '#login-form button[name="login-form[resend]"]'),
+)
 
 
 def _is_login_url(current_url, login_url):
@@ -687,6 +691,74 @@ def _login_diagnostics(driver):
     if error_text:
         diagnostics += f', form_error={error_text!r}'
     return diagnostics
+
+
+def _submit_two_factor_code(driver, code_input, submit_btn, code):
+    """Submit 2FA through the form, with a browser-input fallback.
+
+    Some Chromium/remote-driver combinations report a successful click while
+    the page's JS-backed input has not received the value.  The direct form
+    submission keeps the server-side CSRF/session fields and avoids relying on
+    the submit button's click handler.
+    """
+    normalized_code = str(code).strip()
+    code_input.clear()
+    code_input.send_keys(normalized_code)
+
+    try:
+        entered_value = code_input.get_attribute('value')
+    except Exception:
+        entered_value = None
+
+    if entered_value != normalized_code:
+        try:
+            driver.execute_script(
+                """
+                const input = arguments[0];
+                const value = arguments[1];
+                input.value = value;
+                input.dispatchEvent(new Event('input', {bubbles: true}));
+                input.dispatchEvent(new Event('change', {bubbles: true}));
+                """,
+                code_input,
+                normalized_code,
+            )
+        except Exception:
+            logging.debug('Could not synchronize the 2FA input value through JavaScript.')
+
+    try:
+        driver.execute_script(
+            """
+            const input = arguments[0];
+            const button = arguments[1];
+            if (!input.form) throw new Error('2FA input has no form');
+            if (input.form.requestSubmit) {
+                input.form.requestSubmit(button);
+            } else {
+                input.form.submit();
+            }
+            """,
+            code_input,
+            submit_btn,
+        )
+    except Exception:
+        # Keep compatibility with a local Selenium driver or an older gateway
+        # that cannot marshal WebElement arguments into execute_script.
+        submit_btn.click()
+
+
+def _click_resend_code_if_available(driver):
+    """Ask Kinopub for one fresh code after a rejected code."""
+    resend_btn = _find_first_element(driver, RESEND_CODE_SELECTORS, visible=True)
+    if resend_btn is None:
+        return False
+    try:
+        if not resend_btn.is_enabled():
+            return False
+        resend_btn.click()
+        return True
+    except (NoSuchElementException, StaleElementReferenceException):
+        return False
 
 
 def _wait_for_login_state(driver, login_url, timeout=20):
@@ -750,9 +822,13 @@ def do_login(driver, login, password, cookie_path, base_url):
         if state == '2fa':
             logging.info('2FA code is required. Waiting for code from email processor...')
 
-            timeout = 120
+            timeout = 180
             start_time = time.time()
             used_code_ids = set()
+            resend_attempts = 0
+            max_resend_attempts = 1
+            next_resend_at = start_time + 55
+            resend_requested = False
             expiration_threshold = timezone.now() - timedelta(
                 minutes=settings.CODE_LIFETIME_MINUTES
             )
@@ -760,6 +836,21 @@ def do_login(driver, login, password, cookie_path, base_url):
             while time.time() - start_time < timeout:
                 if not _is_login_url(driver.current_url, login_url):
                     break
+
+                if resend_requested and resend_attempts < max_resend_attempts:
+                    if time.time() >= next_resend_at:
+                        if _click_resend_code_if_available(driver):
+                            resend_attempts += 1
+                            resend_requested = False
+                            logging.info(
+                                'Requested a fresh Kinopub 2FA code after rejection.'
+                            )
+                        else:
+                            # Kinopub keeps the button disabled for a short
+                            # cooldown. Retry the button independently of the
+                            # next email arriving so a rejected code cannot
+                            # leave the session waiting forever.
+                            next_resend_at = time.time() + 5
 
                 code_obj = (
                     Code.objects.filter(received_at__gte=expiration_threshold)
@@ -776,24 +867,26 @@ def do_login(driver, login, password, cookie_path, base_url):
                                 '2FA form disappeared before code %s could be submitted.', code
                             )
                             continue
-                        code_input.clear()
-                        code_input.send_keys(code)
                         used_code_ids.add(code_id)
-                        time.sleep(1)
                         submit_btn = _find_first_element(driver, SUBMIT_SELECTORS, visible=True)
                         if submit_btn is None:
                             logging.warning('2FA submit button is no longer available.')
                             continue
-                        submit_btn.click()
+                        _submit_two_factor_code(driver, code_input, submit_btn, code)
                         state = _wait_for_login_state(driver, login_url, timeout=15)
 
                         if state == 'authenticated':
                             logging.info('Code %s was accepted.', code)
                             break
                         else:
+                            error_text = _login_error_text(driver)
                             logging.warning(
-                                'Code %s was not accepted. Waiting for a new one.', code
+                                'Code %s was not accepted%s. Waiting for a new one.',
+                                code,
+                                f' ({error_text})' if error_text else '',
                             )
+                            if resend_attempts < max_resend_attempts:
+                                resend_requested = True
                     except Exception as e:
                         logging.warning(
                             'Could not use code %s. It might be stale. Error: %s', code, e

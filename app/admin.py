@@ -23,7 +23,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Cast, Coalesce
 from django.http import HttpResponseRedirect
 from django.template.loader import render_to_string
 from django.urls import path, reverse
@@ -2027,6 +2027,11 @@ class TelegramLogChatIdFilter(admin.SimpleListFilter):
 
         return result
 
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(_chat_id_sort=self.value())
+        return queryset
+
 
 @admin.register(TelegramLog, site=admin_site)
 class TelegramLogAdmin(admin.ModelAdmin):
@@ -2083,16 +2088,16 @@ class TelegramLogAdmin(admin.ModelAdmin):
                 output_field=CharField(),
             ),
             _chat_id_sort=Coalesce(
-                F('raw_data__message__chat__id'),
-                F('raw_data__callback_query__message__chat__id'),
-                F('raw_data__my_chat_member__chat__id'),
-                F('raw_data__chat__id'),
+                Cast(F('raw_data__message__chat__id'), CharField()),
+                Cast(F('raw_data__callback_query__message__chat__id'), CharField()),
+                Cast(F('raw_data__my_chat_member__chat__id'), CharField()),
+                Cast(F('raw_data__chat__id'), CharField()),
                 output_field=CharField(),
             ),
             _message_id_sort=Coalesce(
-                F('raw_data__message__message_id'),
-                F('raw_data__callback_query__message__message_id'),
-                F('raw_data__message_id'),
+                Cast(F('raw_data__message__message_id'), CharField()),
+                Cast(F('raw_data__callback_query__message__message_id'), CharField()),
+                Cast(F('raw_data__message_id'), CharField()),
                 output_field=CharField(),
             ),
         )

@@ -63,3 +63,29 @@ class HistoryParserRecoveryTests(SimpleTestCase):
         driver.page_source = '<html><head></head><body></body></html>'
 
         self.assertTrue(history_parser.is_empty_browser_page(driver))
+
+    def test_two_factor_submission_sets_value_and_submits_the_form(self):
+        driver = Mock()
+        code_input = Mock()
+        code_input.get_attribute.return_value = '650665'
+        submit_btn = Mock()
+
+        history_parser._submit_two_factor_code(driver, code_input, submit_btn, ' 650665 ')
+
+        code_input.clear.assert_called_once_with()
+        code_input.send_keys.assert_called_once_with('650665')
+        driver.execute_script.assert_called_once()
+        submit_btn.click.assert_not_called()
+        self.assertIn('requestSubmit', driver.execute_script.call_args.args[0])
+
+    def test_two_factor_submission_falls_back_to_click_for_old_gateway(self):
+        driver = Mock()
+        driver.execute_script.side_effect = RuntimeError('unsupported script arguments')
+        code_input = Mock()
+        code_input.get_attribute.return_value = None
+        submit_btn = Mock()
+
+        history_parser._submit_two_factor_code(driver, code_input, submit_btn, '650665')
+
+        self.assertEqual(driver.execute_script.call_count, 2)
+        submit_btn.click.assert_called_once_with()
