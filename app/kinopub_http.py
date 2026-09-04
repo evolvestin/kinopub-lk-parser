@@ -18,7 +18,7 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urljoin
 
-import requests
+from curl_cffi import requests as curl_requests
 from bs4 import BeautifulSoup, NavigableString, Tag
 from django.conf import settings
 from django.core.cache import cache
@@ -153,38 +153,29 @@ class HttpWebElement:
 
 
 class KinopubHttpDriver:
-    """Persistent requests.Session with the subset of Selenium used by parsers."""
+    """Persistent Chrome-impersonated HTTP session with a Selenium facade."""
 
-    USER_AGENT = (
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 '
-        '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-    )
     RETRIES = 3
 
-    def __init__(self, base_url, login, password, profile_key, timeout=30):
+    def __init__(self, base_url, login, password, profile_key, timeout=30, impersonate=None):
         self.base_url = base_url.rstrip('/') + '/'
         self.login = login
         self.password = password
         self.profile_key = str(profile_key)
         self.timeout = timeout
+        self.impersonate = impersonate or settings.KINOPUB_HTTP_IMPERSONATE
         self.session_file = _session_path(self.profile_key)
-        self.http = requests.Session()
+        # curl_cffi supplies a current Chrome TLS/JA3 profile, HTTP/2/3 and the
+        # corresponding browser headers.  Keeping the profile on the session
+        # is important: changing it request-by-request would look unlike one
+        # browser connection and would also lose connection reuse.
+        self.http = curl_requests.Session(
+            impersonate=self.impersonate,
+            default_headers=True,
+        )
         self.http.headers.update(
             {
-                'User-Agent': self.USER_AGENT,
-                'Accept': (
-                    'text/html,application/xhtml+xml,application/xml;q=0.9,'
-                    'image/avif,image/webp,*/*;q=0.8'
-                ),
                 'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'same-origin',
-                'Sec-Fetch-User': '?1',
             }
         )
         self.http.cookies.clear()
@@ -212,6 +203,10 @@ class KinopubHttpDriver:
             except (KeyError, TypeError, ValueError):
                 continue
 
+    def _cookie_objects(self):
+        """Return Cookie objects, not just names from curl_cffi's facade."""
+        return getattr(self.http.cookies, 'jar', self.http.cookies)
+
     def _save_cookies(self):
         payload = {
             'base_url': self.base_url,
@@ -223,7 +218,7 @@ class KinopubHttpDriver:
                     'domain': cookie.domain,
                     'path': cookie.path,
                 }
-                for cookie in self.http.cookies
+                for cookie in self._cookie_objects()
             ],
         }
         path = self.session_file
@@ -247,7 +242,18 @@ class KinopubHttpDriver:
         absolute_url = urljoin(self._last_url or self.base_url, url)
         headers = {}
         if referer:
-            headers['Referer'] = referer
+            # A form submit or an internal document navigation carries these
+            # values in Chrome.  The initial navigation deliberately keeps
+            # curl_cffi's `Sec-Fetch-Site: none` default.
+            headers.update(
+                {
+                    'Referer': referer,
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'same-origin',
+                    'Sec-Fetch-User': '?1',
+                }
+            )
         last_error = None
         for attempt in range(1, self.RETRIES + 1):
             try:
@@ -272,7 +278,7 @@ class KinopubHttpDriver:
                         continue
                     raise KinopubHttpError(f'KinoPub returned an empty document for {absolute_url}')
                 return response
-            except (requests.RequestException, KinopubHttpError) as exc:
+            except (curl_requests.exceptions.RequestException, KinopubHttpError) as exc:
                 last_error = exc
                 if attempt < self.RETRIES:
                     time.sleep(attempt * 0.5)
@@ -285,7 +291,8 @@ class KinopubHttpDriver:
 
     def get(self, url):
         with _profile_lock(self.profile_key):
-            self._request(url)
+            referer = self._last_url if self._last_response is not None else None
+            self._request(url, referer=referer)
         return None
 
     def refresh(self):
@@ -322,7 +329,7 @@ class KinopubHttpDriver:
                 'domain': cookie.domain,
                 'path': cookie.path,
             }
-            for cookie in self.http.cookies
+            for cookie in self._cookie_objects()
         ]
 
     def add_cookie(self, cookie):
@@ -492,7 +499,7 @@ class KinopubHttpDriver:
         if self._has_logout_marker():
             return True
         login_url = urljoin(self.base_url, 'user/login')
-        self._request(login_url)
+        self._request(login_url, referer=self.current_url)
         form = self._soup.select_one('form#login-form')
         if not form:
             raise KinopubHttpError('KinoPub login form is missing')

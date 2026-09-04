@@ -25,6 +25,7 @@ to `/data`.
 # Current rollout mode: browser-only through Asset Hub
 KINOPUB_HTTP_ENABLED=false
 KINOPUB_BROWSER_FALLBACK_ENABLED=true
+KINOPUB_HTTP_IMPERSONATE=chrome
 
 # Set true later to enable HTTP first; Asset Hub remains the fallback
 KINOPUB_FORCE_BROWSER_FALLBACK=false

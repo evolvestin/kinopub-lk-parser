@@ -70,6 +70,14 @@ class KinopubHttpDriverTests(SimpleTestCase):
             self.assertEqual(payload['base_url'], 'https://kino.watch/')
             self.assertEqual(payload['cookies'][0]['name'], 'PHPSESSID')
 
+    @patch('app.kinopub_http.curl_requests.Session')
+    def test_session_uses_chrome_impersonation(self, session_class):
+        KinopubHttpDriver('https://kino.watch/', 'login', 'password', 'main')
+        session_class.assert_called_once_with(
+            impersonate='chrome',
+            default_headers=True,
+        )
+
     def test_missing_element_keeps_selenium_exception_contract(self):
         driver = self._driver_for_html('<html></html>')
         with self.assertRaises(NoSuchElementException):
