@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import re
@@ -6,6 +7,7 @@ import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
+from pathlib import Path
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -665,6 +667,10 @@ def _login_error_text(driver):
         (By.CSS_SELECTOR, '#login-form .help-block'),
         (By.CSS_SELECTOR, '#login-form .alert-danger'),
         (By.CSS_SELECTOR, '#login-form .error-summary'),
+        (By.CSS_SELECTOR, 'body .alert-danger'),
+        (By.CSS_SELECTOR, 'body [role="alert"]'),
+        (By.CSS_SELECTOR, 'body .invalid-feedback'),
+        (By.CSS_SELECTOR, 'body [class*="error"]'),
     ):
         try:
             for element in driver.find_elements(by, selector):
@@ -693,13 +699,71 @@ def _login_diagnostics(driver):
     return diagnostics
 
 
+def _save_login_screenshot(driver, label):
+    """Save a visual checkpoint from the remote browser for login debugging."""
+    try:
+        result = driver.execute_cdp_cmd('Page.captureScreenshot', {'format': 'png'})
+        image_data = result.get('data') if isinstance(result, dict) else None
+        if not image_data:
+            return None
+        path = Path('/data') / f'kinopub_login_{label}.png'
+        path.write_bytes(base64.b64decode(image_data))
+        return str(path)
+    except Exception as exc:
+        logging.warning('Could not save Kinopub login screenshot (%s): %s', label, exc)
+        return None
+
+
+def _login_form_state(driver):
+    """Return non-sensitive DOM state proving what happened to the login form."""
+    try:
+        return driver.execute_script(
+            """
+            const form = document.querySelector('#login-form');
+            const code = document.querySelector('#login-form input[name=\"login-form[formcode]\"]');
+            const button = document.querySelector('#login-form button[type=\"submit\"], #login-form input[type=\"submit\"]');
+            return {
+                form_present: Boolean(form),
+                form_method: form ? (form.method || '').toUpperCase() : null,
+                form_action: form ? form.action : null,
+                code_present: Boolean(code),
+                code_visible: Boolean(code && code.offsetParent !== null),
+                submit_present: Boolean(button),
+                submit_disabled: Boolean(button && button.disabled),
+                active_tag: document.activeElement ? document.activeElement.tagName : null,
+                active_id: document.activeElement ? document.activeElement.id : null,
+            };
+            """
+        )
+    except Exception as exc:
+        return {'error': type(exc).__name__}
+
+
+def _two_factor_input_state(code_input, submit_btn):
+    """Return safe input/button metadata without exposing the OTP itself."""
+    try:
+        value = code_input.get_attribute('value') or ''
+        return {
+            'input_id': code_input.get_attribute('id'),
+            'input_name': code_input.get_attribute('name'),
+            'input_type': code_input.get_attribute('type'),
+            'value_length': len(value),
+            'maxlength': code_input.get_attribute('maxlength'),
+            'button_id': submit_btn.get_attribute('id'),
+            'button_name': submit_btn.get_attribute('name'),
+            'button_value': submit_btn.get_attribute('value'),
+            'button_type': submit_btn.get_attribute('type'),
+        }
+    except Exception as exc:
+        return {'error': type(exc).__name__}
+
+
 def _submit_two_factor_code(driver, code_input, submit_btn, code):
-    """Submit 2FA through the form, with a browser-input fallback.
+    """Fill 2FA and use Kinopub's normal submit-button handler.
 
     Some Chromium/remote-driver combinations report a successful click while
-    the page's JS-backed input has not received the value.  The direct form
-    submission keeps the server-side CSRF/session fields and avoids relying on
-    the submit button's click handler.
+    the page's JS-backed input has not received the value, so synchronize it
+    before invoking the same button click as a normal Kinopub user.
     """
     normalized_code = str(code).strip()
     code_input.clear()
@@ -726,25 +790,16 @@ def _submit_two_factor_code(driver, code_input, submit_btn, code):
         except Exception:
             logging.debug('Could not synchronize the 2FA input value through JavaScript.')
 
-    try:
-        driver.execute_script(
-            """
-            const input = arguments[0];
-            const button = arguments[1];
-            if (!input.form) throw new Error('2FA input has no form');
-            if (input.form.requestSubmit) {
-                input.form.requestSubmit(button);
-            } else {
-                input.form.submit();
-            }
-            """,
-            code_input,
-            submit_btn,
-        )
-    except Exception:
-        # Keep compatibility with a local Selenium driver or an older gateway
-        # that cannot marshal WebElement arguments into execute_script.
-        submit_btn.click()
+    logging.info(
+        'Kinopub 2FA input prepared: %s',
+        _two_factor_input_state(code_input, submit_btn),
+    )
+    submit_btn.click()
+    logging.info(
+        'Kinopub 2FA click completed. Form state: %s. Screenshot: %s',
+        _login_form_state(driver),
+        _save_login_screenshot(driver, 'after_submit'),
+    )
 
 
 def _click_resend_code_if_available(driver):
@@ -760,15 +815,31 @@ def _click_resend_code_if_available(driver):
             """
             const button = document.querySelector('#resend-code') ||
                 document.querySelector('#login-form button[name="login-form[resend]"]');
-            if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true' ||
-                button.offsetParent === null) {
-                return false;
+            if (!button || !button.form) {
+                return {ok: false, reason: 'missing'};
             }
-            button.click();
-            return true;
+            if (!button.disabled && button.getAttribute('aria-disabled') !== 'true' &&
+                button.offsetParent !== null) {
+                button.click();
+                return {ok: true, method: 'click'};
+            }
+
+            // The countdown is client-side. If it gets stuck in the remote
+            // Chromium, submit the same form with the resend submitter's
+            // name/value so the server still receives login-form[resend].
+            if (!button.name) {
+                return {ok: false, reason: 'button has no name'};
+            }
+            const submitter = document.createElement('input');
+            submitter.type = 'hidden';
+            submitter.name = button.name;
+            submitter.value = button.value || '';
+            button.form.appendChild(submitter);
+            HTMLFormElement.prototype.submit.call(button.form);
+            return {ok: true, method: 'form-submit'};
             """
         )
-        if result is True:
+        if isinstance(result, dict) and result.get('ok') is True:
             return True
 
         # Compatibility fallback for an older gateway that cannot execute
@@ -782,6 +853,56 @@ def _click_resend_code_if_available(driver):
     except Exception as exc:
         logging.debug('Could not click Kinopub 2FA resend button: %s', exc)
         return False
+
+
+def _submit_login_form(driver, login, password, login_url):
+    """Fill and submit the normal Kinopub login form."""
+    wait = WebDriverWait(driver, 30, poll_frequency=1)
+    login_input = wait.until(lambda d: _find_first_element(d, LOGIN_INPUT_SELECTORS))
+    password_input = wait.until(lambda d: _find_first_element(d, PASSWORD_INPUT_SELECTORS))
+    submit_btn = wait.until(
+        lambda d: next(
+            (
+                element
+                for element in (
+                    _find_first_element(d, (selector,), visible=True)
+                    for selector in SUBMIT_SELECTORS
+                )
+                if element and element.is_enabled()
+            ),
+            None,
+        )
+    )
+    login_input.clear()
+    login_input.send_keys(login)
+    password_input.clear()
+    password_input.send_keys(password)
+    time.sleep(1)
+    submit_btn.click()
+    return _wait_for_login_state(driver, login_url, timeout=20)
+
+
+def _restart_login_for_two_factor(driver, login, password, login_url):
+    """Re-enter credentials until Kinopub exposes its existing 2FA form."""
+    last_state = 'timeout'
+    for attempt in range(1, 4):
+        navigate_with_empty_page_recovery(driver, login_url)
+        last_state = _submit_login_form(driver, login, password, login_url)
+        logging.info(
+            'Kinopub relogin attempt %d: state=%s. Diagnostics: %s',
+            attempt,
+            last_state,
+            _login_diagnostics(driver),
+        )
+        if last_state in ('authenticated', '2fa'):
+            return last_state
+        error_text = _login_error_text(driver).lower()
+        if 'код уже отправлен' not in error_text:
+            return last_state
+        # Kinopub may render the "already sent" notice before it restores
+        # the code form. Give its login page a short moment and retry.
+        time.sleep(2)
+    return last_state
 
 
 def _wait_for_login_state(driver, login_url, timeout=20):
@@ -812,32 +933,9 @@ def do_login(driver, login, password, cookie_path, base_url):
         logging.warning('Обнаружена защита Cloudflare на странице входа.')
 
     try:
-        wait = WebDriverWait(driver, 30, poll_frequency=1)
-        login_input = wait.until(lambda d: _find_first_element(d, LOGIN_INPUT_SELECTORS))
-        password_input = wait.until(lambda d: _find_first_element(d, PASSWORD_INPUT_SELECTORS))
-        submit_btn = wait.until(
-            lambda d: next(
-                (
-                    element
-                    for element in (
-                        _find_first_element(d, (selector,), visible=True)
-                        for selector in SUBMIT_SELECTORS
-                    )
-                    if element and element.is_enabled()
-                ),
-                None,
-            )
-        )
-
-        login_input.clear()
-        login_input.send_keys(login)
-        password_input.clear()
-        password_input.send_keys(password)
-        time.sleep(1)
-        login_attempt_started_at = timezone.now()
-        submit_btn.click()
-
-        state = _wait_for_login_state(driver, login_url)
+        state = _submit_login_form(driver, login, password, login_url)
+        if state == 'rejected' and 'код уже отправлен' in _login_error_text(driver).lower():
+            state = _restart_login_for_two_factor(driver, login, password, login_url)
         if state == 'authenticated':
             logging.info('Authorization successful.')
             save_cookies(driver, cookie_path)
@@ -851,15 +949,29 @@ def do_login(driver, login, password, cookie_path, base_url):
             used_code_ids = set()
             resend_attempts = 0
             max_resend_attempts = 1
+            relogin_attempts = 0
+            max_relogin_attempts = 3
             next_resend_at = start_time + 55
             resend_requested = False
             resend_wait_logged = False
             expiration_threshold = timezone.now() - timedelta(
                 minutes=settings.CODE_LIFETIME_MINUTES
             )
-            code_wait_threshold = max(expiration_threshold, login_attempt_started_at)
+            next_session_keepalive_at = start_time + 15
 
             while time.time() - start_time < timeout:
+                if time.time() >= next_session_keepalive_at:
+                    try:
+                        if hasattr(driver, 'keep_alive'):
+                            driver.keep_alive()
+                        else:
+                            driver.execute_script('return true;')
+                    except Exception as keepalive_error:
+                        logging.warning(
+                            'Could not keep the AssetHub browser session alive: %s',
+                            keepalive_error,
+                        )
+                    next_session_keepalive_at = time.time() + 15
                 if not _is_login_url(driver.current_url, login_url):
                     break
 
@@ -886,12 +998,11 @@ def do_login(driver, login, password, cookie_path, base_url):
 
                 code_obj = (
                     Code.objects.filter(
-                        # ``received_at`` is the mail's Date header and can
-                        # lag behind insertion when the listener reconnects.
-                        # ``created_at`` prevents a delayed old message from
-                        # being selected for this login attempt.
-                        created_at__gte=login_attempt_started_at,
-                        received_at__gte=code_wait_threshold,
+                        # Kinopub accepts the latest code for a short period
+                        # even when it was issued before this login attempt.
+                        # Do not require a code newer than the form: the mail
+                        # listener may not receive another message at all.
+                        received_at__gte=expiration_threshold,
                     )
                     .order_by('-received_at')
                     .first()
@@ -906,13 +1017,25 @@ def do_login(driver, login, password, cookie_path, base_url):
                             logging.warning(
                                 '2FA form disappeared before code %s could be submitted.', code
                             )
-                            resend_requested = resend_attempts < max_resend_attempts
                             try:
-                                driver.refresh()
-                                _wait_for_login_state(driver, login_url, timeout=10)
+                                relogin_attempts += 1
+                                if relogin_attempts > max_relogin_attempts:
+                                    break
+                                state = _restart_login_for_two_factor(
+                                    driver, login, password, login_url
+                                )
+                                if state == 'authenticated':
+                                    save_cookies(driver, cookie_path)
+                                    return True
+                                if state == '2fa':
+                                    start_time = time.time()
+                                    next_resend_at = start_time + 55
+                                    next_session_keepalive_at = start_time + 15
+                                    resend_requested = False
+                                    resend_wait_logged = False
                             except Exception as refresh_error:
                                 logging.warning(
-                                    'Could not restore the 2FA form after refresh: %s',
+                                    'Could not restart login after the 2FA form disappeared: %s',
                                     refresh_error,
                                 )
                             continue
@@ -922,6 +1045,11 @@ def do_login(driver, login, password, cookie_path, base_url):
                             continue
                         _submit_two_factor_code(driver, code_input, submit_btn, code)
                         state = _wait_for_login_state(driver, login_url, timeout=15)
+                        logging.info(
+                            'Kinopub 2FA submit result: state=%s. Diagnostics: %s',
+                            state,
+                            _login_diagnostics(driver),
+                        )
 
                         if state == 'authenticated':
                             logging.info('Code %s was accepted.', code)
@@ -933,7 +1061,35 @@ def do_login(driver, login, password, cookie_path, base_url):
                                 code,
                                 f' ({error_text})' if error_text else '',
                             )
-                            if resend_attempts < max_resend_attempts:
+                            if state in ('rejected', 'timeout'):
+                                relogin_attempts += 1
+                                if relogin_attempts > max_relogin_attempts:
+                                    break
+                                try:
+                                    state = _restart_login_for_two_factor(
+                                        driver, login, password, login_url
+                                    )
+                                    if state == 'authenticated':
+                                        save_cookies(driver, cookie_path)
+                                        return True
+                                    if state != '2fa':
+                                        logging.warning(
+                                            'Kinopub did not show 2FA after relogin: state=%s',
+                                            state,
+                                        )
+                                        break
+                                    start_time = time.time()
+                                    next_resend_at = start_time + 55
+                                    next_session_keepalive_at = start_time + 15
+                                    resend_requested = False
+                                    resend_wait_logged = False
+                                except Exception as relogin_error:
+                                    logging.warning(
+                                        'Could not restart Kinopub login after 2FA rejection: %s',
+                                        relogin_error,
+                                    )
+                                    break
+                            elif resend_attempts < max_resend_attempts:
                                 resend_requested = True
                     except Exception as e:
                         logging.warning(
@@ -1000,8 +1156,10 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
         navigate_with_empty_page_recovery(driver, target_url)
         try:
             WebDriverWait(driver, 5).until(
-                expected_conditions.presence_of_element_located(
-                    (By.CSS_SELECTOR, "a[href*='/user/logout']")
+                lambda current_driver: _find_first_element(
+                    current_driver,
+                    ((By.CSS_SELECTOR, "a[href*='/user/logout']"),),
+                    visible=True,
                 )
             )
             logging.info('Session is valid.')

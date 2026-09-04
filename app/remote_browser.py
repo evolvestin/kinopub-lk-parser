@@ -313,6 +313,10 @@ class RemoteBrowserDriver:
     def execute_cdp_cmd(self, command, params):
         return self._submit('execute_cdp_cmd', {'command': command, 'params': params})
 
+    def keep_alive(self):
+        """Touch the gateway lease without changing the page or cookies."""
+        return self._submit('ping')
+
     def get_cookies(self):
         return self._submit('get_cookies')
 

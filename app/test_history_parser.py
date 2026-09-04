@@ -74,13 +74,12 @@ class HistoryParserRecoveryTests(SimpleTestCase):
 
         code_input.clear.assert_called_once_with()
         code_input.send_keys.assert_called_once_with('650665')
-        driver.execute_script.assert_called_once()
-        submit_btn.click.assert_not_called()
-        self.assertIn('requestSubmit', driver.execute_script.call_args.args[0])
+        self.assertEqual(driver.execute_script.call_count, 1)
+        self.assertIn('const form =', driver.execute_script.call_args.args[0])
+        submit_btn.click.assert_called_once_with()
 
-    def test_two_factor_submission_falls_back_to_click_for_old_gateway(self):
+    def test_two_factor_submission_synchronizes_input_before_click(self):
         driver = Mock()
-        driver.execute_script.side_effect = RuntimeError('unsupported script arguments')
         code_input = Mock()
         code_input.get_attribute.return_value = None
         submit_btn = Mock()
@@ -88,6 +87,10 @@ class HistoryParserRecoveryTests(SimpleTestCase):
         history_parser._submit_two_factor_code(driver, code_input, submit_btn, '650665')
 
         self.assertEqual(driver.execute_script.call_count, 2)
+        self.assertIn(
+            "dispatchEvent",
+            driver.execute_script.call_args_list[0].args[0],
+        )
         submit_btn.click.assert_called_once_with()
 
     def test_resend_uses_js_when_remote_element_click_is_unavailable(self):
@@ -96,7 +99,7 @@ class HistoryParserRecoveryTests(SimpleTestCase):
         resend_btn.is_displayed.return_value = True
         resend_btn.is_enabled.return_value = False
         driver.find_elements.return_value = [resend_btn]
-        driver.execute_script.return_value = True
+        driver.execute_script.return_value = {'ok': True, 'method': 'form-submit'}
 
         self.assertTrue(history_parser._click_resend_code_if_available(driver))
         resend_btn.click.assert_not_called()
