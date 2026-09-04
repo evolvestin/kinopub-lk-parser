@@ -22,6 +22,11 @@ urlpatterns = proxy_patterns + [
     path('metrics/', views.metrics, name='metrics'),
     path('admin/', admin_site.urls),
     path('api/internal/set_url', views.internal_set_url, name='internal_set_url'),
+    path(
+        'api/internal/kinopub-code/',
+        views.internal_kinopub_code,
+        name='internal_kinopub_code',
+    ),
     path('api/image_proxy/', views.proxy_image_view, name='proxy_image_view'),
     path(
         'api/admin/wishlist/folder/<int:folder_id>/',

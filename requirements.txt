@@ -2,6 +2,8 @@ django-vite==3.0.4
 google-api-python-client==2.187.0
 Django>=5.2,<6.0
 requests>=2.31,<3
+beautifulsoup4>=4.12,<5
+Brotli>=1.1,<2
 imaplib2==3.6
 PyDrive2==1.21.3
 selenium>=4.15

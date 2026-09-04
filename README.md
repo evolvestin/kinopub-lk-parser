@@ -14,6 +14,32 @@ This script uses the IMAP IDLE protocol for near-instant notifications without c
 -   **Customizable**: Easily change the sender, code format (regex), and target IMAP folder.
 -   **Safe by Default**: Does not mark emails as read unless explicitly configured to do so.
 
+## KinoPub transport
+
+KinoPub pages are requested through a persistent HTTP session by default. The
+session cookies are stored in `/data/kinopub-http-sessions/` and survive
+container restarts and image rebuilds because the compose file mounts `./data`
+to `/data`.
+
+```ini
+# Current rollout mode: browser-only through Asset Hub
+KINOPUB_HTTP_ENABLED=false
+KINOPUB_BROWSER_FALLBACK_ENABLED=true
+
+# Set true later to enable HTTP first; Asset Hub remains the fallback
+KINOPUB_FORCE_BROWSER_FALLBACK=false
+KINOPUB_CODE_API_TOKEN=use-a-separate-long-random-token
+```
+
+If the HTTP transport fails, the same operation is retried through Asset Hub.
+The fallback alert is rate-limited by `KINOPUB_BROWSER_FALLBACK_NOTIFY_TTL`
+(six hours by default), so a persistent outage does not flood Telegram.
+
+For operational login checks, the newest non-expired KinoPub code is available
+only with the dedicated `X-Kinopub-Code-Token` header:
+`GET /api/internal/kinopub-code/`. The endpoint returns HTTP 404 after the
+configured code lifetime and disables caching.
+
 ## Quick Start (Ubuntu)
 
 1.  **Clone or Copy Files**: Place all the project files (`Dockerfile`, `docker-compose.yml`, `app/` directory, etc.) onto your server.

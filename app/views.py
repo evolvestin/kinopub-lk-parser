@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import random
+import secrets
 import urllib.parse
 import uuid
 from collections import defaultdict
@@ -29,6 +30,7 @@ from requests.adapters import HTTPAdapter
 from app.admin_site import admin_site
 from app.models import (
     CasinoSpin,
+    Code,
     Country,
     ExternalRating,
     Genre,
@@ -315,6 +317,42 @@ def _check_token(request):
     if not expected_token:
         return False
     return request.headers.get('X-Bot-Token') == expected_token
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def internal_kinopub_code(request):
+    """Return the newest unexpired KinoPub OTP to an internal caller.
+
+    The endpoint is intentionally separate from the bot API token. It never
+    returns expired codes and does not expose the code in logs or response
+    headers. A dedicated token keeps this operational helper independent from
+    public bot integrations.
+    """
+    configured_token = settings.KINOPUB_CODE_API_TOKEN
+    if not configured_token:
+        return JsonResponse({'error': 'KinoPub code endpoint is not configured'}, status=503)
+
+    supplied_token = request.headers.get('X-Kinopub-Code-Token', '')
+    if not secrets.compare_digest(supplied_token, configured_token):
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    received_after = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
+    code_obj = Code.objects.filter(received_at__gte=received_after).order_by('-received_at').first()
+    if not code_obj:
+        response = JsonResponse({'error': 'No unexpired KinoPub code'}, status=404)
+    else:
+        expires_at = code_obj.received_at + timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
+        response = JsonResponse(
+            {
+                'code': code_obj.code,
+                'received_at': code_obj.received_at.isoformat(),
+                'expires_at': expires_at.isoformat(),
+            }
+        )
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    return response
 
 
 def protected_bot_api(func):

@@ -23,6 +23,11 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 from app.gdrive_backup import BackupManager
+from app.kinopub_http import (
+    KinopubHttpDriver,
+    KinopubHttpError,
+    notify_browser_fallback_once,
+)
 from app.models import (
     Code,
     Country,
@@ -1130,9 +1135,8 @@ def do_login(driver, login, password, cookie_path, base_url):
         return False
 
 
-def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN):
-    logging.info(f'Initializing Selenium driver session (Type: {session_type})...')
-
+def _initialize_browser_session(headless=True, session_type=ParserSessionType.MAIN):
+    logging.info('Initializing Asset Hub browser session (Type: %s)...', session_type)
     if session_type == ParserSessionType.AUX:
         target_url = settings.SITE_AUX_URL
         login = settings.KINOPUB_AUX_LOGIN
@@ -1159,7 +1163,11 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
                 lambda current_driver: _find_first_element(
                     current_driver,
                     ((By.CSS_SELECTOR, "a[href*='/user/logout']"),),
-                    visible=True,
+                    # The logout link is inside a collapsed user menu on the
+                    # current KinoPub layout. Its presence in the DOM is the
+                    # auth signal; requiring visibility creates a false
+                    # session-expired result and sends us back to login.
+                    visible=False,
                 )
             )
             logging.info('Session is valid.')
@@ -1179,6 +1187,44 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
         )
         close_driver(driver)
         return None
+
+
+def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN):
+    """Create the primary HTTP session, falling back to Asset Hub if needed."""
+    logging.info('Initializing KinoPub session (Type: %s)...', session_type)
+    is_aux = session_type == ParserSessionType.AUX or str(session_type) == 'aux'
+    target_url = settings.SITE_AUX_URL if is_aux else settings.SITE_URL
+    login = settings.KINOPUB_AUX_LOGIN if is_aux else settings.KINOPUB_LOGIN
+    password = settings.KINOPUB_AUX_PASSWORD if is_aux else settings.KINOPUB_PASSWORD
+    profile_key = 'aux' if is_aux else 'main'
+
+    if settings.KINOPUB_FORCE_BROWSER_FALLBACK or not settings.KINOPUB_HTTP_ENABLED:
+        return _initialize_browser_session(headless=headless, session_type=session_type)
+
+    driver = None
+    try:
+        driver = KinopubHttpDriver(
+            base_url=target_url,
+            login=login,
+            password=password,
+            profile_key=profile_key,
+            timeout=settings.KINOPUB_HTTP_TIMEOUT_SECONDS,
+        )
+        driver.get(target_url)
+        driver.ensure_authenticated()
+        logging.info('KinoPub HTTP session is authenticated (%s).', profile_key)
+        return driver
+    except Exception as exc:
+        logging.error('KinoPub HTTP session initialization failed: %s', exc, exc_info=True)
+        if driver is not None:
+            driver.quit()
+
+        if not settings.KINOPUB_BROWSER_FALLBACK_ENABLED:
+            return None
+
+        notify_browser_fallback_once(profile_key, exc)
+        logging.warning('Switching %s session to Asset Hub browser fallback.', profile_key)
+        return _initialize_browser_session(headless=headless, session_type=session_type)
 
 
 def _extract_js_data(driver, var_name, regex_pattern):
@@ -1525,9 +1571,42 @@ def get_latest_view_date_orm(mode: str):
 
 
 def open_url_safe(driver, url, headless=True, session_type=ParserSessionType.MAIN):
-    navigate_with_empty_page_recovery(driver, url)
+    def switch_http_to_browser(current_driver, cause):
+        profile_key = 'aux' if session_type == ParserSessionType.AUX else 'main'
+        logging.warning('HTTP transport cannot continue for %s: %s', url, cause)
+        notify_browser_fallback_once(profile_key, cause)
+        close_driver(current_driver)
+        browser_driver = _initialize_browser_session(
+            headless=headless,
+            session_type=session_type,
+        )
+        if browser_driver is None:
+            raise KinopubHttpError(
+                f'HTTP transport failed and Asset Hub fallback could not initialize: {cause}'
+            ) from cause
+        try:
+            navigate_with_empty_page_recovery(browser_driver, url)
+        except Exception:
+            close_driver(browser_driver)
+            raise
+        return browser_driver
+
+    try:
+        navigate_with_empty_page_recovery(driver, url)
+    except KinopubHttpError as exc:
+        if not isinstance(driver, KinopubHttpDriver) or not settings.KINOPUB_BROWSER_FALLBACK_ENABLED:
+            raise
+        driver = switch_http_to_browser(driver, exc)
     try:
         if is_cloudflare_page(driver):
+            if isinstance(driver, KinopubHttpDriver):
+                if not settings.KINOPUB_BROWSER_FALLBACK_ENABLED:
+                    raise KinopubHttpError(f'Cloudflare challenge returned for {url}')
+                return switch_http_to_browser(
+                    driver,
+                    f'Cloudflare challenge returned for {url}',
+                )
+
             logging.warning(f'Обнаружена защита Cloudflare на {url}. Перезапуск сессии...')
             driver.restart()
             time.sleep(10)
@@ -1557,7 +1636,16 @@ def open_url_safe(driver, url, headless=True, session_type=ParserSessionType.MAI
                 else settings.SITE_AUX_URL
             )
 
-            if do_login(driver, login, password, None, base_url):
+            if isinstance(driver, KinopubHttpDriver):
+                try:
+                    driver.ensure_authenticated()
+                    logging.info('Авторизация HTTP-сессии восстановлена. Переход к целевому URL.')
+                    navigate_with_empty_page_recovery(driver, url)
+                except Exception as exc:
+                    if not settings.KINOPUB_BROWSER_FALLBACK_ENABLED:
+                        raise
+                    return switch_http_to_browser(driver, exc)
+            elif do_login(driver, login, password, None, base_url):
                 logging.info('Авторизация восстановлена. Переход к целевому URL.')
                 navigate_with_empty_page_recovery(driver, url)
             else:
@@ -1570,11 +1658,14 @@ def open_url_safe(driver, url, headless=True, session_type=ParserSessionType.MAI
 
 
 def _run_parser_for_mode(driver, mode, headless=True, session_type='main'):
+    is_aux = session_type == ParserSessionType.AUX or str(session_type) == 'aux'
+    base_url = settings.SITE_AUX_URL if is_aux else settings.SITE_URL
+    login = settings.KINOPUB_AUX_LOGIN if is_aux else settings.KINOPUB_LOGIN
     if mode == 'episodes':
-        history_url = f'{settings.SITE_URL}history/index/{settings.KINOPUB_LOGIN}/episodes'
+        history_url = f'{base_url.rstrip("/")}/history/index/{login}/episodes'
         logging.info('Parsing mode: TV Show EPISODES')
     elif mode == 'movies':
-        history_url = f'{settings.SITE_URL}history/index/{settings.KINOPUB_LOGIN}'
+        history_url = f'{base_url.rstrip("/")}/history/index/{login}'
         logging.info('Parsing mode: MOVIES')
     else:
         logging.error("Invalid parsing mode '%s'. Aborting.", mode)
@@ -1647,20 +1738,27 @@ def get_total_pages(driver):
         return 1
 
 
-def run_parser_session(headless=True, driver_instance=None):
+def run_parser_session(headless=True, driver_instance=None, session_type=ParserSessionType.MAIN):
     logging.info('--- Starting Kinopub History Parser Session ---')
     driver = driver_instance
     try:
         if driver is None:
-            driver = initialize_driver_session(headless=headless)
+            driver = initialize_driver_session(
+                headless=headless,
+                session_type=session_type,
+            )
 
         if driver is None:
             message = 'Failed to initialize or use provided driver. Aborting parser run.'
             logging.error(message)
             raise RuntimeError(message)
 
-        episodes_added, driver = _run_parser_for_mode(driver, 'episodes', headless=headless)
-        movies_added, driver = _run_parser_for_mode(driver, 'movies', headless=headless)
+        episodes_added, driver = _run_parser_for_mode(
+            driver, 'episodes', headless=headless, session_type=session_type
+        )
+        movies_added, driver = _run_parser_for_mode(
+            driver, 'movies', headless=headless, session_type=session_type
+        )
 
         total_views_added = episodes_added + movies_added
         if total_views_added > 0:

@@ -271,6 +271,35 @@ BROWSER_GATEWAY_URL = os.getenv('BROWSER_GATEWAY_URL', '').strip()
 BROWSER_GATEWAY_TOKEN = os.getenv('BROWSER_GATEWAY_TOKEN', '').strip()
 BROWSER_GATEWAY_TASK_TIMEOUT_SECONDS = int(os.getenv('BROWSER_GATEWAY_TASK_TIMEOUT_SECONDS', '900'))
 
+
+def _env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+# HTTP is the primary KinoPub transport.  Asset Hub remains available as an
+# automatic fallback, and can be forced for an incident or a controlled test.
+# Keep browser-only mode as the safe rollout default until the Asset Hub
+# fallback has been observed in production. Set KINOPUB_HTTP_ENABLED=true to
+# enable the HTTP transport explicitly.
+KINOPUB_HTTP_ENABLED = _env_bool('KINOPUB_HTTP_ENABLED', False)
+KINOPUB_FORCE_BROWSER_FALLBACK = _env_bool(
+    'KINOPUB_FORCE_BROWSER_FALLBACK',
+    _env_bool('KINOPUB_USE_BROWSER_FALLBACK', False),
+)
+KINOPUB_BROWSER_FALLBACK_ENABLED = _env_bool('KINOPUB_BROWSER_FALLBACK_ENABLED', True)
+KINOPUB_HTTP_TIMEOUT_SECONDS = int(os.getenv('KINOPUB_HTTP_TIMEOUT_SECONDS', '30'))
+KINOPUB_HTTP_LOGIN_TIMEOUT_SECONDS = int(os.getenv('KINOPUB_HTTP_LOGIN_TIMEOUT_SECONDS', '180'))
+KINOPUB_HTTP_SESSION_DIR = os.getenv('KINOPUB_HTTP_SESSION_DIR', '/data/kinopub-http-sessions')
+KINOPUB_BROWSER_FALLBACK_NOTIFY_TTL = int(
+    os.getenv('KINOPUB_BROWSER_FALLBACK_NOTIFY_TTL', str(6 * 60 * 60))
+)
+# Existing deployments already share the gateway token with trusted internal
+# services. A dedicated token is preferred, while this fallback keeps the new
+# endpoint usable without another secret-rotation step.
+KINOPUB_CODE_API_TOKEN = (
+    os.getenv('KINOPUB_CODE_API_TOKEN', '').strip() or BROWSER_GATEWAY_TOKEN
+)
+
 POSTER_BASE_URL = os.getenv('POSTER_BASE_URL', 'https://google.com/')
 TMDB_API_KEY = os.getenv('TMDB_API_KEY')
 TMDB_API_BASE_URL = os.getenv('TMDB_API_BASE_URL', 'https://api.themoviedb.org/3').rstrip('/')
