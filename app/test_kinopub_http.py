@@ -1,9 +1,11 @@
 import json
+from datetime import timedelta
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from bs4 import BeautifulSoup
 from django.test import SimpleTestCase, override_settings
+from django.utils import timezone
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 
@@ -82,6 +84,65 @@ class KinopubHttpDriverTests(SimpleTestCase):
         driver = self._driver_for_html('<html></html>')
         with self.assertRaises(NoSuchElementException):
             driver.find_element(By.ID, 'missing')
+
+    @override_settings(KINOPUB_HTTP_LOGIN_TIMEOUT_SECONDS=3, CODE_LIFETIME_MINUTES=15)
+    @patch('app.kinopub_http.time.sleep')
+    def test_http_login_uses_post_redirect_url_for_password_and_code(self, _sleep):
+        driver = self._driver_for_html(
+            '<form id="login-form" method="post" action="/user/login">'
+            '<input name="login-form[login]">'
+            '<input name="login-form[password]">'
+            '<input name="login-form[formcode]">'
+            '<button type="submit">Войти</button></form>'
+        )
+        driver.base_url = 'http://kinopub.test/'
+        driver.login = 'login'
+        driver.password = 'password'
+        driver._last_url = 'https://kinopub.test/user/login'
+        driver._has_logout_marker = lambda: driver._authenticated
+        driver._authenticated = False
+        driver._save_cookies = lambda: None
+        requests = []
+
+        code = type('CodeStub', (), {
+            'id': 7,
+            'code': '123456',
+            'received_at': timezone.now() - timedelta(seconds=10),
+        })()
+
+        def request(url, method='GET', data=None, referer=None):
+            requests.append((url, method, referer, dict(data or {})))
+            if method == 'GET':
+                driver._last_url = 'https://kinopub.test/user/login'
+                driver._soup = BeautifulSoup(
+                    '<form id="login-form" method="post" action="/user/login">'
+                    '<input name="login-form[login]">'
+                    '<input name="login-form[password]">'
+                    '<input name="login-form[formcode]">'
+                    '<button type="submit">Войти</button></form>',
+                    'html.parser',
+                )
+            elif data and data.get('login-form[formcode]') == '123456':
+                driver._authenticated = True
+                driver._soup = BeautifulSoup(
+                    '<a href="/user/logout">Выйти</a>', 'html.parser'
+                )
+            return type('ResponseStub', (), {'status_code': 200})()
+
+        driver._request = request
+        with patch('app.models.Code.objects.filter') as filter_codes:
+            filter_codes.return_value.exclude.return_value.order_by.return_value.first.side_effect = [
+                code,
+                None,
+            ]
+            self.assertTrue(driver.ensure_authenticated())
+
+        post_requests = [item for item in requests if item[1] == 'POST']
+        self.assertEqual(len(post_requests), 2)
+        self.assertEqual(
+            [item[2] for item in post_requests],
+            ['https://kinopub.test/user/login', 'https://kinopub.test/user/login'],
+        )
 
     @override_settings(KINOPUB_BROWSER_FALLBACK_ENABLED=True)
     @patch('app.history_parser.notify_browser_fallback_once')

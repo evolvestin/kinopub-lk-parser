@@ -498,8 +498,14 @@ class KinopubHttpDriver:
     def ensure_authenticated(self):
         if self._has_logout_marker():
             return True
-        login_url = urljoin(self.base_url, 'user/login')
-        self._request(login_url, referer=self.current_url)
+        requested_login_url = urljoin(self.base_url, 'user/login')
+        self._request(requested_login_url, referer=self.current_url)
+        # KinoPub redirects an HTTP entry point to HTTPS.  Subsequent browser
+        # form submits use the URL of the document that is actually open, not
+        # the pre-redirect URL supplied by configuration.  Keeping the
+        # canonical URL here is important for Referer checks on the password
+        # and 2FA POSTs.
+        login_url = self.current_url
         form = self._soup.select_one('form#login-form')
         if not form:
             raise KinopubHttpError('KinoPub login form is missing')
@@ -515,7 +521,7 @@ class KinopubHttpDriver:
             urljoin(self.current_url, form.get('action', '/user/login')),
             method=form.get('method', 'POST').upper(),
             data=data,
-            referer=login_url,
+            referer=self.current_url,
         )
         if self._has_logout_marker():
             self._save_cookies()
@@ -523,6 +529,11 @@ class KinopubHttpDriver:
         if not self._soup.select_one('input[name="login-form[formcode]"]'):
             raise KinopubHttpError(self._login_error() or 'KinoPub login was rejected')
 
+        logger.info(
+            'KinoPub HTTP login requires 2FA. Diagnostics: url=%r, title=%r',
+            self.current_url,
+            self.title,
+        )
         self._wait_for_code(login_url)
         if not self._has_logout_marker():
             raise KinopubHttpError(self._login_error() or 'KinoPub 2FA was rejected')
@@ -534,6 +545,7 @@ class KinopubHttpDriver:
 
         deadline = time.monotonic() + settings.KINOPUB_HTTP_LOGIN_TIMEOUT_SECONDS
         used_ids = set()
+        attempted_at = {}
         while time.monotonic() < deadline:
             expiration = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
             code_obj = (
@@ -543,26 +555,63 @@ class KinopubHttpDriver:
                 .first()
             )
             if code_obj:
-                used_ids.add(code_obj.id)
+                # A transient failed POST must not make the only still-valid
+                # code disappear from the polling loop.  The browser path
+                # retries the form after a rejected/unfinished submit; do the
+                # same here, at most twice per database row.
+                attempts = attempted_at.get(code_obj.id, 0)
+                if attempts >= 2:
+                    used_ids.add(code_obj.id)
+                    time.sleep(1)
+                    continue
+                attempted_at[code_obj.id] = attempts + 1
                 form = self._soup.select_one('form#login-form')
                 if not form:
-                    return
+                    logger.warning(
+                        'KinoPub HTTP 2FA form disappeared before code submission; '
+                        'refreshing the login page.'
+                    )
+                    self._request(login_url, referer=self.current_url)
+                    time.sleep(1)
+                    continue
                 data = {
                     field.get('name'): field.get('value', '')
                     for field in form.select('input[name]')
                     if field.get('name')
                 }
                 data['login-form[formcode]'] = code_obj.code
+                logger.info(
+                    'KinoPub HTTP 2FA code found (id=%s, received_at=%s); submitting via %s.',
+                    code_obj.id,
+                    code_obj.received_at.isoformat(),
+                    self.current_url,
+                )
                 self._request(
                     urljoin(self.current_url, form.get('action', '/user/login')),
                     method='POST',
                     data=data,
-                    referer=login_url,
+                    # Use the actual post-redirect document URL.  With an
+                    # HTTP SITE_URL this is HTTPS, matching a real browser.
+                    referer=self.current_url,
                 )
                 if self._has_logout_marker():
+                    logger.info('KinoPub HTTP 2FA code accepted (id=%s).', code_obj.id)
                     return
-                if self._login_error():
-                    logger.warning('KinoPub HTTP 2FA code was rejected; waiting for another code.')
+                error = self._login_error()
+                logger.warning(
+                    'KinoPub HTTP 2FA code was not accepted (id=%s, attempt=%s). '
+                    'Diagnostics: url=%r, title=%r%s',
+                    code_obj.id,
+                    attempts + 1,
+                    self.current_url,
+                    self.title,
+                    f', form_error={error!r}' if error else '',
+                )
+                if attempts + 1 < 2:
+                    # Re-read the form after a failed navigation before the
+                    # retry. This also handles servers that return the form in
+                    # a fresh document with a new hidden field/token.
+                    self._request(login_url, referer=self.current_url)
             time.sleep(1)
         raise TimeoutException('Timed out waiting for KinoPub HTTP 2FA code')
 
