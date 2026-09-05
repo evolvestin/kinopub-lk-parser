@@ -579,6 +579,12 @@ class KinopubHttpDriver:
                     for field in form.select('input[name]')
                     if field.get('name')
                 }
+                # The 2FA response form may contain only the code input, but
+                # KinoPub validates the credentials again on this POST. A
+                # browser keeps the typed values in its live DOM; a server
+                # rendered HTTP response does not, so send them explicitly.
+                data['login-form[login]'] = self.login
+                data['login-form[password]'] = self.password
                 data['login-form[formcode]'] = code_obj.code
                 logger.info(
                     'KinoPub HTTP 2FA code found (id=%s, received_at=%s); submitting via %s.',

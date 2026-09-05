@@ -143,6 +143,8 @@ class KinopubHttpDriverTests(SimpleTestCase):
             [item[2] for item in post_requests],
             ['https://kinopub.test/user/login', 'https://kinopub.test/user/login'],
         )
+        self.assertEqual(post_requests[1][3]['login-form[login]'], 'login')
+        self.assertEqual(post_requests[1][3]['login-form[password]'], 'password')
 
     @override_settings(KINOPUB_BROWSER_FALLBACK_ENABLED=True)
     @patch('app.history_parser.notify_browser_fallback_once')
