@@ -17,7 +17,7 @@ import time
 from contextlib import contextmanager
 from datetime import timedelta
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from curl_cffi import requests as curl_requests
 from bs4 import BeautifulSoup, NavigableString, Tag
@@ -104,6 +104,14 @@ def _is_authentication_failure(exc: Exception | str) -> bool:
             'login was rejected',
         )
     )
+
+
+def _secure_url(url: str) -> str:
+    """Use the TLS endpoint for credential/2FA form submissions."""
+    parts = urlsplit(url)
+    if parts.scheme.lower() != 'http':
+        return url
+    return urlunsplit(('https', parts.netloc, parts.path, parts.query, parts.fragment))
 
 
 def _session_path(profile_key: str) -> Path:
@@ -675,7 +683,7 @@ class KinopubHttpDriver:
                         'KinoPub HTTP 2FA form disappeared before code submission; '
                         'refreshing the login page.'
                     )
-                    self._request(login_url, referer=self.current_url)
+                    self._request(_secure_url(login_url), referer=self.current_url)
                     time.sleep(1)
                     continue
                 data = {
@@ -699,8 +707,11 @@ class KinopubHttpDriver:
                     code_obj.created_at.isoformat(),
                     self.current_url,
                 )
+                submit_url = _secure_url(
+                    urljoin(self.current_url, form.get('action', '/user/login'))
+                )
                 self._request(
-                    urljoin(self.current_url, form.get('action', '/user/login')),
+                    submit_url,
                     method='POST',
                     data=data,
                     # Use the actual post-redirect document URL.  With an

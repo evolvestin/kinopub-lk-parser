@@ -60,3 +60,8 @@ If HTTP 2FA times out, do not start the browser fallback: that would create a
 second login challenge and spam the Telegram channel. Inspect whether the
 email-listener stored a fresh `Code` and whether the PROD endpoint has a fresh
 value before retrying.
+
+When `SITE_URL` is an HTTP alias such as `http://8i1n.pkr.ovh`, the HTTP
+driver may receive the login form over HTTP while the 2FA submission must be
+sent to the HTTPS form endpoint. Keep the HTTPS upgrade for the second POST;
+otherwise KinoPub can answer `400 Bad Request` even for a fresh valid code.

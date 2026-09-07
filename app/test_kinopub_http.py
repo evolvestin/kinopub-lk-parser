@@ -119,6 +119,16 @@ class KinopubHttpDriverTests(SimpleTestCase):
 
         self.assertTrue(history_parser._wait_for_browser_document(Driver(), timeout=1))
 
+    def test_2fa_submission_url_is_upgraded_to_https(self):
+        self.assertEqual(
+            kinopub_http._secure_url('http://8i1n.pkr.ovh/user/login'),
+            'https://8i1n.pkr.ovh/user/login',
+        )
+        self.assertEqual(
+            kinopub_http._secure_url('https://8i1n.pkr.ovh/user/login'),
+            'https://8i1n.pkr.ovh/user/login',
+        )
+
     @override_settings(KINOPUB_BROWSER_FALLBACK_ENABLED=True)
     @patch('app.history_parser._initialize_browser_session')
     @patch('app.history_parser.KinopubHttpDriver')
