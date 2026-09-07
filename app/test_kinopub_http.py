@@ -6,7 +6,7 @@ from unittest.mock import patch
 from bs4 import BeautifulSoup
 from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 
 from app import history_parser, kinopub_http
@@ -108,6 +108,34 @@ class KinopubHttpDriverTests(SimpleTestCase):
         self.assertEqual(requests, ['https://kino.watch/history', 'https://kino.watch/history'])
         self.assertIn('login-form', driver.page_source)
 
+    @patch('app.history_parser.time.sleep')
+    def test_empty_browser_document_is_allowed_to_finish_loading(self, _sleep):
+        class Driver:
+            pages = iter(['<html><body></body></html>', '<html><body>login</body></html>'])
+
+            @property
+            def page_source(self):
+                return next(self.pages)
+
+        self.assertTrue(history_parser._wait_for_browser_document(Driver(), timeout=1))
+
+    @override_settings(KINOPUB_BROWSER_FALLBACK_ENABLED=True)
+    @patch('app.history_parser._initialize_browser_session')
+    @patch('app.history_parser.KinopubHttpDriver')
+    def test_http_2fa_timeout_does_not_start_second_browser_login(
+        self, driver_class, initialize_browser
+    ):
+        driver = driver_class.return_value
+        driver.ensure_authenticated.side_effect = TimeoutException(
+            'Timed out waiting for KinoPub HTTP 2FA code'
+        )
+
+        result = history_parser.initialize_driver_session(session_type='main')
+
+        self.assertIsNone(result)
+        initialize_browser.assert_not_called()
+        driver.quit.assert_called_once()
+
     @override_settings(KINOPUB_HTTP_LOGIN_TIMEOUT_SECONDS=3, CODE_LIFETIME_MINUTES=15)
     @patch('app.kinopub_http.time.sleep')
     def test_http_login_uses_post_redirect_url_for_password_and_code(self, _sleep):
@@ -170,8 +198,8 @@ class KinopubHttpDriverTests(SimpleTestCase):
             [item[2] for item in post_requests],
             ['https://kinopub.test/user/login', 'https://kinopub.test/user/login'],
         )
-        self.assertEqual(post_requests[1][3]['login-form[login]'], 'login')
-        self.assertEqual(post_requests[1][3]['login-form[password]'], 'password')
+        self.assertNotIn('login-form[login]', post_requests[1][3])
+        self.assertNotIn('login-form[password]', post_requests[1][3])
 
     @override_settings(KINOPUB_BROWSER_FALLBACK_ENABLED=True)
     @patch('app.history_parser.notify_browser_fallback_once')

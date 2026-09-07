@@ -26,6 +26,8 @@ from app.gdrive_backup import BackupManager
 from app.kinopub_http import (
     KinopubHttpDriver,
     KinopubHttpError,
+    _is_authentication_failure,
+    _distributed_profile_lock,
     notify_browser_fallback_once,
 )
 from app.models import (
@@ -79,25 +81,37 @@ def is_empty_browser_page(driver):
     return source.startswith('<html') and '<body></body>' in source and len(source) <= 128
 
 
+def _wait_for_browser_document(driver, timeout=20):
+    """Wait for a transient empty remote document to finish loading."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not is_empty_browser_page(driver):
+            return True
+        time.sleep(0.5)
+    return not is_empty_browser_page(driver)
+
+
 def navigate_with_empty_page_recovery(driver, url):
     """Retry one navigation when Chromium returns an empty document."""
     driver.get(url)
-    if not is_empty_browser_page(driver):
+    if _wait_for_browser_document(driver):
         return driver
 
-    logging.warning('AssetHub returned an empty document for %s. Reloading page once.', url)
+    logging.warning(
+        'AssetHub returned an empty document for %s. Waiting ended; reloading page once.', url
+    )
     try:
         driver.refresh()
     except Exception as exc:
         logging.warning('Reload failed for empty document %s: %s', url, exc)
-    if not is_empty_browser_page(driver):
+    if _wait_for_browser_document(driver):
         return driver
 
     logging.warning('Page reload did not recover %s. Restarting browser once.', url)
     driver.restart()
     time.sleep(1)
     driver.get(url)
-    if is_empty_browser_page(driver):
+    if not _wait_for_browser_document(driver):
         raise RemoteBrowserError(f'AssetHub returned an empty document for {url}')
     return driver
 
@@ -1203,23 +1217,36 @@ def initialize_driver_session(headless=True, session_type=ParserSessionType.MAIN
 
     driver = None
     try:
-        driver = KinopubHttpDriver(
-            base_url=target_url,
-            login=login,
-            password=password,
-            profile_key=profile_key,
-            timeout=settings.KINOPUB_HTTP_TIMEOUT_SECONDS,
-        )
-        driver.get(target_url)
-        driver.ensure_authenticated()
-        logging.info('KinoPub HTTP session is authenticated (%s).', profile_key)
-        return driver
+        with _distributed_profile_lock(profile_key):
+            driver = KinopubHttpDriver(
+                base_url=target_url,
+                login=login,
+                password=password,
+                profile_key=profile_key,
+                timeout=settings.KINOPUB_HTTP_TIMEOUT_SECONDS,
+            )
+            driver.get(target_url)
+            driver.ensure_authenticated()
+            logging.info('KinoPub HTTP session is authenticated (%s).', profile_key)
+            return driver
     except Exception as exc:
         logging.error('KinoPub HTTP session initialization failed: %s', exc, exc_info=True)
         if driver is not None:
             driver.quit()
 
         if not settings.KINOPUB_BROWSER_FALLBACK_ENABLED:
+            return None
+
+        # Starting a second browser login after an HTTP 2FA timeout creates a
+        # new challenge and is the source of repeated Telegram OTP messages.
+        # Let the normal task retry the same session instead; browser fallback
+        # remains available for transport/Cloudflare failures.
+        if _is_authentication_failure(exc):
+            logging.error(
+                'Not switching %s to browser fallback after an authentication failure; '
+                'this would request another KinoPub 2FA code.',
+                profile_key,
+            )
             return None
 
         notify_browser_fallback_once(profile_key, exc)
@@ -1642,7 +1669,10 @@ def open_url_safe(driver, url, headless=True, session_type=ParserSessionType.MAI
                     logging.info('Авторизация HTTP-сессии восстановлена. Переход к целевому URL.')
                     navigate_with_empty_page_recovery(driver, url)
                 except Exception as exc:
-                    if not settings.KINOPUB_BROWSER_FALLBACK_ENABLED:
+                    if (
+                        not settings.KINOPUB_BROWSER_FALLBACK_ENABLED
+                        or _is_authentication_failure(exc)
+                    ):
                         raise
                     return switch_http_to_browser(driver, exc)
             elif do_login(driver, login, password, None, base_url):

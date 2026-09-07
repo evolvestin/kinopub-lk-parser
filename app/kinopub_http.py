@@ -14,6 +14,7 @@ import os
 import re
 import threading
 import time
+from contextlib import contextmanager
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urljoin
@@ -39,11 +40,70 @@ class KinopubHttpError(WebDriverException):
 _SESSION_LOCKS: dict[str, threading.RLock] = {}
 _SESSION_LOCKS_GUARD = threading.Lock()
 _LOCAL_FALLBACK_NOTICE_UNTIL: dict[str, float] = {}
+_AUTH_LOCK_TIMEOUT_SECONDS = 360
+_CODE_ARRIVAL_GRACE_SECONDS = 15
 
 
 def _profile_lock(profile_key: str) -> threading.RLock:
     with _SESSION_LOCKS_GUARD:
         return _SESSION_LOCKS.setdefault(profile_key, threading.RLock())
+
+
+@contextmanager
+def _distributed_profile_lock(profile_key: str):
+    """Serialize login attempts across Celery processes and containers."""
+    local_lock = _profile_lock(profile_key)
+    local_lock.acquire()
+    cache_key = f'kinopub:http-auth-lock:{profile_key}'
+    cache_lock_acquired = False
+    try:
+        deadline = time.monotonic() + _AUTH_LOCK_TIMEOUT_SECONDS
+        while True:
+            try:
+                cache_lock_acquired = cache.add(
+                    cache_key,
+                    'locked',
+                    timeout=_AUTH_LOCK_TIMEOUT_SECONDS,
+                )
+            except Exception as exc:
+                # A cache outage must not make the parser unusable. The local
+                # lock still protects threads inside this process.
+                logger.warning('Could not acquire distributed KinoPub auth lock: %s', exc)
+                break
+
+            if cache_lock_acquired:
+                break
+            if time.monotonic() >= deadline:
+                raise TimeoutException(
+                    f'Timed out waiting for KinoPub authentication lock ({profile_key})'
+                )
+            logger.info('Another %s worker is authenticating KinoPub; waiting for its session.', profile_key)
+            time.sleep(1)
+
+        yield
+    finally:
+        if cache_lock_acquired:
+            try:
+                cache.delete(cache_key)
+            except Exception as exc:
+                logger.warning('Could not release distributed KinoPub auth lock: %s', exc)
+        local_lock.release()
+
+
+def _is_authentication_failure(exc: Exception | str) -> bool:
+    """Return True for failures where browser fallback would request another OTP."""
+    message = str(exc).lower()
+    return any(
+        marker in message
+        for marker in (
+            'waiting for kinopub http 2fa code',
+            'authentication lock',
+            'kinopub 2fa',
+            'kinopub login',
+            'login form',
+            'login was rejected',
+        )
+    )
 
 
 def _session_path(profile_key: str) -> Path:
@@ -536,6 +596,10 @@ class KinopubHttpDriver:
     def ensure_authenticated(self):
         if self._has_logout_marker():
             return True
+        # Record the challenge before submitting credentials. KinoPub can
+        # deliver the email code while the password POST is still returning;
+        # recording it only after the 2FA form is parsed drops that valid code.
+        login_challenge_started_at = timezone.now()
         requested_login_url = urljoin(self.base_url, 'user/login')
         self._request(requested_login_url, referer=self.current_url)
         # KinoPub redirects an HTTP entry point to HTTPS.  Subsequent browser
@@ -575,22 +639,27 @@ class KinopubHttpDriver:
             self.current_url,
             self.title,
         )
-        self._wait_for_code(login_url)
+        self._wait_for_code(login_url, login_challenge_started_at)
         if not self._has_logout_marker():
             raise KinopubHttpError(self._login_error() or 'KinoPub 2FA was rejected')
         self._save_cookies()
         return True
 
-    def _wait_for_code(self, login_url):
+    def _wait_for_code(self, login_url, login_challenge_started_at=None):
         from app.models import Code
 
         deadline = time.monotonic() + settings.KINOPUB_HTTP_LOGIN_TIMEOUT_SECONDS
-        login_started_at = timezone.now()
-        self.code_wait_started_at = login_started_at
+        login_started_at = login_challenge_started_at or timezone.now()
+        # This remains the moment when the actual 2FA form became visible;
+        # external smoke tooling uses it as the safe point to start polling.
+        self.code_wait_started_at = timezone.now()
         used_ids = set()
         while time.monotonic() < deadline:
             expiration = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
-            code_not_before = max(expiration, login_started_at)
+            code_not_before = max(
+                expiration,
+                login_started_at - timedelta(seconds=_CODE_ARRIVAL_GRACE_SECONDS),
+            )
             code_obj = (
                 Code.objects.filter(
                     created_at__gte=code_not_before,
@@ -613,16 +682,16 @@ class KinopubHttpDriver:
                     field.get('name'): field.get('value', '')
                     for field in form.select('input[name]')
                     if field.get('name')
+                    and field.get('name')
+                    not in {'login-form[login]', 'login-form[password]'}
                 }
                 submitter = form.select_one('button[type="submit"], input[type="submit"]')
                 if submitter and submitter.get('name'):
                     data[submitter['name']] = submitter.get('value', '')
-                # The 2FA response form may contain only the code input, but
-                # KinoPub validates the credentials again on this POST. A
-                # browser keeps the typed values in its live DOM; a server
-                # rendered HTTP response does not, so send them explicitly.
-                data['login-form[login]'] = self.login
-                data['login-form[password]'] = self.password
+                # The 2FA response form is a separate POST and contains its
+                # own CSRF token. KinoPub rejects the original login/password
+                # fields when they are added to this second request; a real
+                # browser submits only the fields from the visible 2FA form.
                 data['login-form[formcode]'] = code_obj.code
                 logger.info(
                     'KinoPub HTTP 2FA code found (id=%s, created_at=%s); submitting via %s.',
@@ -683,7 +752,15 @@ class KinopubHttpDriver:
                         'delivered code without requesting another resend.'
                     )
             time.sleep(1)
-        raise TimeoutException('Timed out waiting for KinoPub HTTP 2FA code')
+        latest_code = Code.objects.order_by('-created_at').first()
+        latest_code_info = (
+            f' Latest stored code id={latest_code.id}, created_at={latest_code.created_at.isoformat()}'
+            if latest_code
+            else ' No stored KinoPub codes were found.'
+        )
+        raise TimeoutException(
+            'Timed out waiting for KinoPub HTTP 2FA code.' + latest_code_info
+        )
 
     def _has_logout_marker(self):
         return bool(self._soup.select_one('a[href*="/user/logout"]'))
