@@ -36,13 +36,49 @@ class KinopubCodeEndpointTests(TestCase):
         self.assertEqual(response['Cache-Control'], 'no-store, no-cache, must-revalidate, max-age=0')
 
     def test_endpoint_does_not_return_expired_codes(self):
-        Code.objects.create(
+        expired = Code.objects.create(
             code='333333',
             telegram_message_id=-1,
-            received_at=timezone.now() - timedelta(minutes=16),
+            received_at=timezone.now(),
+        )
+        Code.objects.filter(pk=expired.pk).update(
+            created_at=timezone.now() - timedelta(minutes=16)
         )
 
         response = self.client.get(self.url, HTTP_X_KINOPUB_CODE_TOKEN='test-code-token')
 
         self.assertEqual(response.status_code, 404)
         self.assertNotIn('code', response.json())
+
+    def test_endpoint_can_filter_codes_after_login_start(self):
+        now = timezone.now()
+        old_code = Code.objects.create(
+            code='444444',
+            telegram_message_id=-1,
+            received_at=now,
+        )
+        new_code = Code.objects.create(
+            code='555555',
+            telegram_message_id=-1,
+            received_at=now,
+        )
+        Code.objects.filter(pk=old_code.pk).update(created_at=now - timedelta(seconds=5))
+        Code.objects.filter(pk=new_code.pk).update(created_at=now + timedelta(seconds=5))
+
+        response = self.client.get(
+            self.url,
+            {'after': now.isoformat()},
+            HTTP_X_KINOPUB_CODE_TOKEN='test-code-token',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['code'], '555555')
+
+    def test_endpoint_rejects_invalid_after_timestamp(self):
+        response = self.client.get(
+            self.url,
+            {'after': 'not-a-timestamp'},
+            HTTP_X_KINOPUB_CODE_TOKEN='test-code-token',
+        )
+
+        self.assertEqual(response.status_code, 400)

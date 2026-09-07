@@ -10,7 +10,7 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 
 from app import history_parser, kinopub_http
-from app.kinopub_http import KinopubHttpDriver
+from app.kinopub_http import KinopubHttpDriver, KinopubHttpError
 
 
 class KinopubHttpDriverTests(SimpleTestCase):
@@ -85,6 +85,29 @@ class KinopubHttpDriverTests(SimpleTestCase):
         with self.assertRaises(NoSuchElementException):
             driver.find_element(By.ID, 'missing')
 
+    @patch('app.kinopub_http.time.sleep')
+    def test_empty_get_reloads_before_caller_handles_login_redirect(self, _sleep):
+        driver = self._driver_for_html('')
+        driver.profile_key = 'empty-get-test'
+        driver._last_response = None
+        requests = []
+
+        def request(url, method='GET', data=None, referer=None):
+            requests.append(url)
+            if len(requests) == 1:
+                raise KinopubHttpError('KinoPub returned an empty document for https://kino.watch/history')
+            driver._last_url = 'https://kino.watch/user/login'
+            driver._soup = BeautifulSoup(
+                '<form id="login-form"><input name="login-form[login]"></form>',
+                'html.parser',
+            )
+
+        driver._request = request
+        driver.get('https://kino.watch/history')
+
+        self.assertEqual(requests, ['https://kino.watch/history', 'https://kino.watch/history'])
+        self.assertIn('login-form', driver.page_source)
+
     @override_settings(KINOPUB_HTTP_LOGIN_TIMEOUT_SECONDS=3, CODE_LIFETIME_MINUTES=15)
     @patch('app.kinopub_http.time.sleep')
     def test_http_login_uses_post_redirect_url_for_password_and_code(self, _sleep):
@@ -101,12 +124,14 @@ class KinopubHttpDriverTests(SimpleTestCase):
         driver._last_url = 'https://kinopub.test/user/login'
         driver._has_logout_marker = lambda: driver._authenticated
         driver._authenticated = False
+        driver._code_submitted = False
         driver._save_cookies = lambda: None
         requests = []
 
         code = type('CodeStub', (), {
             'id': 7,
             'code': '123456',
+            'created_at': timezone.now() - timedelta(seconds=10),
             'received_at': timezone.now() - timedelta(seconds=10),
         })()
 
@@ -114,19 +139,21 @@ class KinopubHttpDriverTests(SimpleTestCase):
             requests.append((url, method, referer, dict(data or {})))
             if method == 'GET':
                 driver._last_url = 'https://kinopub.test/user/login'
-                driver._soup = BeautifulSoup(
-                    '<form id="login-form" method="post" action="/user/login">'
-                    '<input name="login-form[login]">'
-                    '<input name="login-form[password]">'
-                    '<input name="login-form[formcode]">'
-                    '<button type="submit">Войти</button></form>',
-                    'html.parser',
-                )
+                if driver._code_submitted:
+                    driver._authenticated = True
+                    driver._soup = BeautifulSoup('<a href="/user/logout">Выйти</a>', 'html.parser')
+                else:
+                    driver._soup = BeautifulSoup(
+                        '<form id="login-form" method="post" action="/user/login">'
+                        '<input name="login-form[login]">'
+                        '<input name="login-form[password]">'
+                        '<input name="login-form[formcode]">'
+                        '<button type="submit">Войти</button></form>',
+                        'html.parser',
+                    )
             elif data and data.get('login-form[formcode]') == '123456':
-                driver._authenticated = True
-                driver._soup = BeautifulSoup(
-                    '<a href="/user/logout">Выйти</a>', 'html.parser'
-                )
+                driver._code_submitted = True
+                driver._soup = BeautifulSoup('', 'html.parser')
             return type('ResponseStub', (), {'status_code': 200})()
 
         driver._request = request

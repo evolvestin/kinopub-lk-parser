@@ -35,6 +35,11 @@ class Code(BaseModel):
     code = models.CharField(max_length=255)
     telegram_message_id = models.IntegerField()
     received_at = models.DateTimeField()
+    # IMAP UIDs make email processing idempotent.  A Telegram request can
+    # time out after Telegram has already accepted the message; without the
+    # source UID the same unseen email is sent to the channel again on every
+    # reconnect.
+    source_uid = models.CharField(max_length=255, unique=True, null=True, blank=True)
 
     class Meta:
         verbose_name = 'Code'

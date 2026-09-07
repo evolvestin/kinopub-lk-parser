@@ -184,6 +184,7 @@ class KinopubHttpDriver:
         self._last_response = None
         self._last_url = self.base_url
         self._soup = BeautifulSoup('', 'html.parser')
+        self.code_wait_started_at = None
 
     def _load_cookies(self):
         try:
@@ -254,6 +255,18 @@ class KinopubHttpDriver:
                     'Sec-Fetch-User': '?1',
                 }
             )
+        if method.upper() == 'POST':
+            # Native browser form submissions include Origin and an explicit
+            # URL-encoded content type.  Some KinoPub edges return an empty
+            # 200 response when these signals are missing.
+            origin = absolute_url.split('/', 3)
+            headers.update(
+                {
+                    'Origin': '/'.join(origin[:3]),
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                }
+            )
         last_error = None
         for attempt in range(1, self.RETRIES + 1):
             try:
@@ -287,12 +300,37 @@ class KinopubHttpDriver:
     @staticmethod
     def _is_empty_document(source):
         compact = re.sub(r'\s+', '', source or '').lower()
-        return compact.startswith('<html') and '<body></body>' in compact and len(compact) <= 256
+        return not compact or (
+            compact.startswith('<html') and '<body></body>' in compact and len(compact) <= 256
+        )
 
     def get(self, url):
         with _profile_lock(self.profile_key):
             referer = self._last_url if self._last_response is not None else None
-            self._request(url, referer=referer)
+            try:
+                self._request(url, referer=referer)
+            except KinopubHttpError as exc:
+                if 'empty document' not in str(exc).lower():
+                    raise
+                # A concurrent login on the same KinoPub account can revoke
+                # this session and produce an empty 200 document once. Treat
+                # it as a stale page: reload the target and let the caller
+                # observe the normal redirect to /user/login.
+                logger.warning(
+                    'KinoPub returned an empty document for %s; reloading once '
+                    'before checking session expiry.',
+                    url,
+                )
+                time.sleep(1)
+                self._request(url, referer=self._last_url)
+            if not self.page_source.strip():
+                logger.warning(
+                    'KinoPub returned an empty page for %s; reloading once '
+                    'before checking session expiry.',
+                    url,
+                )
+                time.sleep(1)
+                self._request(url, referer=self._last_url)
         return None
 
     def refresh(self):
@@ -514,6 +552,9 @@ class KinopubHttpDriver:
             for field in form.select('input[name]')
             if field.get('name')
         }
+        submitter = form.select_one('button[type="submit"], input[type="submit"]')
+        if submitter and submitter.get('name'):
+            data[submitter['name']] = submitter.get('value', '')
         data['login-form[login]'] = self.login
         data['login-form[password]'] = self.password
         data.setdefault('login-form[rememberMe]', '0')
@@ -544,27 +585,21 @@ class KinopubHttpDriver:
         from app.models import Code
 
         deadline = time.monotonic() + settings.KINOPUB_HTTP_LOGIN_TIMEOUT_SECONDS
+        login_started_at = timezone.now()
+        self.code_wait_started_at = login_started_at
         used_ids = set()
-        attempted_at = {}
         while time.monotonic() < deadline:
             expiration = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
+            code_not_before = max(expiration, login_started_at)
             code_obj = (
-                Code.objects.filter(received_at__gte=expiration)
+                Code.objects.filter(
+                    created_at__gte=code_not_before,
+                )
                 .exclude(id__in=used_ids)
-                .order_by('-received_at')
+                .order_by('-created_at')
                 .first()
             )
             if code_obj:
-                # A transient failed POST must not make the only still-valid
-                # code disappear from the polling loop.  The browser path
-                # retries the form after a rejected/unfinished submit; do the
-                # same here, at most twice per database row.
-                attempts = attempted_at.get(code_obj.id, 0)
-                if attempts >= 2:
-                    used_ids.add(code_obj.id)
-                    time.sleep(1)
-                    continue
-                attempted_at[code_obj.id] = attempts + 1
                 form = self._soup.select_one('form#login-form')
                 if not form:
                     logger.warning(
@@ -579,6 +614,9 @@ class KinopubHttpDriver:
                     for field in form.select('input[name]')
                     if field.get('name')
                 }
+                submitter = form.select_one('button[type="submit"], input[type="submit"]')
+                if submitter and submitter.get('name'):
+                    data[submitter['name']] = submitter.get('value', '')
                 # The 2FA response form may contain only the code input, but
                 # KinoPub validates the credentials again on this POST. A
                 # browser keeps the typed values in its live DOM; a server
@@ -587,9 +625,9 @@ class KinopubHttpDriver:
                 data['login-form[password]'] = self.password
                 data['login-form[formcode]'] = code_obj.code
                 logger.info(
-                    'KinoPub HTTP 2FA code found (id=%s, received_at=%s); submitting via %s.',
+                    'KinoPub HTTP 2FA code found (id=%s, created_at=%s); submitting via %s.',
                     code_obj.id,
-                    code_obj.received_at.isoformat(),
+                    code_obj.created_at.isoformat(),
                     self.current_url,
                 )
                 self._request(
@@ -600,24 +638,50 @@ class KinopubHttpDriver:
                     # HTTP SITE_URL this is HTTPS, matching a real browser.
                     referer=self.current_url,
                 )
+                # Some KinoPub frontends answer the successful form POST with
+                # an empty 200 document while keeping the authenticated state
+                # in the PHP session. Fetch the redirect target once before
+                # deciding that authentication failed.
+                if not self.page_source.strip() and self.current_url:
+                    logger.info(
+                        'KinoPub returned an empty 2FA POST document; refreshing %s '
+                        'to inspect the session state.',
+                        self.current_url,
+                    )
+                    self._request(self.current_url, referer=self.current_url)
                 if self._has_logout_marker():
                     logger.info('KinoPub HTTP 2FA code accepted (id=%s).', code_obj.id)
                     return
                 error = self._login_error()
                 logger.warning(
-                    'KinoPub HTTP 2FA code was not accepted (id=%s, attempt=%s). '
-                    'Diagnostics: url=%r, title=%r%s',
+                    'KinoPub HTTP 2FA code was not accepted (id=%s). '
+                    'Diagnostics: url=%r, title=%r, status=%s, body_len=%s, '
+                    'code_form=%s, logout_marker=%s%s',
                     code_obj.id,
-                    attempts + 1,
                     self.current_url,
                     self.title,
+                    self._last_response.status_code if self._last_response is not None else None,
+                    len(self.page_source),
+                    bool(self._soup.select_one('input[name="login-form[formcode]"]')),
+                    self._has_logout_marker(),
                     f', form_error={error!r}' if error else '',
                 )
-                if attempts + 1 < 2:
-                    # Re-read the form after a failed navigation before the
-                    # retry. This also handles servers that return the form in
-                    # a fresh document with a new hidden field/token.
-                    self._request(login_url, referer=self.current_url)
+                # Never submit a rejected OTP a second time. KinoPub commonly
+                # responds to an expired code by issuing a fresh one; retrying
+                # the old value only burns time and can trigger another code.
+                used_ids.add(code_obj.id)
+                error_lower = error.lower()
+                fresh_code_sent = any(
+                    marker in error_lower
+                    for marker in ('отправили новый', 'отправлен проверочный', 'sent a new')
+                )
+                if fresh_code_sent:
+                    logger.info('KinoPub reported that a fresh 2FA code was sent; waiting for it.')
+                else:
+                    logger.warning(
+                        'KinoPub did not confirm a fresh 2FA code; waiting for an externally '
+                        'delivered code without requesting another resend.'
+                    )
             time.sleep(1)
         raise TimeoutException('Timed out waiting for KinoPub HTTP 2FA code')
 

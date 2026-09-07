@@ -202,6 +202,7 @@ admin_site.register(User, CustomUserAdmin)
 class CodeAdmin(admin.ModelAdmin):
     list_display = (
         'code',
+        'source_uid',
         'telegram_message_id',
         'received_at',
         'created_at',
@@ -211,6 +212,7 @@ class CodeAdmin(admin.ModelAdmin):
     search_fields = ('code',)
     readonly_fields = (
         'code',
+        'source_uid',
         'telegram_message_id',
         'received_at',
         'created_at',

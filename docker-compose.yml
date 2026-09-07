@@ -76,7 +76,10 @@ services:
         fi
       "
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/admin/login/ > /dev/null"]
+      # Keep the liveness probe independent from admin rendering, sessions,
+      # and database work.  /admin/login/ can exceed the health timeout while
+      # the ASGI process itself is healthy, which blocks dependent services.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/robots.txt > /dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3

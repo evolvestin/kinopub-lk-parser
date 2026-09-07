@@ -338,15 +338,27 @@ def internal_kinopub_code(request):
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     received_after = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
-    code_obj = Code.objects.filter(received_at__gte=received_after).order_by('-received_at').first()
+    code_query = Code.objects.filter(created_at__gte=received_after)
+    after_value = request.GET.get('after')
+    if after_value:
+        try:
+            after_dt = datetime.fromisoformat(after_value.replace('Z', '+00:00'))
+            if timezone.is_naive(after_dt):
+                after_dt = timezone.make_aware(after_dt, timezone.get_current_timezone())
+        except ValueError:
+            return JsonResponse({'error': 'Invalid after timestamp'}, status=400)
+        code_query = code_query.filter(created_at__gte=after_dt)
+
+    code_obj = code_query.order_by('-created_at').first()
     if not code_obj:
         response = JsonResponse({'error': 'No unexpired KinoPub code'}, status=404)
     else:
-        expires_at = code_obj.received_at + timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
+        expires_at = code_obj.created_at + timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
         response = JsonResponse(
             {
                 'code': code_obj.code,
                 'received_at': code_obj.received_at.isoformat(),
+                'created_at': code_obj.created_at.isoformat(),
                 'expires_at': expires_at.isoformat(),
             }
         )

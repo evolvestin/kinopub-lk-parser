@@ -1,4 +1,5 @@
 import datetime
+import datetime
 import email
 import logging
 import re
@@ -66,6 +67,21 @@ def get_message_body(email_msg) -> str:
             return ''
 
 
+def _source_uid(uid) -> str:
+    """Return a stable database key for an email in the selected IMAP folder."""
+    if isinstance(uid, bytes):
+        uid = uid.decode('ascii', errors='replace')
+    return f'{settings.IMAP_FOLDER}:{uid}'
+
+
+def _mark_seen(mail, uid):
+    if not settings.MARK_AS_SEEN:
+        return
+    status, _ = mail.uid('STORE', uid, '+FLAGS', r'(\Seen)')
+    if status != 'OK':
+        logging.warning('Could not mark email uid=%s as seen.', uid)
+
+
 def process_emails(mail, shutdown_flag):
     try:
         status, data = mail.uid('SEARCH', None, 'UNSEEN', 'FROM', f'"{settings.ALLOWED_SENDER}"')
@@ -115,23 +131,58 @@ def process_emails(mail, shutdown_flag):
             code_match = re.search(settings.REGEX_CODE, body)
             if code_match:
                 code_str = code_match.group(0)
-                logging.info('Found code %s in email (uid=%s)', code_str, uid)
-
-                message_id = TelegramSender().send_message(code(code_str))
-                if message_id:
-                    Code.objects.create(
-                        code=code_str,
-                        telegram_message_id=message_id,
-                        received_at=received_at_dt,
+                source_uid = _source_uid(uid)
+                code_obj, created = Code.objects.get_or_create(
+                    source_uid=source_uid,
+                    defaults={
+                        'code': code_str,
+                        # The parser must be able to use the code even when
+                        # Telegram's response is lost after delivery.
+                        'telegram_message_id': -1,
+                        'received_at': received_at_dt,
+                    },
+                )
+                if not created:
+                    logging.info(
+                        'Code email uid=%s was already processed (code id=%s); '
+                        'marking it seen without resending.',
+                        uid,
+                        code_obj.id,
                     )
+                    _mark_seen(mail, uid)
+                    continue
+
+                logging.info('Found code %s in email (uid=%s)', code_str, uid)
+                message_id = None
+                try:
+                    message_id = TelegramSender().send_message(code(code_str))
+                except Exception as exc:
+                    # The code is already durable and available to the
+                    # parser.  Do not leave the email unseen: a timeout can
+                    # mean Telegram accepted the message already.
+                    logging.error(
+                        'Telegram delivery failed for code id=%s, keeping the code for the '
+                        'parser without retrying the email: %s',
+                        code_obj.id,
+                        exc,
+                    )
+
+                if message_id:
+                    Code.objects.filter(pk=code_obj.pk).update(telegram_message_id=message_id)
                     logging.info(
                         'Code %s (msg_id: %d) added to the database.', code_str, message_id
                     )
-                    BackupManager().schedule_backup()
-                    if settings.MARK_AS_SEEN:
-                        mail.uid('STORE', uid, '+FLAGS', r'(\Seen)')
+                else:
+                    logging.warning(
+                        'Telegram message id was not returned for code id=%s; '
+                        'the code remains available to KinoPub and will not be resent.',
+                        code_obj.id,
+                    )
+                BackupManager().schedule_backup()
+                _mark_seen(mail, uid)
             else:
-                logging.info('No 6-digit code found in message (uid=%s). Leaving UNSEEN.', uid)
+                logging.info('No 6-digit code found in message (uid=%s). Marking as seen.', uid)
+                _mark_seen(mail, uid)
 
     except (imaplib2.IMAP4.error, OSError) as e:
         logging.error('Error processing emails: %s', e)

@@ -1007,9 +1007,9 @@ def do_login(driver, login, password, cookie_path, base_url):
                         # even when it was issued before this login attempt.
                         # Do not require a code newer than the form: the mail
                         # listener may not receive another message at all.
-                        received_at__gte=expiration_threshold,
+                        created_at__gte=expiration_threshold,
                     )
-                    .order_by('-received_at')
+                    .order_by('-created_at')
                     .first()
                 )
                 if code_obj and code_obj.id not in used_code_ids:

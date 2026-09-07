@@ -217,7 +217,7 @@ def expire_codes_task():
     expiration_threshold = timezone.now() - timedelta(minutes=settings.CODE_LIFETIME_MINUTES)
 
     expired_codes = list(
-        Code.objects.filter(received_at__lt=expiration_threshold).exclude(telegram_message_id=-1)
+        Code.objects.filter(created_at__lt=expiration_threshold).exclude(telegram_message_id=-1)
     )
 
     if expired_codes:
