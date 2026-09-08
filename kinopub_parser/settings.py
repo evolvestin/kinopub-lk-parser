@@ -426,7 +426,12 @@ CELERY_BEAT_SCHEDULE = {
     },
     'update_site_metrics': {
         'task': 'app.tasks.update_site_metrics_task',
-        'schedule': crontab(minute=10),  # every hour, offset from the history parser at :00
+        # Keep the hourly frequency, but move the 12:00 run after the
+        # 12:00 Poiskkino refresh (which normally finishes around :40).
+        'schedule': MultiSchedule(
+            crontab(minute=10, hour='0-11,13-23'),
+            crontab(minute=50, hour=12),
+        ),
         'options': {'queue': 'metrics'},
     },
     'auto_enqueue_missing_metadata': {
@@ -467,9 +472,9 @@ if ENVIRONMENT == 'PROD':
             },
             'sync_imdb_data': {
                 'task': 'app.tasks.sync_imdb_data_task',
-                # Observed runtime is about 2h22m. This avoids the daily sync
-                # and leaves a gap before the 11:00 history-parser run.
-                'schedule': crontab(minute=0, hour=8),
+                # The current run takes about 1h53m. Start it at 07:00 so
+                # the 09:00 TMDB window does not wait on external ratings.
+                'schedule': crontab(minute=0, hour=7),
             },
             'backup_database_hourly': {
                 'task': 'app.tasks.backup_database',
