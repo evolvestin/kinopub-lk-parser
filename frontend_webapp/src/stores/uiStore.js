@@ -84,8 +84,16 @@ export const useUIStore = defineStore('ui', () => {
   // whole screen directly from router-view can lag behind during a rapid tab
   // switch while a lazy chunk is resolving.
   const activeView = ref(viewNameFromPath(router.currentRoute.value.path))
+  // Keep the intended path synchronously while a router navigation is in
+  // flight. A modal can be interacted with before router.currentRoute has
+  // caught up; using this snapshot prevents query-only updates from dropping
+  // an open show/history layer.
+  const stableRoutePath = ref(router.currentRoute.value.path || '/search')
+  const stableRouteQuery = ref({ ...router.currentRoute.value.query })
   router.afterEach((to) => {
     activeView.value = viewNameFromPath(to.path)
+    stableRoutePath.value = to.path
+    stableRouteQuery.value = { ...to.query }
   })
 
   function syncActiveView() {
@@ -94,9 +102,12 @@ export const useUIStore = defineStore('ui', () => {
 
   function openLayer(type, id, query = {}) {
     if (window.IS_ADMIN_DASHBOARD) return
-    const currentPath = router.currentRoute.value.path
+    const currentPath = stableRoutePath.value || router.currentRoute.value.path
     const newPath = `${currentPath}/${type}/${id}`.replace(/\/+/g, '/')
-    router.push({ path: newPath, query: { ...router.currentRoute.value.query, ...query } })
+    stableRoutePath.value = newPath
+    const nextQuery = { ...stableRouteQuery.value, ...query }
+    stableRouteQuery.value = nextQuery
+    router.push({ path: newPath, query: nextQuery })
   }
 
   function popLayer() {
@@ -104,13 +115,15 @@ export const useUIStore = defineStore('ui', () => {
     if (window.history.state && window.history.state.back) {
       router.back()
     } else {
-      const currentPath = router.currentRoute.value.path
+      const currentPath = stableRoutePath.value || router.currentRoute.value.path
       const segments = currentPath.split('/')
       if (segments.length > 2) {
         const newPath = segments.slice(0, -2).join('/')
-        router.replace({ path: newPath, query: router.currentRoute.value.query })
+        stableRoutePath.value = newPath
+        router.replace({ path: newPath, query: stableRouteQuery.value })
       } else {
-        router.replace({ path: '/search', query: router.currentRoute.value.query })
+        stableRoutePath.value = '/search'
+        router.replace({ path: '/search', query: stableRouteQuery.value })
       }
     }
   }
@@ -119,7 +132,7 @@ export const useUIStore = defineStore('ui', () => {
     if (window.IS_ADMIN_DASHBOARD) return
     isHistoryEditMode.value = false
     localStorage.setItem('kp_last_active_view', viewName)
-    const query = { ...router.currentRoute.value.query }
+    const query = { ...stableRouteQuery.value }
     if (viewName !== 'stats') {
       delete query.shared_id
       delete query.tab
@@ -131,7 +144,35 @@ export const useUIStore = defineStore('ui', () => {
     // history entry. This also prevents a fast sequence of tab clicks from
     // leaving an obsolete kept-alive view visible while the hash catches up.
     activeView.value = viewNameFromPath(`/${viewName}`)
+    stableRoutePath.value = `/${viewName}`
     router.replace({ name: viewName, query })
+  }
+
+  function replaceQuery(query) {
+    const nextQuery = { ...stableRouteQuery.value, ...query }
+    stableRouteQuery.value = nextQuery
+    return router.replace({
+      path: stableRoutePath.value || router.currentRoute.value.path,
+      query: nextQuery
+    })
+  }
+
+  function updateModalQuery(params) {
+    const nextQuery = { ...stableRouteQuery.value }
+    Object.keys(params).forEach((key) => {
+      const val = params[key]
+      const queryKey = `modal_${key}`
+      if (val === null || val === undefined || val === '') {
+        delete nextQuery[queryKey]
+      } else {
+        nextQuery[queryKey] = String(val)
+      }
+    })
+    stableRouteQuery.value = nextQuery
+    return router.replace({
+      path: stableRoutePath.value || router.currentRoute.value.path,
+      query: nextQuery
+    })
   }
 
   function showToast(text) {
@@ -145,7 +186,7 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   function openModal(key, context = null) {
-    const currentQuery = { ...router.currentRoute.value.query }
+    const currentQuery = { ...stableRouteQuery.value }
     Object.keys(currentQuery).forEach(k => {
       if (k.startsWith('modal_')) delete currentQuery[k]
     })
@@ -157,21 +198,28 @@ export const useUIStore = defineStore('ui', () => {
         }
       })
     }
-    router.push({ query: currentQuery })
+    // Modal state is UI state, not a navigable page. Replacing the query makes
+    // rapid close/open sequences atomic and prevents a stale modal_level from
+    // being restored by an asynchronous router.back().
+    stableRouteQuery.value = currentQuery
+    router.replace({
+      path: stableRoutePath.value || router.currentRoute.value.path,
+      query: currentQuery
+    })
   }
 
   function closeModal(key) {
-    const currentQuery = { ...router.currentRoute.value.query }
+    const currentQuery = { ...stableRouteQuery.value }
     if (currentQuery.modal === key) {
-      if (window.history.state && window.history.state.back) {
-        router.back()
-      } else {
-        delete currentQuery.modal
-        Object.keys(currentQuery).forEach(k => {
-          if (k.startsWith('modal_')) delete currentQuery[k]
-        })
-        router.replace({ query: currentQuery })
-      }
+      delete currentQuery.modal
+      Object.keys(currentQuery).forEach(k => {
+        if (k.startsWith('modal_')) delete currentQuery[k]
+      })
+      stableRouteQuery.value = currentQuery
+      router.replace({
+        path: stableRoutePath.value || router.currentRoute.value.path,
+        query: currentQuery
+      })
     }
   }
 
@@ -231,7 +279,7 @@ export const useUIStore = defineStore('ui', () => {
     isLoading, isAppReady, theme, toast, layerStack, hasOpenLayers, activeView, modals,
     isHistoryEditMode, episodesCache, showsCache, dismissedHints, isCasinoHistoryOpen,
     openLayer, popLayer, switchBaseView, syncActiveView, showToast, toggleTheme, fitText, fitAll,
-    openModal, closeModal, dismissHint,
+    openModal, closeModal, replaceQuery, updateModalQuery, dismissHint,
     setLoading: (v) => { isLoading.value = v },
     setAppReady: (v) => { isAppReady.value = v }
   }

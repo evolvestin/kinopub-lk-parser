@@ -53,9 +53,7 @@ const showInformer = ref(false)
 const keepStats = computed({
   get: () => router.currentRoute.value.query.modal_keepStats !== 'false',
   set: (val) => {
-    const query = { ...router.currentRoute.value.query }
-    query.modal_keepStats = String(val)
-    router.replace({ query }).catch(() => {})
+    uiStore.updateModalQuery({ keepStats: val }).catch(() => {})
   }
 })
 

@@ -186,7 +186,7 @@ const loadNotificationStatus = async () => {
       const query = { ...router.currentRoute.value.query }
       if (!query.q) {
         query.q = data.title
-        router.replace({ query }).catch(() => {})
+        uiStore.replaceQuery(query).catch(() => {})
       }
     }
 

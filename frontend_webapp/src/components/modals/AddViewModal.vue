@@ -144,50 +144,60 @@ const loading = ref(false)
 const isSaving = ref(false)
 
 const updateQueryParams = (params) => {
-  const query = { ...router.currentRoute.value.query }
-  Object.keys(params).forEach(key => {
-    const val = params[key]
-    if (val === null || val === undefined || val === '') {
-      delete query[`modal_${key}`]
-    } else {
-      query[`modal_${key}`] = String(val)
-    }
-  })
-  router.replace({ query }).catch(() => {})
+  uiStore.updateModalQuery(params).catch(() => {})
+}
+
+// Modal controls must respond immediately. The URL is still synchronized for
+// deep links/back-forward, but it is asynchronous and must not be the only
+// source of truth while the user clicks through seasons or date modes.
+const draft = ref({})
+const hasDraft = (key) => Object.prototype.hasOwnProperty.call(draft.value, key)
+const draftValue = (key, fallback) => hasDraft(key) ? draft.value[key] : fallback()
+const setDraft = (key, value, queryKey = key) => {
+  // Replace the draft object so computed values that were previously using
+  // their fallback also get a reactive update on the first user click.
+  draft.value = { ...draft.value, [key]: value }
+  updateQueryParams({ [queryKey]: value })
 }
 
 const level = computed({
-  get: () => router.currentRoute.value.query.modal_level || 'main',
-  set: (val) => updateQueryParams({ level: val })
+  get: () => draftValue('level', () => router.currentRoute.value.query.modal_level || 'main'),
+  set: (val) => setDraft('level', val)
 })
 
 const season = computed({
-  get: () => parseInt(router.currentRoute.value.query.modal_season) || 1,
-  set: (val) => updateQueryParams({ season: val })
+  get: () => draftValue('season', () => parseInt(router.currentRoute.value.query.modal_season) || 1),
+  set: (val) => setDraft('season', val)
 })
 
 const episode = computed({
-  get: () => parseInt(router.currentRoute.value.query.modal_episode) || 1,
-  set: (val) => updateQueryParams({ episode: val })
+  get: () => draftValue('episode', () => parseInt(router.currentRoute.value.query.modal_episode) || 1),
+  set: (val) => setDraft('episode', val)
 })
 
 const selectedSeasonNumber = computed({
   get: () => {
-    const val = router.currentRoute.value.query.modal_selectedSeasonNumber
-    return val ? parseInt(val) : null
+    return draftValue('selectedSeasonNumber', () => {
+      const val = router.currentRoute.value.query.modal_selectedSeasonNumber
+      return val ? parseInt(val) : null
+    })
   },
-  set: (val) => updateQueryParams({ selectedSeasonNumber: val })
+  set: (val) => setDraft('selectedSeasonNumber', val)
 })
 
 const targetMe = computed({
   get: () => {
-    const isGroup = router.currentRoute.value.query.modal_targetGroup !== 'false'
-    if (isGroup) return true
-    return router.currentRoute.value.query.modal_targetMe !== 'false'
+    return draftValue('targetMe', () => {
+      const isGroup = router.currentRoute.value.query.modal_targetGroup !== 'false'
+      if (isGroup) return true
+      return router.currentRoute.value.query.modal_targetMe !== 'false'
+    })
   },
   set: (val) => {
+    draft.value = { ...draft.value, targetMe: val }
     const params = { targetMe: val }
     if (!val) {
+      draft.value = { ...draft.value, targetGroup: false }
       params.targetGroup = false
     }
     updateQueryParams(params)
@@ -195,10 +205,12 @@ const targetMe = computed({
 })
 
 const targetGroup = computed({
-  get: () => router.currentRoute.value.query.modal_targetGroup !== 'false',
+  get: () => draftValue('targetGroup', () => router.currentRoute.value.query.modal_targetGroup !== 'false'),
   set: (val) => {
+    draft.value = { ...draft.value, targetGroup: val }
     const params = { targetGroup: val }
     if (val) {
+      draft.value = { ...draft.value, targetMe: true }
       params.targetMe = true
     }
     updateQueryParams(params)
@@ -206,23 +218,23 @@ const targetGroup = computed({
 })
 
 const exactDate = computed({
-  get: () => router.currentRoute.value.query.modal_exactDate || new Date().toISOString().split('T')[0],
-  set: (val) => updateQueryParams({ exactDate: val })
+  get: () => draftValue('exactDate', () => router.currentRoute.value.query.modal_exactDate || new Date().toISOString().split('T')[0]),
+  set: (val) => setDraft('exactDate', val)
 })
 
 const monthDate = computed({
-  get: () => router.currentRoute.value.query.modal_monthDate || new Date().toISOString().substring(0, 7),
-  set: (val) => updateQueryParams({ monthDate: val })
+  get: () => draftValue('monthDate', () => router.currentRoute.value.query.modal_monthDate || new Date().toISOString().substring(0, 7)),
+  set: (val) => setDraft('monthDate', val)
 })
 
 const yearDate = computed({
-  get: () => parseInt(router.currentRoute.value.query.modal_yearDate) || new Date().getFullYear(),
-  set: (val) => updateQueryParams({ yearDate: val })
+  get: () => draftValue('yearDate', () => parseInt(router.currentRoute.value.query.modal_yearDate) || new Date().getFullYear()),
+  set: (val) => setDraft('yearDate', val)
 })
 
 const dateMode = computed({
-  get: () => router.currentRoute.value.query.modal_dateMode || 'exact',
-  set: (val) => updateQueryParams({ dateMode: val })
+  get: () => draftValue('dateMode', () => router.currentRoute.value.query.modal_dateMode || 'exact'),
+  set: (val) => setDraft('dateMode', val)
 })
 
 const selectedSeason = computed(() => {
@@ -308,30 +320,22 @@ const openEpisodeSelector = async () => {
 }
 
 const selectSeason = (s) => {
-  updateQueryParams({
-    selectedSeasonNumber: s.season_number,
-    level: 'episodes'
-  })
+  selectedSeasonNumber.value = s.season_number
+  level.value = 'episodes'
 }
 
 const selectEpisode = (e) => {
-  updateQueryParams({
-    season: selectedSeasonNumber.value,
-    episode: e.episode_number,
-    level: 'main'
-  })
+  season.value = selectedSeasonNumber.value
+  episode.value = e.episode_number
+  level.value = 'main'
 }
 
 const goBack = () => {
   if (level.value === 'episodes') {
-    updateQueryParams({
-      level: 'seasons',
-      selectedSeasonNumber: null
-    })
+    level.value = 'seasons'
+    selectedSeasonNumber.value = null
   } else if (level.value === 'seasons') {
-    updateQueryParams({
-      level: 'main'
-    })
+    level.value = 'main'
   }
 }
 

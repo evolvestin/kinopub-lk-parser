@@ -230,21 +230,16 @@ const openTelegramLink = (url) => {
 }
 
 const updateQueryParams = (params) => {
-  const query = { ...router.currentRoute.value.query }
-  Object.keys(params).forEach(key => {
-    const val = params[key]
-    if (val === null || val === undefined || val === '') {
-      delete query[`modal_${key}`]
-    } else {
-      query[`modal_${key}`] = String(val)
-    }
-  })
-  router.replace({ query }).catch(() => {})
+  uiStore.updateModalQuery(params).catch(() => {})
 }
 
 const showId = computed(() => {
   const val = router.currentRoute.value.query.modal_showId
-  return val ? parseInt(val) : null
+  if (val) return parseInt(val)
+  // During a same-tick modal transition the query can become observable one
+  // render after the component is mounted. Keep the runtime modal context as
+  // a safe source for that first render as well.
+  return uiStore.modals.details.context?.showId || null
 })
 
 const ratingType = computed({
@@ -487,7 +482,7 @@ watch(() => router.currentRoute.value.query.modal_fullVoters, async (newVal) => 
   }
 }, { immediate: true })
 
-watch(showId, (newId, oldId) => {
+const reloadForShow = (newId, oldId) => {
   if (newId) {
     showData.value = null
     if (oldId !== undefined && newId !== oldId) {
@@ -498,7 +493,29 @@ watch(showId, (newId, oldId) => {
     if (votersObserver) votersObserver.disconnect()
     loadShowData()
   }
-}, { immediate: true })
+}
+
+// The modal is mounted after the router query has been updated. Initialising
+// from onMounted avoids the first-render race where the immediate watcher saw
+// an empty modal_showId and left the dialog on an endless loading state.
+onMounted(() => {
+  // The component may mount in the same tick as router.replace(). Retry once
+  // on the next task if the query has not propagated yet; never leave the
+  // dialog permanently stuck on its loading skeleton.
+  const init = (attempt = 0) => {
+    if (showId.value) {
+      reloadForShow(showId.value, undefined)
+    } else if (attempt < 3) {
+      setTimeout(() => init(attempt + 1), 0)
+    } else {
+      loading.value = false
+      uiStore.showToast('Не удалось определить фильм')
+      close()
+    }
+  }
+  init()
+})
+watch(showId, reloadForShow)
 
 watch(showData, () => {
   selectDefaultTab()

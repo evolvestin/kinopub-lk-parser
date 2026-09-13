@@ -160,23 +160,23 @@ const needsRefresh = ref(false)
 const sliderRef = ref(null)
 
 const localVal = ref(5.0)
+// Keep nested navigation responsive while the hash router is updating. The
+// URL remains the durable state for reloads/deep links, but it must not be the
+// only source of truth for a rapid click through the rating flow.
+const draft = ref({})
+const hasDraft = (key) => Object.prototype.hasOwnProperty.call(draft.value, key)
+const draftValue = (key, fallback) => hasDraft(key) ? draft.value[key] : fallback()
 
 const updateQueryParams = (params) => {
-  const query = { ...router.currentRoute.value.query }
-  Object.keys(params).forEach(key => {
-    const val = params[key]
-    if (val === null || val === undefined || val === '') {
-      delete query[`modal_${key}`]
-    } else {
-      query[`modal_${key}`] = String(val)
-    }
-  })
-  router.replace({ query }).catch(() => {})
+  uiStore.updateModalQuery(params).catch(() => {})
 }
 
 const level = computed({
-  get: () => router.currentRoute.value.query.modal_level || 'show',
-  set: (v) => updateQueryParams({ level: v })
+  get: () => draftValue('level', () => router.currentRoute.value.query.modal_level || 'show'),
+  set: (v) => {
+    draft.value = { ...draft.value, level: v }
+    updateQueryParams({ level: v })
+  }
 })
 
 const val = computed({
@@ -188,10 +188,13 @@ const val = computed({
 
 const season = computed({
   get: () => {
-    const v = router.currentRoute.value.query.modal_season
+    const v = draftValue('season', () => router.currentRoute.value.query.modal_season)
     return v ? parseInt(v) : null
   },
-  set: (v) => updateQueryParams({ season: v })
+  set: (v) => {
+    draft.value = { ...draft.value, season: v }
+    updateQueryParams({ season: v })
+  }
 })
 
 const isRatingUnchanged = computed(() => {
@@ -214,10 +217,13 @@ const isRatingUnchanged = computed(() => {
 
 const episode = computed({
   get: () => {
-    const v = router.currentRoute.value.query.modal_episode
+    const v = draftValue('episode', () => router.currentRoute.value.query.modal_episode)
     return v ? parseInt(v) : null
   },
-  set: (v) => updateQueryParams({ episode: v })
+  set: (v) => {
+    draft.value = { ...draft.value, episode: v }
+    updateQueryParams({ episode: v })
+  }
 })
 
 const debounce = (fn, delay) => {
@@ -445,6 +451,7 @@ const goToSeasons = async () => {
 }
 
 const selectSeason = (s) => {
+  draft.value = { ...draft.value, season: s.season_number, level: 'episodes' }
   updateQueryParams({
     season: s.season_number,
     level: 'episodes'
@@ -465,6 +472,12 @@ const getEpisodeClass = (e) => {
 }
 
 const selectEpisode = (e) => {
+  draft.value = {
+    ...draft.value,
+    episode: e.episode_number,
+    level: 'score',
+    val: e.rating ? parseFloat(e.rating) : 5.0
+  }
   updateQueryParams({
     episode: e.episode_number,
     val: e.rating ? parseFloat(e.rating) : 5.0,
@@ -474,14 +487,19 @@ const selectEpisode = (e) => {
 
 const goBack = () => {
   if (level.value === 'score') {
+    draft.value = { ...draft.value, level: 'episodes', episode: null, val: null }
     updateQueryParams({
       level: 'episodes',
-      episode: null
+      episode: null,
+      val: null
     })
   } else if (level.value === 'episodes') {
+    draft.value = { ...draft.value, level: 'seasons', season: null, episode: null, val: null }
     updateQueryParams({
       level: 'seasons',
-      season: null
+      season: null,
+      episode: null,
+      val: null
     })
   }
 }

@@ -29,6 +29,23 @@ const LayerLoading = {
     h('div', { class: 'layer-loading-card layer-loading-card-short' })
   ])
 }
+const ModalLoading = {
+  render: () => h('div', { class: 'modal-overlay show modal-loading-overlay', 'aria-busy': 'true' }, [
+    h('div', { class: 'modal-content modal-loading-content' }, [
+      h('div', { class: 'modal-loading-header' }, [
+        h('div', { class: 'modal-loading-title' }),
+        h('div', { class: 'modal-loading-close' })
+      ]),
+      h('div', { class: 'modal-loading-body' }, [
+        h('div', { class: 'modal-loading-line modal-loading-line-wide' }),
+        h('div', { class: 'modal-loading-line' }),
+        h('div', { class: 'modal-loading-row' }),
+        h('div', { class: 'modal-loading-row' }),
+        h('div', { class: 'modal-loading-button' })
+      ])
+    ])
+  ])
+}
 const WishlistView = defineAsyncComponent({
   loader: () => import('./views/WishlistView.vue'),
   loadingComponent: ViewLoading,
@@ -55,17 +72,22 @@ const HistoryLayer = defineAsyncComponent({
   delay: 0
 })
 
-const ShareModal = defineAsyncComponent(() => import('./components/modals/ShareModal.vue'))
-const CasinoModal = defineAsyncComponent(() => import('./components/modals/CasinoModal.vue'))
-const RatingModal = defineAsyncComponent(() => import('./components/modals/RatingModal.vue'))
-const AddViewModal = defineAsyncComponent(() => import('./components/modals/AddViewModal.vue'))
-const WlFolderModal = defineAsyncComponent(() => import('./components/modals/WlFolderModal.vue'))
-const WlEditModal = defineAsyncComponent(() => import('./components/modals/WlEditModal.vue'))
-const WlLimitModal = defineAsyncComponent(() => import('./components/modals/WlLimitModal.vue'))
-const WlDeleteModal = defineAsyncComponent(() => import('./components/modals/WlDeleteModal.vue'))
-const RatingsDetailsModal = defineAsyncComponent(() => import('./components/modals/RatingsDetailsModal.vue'))
-const UnsubscribeLayer = defineAsyncComponent(() => import('./components/layers/UnsubscribeLayer.vue'))
-const PrivacyModal = defineAsyncComponent(() => import('./components/modals/PrivacyModal.vue'))
+const asyncModal = (loader) => defineAsyncComponent({ loader, loadingComponent: ModalLoading, delay: 0 })
+const ShareModal = asyncModal(() => import('./components/modals/ShareModal.vue'))
+const CasinoModal = asyncModal(() => import('./components/modals/CasinoModal.vue'))
+const RatingModal = asyncModal(() => import('./components/modals/RatingModal.vue'))
+const AddViewModal = asyncModal(() => import('./components/modals/AddViewModal.vue'))
+const WlFolderModal = asyncModal(() => import('./components/modals/WlFolderModal.vue'))
+const WlEditModal = asyncModal(() => import('./components/modals/WlEditModal.vue'))
+const WlLimitModal = asyncModal(() => import('./components/modals/WlLimitModal.vue'))
+const WlDeleteModal = asyncModal(() => import('./components/modals/WlDeleteModal.vue'))
+const RatingsDetailsModal = asyncModal(() => import('./components/modals/RatingsDetailsModal.vue'))
+const UnsubscribeLayer = defineAsyncComponent({
+  loader: () => import('./components/layers/UnsubscribeLayer.vue'),
+  loadingComponent: LayerLoading,
+  delay: 0
+})
+const PrivacyModal = asyncModal(() => import('./components/modals/PrivacyModal.vue'))
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -231,6 +253,20 @@ onMounted(async () => {
     import('./views/StatsView.vue').catch(() => {})
     import('./views/WishlistView.vue').catch(() => {})
     import('./components/layers/HistoryLayer.vue').catch(() => {})
+    // Fetch every modal chunk after first paint, so the first user click never
+    // produces a blank overlay while the component code is still downloading.
+    ;[
+      './components/modals/ShareModal.vue',
+      './components/modals/CasinoModal.vue',
+      './components/modals/RatingModal.vue',
+      './components/modals/AddViewModal.vue',
+      './components/modals/WlFolderModal.vue',
+      './components/modals/WlEditModal.vue',
+      './components/modals/WlLimitModal.vue',
+      './components/modals/WlDeleteModal.vue',
+      './components/modals/RatingsDetailsModal.vue',
+      './components/modals/PrivacyModal.vue'
+    ].forEach((modulePath) => import(modulePath).catch(() => {}))
     statsStore.prefetchInitialStats()
     wishlistStore.fetchWishlist()
   }, 0)

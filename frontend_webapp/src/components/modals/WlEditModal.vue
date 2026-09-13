@@ -68,16 +68,7 @@ const folder = computed(() => {
 })
 
 const updateQueryParams = (params) => {
-  const query = { ...router.currentRoute.value.query }
-  Object.keys(params).forEach(key => {
-    const val = params[key]
-    if (val === null || val === undefined || (val === '' && key !== 'name')) {
-      delete query[`modal_${key}`]
-    } else {
-      query[`modal_${key}`] = String(val)
-    }
-  })
-  router.replace({ query }).catch(() => {})
+  uiStore.updateModalQuery(params).catch(() => {})
 }
 
 const name = computed({

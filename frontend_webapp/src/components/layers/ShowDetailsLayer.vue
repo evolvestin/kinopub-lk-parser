@@ -380,7 +380,7 @@ const loadShowData = async () => {
       const query = { ...router.currentRoute.value.query }
       if (!query.q) {
         query.q = cachedData.title
-        router.replace({ query }).catch(() => {})
+        uiStore.replaceQuery(query).catch(() => {})
       }
     }
   }
@@ -397,7 +397,7 @@ const loadShowData = async () => {
       const query = { ...router.currentRoute.value.query }
       if (!query.q) {
         query.q = data.title
-        router.replace({ query }).catch(() => {})
+        uiStore.replaceQuery(query).catch(() => {})
       }
     }
 
