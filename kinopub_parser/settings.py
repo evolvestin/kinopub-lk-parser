@@ -34,11 +34,6 @@ _web_port = os.getenv('WEB_PORT', '8012')
 CSRF_TRUSTED_ORIGINS = [
     f'http://localhost:{_web_port}',
     f'http://127.0.0.1:{_web_port}',
-    'https://*.trycloudflare.com',
-    'https://*.lhr.life',
-    'https://*.tuns.sh',
-    'https://*.tunnelmole.net',
-    'https://*.serveousercontent.com',
 ]
 
 if WEBAPP_PUBLIC_URL := os.getenv('WEBAPP_PUBLIC_URL'):
@@ -193,9 +188,6 @@ if not DJANGO_VITE_ASSETS_PATH.exists():
 
 if DJANGO_VITE_ASSETS_PATH.exists():
     STATICFILES_DIRS.append(DJANGO_VITE_ASSETS_PATH)
-
-_public_url = os.getenv('WEBAPP_PUBLIC_URL', '')
-IS_TUNNEL = 'trycloudflare.com' in _public_url
 
 ASGI_APPLICATION = 'kinopub_parser.asgi.application'
 

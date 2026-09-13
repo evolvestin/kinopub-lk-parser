@@ -219,12 +219,8 @@
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const host = window.location.hostname;
                 
-                // Если порт явно задан в настройках и это не туннель - используем его.
-                // Если мы на туннеле (*.trycloudflare.com), порт ВСЕГДА должен отсутствовать.
                 let port = '';
-                if (host.includes('trycloudflare.com')) {
-                    port = '';
-                } else if (wsPort) {
+                if (wsPort) {
                     port = ':' + wsPort;
                 } else if (window.location.port && window.location.port !== '80' && window.location.port !== '443') {
                     port = ':' + window.location.port;

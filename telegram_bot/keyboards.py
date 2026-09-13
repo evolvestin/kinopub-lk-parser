@@ -1,7 +1,6 @@
 import os
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from services.url_store import URLStore
 
 from shared.buttons import (
     get_rate_episodes_button_data,
@@ -99,10 +98,8 @@ def get_show_card_keyboard(
     has_any_ratings: bool = False,
     channel_url: str = None,
 ):
-    dynamic_url = URLStore().get_url()
     base_url = (
-        dynamic_url
-        or os.getenv('WEBAPP_PUBLIC_URL')
+        os.getenv('WEBAPP_PUBLIC_URL')
         or os.getenv('BACKEND_URL')
         or 'http://localhost:8000'
     ).rstrip('/')

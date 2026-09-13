@@ -21,7 +21,6 @@ urlpatterns = proxy_patterns + [
     path('', views.redirect_index, name='index'),
     path('metrics/', views.metrics, name='metrics'),
     path('admin/', admin_site.urls),
-    path('api/internal/set_url', views.internal_set_url, name='internal_set_url'),
     path(
         'api/internal/kinopub-code/',
         views.internal_kinopub_code,
@@ -47,6 +46,12 @@ urlpatterns = proxy_patterns + [
     ),
     # WebApp Endpoints
     path('webapp/', views.webapp_index, name='webapp_index'),
+    path(
+        'webapp-preview-app/<int:telegram_id>/',
+        views.webapp_preview_app,
+        name='webapp-preview-app',
+    ),
+    path('webapp-preview/<int:telegram_id>/', views.webapp_preview, name='webapp-preview'),
     path(
         'api/webapp/collection/<str:collection_type>/<str:item_id>/',
         views.webapp_get_collection,

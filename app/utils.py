@@ -192,9 +192,6 @@ def get_scheduled_tasks_info():
 
 
 def get_webapp_base_url() -> str:
-    live_url = cache.get('live_webapp_url')
-    if live_url:
-        return live_url.rstrip('/')
     base_url = (
         getattr(settings, 'WEBAPP_PUBLIC_URL', None)
         or getattr(settings, 'BACKEND_URL', None)

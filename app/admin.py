@@ -850,6 +850,7 @@ class ViewUserAdmin(admin.ModelAdmin):
         'telegram_id',
         'get_colored_name',
         'get_colored_username',
+        'webapp_preview_link',
         'language',
         'get_role_sortable',
         'is_bot_active',
@@ -863,6 +864,7 @@ class ViewUserAdmin(admin.ModelAdmin):
         'django_user',
         'role_message_id',
         'telegram_actions',
+        'webapp_preview_link',
         'get_avatar_preview',
         'created_at',
         'updated_at',
@@ -874,7 +876,10 @@ class ViewUserAdmin(admin.ModelAdmin):
             {'fields': ('name', 'username', 'get_avatar_preview', 'photo_url')},
         ),
         ('Конфиденциальность', {'fields': ('is_anonymous', 'privacy_choice_made')}),
-        ('Технические характеристики', {'fields': ('screen_width', 'screen_height')}),
+        (
+            'Технические характеристики',
+            {'fields': ('screen_width', 'screen_height', 'webapp_preview_link')},
+        ),
         (
             'Системные данные',
             {
@@ -943,6 +948,16 @@ class ViewUserAdmin(admin.ModelAdmin):
             '<a class="button" style="padding:4px 10px; background:#2ecc71; color:white; '
             'text-decoration:none; border-radius:4px;" href="?_resend_telegram=1">'
             'Отправить новое сообщение о роли</a>'
+        )
+
+    @admin.display(description='Предпросмотр WebApp')
+    def webapp_preview_link(self, obj):
+        if not obj.telegram_id:
+            return '—'
+        url = reverse('webapp-preview', args=(obj.telegram_id,))
+        return format_html(
+            '<a class="button" href="{}" target="_blank" rel="noopener">Открыть iframe</a>',
+            url,
         )
 
     @admin.display(description='Django User', ordering='django_user')

@@ -9,7 +9,6 @@ from aiogram.filters import CommandObject
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 from sender import MessageSender
 from services.bot_instance import BotInstance
-from services.url_store import URLStore
 
 from shared.card_formatter import get_ratings_report_blocks, get_show_card_text
 from shared.constants import SERIES_TYPES, UserRole
@@ -30,10 +29,8 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
     if args:
         if args.startswith('stat_'):
             stat_id = args.replace('stat_', '')
-            dynamic_url = URLStore().get_url()
             base_url = (
-                dynamic_url
-                or os.getenv('WEBAPP_PUBLIC_URL')
+                os.getenv('WEBAPP_PUBLIC_URL')
                 or os.getenv('BACKEND_URL')
                 or 'http://localhost:8000'
             )
@@ -202,10 +199,8 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
 
     keyboard = None
     if success:
-        dynamic_url = URLStore().get_url()
         base_url = (
-            dynamic_url
-            or os.getenv('WEBAPP_PUBLIC_URL')
+            os.getenv('WEBAPP_PUBLIC_URL')
             or os.getenv('BACKEND_URL')
             or 'http://localhost:8000'
         )
@@ -532,10 +527,8 @@ async def handle_history_action_command(message: Message, bot: Bot):
 
 
 async def handle_stats_command(message: Message, bot: Bot):
-    dynamic_url = URLStore().get_url()
     base_url = (
-        dynamic_url
-        or os.getenv('WEBAPP_PUBLIC_URL')
+        os.getenv('WEBAPP_PUBLIC_URL')
         or os.getenv('BACKEND_URL')
         or 'http://localhost:8000'
     )

@@ -214,39 +214,6 @@ services:
     networks:
       - kinopub-net
 
-  tunnel:
-    image: node:20-alpine
-    restart: unless-stopped
-    profiles:
-      - dev
-    network_mode: "service:asgi"
-    depends_on:
-      - asgi
-    environment:
-      - NODE_OPTIONS=--dns-result-order=ipv4first
-    command: >
-      sh -c "
-        npm install -g tunnelmole &&
-        tmole 8001
-      "
-
-  tunnel-monitor:
-    build:
-      context: ./tunnel_monitor
-    profiles:
-      - dev
-    restart: unless-stopped
-    env_file: .env
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - kinopub-net
-    depends_on:
-      telegram-bot:
-        condition: service_started
-      tunnel:
-        condition: service_started
-  
   health-monitor:
     build: .
     restart: unless-stopped
@@ -279,7 +246,6 @@ services:
     environment:
       - NODE_ENV=development
       - VITE_DEV_SERVER_HOST=${VITE_DEV_SERVER_HOST:-localhost}
-      - WEBAPP_PUBLIC_URL=${WEBAPP_PUBLIC_URL}
     networks:
       kinopub-net:
         aliases:

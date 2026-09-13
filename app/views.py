@@ -19,9 +19,10 @@ from django.db import transaction
 from django.db.models import Avg, Case, F, IntegerField, Max, Prefetch, Q, Sum, Value, When
 from django.db.models.query import QuerySet
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from redis import Redis
@@ -1088,8 +1089,8 @@ def bot_assign_group_view(request):
         return JsonResponse({'error': str(e)}, status=400)
 
 
-def webapp_index(request):
-    view_user = get_webapp_user(request)
+def webapp_index(request, preview_user=None):
+    view_user = preview_user or get_webapp_user(request)
     user_role = view_user.role if view_user else UserRole.GUEST.value
     context = {
         'is_debug': settings.ENVIRONMENT == 'DEV',
@@ -1098,7 +1099,40 @@ def webapp_index(request):
     return render(request, 'webapp/stats.html', context)
 
 
+def webapp_preview_telegram_id(request):
+    """Return the impersonated user id for an authenticated staff preview only."""
+    raw_id = request.headers.get('X-WebApp-Preview-Telegram-ID', '')
+    if not raw_id or not request.user.is_active or not request.user.is_staff:
+        return None
+    try:
+        return int(raw_id)
+    except (TypeError, ValueError):
+        return None
+
+
+@staff_member_required
+def webapp_preview(request, telegram_id):
+    """Render an administrator shell with the selected user's saved viewport."""
+    user = get_object_or_404(ViewUser, telegram_id=telegram_id)
+    viewport = None
+    if user.screen_width and user.screen_height:
+        viewport = {'width': user.screen_width, 'height': user.screen_height}
+    return render(request, 'webapp/user_preview.html', {'user': user, 'viewport': viewport})
+
+
+@staff_member_required
+@xframe_options_sameorigin
+def webapp_preview_app(request, telegram_id):
+    """Serve the WebApp inside an authenticated staff preview iframe."""
+    user = get_object_or_404(ViewUser, telegram_id=telegram_id)
+    return webapp_index(request, preview_user=user)
+
+
 def get_webapp_user(request) -> ViewUser | None:
+    preview_telegram_id = webapp_preview_telegram_id(request)
+    if preview_telegram_id is not None:
+        return ViewUser.objects.filter(telegram_id=preview_telegram_id).first()
+
     init_data = None
     if request.method == 'POST':
         try:
@@ -3144,31 +3178,6 @@ def vite_proxy_view(request, path=''):
     except Exception as e:
         logger.error(f'[ViteProxy] FAILED {upstream_url}: {str(e)}')
         return HttpResponse(status=504)
-
-
-@csrf_exempt
-@require_http_methods(['POST'])
-def internal_set_url(request):
-    """
-    Принимает новый URL от tunnel-monitor и сохраняет его в кэш.
-    Используется для генерации корректных ссылок в боте и письмах.
-    """
-    expected_token = settings.BOT_TOKEN
-    if request.headers.get('X-Bot-Token') != expected_token:
-        return JsonResponse({'ok': False, 'error': 'Unauthorized'}, status=403)
-
-    try:
-        data = json.loads(request.body)
-        url = data.get('url')
-        if not url:
-            return JsonResponse({'ok': False, 'error': 'No URL provided'}, status=400)
-
-        # Сохраняем в кэш Redis на 24 часа
-        cache.set('live_webapp_url', url.rstrip('/'), timeout=86400)
-        logger.info(f'[System] WebApp URL updated via Monitor: {url}')
-        return JsonResponse({'ok': True})
-    except Exception as e:
-        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
 
 @csrf_exempt

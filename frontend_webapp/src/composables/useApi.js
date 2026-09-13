@@ -1,6 +1,8 @@
 import { useTelegram } from './useTelegram'
 import { logger } from '../utils/logger'
 
+const webAppPreviewTelegramId = new URLSearchParams(window.location.search).get('webapp_preview')
+
 export function useApi() {
   async function request(endpoint, method = 'GET', payload = null) {
     const { initData } = useTelegram()
@@ -12,6 +14,10 @@ export function useApi() {
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
       }
+    }
+
+    if (webAppPreviewTelegramId) {
+      options.headers['X-WebApp-Preview-Telegram-ID'] = webAppPreviewTelegramId
     }
 
     if (initData) {

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Предпросмотр WebApp — {{ user }}</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #16191f; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; overflow: auto; }
+    .viewport { width: {{ viewport.width }}px; height: {{ viewport.height }}px; border: 0; background: #fff; box-shadow: 0 20px 70px #0009; }
+    .message { max-width: 430px; padding: 24px; text-align: center; color: #e9edf2; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  {% if viewport %}
+    <iframe
+      class="viewport"
+      title="WebApp {{ user }}"
+      src="/webapp-preview-app/{{ user.telegram_id }}/?webapp_preview={{ user.telegram_id }}"
+    ></iframe>
+  {% else %}
+    <div class="message">
+      Для пользователя <b>{{ user }}</b> ещё не сохранён размер WebApp.
+      Откройте приложение один раз из Telegram и обновите эту страницу.
+    </div>
+  {% endif %}
+</body>
+</html>

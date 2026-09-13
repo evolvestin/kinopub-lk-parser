@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 
-const initialRole = localStorage.getItem('user_role') || window.USER_ROLE || 'guest'
+const isWebAppPreview = new URLSearchParams(window.location.search).has('webapp_preview')
+const initialRole = isWebAppPreview
+  ? (window.USER_ROLE || 'guest')
+  : (localStorage.getItem('user_role') || window.USER_ROLE || 'guest')
 window.USER_ROLE = initialRole
 
 export const useUserStore = defineStore('user', () => {
@@ -22,6 +25,7 @@ export const useUserStore = defineStore('user', () => {
 
   watch(userRole, (newRole) => {
     window.USER_ROLE = newRole
+    if (isWebAppPreview) return
     if (newRole) {
       localStorage.setItem('user_role', newRole)
     } else {
