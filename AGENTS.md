@@ -84,3 +84,16 @@ that have not yet been matched:
 * Do not use IMDb identity, IMDb fields, or IMDb duplicate findings as evidence
   for person matching, and do not modify IMDb duplicates at all. IMDb is
   explicitly out of scope for person deduplication.
+
+## External rating storage policy
+
+* `ExternalRating.kp` is the authoritative Kinopoisk rating field. New code,
+  metrics, reports, admin filters, and API reads must use `ext_rating__kp` or
+  the related `ExternalRating.kp` value.
+* `Show.kinopoisk_rating` is a deprecated legacy mirror retained only for
+  compatibility with old parser/full-scan/UI paths. Do not use it for new
+  logic or restore it from another source. Remove the field after all legacy
+  readers and writers have been migrated to `ExternalRating.kp`.
+* `Show.poiskkino_updated_at` is the Kinopoisk/Poiskkino freshness marker.
+  `Show.imdb_rating_updated_at` is the IMDb freshness marker. Do not use the
+  shared `ExternalRating.updated_at` as a source-specific freshness metric.

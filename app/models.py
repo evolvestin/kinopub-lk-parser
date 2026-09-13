@@ -397,6 +397,8 @@ class Show(BaseModel):
     year = models.IntegerField(null=True, blank=True, db_index=True)
     status = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     kinopoisk_url = models.URLField(max_length=255, null=True, blank=True)
+    # Deprecated compatibility mirror. The authoritative KP rating is
+    # ExternalRating.kp; new code must not read or write this field.
     kinopoisk_rating = models.FloatField(null=True, blank=True)
     kinopoisk_votes = models.IntegerField(null=True, blank=True)
     kinopoisk_rating_available = models.BooleanField(
@@ -410,6 +412,13 @@ class Show(BaseModel):
     imdb_url = models.URLField(max_length=255, null=True, blank=True)
     imdb_rating = models.FloatField(null=True, blank=True)
     imdb_votes = models.IntegerField(null=True, blank=True)
+    imdb_rating_updated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='IMDb rating updated at',
+        help_text='The last time the official IMDb ratings dataset updated this title.',
+    )
     imdb_rating_available = models.BooleanField(
         default=False,
         db_index=True,
@@ -433,7 +442,10 @@ class Show(BaseModel):
 
     @property
     def display_genres(self):
-        names = list(self.genres.values_list('name', flat=True))
+        # `.all()` reuses Django's prefetch cache. Calling `.values_list()` on
+        # the related manager bypasses that cache and becomes an N+1 when a
+        # list of prefetched shows is serialized.
+        names = [genre.name for genre in self.genres.all()]
         seen = set()
         result = []
         for n in names:
@@ -444,7 +456,9 @@ class Show(BaseModel):
         return sorted(result)
 
     def get_internal_rating_data(self, current_user=None, override_public_user_id=None):
-        ratings = self.ratings.select_related('user').all()
+        ratings = getattr(self, '_prefetched_objects_cache', {}).get('ratings')
+        if ratings is None:
+            ratings = self.ratings.select_related('user').all()
         if not ratings:
             return None, []
 

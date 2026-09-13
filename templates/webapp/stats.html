@@ -41,7 +41,11 @@
         })();
     </script>
     {% vite_hmr_client %}
-    {% vite_asset 'src/main.js' %}
+    {% if is_debug %}
+      <script type="module" src="/__vite__/src/main.js?v=webapp-{{ APP_VERSION }}"></script>
+    {% else %}
+      {% vite_asset 'src/main.js' %}
+    {% endif %}
 </head>
 <body>
     <div id="app"></div>

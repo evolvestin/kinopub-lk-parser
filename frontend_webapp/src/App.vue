@@ -1,34 +1,32 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUIStore } from './stores/uiStore'
 import { useStatsStore } from './stores/useStatsStore'
-import { useWishlistStore } from './stores/wishlistStore'
 import { useTelegram } from './composables/useTelegram'
 import { logger } from './utils/logger'
 import BottomNav from './components/layout/BottomNav.vue'
 import Loader from './components/layout/Loader.vue'
 import Toast from './components/layout/Toast.vue'
 
-import ShowDetailsLayer from './components/layers/ShowDetailsLayer.vue'
-import CollectionLayer from './components/layers/CollectionLayer.vue'
-import HistoryLayer from './components/layers/HistoryLayer.vue'
+const ShowDetailsLayer = defineAsyncComponent(() => import('./components/layers/ShowDetailsLayer.vue'))
+const CollectionLayer = defineAsyncComponent(() => import('./components/layers/CollectionLayer.vue'))
+const HistoryLayer = defineAsyncComponent(() => import('./components/layers/HistoryLayer.vue'))
 
-import ShareModal from './components/modals/ShareModal.vue'
-import CasinoModal from './components/modals/CasinoModal.vue'
-import RatingModal from './components/modals/RatingModal.vue'
-import AddViewModal from './components/modals/AddViewModal.vue'
-import WlFolderModal from './components/modals/WlFolderModal.vue'
-import WlEditModal from './components/modals/WlEditModal.vue'
-import WlLimitModal from './components/modals/WlLimitModal.vue'
-import WlDeleteModal from './components/modals/WlDeleteModal.vue'
-import RatingsDetailsModal from './components/modals/RatingsDetailsModal.vue'
-import UnsubscribeLayer from './components/layers/UnsubscribeLayer.vue'
-import PrivacyModal from './components/modals/PrivacyModal.vue'
+const ShareModal = defineAsyncComponent(() => import('./components/modals/ShareModal.vue'))
+const CasinoModal = defineAsyncComponent(() => import('./components/modals/CasinoModal.vue'))
+const RatingModal = defineAsyncComponent(() => import('./components/modals/RatingModal.vue'))
+const AddViewModal = defineAsyncComponent(() => import('./components/modals/AddViewModal.vue'))
+const WlFolderModal = defineAsyncComponent(() => import('./components/modals/WlFolderModal.vue'))
+const WlEditModal = defineAsyncComponent(() => import('./components/modals/WlEditModal.vue'))
+const WlLimitModal = defineAsyncComponent(() => import('./components/modals/WlLimitModal.vue'))
+const WlDeleteModal = defineAsyncComponent(() => import('./components/modals/WlDeleteModal.vue'))
+const RatingsDetailsModal = defineAsyncComponent(() => import('./components/modals/RatingsDetailsModal.vue'))
+const UnsubscribeLayer = defineAsyncComponent(() => import('./components/layers/UnsubscribeLayer.vue'))
+const PrivacyModal = defineAsyncComponent(() => import('./components/modals/PrivacyModal.vue'))
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
-const wishlistStore = useWishlistStore()
 const { tg, showConfirm } = useTelegram()
 const router = useRouter()
 
@@ -168,18 +166,21 @@ onMounted(async () => {
 
   await router.replace({ path: targetPath, query: targetQuery })
 
-  try {
-    await Promise.allSettled([
-      statsStore.fetchStats(statsStore.currentYear, false),
-      wishlistStore.fetchWishlist()
-    ])
-  } catch (e) {
-    logger.error('Failed to fetch initial data during bootstrap:', e)
-  } finally {
-    uiStore.setLoading(false)
-    uiStore.setAppReady(true)
-    logger.timeEnd('InitialBootstrap')
-  }
+  // The shell and the search screen do not need either large dataset.  Do not
+  // make first paint wait for statistics, wishlist rows, or remote images.
+  // Each data-heavy view already owns its fetch lifecycle and shows its own
+  // empty/loading state when the user opens it.
+  uiStore.setLoading(false)
+  uiStore.setAppReady(true)
+  logger.timeEnd('InitialBootstrap')
+
+  // Warm the stats route and its data after the first paint. The user can
+  // open the section immediately while both the code and the response are
+  // already being prepared in the background.
+  setTimeout(() => {
+    import('./views/StatsView.vue').catch(() => {})
+    statsStore.prefetchInitialStats()
+  }, 0)
 })
 
 onUnmounted(() => {

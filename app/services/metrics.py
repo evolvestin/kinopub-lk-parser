@@ -11,7 +11,6 @@ from django.utils import timezone
 
 from app.models import (
     Country,
-    ExternalRating,
     Genre,
     Person,
     Show,
@@ -67,34 +66,42 @@ def _aggregate_by_display_type(stats_qs, type_field='type', count_field='total')
     ]
 
 
+def _countries_with_metadata_for_aliases(countries):
+    normalized_names = {
+        RAW_TO_NORMALIZED_COUNTRY[country.name]
+        for country in countries
+        if country.name in RAW_TO_NORMALIZED_COUNTRY
+    }
+    if not normalized_names:
+        return set()
+
+    return set(
+        Country.objects.filter(name__in=normalized_names)
+        .exclude(Q(iso_code__isnull=True) | Q(iso_code=''))
+        .values_list('name', flat=True)
+    )
+
+
 def calculate_missing_country_meta_metric():
-    raw_missing = Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code=''))
+    raw_missing = list(Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code='')))
+    normalized_with_metadata = _countries_with_metadata_for_aliases(raw_missing)
     count = 0
     for c in raw_missing:
         norm_name = RAW_TO_NORMALIZED_COUNTRY.get(c.name, c.name)
-        if norm_name != c.name:
-            if (
-                Country.objects.filter(name=norm_name)
-                .exclude(Q(iso_code__isnull=True) | Q(iso_code=''))
-                .exists()
-            ):
-                continue
+        if norm_name != c.name and norm_name in normalized_with_metadata:
+            continue
         count += 1
     return [{'name': 'Страны', 'value': count}]
 
 
 def get_missing_country_meta_list():
-    raw_missing = Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code=''))
+    raw_missing = list(Country.objects.filter(Q(iso_code__isnull=True) | Q(iso_code='')))
+    normalized_with_metadata = _countries_with_metadata_for_aliases(raw_missing)
     valid_missing = []
     for c in raw_missing:
         norm_name = RAW_TO_NORMALIZED_COUNTRY.get(c.name, c.name)
-        if norm_name != c.name:
-            if (
-                Country.objects.filter(name=norm_name)
-                .exclude(Q(iso_code__isnull=True) | Q(iso_code=''))
-                .exists()
-            ):
-                continue
+        if norm_name != c.name and norm_name in normalized_with_metadata:
+            continue
         valid_missing.append({'id': c.id, 'name': c.name})
     return valid_missing
 
@@ -127,15 +134,9 @@ def get_unused_countries_list():
     )
 
 
-def _format_type(t):
-    if not t:
-        return 'Неизвестно'
-    return SHOW_TYPE_DISPLAY_RU.get(t, t)
-
-
 def calculate_has_kp_metric():
     stats = (
-        Show.objects.filter(kinopoisk_rating__isnull=False)
+        Show.objects.filter(ext_rating__kp__isnull=False)
         .values('type')
         .annotate(total=Count('id'))
         .order_by('-total')
@@ -217,21 +218,17 @@ def get_has_rating_list(show_type: str, source: str):
         return Show.objects.filter(type=show_type, imdb_rating__isnull=False).values(
             'id', 'title', 'original_title'
         )
-
-    rating_exists = ExternalRating.objects.filter(
-        show_id=OuterRef('pk'), **{f'{source}__isnull': False}
-    )
-    return (
-        Show.objects.filter(type=show_type)
-        .filter(Exists(rating_exists))
-        .values('id', 'title', 'original_title')
-    )
+    if source == 'kp':
+        return Show.objects.filter(type=show_type, ext_rating__kp__isnull=False).values(
+            'id', 'title', 'original_title'
+        )
+    return Show.objects.none()
 
 
 def calculate_missing_kp_metric():
     qs = Show.objects.filter(
         kinopoisk_url__gt='',
-        kinopoisk_rating__isnull=True,
+        ext_rating__kp__isnull=True,
         kinopoisk_rating_available=True,
     ).exclude(kinopoisk_url__endswith='/film/0')
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
@@ -242,7 +239,7 @@ def calculate_kp_unrated_metric():
     """Titles checked by Poiskkino where KinoPoisk has no published rating."""
     qs = Show.objects.filter(
         kinopoisk_url__gt='',
-        kinopoisk_rating__isnull=True,
+        ext_rating__kp__isnull=True,
         kinopoisk_rating_available=False,
         poiskkino_updated_at__isnull=False,
     ).exclude(kinopoisk_url__endswith='/film/0')
@@ -425,7 +422,7 @@ def get_missing_kp_list(show_type: str):
         Show.objects.filter(
             type=show_type,
             kinopoisk_url__gt='',
-            kinopoisk_rating__isnull=True,
+            ext_rating__kp__isnull=True,
             kinopoisk_rating_available=True,
         )
         .exclude(kinopoisk_url__endswith='/film/0')
@@ -438,7 +435,7 @@ def get_kp_unrated_list(show_type: str):
         Show.objects.filter(
             type=show_type,
             kinopoisk_url__gt='',
-            kinopoisk_rating__isnull=True,
+            ext_rating__kp__isnull=True,
             kinopoisk_rating_available=False,
             poiskkino_updated_at__isnull=False,
         )
@@ -617,8 +614,15 @@ def get_total_persons_list(show_type: str, max_items=None):
 
 
 def get_unused_persons_list():
-    return Person.objects.filter(master_person__isnull=True, showcrew__isnull=True).values(
-        'id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id'
+    used_person_ids = (
+        ShowCrew.objects.annotate(canonical_id=_canonical_person_id_expression())
+        .values_list('canonical_id', flat=True)
+        .distinct()
+    )
+    return (
+        Person.objects.filter(master_person__isnull=True)
+        .exclude(id__in=used_person_ids)
+        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id')
     )
 
 
@@ -1024,7 +1028,7 @@ def calculate_missing_status_metric():
 
 def get_missing_status_list(show_type: str):
     return (
-        Show.objects.filter(kinopub_id__isnull=False, type=show_type)
+        Show.objects.filter(kinopub_id__isnull=False, type__in=SERIES_TYPES, type=show_type)
         .filter(Q(status__isnull=True) | Q(status=''))
         .values('id', 'title', 'original_title')
     )
@@ -1246,7 +1250,7 @@ def calculate_total_genres_metric():
 
     data = [
         {'name': 'Основные жанры', 'value': mapped_count},
-        {'name': 'Дубликаты', 'value': unmapped_count},
+        {'name': 'Неканонические', 'value': unmapped_count},
     ]
     return sorted(data, key=lambda x: x['value'], reverse=True)
 
@@ -1335,18 +1339,12 @@ def get_tmdb_missing_durations_list(show_type: str):
 
 
 def calculate_unused_persons_metric():
-    return [
-        {
-            'name': 'Без ролей',
-            'value': Person.objects.filter(
-                master_person__isnull=True, showcrew__isnull=True
-            ).count(),
-        }
-    ]
-
-    alias_map = _get_alias_map()
-    used_person_ids = set(ShowCrew.objects.values_list('person_id', flat=True))
-    used_master_ids = {alias_map.get(pid, pid) for pid in used_person_ids}
-    total_master_persons = Person.objects.filter(master_person__isnull=True).count()
-    count = max(0, total_master_persons - len(used_master_ids))
-    return [{'name': 'Без ролей', 'value': count}]
+    used_person_ids = (
+        ShowCrew.objects.annotate(canonical_id=_canonical_person_id_expression())
+        .values_list('canonical_id', flat=True)
+        .distinct()
+    )
+    unused_count = (
+        Person.objects.filter(master_person__isnull=True).exclude(id__in=used_person_ids).count()
+    )
+    return [{'name': 'Без ролей', 'value': unused_count}]

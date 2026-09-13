@@ -288,7 +288,8 @@ const systemStats = computed(() => [
   { label: 'Последний просмотр', val: ctx.last_actions?.history || '—', icon: 'chart', bg: 'rgba(56, 139, 253, 0.15)', color: '#388bfd' },
   { label: 'Запуск парсера', val: ctx.last_actions?.parser_run || '—', icon: 'zap', bg: 'rgba(163, 113, 247, 0.15)', color: '#a371f7' },
   { label: 'Новые релизы', val: ctx.last_actions?.shows || '—', icon: 'play_circle', bg: 'rgba(46, 160, 67, 0.15)', color: '#2ea043' },
-  { label: 'Рейтинги (KP/IMDb)', val: ctx.last_actions?.ratings || '—', icon: 'star', bg: 'rgba(241, 196, 15, 0.15)', color: '#f1c40f' },
+  { label: 'Рейтинги KP', val: ctx.last_actions?.ratings_kp || '—', icon: 'star', bg: 'rgba(241, 196, 15, 0.15)', color: '#f1c40f' },
+  { label: 'Рейтинги IMDb', val: ctx.last_actions?.ratings_imdb || '—', icon: 'star', bg: 'rgba(163, 113, 247, 0.15)', color: '#a371f7' },
   { label: 'Хронометраж', val: ctx.last_actions?.durations || '—', icon: 'time', bg: 'rgba(163, 113, 247, 0.15)', color: '#a371f7' },
   { label: 'Фото персон', val: ctx.last_actions?.photos || '—', icon: 'user', bg: 'rgba(231, 76, 60, 0.15)', color: '#e74c3c' },
   { label: 'Активность Telegram', val: ctx.last_actions?.tg || '—', icon: 'check', bg: 'rgba(46, 204, 113, 0.15)', color: '#2ecc71' },
@@ -357,7 +358,7 @@ const metricGroups = ref([
       { key: 'total_countries', icon: 'globe', color: '#388bfd', label: 'Всего стран', centerLabel: 'СТРАН', valField: 'value', severity: 'info', desc: 'Статистика базы стран.', showDesc: false },
       { key: 'tmdb_no_countries', icon: 'minus', color: '#60a5fa', label: 'TMDB: Без стран', centerLabel: 'БЕЗ СТРАН', valField: 'value', severity: 'info', desc: 'Шоу из TMDB, к которым не привязана ни одна страна.', showDesc: false },
       { key: 'no_countries', icon: 'minus', color: '#2ea043', label: 'KinoPub: Без стран', centerLabel: 'БЕЗ СТРАН', valField: 'value', severity: 'critical', desc: 'Шоу из KinoPub, к которым не привязана ни одна страна.', showDesc: false },
-      { key: 'missing_country_meta', icon: 'target', color: 'var(--danger)', label: 'Страны без ISO кода', centerLabel: 'БЕЗ ISO', valField: 'value', severity: 'critical', desc: 'Страны, для которых не заполнен ISO код или отсутствует флаг Эмодзи.', showDesc: false }
+      { key: 'missing_country_meta', icon: 'target', color: 'var(--danger)', label: 'Страны без ISO кода', centerLabel: 'БЕЗ ISO', valField: 'value', severity: 'critical', desc: 'Страны, для которых не заполнен ISO-код.', showDesc: false }
     ]
   },
   {

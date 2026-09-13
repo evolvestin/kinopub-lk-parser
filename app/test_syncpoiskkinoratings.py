@@ -1,10 +1,11 @@
 from unittest.mock import patch
 
 from django.db import OperationalError
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
+from app.management.commands.syncimdbdata import Command as ImdbCommand
 from app.management.commands.syncpoiskkinoratings import Command
-from app.models import ShowCrew
+from app.models import Show, ShowCrew
 from shared.formatters import format_country_display_names
 
 
@@ -69,3 +70,20 @@ class PoiskkinoSyncHelperTests(SimpleTestCase):
             ),
             ['🇮🇹 Италия', '🇺🇸 США'],
         )
+
+
+class ImdbRatingTimestampTests(TestCase):
+    def test_imdb_rating_sync_records_its_own_timestamp(self):
+        show = Show.objects.create(
+            title='IMDb timestamp test',
+            original_title='IMDb timestamp test',
+            type='Movie',
+            imdb_id='tt12345678',
+        )
+
+        result = ImdbCommand._save_rating_batch([('tt12345678', 8.4, 1234)], {})
+
+        show.refresh_from_db()
+        self.assertEqual(result['updated'], 1)
+        self.assertEqual(show.imdb_rating, 8.4)
+        self.assertIsNotNone(show.imdb_rating_updated_at)

@@ -65,12 +65,12 @@ def handle_new_view_history(sender, instance, **kwargs):
                 view_date__lt=instance.view_date,
                 view_date__gte=six_months_ago,
                 is_checked=True,
-            )
+            ).prefetch_related('users')
 
             current_users_set = set(instance.users.values_list('id', flat=True))
 
             for old_view in older_duplicates:
-                old_users_set = set(old_view.users.values_list('id', flat=True))
+                old_users_set = {user.id for user in old_view.users.all()}
 
                 if current_users_set == old_users_set:
                     old_view.is_checked = False

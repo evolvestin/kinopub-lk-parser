@@ -3,7 +3,6 @@ import { ref, computed, markRaw, watch } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
 import { useUserStore } from './userStore'
-import { preloadImage } from '../utils/helpers'
 import router from '../router'
 
 export const useStatsStore = defineStore('stats', () => {
@@ -14,8 +13,10 @@ export const useStatsStore = defineStore('stats', () => {
   const statsCache = ref({})
   const sharedDataMap = ref({})
   const availableYears = ref([])
-  const isPreloadingYears = ref(false)
   const optimisticRatings = ref({})
+  const pendingRequests = ref(0)
+  const statsError = ref(null)
+  const isLoading = computed(() => pendingRequests.value > 0)
 
   const currentYear = computed({
     get() {
@@ -49,7 +50,13 @@ export const useStatsStore = defineStore('stats', () => {
       } else {
         query.tab = val
       }
-      router.replace({ query }).catch(() => {})
+      // Stats tabs belong to the stats route. Keeping the route explicit also
+      // makes the action resilient if a cached keep-alive view briefly lags
+      // behind the router during a hot update.
+      const path = router.currentRoute.value.path.startsWith('/stats')
+        ? router.currentRoute.value.path
+        : '/stats'
+      router.replace({ path, query }).catch(() => {})
     }
   })
 
@@ -64,7 +71,7 @@ export const useStatsStore = defineStore('stats', () => {
     return statsCache.value[currentYear.value] || null
   })
 
-  const hasGroup = computed(() => !!currentStats.value?.group)
+  const hasGroup = computed(() => !!(currentStats.value?.group || currentStats.value?.meta?.has_group))
 
   const userShowRatings = computed(() => {
     const ratingsMap = {}
@@ -120,62 +127,6 @@ export const useStatsStore = defineStore('stats', () => {
     optimisticRatings.value = {}
   }
 
-  async function resolveAllImages(data) {
-    if (!data) return
-
-    const history = [...(data.history_movies || []), ...(data.history_episodes || [])]
-    history.slice(0, 100).forEach(item => {
-      if (item.poster_url) preloadImage(item.poster_url)
-    })
-
-    const leaderCategories = ['actors', 'directors', 'writers']
-    leaderCategories.forEach(cat => {
-      const categoryData = data[cat]
-      if (!categoryData) return
-
-      ['series', 'others'].forEach(subKey => {
-        const persons = categoryData[subKey]
-        if (Array.isArray(persons)) {
-          persons.forEach(person => {
-            if (person.photo_url) {
-              preloadImage(person.photo_url).then(success => {
-                if (!success && person.fallback_photo_url) {
-                  preloadImage(person.fallback_photo_url)
-                }
-              })
-            } else if (person.fallback_photo_url) {
-              preloadImage(person.fallback_photo_url)
-            }
-          })
-        }
-      })
-    })
-
-    if (Array.isArray(data.countries)) {
-      data.countries.forEach(c => {
-        if (c.photo_url) preloadImage(c.photo_url)
-      })
-    }
-
-    if (Array.isArray(data.binges)) {
-      data.binges.forEach(b => {
-        if (b.poster_url) preloadImage(b.poster_url)
-      })
-    }
-
-    if (data.group?.members) {
-      data.group.members.forEach(m => {
-        if (m.photo_url) preloadImage(m.photo_url)
-      })
-    }
-    
-    if (Array.isArray(data.wishlist_watched_items)) {
-      data.wishlist_watched_items.forEach(item => {
-        if (item.poster_url) preloadImage(item.poster_url)
-      })
-    }
-  }
-
   const activeRequests = {}
 
   async function fetchSharedStats(statId, year = 'all', isBackground = false) {
@@ -183,12 +134,12 @@ export const useStatsStore = defineStore('stats', () => {
     if (statsCache.value[cacheKey]) {
       if (!isBackground) {
         currentYear.value = year
-        resolveAllImages(statsCache.value[cacheKey])
       }
       return statsCache.value[cacheKey]
     }
 
-    if (!isBackground) uiStore.setLoading(true)
+    pendingRequests.value += 1
+    statsError.value = null
     try {
       if (!sharedDataMap.value[statId]) {
         const res = await api.get(`shared_stats/${statId}/`)
@@ -205,20 +156,25 @@ export const useStatsStore = defineStore('stats', () => {
         statsCache.value[cacheKey] = markRaw(yearData)
         if (!isBackground) {
           currentYear.value = year
-          resolveAllImages(yearData)
           clearOptimisticRatings()
         }
         return yearData
       }
     } catch (error) {
       console.error('[StatsStore] Shared fetch error:', error)
+      statsError.value = error
       if (!isBackground) uiStore.showToast('Ошибка загрузки общей статистики')
     } finally {
-      if (!isBackground) uiStore.setLoading(false)
+      pendingRequests.value = Math.max(0, pendingRequests.value - 1)
     }
   }
 
-  async function fetchStats(year = 'all', isBackground = false, force = false) {
+  async function fetchStats(
+    year = 'all',
+    isBackground = false,
+    force = false,
+    includeGroup = activeTab.value === 'group'
+  ) {
     if (isShared.value && sharedId.value) {
       return fetchSharedStats(sharedId.value, year, isBackground)
     }
@@ -226,7 +182,6 @@ export const useStatsStore = defineStore('stats', () => {
     if (statsCache.value[year] && !force) {
       if (!isBackground) {
         currentYear.value = year
-        resolveAllImages(statsCache.value[year])
       }
       return statsCache.value[year]
     }
@@ -234,26 +189,22 @@ export const useStatsStore = defineStore('stats', () => {
     if (activeRequests[year]) {
       const promise = activeRequests[year]
       if (!isBackground) {
-        uiStore.setLoading(true)
-        try {
-          const data = await promise
-          currentYear.value = year
-          resolveAllImages(data)
-          return data
-        } finally {
-          uiStore.setLoading(false)
-        }
+        const data = await promise
+        currentYear.value = year
+        return data
       }
       return promise
     }
 
-    if (!isBackground) uiStore.setLoading(true)
+    pendingRequests.value += 1
+    statsError.value = null
 
     const promise = (async () => {
       try {
         const data = await api.post('detailed_stats/', {
           period_type: 'year',
           period_value: year === 'all' ? 0 : year,
+          include_group: includeGroup,
           screen_width: window.innerWidth,
           screen_height: window.innerHeight
         })
@@ -272,6 +223,7 @@ export const useStatsStore = defineStore('stats', () => {
         return data
       } finally {
         delete activeRequests[year]
+        pendingRequests.value = Math.max(0, pendingRequests.value - 1)
       }
     })()
 
@@ -281,32 +233,31 @@ export const useStatsStore = defineStore('stats', () => {
       const data = await promise
       if (!isBackground) {
         currentYear.value = year
-        resolveAllImages(data)
       }
       clearOptimisticRatings()
-      if (!isBackground && !isPreloadingYears.value) {
-        triggerBackgroundPreload()
-      }
       return data
     } catch (error) {
       console.error('[StatsStore] Fetch error:', error)
+      statsError.value = error
       if (!isBackground) uiStore.showToast('Ошибка загрузки данных')
       throw error
-    } finally {
-      if (!isBackground) uiStore.setLoading(false)
     }
   }
 
-  async function triggerBackgroundPreload() {
-    if (isPreloadingYears.value || isShared.value) return
-    isPreloadingYears.value = true
-    for (const year of availableYears.value) {
-      if (!statsCache.value[year]) {
-        await new Promise(r => setTimeout(r, 1200))
-        await fetchStats(year, true)
+  async function prefetchInitialStats() {
+    const year = currentYear.value
+    try {
+      const data = await fetchStats(year, true, false, activeTab.value === 'group')
+
+      // Warm the group tab after the personal response tells us that a group
+      // exists. It remains fully background work and replaces the same cache
+      // entry with the richer payload when complete.
+      if (data?.meta?.has_group && !data.group) {
+        await fetchStats(year, true, true, true)
       }
+    } catch (error) {
+      console.warn('[StatsStore] Background stats prefetch failed:', error)
     }
-    isPreloadingYears.value = false
   }
 
   async function removeHistoryItem(historyId, layerHistoryId = '') {
@@ -530,14 +481,22 @@ export const useStatsStore = defineStore('stats', () => {
 
   watch(() => currentYear.value, (newYear) => {
     if (newYear && !statsCache.value[newYear]) {
-      fetchStats(newYear)
+      fetchStats(newYear, true)
+    }
+  })
+
+  watch(() => activeTab.value, (newTab) => {
+    const stats = currentStats.value
+    if (newTab === 'group' && stats?.meta?.has_group && !stats.group) {
+      fetchStats(currentYear.value, true, true, true)
     }
   })
 
   return {
     statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup, isShared, sharedId,
+    isLoading, statsError,
     userShowRatings, sharedShowRatings, setOptimisticRating, clearOptimisticRatings,
-    fetchStats, resolveAllImages, getHistoryByType, removeHistoryItem, fetchCasinoHistory,
+    fetchStats, prefetchInitialStats, getHistoryByType, removeHistoryItem, fetchCasinoHistory,
     setActiveTab: (tab) => { activeTab.value = tab },
     setYear: (year) => { currentYear.value = year }
   }

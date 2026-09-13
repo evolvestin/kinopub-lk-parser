@@ -54,7 +54,6 @@ import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useUIStore } from '../../stores/uiStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
-import { preloadImage } from '../../utils/helpers'
 import ShowCard from '../shared/ShowCard.vue'
 import PersonAvatar from '../shared/PersonAvatar.vue'
 
@@ -98,11 +97,6 @@ const loadData = async (isLoadMore = false) => {
       items.value = newItems
     }
 
-    if (newItems.length) {
-      newItems.forEach(item => {
-        if (item.poster_url) preloadImage(item.poster_url)
-      })
-    }
   } catch (e) {
     console.error('[CollectionLayer] Failed to load collection:', e)
     uiStore.showToast('Ошибка загрузки коллекции')

@@ -16,7 +16,7 @@ from django.contrib.auth.models import Permission, User
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Avg, Case, F, IntegerField, Max, Prefetch, Q, Sum, Value, When
+from django.db.models import Avg, Case, F, IntegerField, Max, Prefetch, Q, Subquery, Sum, Value, When
 from django.db.models.query import QuerySet
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -161,7 +161,12 @@ def metrics(request):
         if last_parser_log
         else 'Никогда',
         'shows': _get_latest_date(Show.objects.all(), 'created_at'),
-        'ratings': _get_latest_date(ExternalRating.objects.all(), 'updated_at'),
+        'ratings_kp': _get_latest_date(
+            Show.objects.filter(poiskkino_updated_at__isnull=False), 'poiskkino_updated_at'
+        ),
+        'ratings_imdb': _get_latest_date(
+            Show.objects.filter(imdb_rating_updated_at__isnull=False), 'imdb_rating_updated_at'
+        ),
         'durations': _get_latest_date(ShowDuration.objects.all(), 'updated_at'),
         'photos': _get_latest_date(Person.objects.filter(is_photo_fetched=True), 'updated_at'),
         'tg': _get_latest_date(TelegramLog.objects.all(), 'created_at'),
@@ -284,7 +289,7 @@ def _serialize_show_details(show, user=None):
                     for u in h_users
                 ],
                 'message_id': h.telegram_message_id,
-                'is_viewer': user in h.users.all() if user else False,
+                'is_viewer': user.id in {u.id for u in h_users} if user else False,
             }
         )
 
@@ -634,7 +639,7 @@ def bot_search_shows(request):
 
     results = []
     for show in shows:
-        poster_url = get_poster_url(show.id)
+        poster_url = build_poster_url(show.kinopub_id, show.tmdb_poster_path)
         internal_rating, user_ratings_list = show.get_internal_rating_data(current_user=user)
 
         results.append(
@@ -1066,17 +1071,19 @@ def bot_assign_group_view(request):
         user = ViewUser.objects.get(telegram_id=telegram_id)
         group = ViewUserGroup.objects.get(id=group_id)
 
-        if user not in group.users.all():
+        group_user_ids = set(group.users.values_list('id', flat=True))
+        if user.id not in group_user_ids:
             return JsonResponse({'status': 'error', 'error': 'User not in group'}, status=403)
 
         view_history = ViewHistory.objects.get(id=view_id)
 
-        group_users = group.users.all()
-        added_count = 0
-        for group_member in group_users:
-            if not view_history.users.filter(id=group_member.id).exists():
-                view_history.users.add(group_member)
-                added_count += 1
+        existing_user_ids = set(
+            view_history.users.filter(id__in=group_user_ids).values_list('id', flat=True)
+        )
+        ids_to_add = group_user_ids - existing_user_ids
+        if ids_to_add:
+            view_history.users.add(*ids_to_add)
+        added_count = len(ids_to_add)
 
         if added_count > 0:
             TelegramSender().update_history_message(view_history)
@@ -1203,10 +1210,20 @@ def webapp_get_detailed_stats(request):
         )
 
         stats = generate_user_stats(view_user, year=year)
-
-        group_stats = generate_group_stats(view_user, year=year)
-        if group_stats:
-            stats['group'] = group_stats
+        # Group history is large and is only needed after the user switches to
+        # the group tab. Keep the cheap capability flag in the small personal
+        # response and avoid serialising/recomputing the group payload on the
+        # common personal-stats path.
+        include_group = body.get('include_group', True)
+        if include_group:
+            group_stats = generate_group_stats(view_user, year=year)
+            if group_stats:
+                stats['group'] = group_stats
+            stats.setdefault('meta', {})['has_group'] = bool(group_stats)
+        else:
+            stats.setdefault('meta', {})['has_group'] = ViewUserGroup.objects.filter(
+                users=view_user
+            ).exists()
 
         return JsonResponse(stats)
 
@@ -1558,7 +1575,7 @@ def webapp_get_show_full(request, show_id):
                     'view_date': format_precision_date(h.view_date, h.date_precision),
                     'season_number': h.season_number,
                     'episode_number': h.episode_number,
-                    'poster_url': get_poster_url(show.id),
+                    'poster_url': build_poster_url(show.kinopub_id, show.tmdb_poster_path),
                     'user_names': [
                         u.name or u.username or str(u.telegram_id) for u in allowed_users
                     ],
@@ -1633,6 +1650,19 @@ def webapp_get_show_full(request, show_id):
 
         genres_list = [{'id': gid, 'name': name} for name, gid in sorted(genre_map.items())]
 
+        # Resolve normalized country aliases in one query.  The previous
+        # implementation queried Country once for every aliased country in
+        # the show details response.
+        normalized_country_names = {
+            RAW_TO_NORMALIZED_COUNTRY.get(c.name, c.name)
+            for c in show.countries.all()
+            if RAW_TO_NORMALIZED_COUNTRY.get(c.name, c.name) != c.name
+        }
+        normalized_countries = {
+            country.name: country
+            for country in Country.objects.filter(name__in=normalized_country_names)
+        }
+
         countries_data = []
         seen_names = set()
         for c in show.countries.all():
@@ -1641,7 +1671,7 @@ def webapp_get_show_full(request, show_id):
                 continue
             seen_names.add(norm_name)
             if norm_name != c.name:
-                target = Country.objects.filter(name=norm_name).first()
+                target = normalized_countries.get(norm_name)
                 if target:
                     countries_data.append(
                         {'id': target.id, 'name': target.name, 'emoji': target.emoji_flag}
@@ -1733,8 +1763,8 @@ def webapp_get_show_full(request, show_id):
             'year': show.year,
             'status': show.status,
             'plot': show.plot,
-            'poster_large': get_poster_url(show.id, 'big'),
-            'poster_medium': get_poster_url(show.id, 'medium'),
+            'poster_large': build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'big'),
+            'poster_medium': build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'medium'),
             'kinopoisk_rating': show.kinopoisk_rating,
             'kinopoisk_votes': show.kinopoisk_votes,
             'kinopoisk_url': show.kinopoisk_url,
@@ -1855,7 +1885,9 @@ def webapp_get_collection(request, collection_type, item_id):
                     'original_title': show.original_title,
                     'year': show.year,
                     'type': show.type,
-                    'poster_url': get_poster_url(show.id, 'medium'),
+                    'poster_url': build_poster_url(
+                        show.kinopub_id, show.tmdb_poster_path, 'medium'
+                    ),
                     'user_rating': user_ratings.get(show.id),
                 }
             )
@@ -1909,7 +1941,7 @@ def webapp_search(request):
                     'original_title': s.original_title,
                     'year': s.year,
                     'type': s.type,
-                    'poster_url': get_poster_url(s.id, 'medium'),
+                    'poster_url': build_poster_url(s.kinopub_id, s.tmdb_poster_path, 'medium'),
                     'user_rating': user_ratings.get(s.id),
                 }
             )
@@ -2003,7 +2035,7 @@ def get_metric_details(request, key):
             {
                 'type': db_show_type,
                 'kinopoisk_url__isnull': 'False',
-                'kinopoisk_rating__isnull': 'True',
+                'ext_rating__kp__isnull': 'True',
                 'kinopoisk_rating_available': 'True',
             }
         )
@@ -2014,7 +2046,7 @@ def get_metric_details(request, key):
             {
                 'type': db_show_type,
                 'kinopoisk_url__isnull': 'False',
-                'kinopoisk_rating__isnull': 'True',
+                'ext_rating__kp__isnull': 'True',
                 'kinopoisk_rating_available': 'False',
             }
         )
@@ -2431,7 +2463,9 @@ def webapp_wishlist_data(request):
                             'original_title': item.show.original_title,
                             'year': item.show.year,
                             'type': item.show.type,
-                            'poster_url': get_poster_url(item.show.id, 'small'),
+                            'poster_url': build_poster_url(
+                                item.show.kinopub_id, item.show.tmdb_poster_path, 'small'
+                            ),
                             'added_at': item.created_at.strftime('%Y-%m-%d'),
                             'user_rating': user_ratings.get(item.show_id),
                         }
@@ -2624,7 +2658,9 @@ def webapp_casino(request):
                                     'original_title': show.original_title,
                                     'year': show.year,
                                     'type': show.type,
-                                    'poster_url': get_poster_url(show.id, 'small'),
+                                    'poster_url': build_poster_url(
+                                        show.kinopub_id, show.tmdb_poster_path, 'small'
+                                    ),
                                     'user_rating': user_rating.rating if user_rating else None,
                                 },
                                 'expires': expires_ms,
@@ -2680,7 +2716,9 @@ def webapp_casino(request):
                         'original_title': winner_show.original_title,
                         'year': winner_show.year,
                         'type': winner_show.type,
-                        'poster_url': get_poster_url(winner_show.id, 'small'),
+                        'poster_url': build_poster_url(
+                            winner_show.kinopub_id, winner_show.tmdb_poster_path, 'small'
+                        ),
                         'user_rating': user_rating.rating if user_rating else None,
                     },
                     'expires': expires_ms,
@@ -2702,7 +2740,9 @@ def webapp_casino(request):
                         'show__title': s.show.title,
                         'show__original_title': s.show.original_title,
                         'show__year': s.show.year,
-                        'poster_url': get_poster_url(s.show.id, 'small'),
+                        'poster_url': build_poster_url(
+                            s.show.kinopub_id, s.show.tmdb_poster_path, 'small'
+                        ),
                         'view_date': timezone.localtime(s.created_at).strftime('%Y-%m-%d %H:%M'),
                         'season_number': 0,
                         'episode_number': 0,
@@ -2761,7 +2801,9 @@ def admin_get_folder_content(request, folder_id):
                     'original_title': item.show.original_title,
                     'year': item.show.year,
                     'type': item.show.type,
-                    'poster_url': get_poster_url(item.show.id, 'small'),
+                        'poster_url': build_poster_url(
+                            item.show.kinopub_id, item.show.tmdb_poster_path, 'small'
+                        ),
                     'added_at': item.created_at.strftime('%Y-%m-%d'),
                     'user_rating': user_ratings.get(item.show_id),
                 }
@@ -2839,14 +2881,22 @@ def webapp_add_view(request):
             users_to_add.add(view_user)
 
         if target_group:
-            groups = ViewUserGroup.objects.filter(users=view_user)
-            for group in groups:
-                for member in group.users.all():
-                    users_to_add.add(member)
+            group_member_ids = ViewUserGroup.objects.filter(users=view_user).values(
+                'users__id'
+            )
+            users_to_add.update(
+                ViewUser.objects.filter(id__in=Subquery(group_member_ids)).values_list(
+                    'id', flat=True
+                )
+            )
 
-        for u in users_to_add:
-            if not vh.users.filter(id=u.id).exists():
-                vh.users.add(u)
+        users_to_add_ids = {
+            user_id if isinstance(user_id, int) else user_id.id for user_id in users_to_add
+        }
+        existing_ids = set(vh.users.filter(id__in=users_to_add_ids).values_list('id', flat=True))
+        ids_to_add = users_to_add_ids - existing_ids
+        if ids_to_add:
+            vh.users.add(*ids_to_add)
 
         show_title = vh.show.title or vh.show.original_title
         send_view_confirmation_task.delay(
@@ -3124,6 +3174,7 @@ def merge_persons_api(request):
 
 
 _vite_session = None
+_image_proxy_session = None
 
 
 def _get_vite_session():
@@ -3134,6 +3185,17 @@ def _get_vite_session():
         _vite_session.mount('http://', adapter)
         _vite_session.mount('https://', adapter)
     return _vite_session
+
+
+def _get_image_proxy_session():
+    """Reuse remote image connections across concurrent lazy image requests."""
+    global _image_proxy_session
+    if _image_proxy_session is None:
+        _image_proxy_session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=100, pool_maxsize=100, max_retries=1)
+        _image_proxy_session.mount('http://', adapter)
+        _image_proxy_session.mount('https://', adapter)
+    return _image_proxy_session
 
 
 @csrf_exempt
@@ -3231,8 +3293,8 @@ def webapp_show_notification_status(request, show_id):
                 'title': show.title,
                 'original_title': show.original_title,
                 'plot': show.plot,
-                'poster_medium': get_poster_url(show.id, 'medium'),
-                'poster_large': get_poster_url(show.id, 'big'),
+                'poster_medium': build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'medium'),
+                'poster_large': build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'big'),
                 'reasons': reasons,
                 'is_muted': is_muted,
                 'has_any_muted': has_any_muted,
@@ -3373,14 +3435,15 @@ def proxy_image_view(request):
         return response
 
     try:
-        session = requests.Session()
+        session = _get_image_proxy_session()
+        request_proxies = None
         if 'tmdb.org' in parsed.netloc and settings.TMDB_PROXY:
-            session.proxies = {
+            request_proxies = {
                 'http': settings.TMDB_PROXY,
                 'https': settings.TMDB_PROXY,
             }
 
-        res = session.get(image_url, timeout=(2.0, 3.5))
+        res = session.get(image_url, timeout=(2.0, 3.5), proxies=request_proxies)
         if res.status_code == 200:
             content_type = res.headers.get('Content-Type', 'image/jpeg')
             content = res.content

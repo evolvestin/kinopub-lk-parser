@@ -197,7 +197,7 @@ import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { icons } from '../../utils/icons'
-import { preloadImage, getRatingClass, isImageBroken, markImageAsBroken } from '../../utils/helpers'
+import { getRatingClass, isImageBroken, markImageAsBroken } from '../../utils/helpers'
 import PersonPill from '../shared/PersonPill.vue'
 
 const props = defineProps(['showId'])
@@ -399,24 +399,6 @@ const loadShowData = async () => {
         query.q = data.title
         router.replace({ query }).catch(() => {})
       }
-    }
-
-    if (data.crew) {
-      data.crew.forEach(group => {
-        if (group.persons) {
-          group.persons.forEach(person => {
-            if (person.photo_url) {
-              preloadImage(person.photo_url, 'low').then(success => {
-                if (!success && person.fallback_photo_url) {
-                  preloadImage(person.fallback_photo_url, 'low')
-                }
-              })
-            } else if (person.fallback_photo_url) {
-              preloadImage(person.fallback_photo_url, 'low')
-            }
-          })
-        }
-      })
     }
 
     if (['Series', 'Documentary Series', 'TV Show'].includes(data.type)) {

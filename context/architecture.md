@@ -188,7 +188,7 @@ spelling, case, punctuation, and internal whitespace remain unchanged.
 
 ## External Ratings Synchronization Policy
 
-**RULE**: IMDb and Poiskkino have separate ownership of rating fields. IMDb's daily official datasets own `Show.imdb_rating`, `Show.imdb_votes`, and the IMDb value in an existing `ExternalRating` row. Poiskkino must never overwrite those IMDb fields.
+**RULE**: IMDb and Poiskkino have separate ownership of rating fields and freshness markers. IMDb's daily official datasets own `Show.imdb_rating`, `Show.imdb_votes`, `Show.imdb_rating_updated_at`, and the IMDb value in an existing `ExternalRating` row. Poiskkino owns the KP value in `ExternalRating.kp` and the freshness marker `Show.poiskkino_updated_at`; `Show.kinopoisk_rating` and `Show.kinopoisk_votes` are legacy mirror fields. Poiskkino must never overwrite the IMDb fields or timestamp.
 
 1. **IMDb**:
    * `title.basics.tsv.gz` and `title.ratings.tsv.gz` are downloaded from the official daily IMDb dataset location.

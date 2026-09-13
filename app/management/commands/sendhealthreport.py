@@ -13,7 +13,6 @@ from redis import Redis
 
 from app.management.base import LoggableBaseCommand
 from app.models import (
-    ExternalRating,
     LogEntry,
     Person,
     Show,
@@ -143,9 +142,20 @@ class Command(LoggableBaseCommand):
 
         _check_delay(_get_latest_dt(Show.objects.all(), 'created_at'), 168, 'Новые релизы')
         _check_delay(
-            _get_latest_dt(ExternalRating.objects.all(), 'updated_at'),
-            24,
-            'Рейтинги (KP/IMDb)',
+            _get_latest_dt(
+                Show.objects.filter(poiskkino_updated_at__isnull=False), 'poiskkino_updated_at'
+            ),
+            72,
+            'Рейтинги KP',
+            False,
+        )
+        _check_delay(
+            _get_latest_dt(
+                Show.objects.filter(imdb_rating_updated_at__isnull=False),
+                'imdb_rating_updated_at',
+            ),
+            48,
+            'Рейтинги IMDb',
             False,
         )
         _check_delay(

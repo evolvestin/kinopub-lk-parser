@@ -45,10 +45,10 @@
         </div>
 
         <div class="tabs" v-if="statsStore.hasGroup">
-          <button class="tab" :class="{ on: statsStore.activeTab === 'personal' }" @click="statsStore.setActiveTab('personal')">
+          <button class="tab" :class="{ on: !isGroupTab }" @click="selectTab('personal')">
             <div class="icon" v-html="icons.user"></div> Личная
           </button>
-          <button class="tab" :class="{ on: statsStore.activeTab === 'group' }" @click="statsStore.setActiveTab('group')">
+          <button class="tab" :class="{ on: isGroupTab }" @click="selectTab('group')">
             <div class="icon" v-html="icons.users"></div> Группа
           </button>
         </div>
@@ -63,7 +63,7 @@
           >{{ year === 'all' ? 'Всё время' : year }}</button>
         </div>
 
-        <div v-if="statsStore.activeTab === 'personal'" id="sec-personal">
+        <div v-if="!isGroupTab" id="sec-personal">
           <div class="label"><div class="icon" v-html="icons.dash"></div> Обзор</div>
           
           <div class="grid">
@@ -240,9 +240,13 @@
           </div>
         </div>
 
-        <div v-if="statsStore.activeTab === 'group'" id="sec-group">
-            <div class="empty" v-if="!currentStats.group">
+        <div v-if="isGroupTab" id="sec-group">
+            <div class="empty" v-if="!currentStats.group && !statsStore.isLoading">
                 <div class="icon" v-html="icons.users"></div>Вы не состоите в группе
+            </div>
+            <div class="stats-skeleton stats-group-pending" v-else-if="!currentStats.group">
+              <div class="stats-skeleton-card"></div>
+              <div class="stats-skeleton-card stats-skeleton-card-short"></div>
             </div>
             <template v-else>
                 <div class="card hoverable anim-item">
@@ -289,11 +293,32 @@
         <div class="safe-bottom-spacer"></div>
       </div>
     </template>
+
+    <div v-else class="stats-skeleton" :aria-busy="statsStore.isLoading">
+      <template v-if="statsStore.statsError">
+        <div class="stats-error-card">
+          Не удалось загрузить статистику
+          <button class="btn-primary" @click="statsStore.fetchStats(statsStore.currentYear, false, true)">
+            Повторить
+          </button>
+        </div>
+      </template>
+      <template v-else>
+        <div class="stats-skeleton-header">
+          <div class="stats-skeleton-avatar"></div>
+          <div class="stats-skeleton-title"></div>
+        </div>
+        <div class="stats-skeleton-card"></div>
+        <div class="stats-skeleton-card stats-skeleton-card-short"></div>
+        <div class="stats-skeleton-card"></div>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, ref, onMounted, watch, defineAsyncComponent } from 'vue'
+import { useRoute } from 'vue-router'
 import { useStatsStore } from '../stores/useStatsStore'
 import { useUIStore } from '../stores/uiStore'
 import { useUserStore } from '../stores/userStore'
@@ -303,15 +328,27 @@ import StatCard from '../components/stats/StatCard.vue'
 import ActivityHeatmap from '../components/stats/ActivityHeatmap.vue'
 import GenreDonut from '../components/stats/GenreDonut.vue'
 import LeaderList from '../components/stats/LeaderList.vue'
-import BaseChart from '../components/shared/BaseChart.vue'
 import BouncyBarChart from '../components/shared/BouncyBarChart.vue'
 import PosterImage from '../components/shared/PosterImage.vue'
 import { useTelegram } from '../composables/useTelegram'
 
+const BaseChart = defineAsyncComponent(() => import('../components/shared/BaseChart.vue'))
+
 const statsStore = useStatsStore()
 const uiStore = useUIStore()
 const userStore = useUserStore()
+const route = useRoute()
 const { showConfirm } = useTelegram()
+
+// Keep the visible tab local so a click updates the section immediately even
+// while the hash-router finishes its navigation in the background.
+const activeTab = ref(route.query.tab || 'personal')
+const isGroupTab = computed(() => activeTab.value === 'group' || route.query.tab === 'group')
+
+const selectTab = (tab) => {
+  activeTab.value = tab
+  statsStore.setActiveTab(tab)
+}
 
 const FAKE_STATS = {
   meta: { name: 'Гость', year: 'all', years: ['all'] },
@@ -707,7 +744,19 @@ const openGroupMemberHistory = (index, name) => {
 
 const handleHeatmapClick = ({ date, value }) => value > 0 && openHistory('day', { date: date, title: date })
 
-onMounted(() => { if (!statsStore.currentStats) statsStore.fetchStats(statsStore.currentYear) })
+onMounted(() => { if (!statsStore.currentStats) statsStore.fetchStats(statsStore.currentYear, true) })
+
+watch(activeTab, (newTab) => {
+  if (newTab === 'group' && statsStore.currentStats?.meta?.has_group && !statsStore.currentStats.group) {
+    statsStore.fetchStats(statsStore.currentYear, true, true, true)
+  }
+}, { immediate: true })
+
+watch(() => route.query.tab, (newTab) => {
+  // Keep deep-linking/back-forward navigation in sync without resetting a
+  // freshly clicked tab while Vue Router is still committing its query.
+  if (newTab && newTab !== activeTab.value) activeTab.value = newTab
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -715,5 +764,65 @@ onMounted(() => { if (!statsStore.currentStats) statsStore.fetchStats(statsStore
     top: 50% !important;
     transform: translateY(-50%) rotate(45deg) !important;
     right: 20px !important;
+}
+
+.stats-skeleton {
+    padding: 18px 16px 40px;
+}
+
+.stats-skeleton-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0 22px;
+}
+
+.stats-skeleton-avatar,
+.stats-skeleton-title,
+.stats-skeleton-card {
+    background: linear-gradient(100deg, var(--bg-input) 30%, var(--bg-card) 50%, var(--bg-input) 70%);
+    background-size: 300% 100%;
+    animation: stats-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.stats-skeleton-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+}
+
+.stats-skeleton-title {
+    width: 42%;
+    height: 18px;
+    border-radius: 8px;
+}
+
+.stats-skeleton-card {
+    height: 122px;
+    margin-bottom: 14px;
+    border-radius: 18px;
+}
+
+.stats-skeleton-card-short {
+    height: 82px;
+}
+
+.stats-error-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 48px 20px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.stats-group-pending {
+    padding-top: 8px;
+}
+
+@keyframes stats-skeleton-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
 }
 </style>

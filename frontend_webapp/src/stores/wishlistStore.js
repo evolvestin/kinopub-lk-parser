@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch, markRaw } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
-import { preloadImage } from '../utils/helpers'
 import router from '../router'
 
 export const useWishlistStore = defineStore('wishlist', () => {
@@ -64,11 +63,6 @@ export const useWishlistStore = defineStore('wishlist', () => {
           activeFolderId.value = null
         }
 
-        folders.value.forEach(f => {
-          f.items.forEach(item => {
-            if (item.poster_url) preloadImage(item.poster_url)
-          })
-        })
         isLoaded.value = true
       } catch (error) {
         uiStore.showToast('Ошибка загрузки избранного')

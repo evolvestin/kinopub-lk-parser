@@ -49,7 +49,7 @@ from shared.constants import (
     UserRole,
 )
 from shared.formatters import format_duration, format_precision_date
-from shared.media import get_poster_url
+from shared.media import build_poster_url
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +146,17 @@ def _get_yearly_summary(base_qs, dur_qs, year=None):
         'last_view_date': counts['last_view'].strftime('%Y-%m-%d') if counts['last_view'] else None,
         'most_active_month': peak_month_data,
     }
+
+
+def _poster_url(show, size='small'):
+    """Build a poster URL from an already-loaded show row.
+
+    Stats serialisation touches hundreds of history/rating rows. Calling the
+    generic get_poster_url(show_id) there performs one extra SELECT per row.
+    All callers in this module use querysets with select_related('show'), so
+    the two fields needed to build the URL are already in memory.
+    """
+    return build_poster_url(show.kinopub_id, show.tmdb_poster_path, size)
 
 
 def _get_favorites(base_qs, dur_qs):
@@ -342,7 +353,14 @@ def _get_favorites(base_qs, dur_qs):
 def _get_binge_records(base_qs):
     binge_qs = (
         base_qs.filter(season_number__gt=0, date_precision='exact')
-        .values('show_id', 'show__title', 'show__original_title', 'view_date')
+        .values(
+            'show_id',
+            'show__title',
+            'show__original_title',
+            'show__kinopub_id',
+            'show__tmdb_poster_path',
+            'view_date',
+        )
         .annotate(episodes_count=Count('id'))
         .filter(episodes_count__gte=3)
         .order_by('-episodes_count')[:5]
@@ -367,7 +385,9 @@ def _get_binge_records(base_qs):
                 'episodes_count': cnt,
                 'count': cnt,
                 'tier': tier,
-                'poster_url': get_poster_url(b['show_id']),
+                'poster_url': build_poster_url(
+                    b['show__kinopub_id'], b['show__tmdb_poster_path']
+                ),
             }
         )
     return result
@@ -619,7 +639,7 @@ def generate_user_stats(user, year=None):
                 'episode': r.episode_number,
                 'rating': r.rating,
                 'date': r.updated_at.strftime('%Y-%m-%d'),
-                'poster_url': get_poster_url(r.show_id),
+                'poster_url': _poster_url(r.show),
             }
         )
 
@@ -679,7 +699,7 @@ def generate_user_stats(user, year=None):
                 'show__title': wl_item.show.title,
                 'show__original_title': wl_item.show.original_title,
                 'show__year': wl_item.show.year,
-                'poster_url': get_poster_url(wl_item.show.id),
+                'poster_url': _poster_url(wl_item.show),
                 'view_date': timezone.localtime(wl_item.created_at).strftime('%Y-%m-%d'),
                 'user_names': [],
                 'user_photos': [],
@@ -765,7 +785,7 @@ def generate_user_stats(user, year=None):
                 'raw_date': h.view_date.strftime('%Y-%m-%d') if h.view_date else None,
                 'date_precision': h.date_precision,
                 'user_rating': h.user_rating,
-                'poster_url': get_poster_url(h.show_id),
+                'poster_url': _poster_url(h.show),
                 'user_ids': [u.id for u in allowed_users],
                 'user_names': [u.name or u.username or str(u.telegram_id) for u in allowed_users],
                 'user_photos': [] if is_guest else [u.photo_url for u in allowed_users],
@@ -804,7 +824,7 @@ def generate_user_stats(user, year=None):
                 'date_precision': h.date_precision,
                 'user_rating': h.user_rating,
                 'user_show_rating': h.user_show_rating,
-                'poster_url': get_poster_url(h.show_id),
+                'poster_url': _poster_url(h.show),
                 'user_ids': [u.id for u in allowed_users],
                 'user_names': [u.name or u.username or str(u.telegram_id) for u in allowed_users],
                 'user_photos': [] if is_guest else [u.photo_url for u in allowed_users],
@@ -904,18 +924,20 @@ def generate_group_stats(user, year=None):
 
     favs = _get_favorites(base_qs, dur_qs)
 
+    member_history_qs = ViewHistory.objects.filter(users__in=group_user_ids, is_checked=True)
+    if year:
+        member_history_qs = member_history_qs.filter(view_date__year=year)
+    member_views = dict(
+        member_history_qs.values('users').annotate(views=Count('id')).values_list('users', 'views')
+    )
+
     members = []
     for u in group_users:
-        u_history_filter = Q(users=u, is_checked=True)
-        if year:
-            u_history_filter &= Q(view_date__year=year)
-
-        u_views = ViewHistory.objects.filter(u_history_filter).count()
         members.append(
             {
                 'id': u.id,
                 'name': u.name or u.username or str(u.telegram_id),
-                'views': u_views,
+                'views': member_views.get(u.id, 0),
                 'photo_url': u.photo_url,
             }
         )
@@ -935,7 +957,7 @@ def generate_group_stats(user, year=None):
             'show__original_title': h.show.original_title,
             'show__year': h.show.year,
             'view_date': format_precision_date(h.view_date, h.date_precision),
-            'poster_url': get_poster_url(h.show_id),
+            'poster_url': _poster_url(h.show),
             'user_ids': [u.id for u in allowed_users],
             'user_names': [u.name or u.username or str(u.telegram_id) for u in allowed_users],
             'user_photos': [u.photo_url for u in allowed_users],

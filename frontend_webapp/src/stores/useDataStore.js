@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
-import { preloadImage } from '../utils/helpers'
 import router from '../router'
 
 export const useDataStore = defineStore('data', () => {
@@ -60,15 +59,6 @@ export const useDataStore = defineStore('data', () => {
         }
         hasMoreShows.value = data.has_more
 
-        if (data.shows) {
-          data.shows.forEach(s => s.poster_url && preloadImage(s.poster_url))
-        }
-        if (data.persons && !isLoadMore) {
-          data.persons.forEach(p => {
-            if (p.photo_url) preloadImage(p.photo_url)
-            if (p.fallback_photo_url) preloadImage(p.fallback_photo_url)
-          })
-        }
       }
     } catch (error) {
       uiStore.showToast('Ошибка поиска')

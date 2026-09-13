@@ -120,6 +120,7 @@ def _merge_show_fields(canonical, duplicate, allow_tmdb_conflict=False, preferre
         'imdb_url',
         'imdb_rating',
         'imdb_votes',
+        'imdb_rating_updated_at',
         'tmdb_poster_path',
         'plot',
         'tmdb_enrichment_checked_at',
@@ -146,12 +147,18 @@ def _merge_show_fields(canonical, duplicate, allow_tmdb_conflict=False, preferre
 
 
 def _merge_crew(canonical_id, duplicate_id, stats):
-    for row in ShowCrew.objects.filter(show_id=duplicate_id).order_by('id'):
-        existing = ShowCrew.objects.filter(
-            show_id=canonical_id,
-            person_id=row.person_id,
-            profession=row.profession,
-        ).first()
+    rows = list(ShowCrew.objects.filter(show_id=duplicate_id).order_by('id'))
+    keys = {(row.person_id, row.profession) for row in rows}
+    existing_by_key = {
+        (row.person_id, row.profession): row
+        for row in ShowCrew.objects.filter(
+            show_id=canonical_id, person_id__in={key[0] for key in keys}
+        )
+        if (row.person_id, row.profession) in keys
+    }
+
+    for row in rows:
+        existing = existing_by_key.get((row.person_id, row.profession))
         if existing:
             changed_fields = []
             if not existing.en_profession and row.en_profession:
@@ -170,12 +177,16 @@ def _merge_crew(canonical_id, duplicate_id, stats):
 
 
 def _merge_durations(canonical_id, duplicate_id, stats):
-    for row in ShowDuration.objects.filter(show_id=duplicate_id).order_by('id'):
-        existing = ShowDuration.objects.filter(
-            show_id=canonical_id,
-            season_number=row.season_number,
-            episode_number=row.episode_number,
-        ).first()
+    rows = list(ShowDuration.objects.filter(show_id=duplicate_id).order_by('id'))
+    keys = {(row.season_number, row.episode_number) for row in rows}
+    existing_by_key = {
+        (row.season_number, row.episode_number): row
+        for row in ShowDuration.objects.filter(show_id=canonical_id)
+        if (row.season_number, row.episode_number) in keys
+    }
+
+    for row in rows:
+        existing = existing_by_key.get((row.season_number, row.episode_number))
         if existing:
             if existing.is_estimated and not row.is_estimated:
                 existing.duration_seconds = row.duration_seconds
@@ -190,13 +201,16 @@ def _merge_durations(canonical_id, duplicate_id, stats):
 
 def _merge_histories(canonical_id, duplicate_id, stats):
     rows = ViewHistory.objects.filter(show_id=duplicate_id).prefetch_related('users').order_by('id')
+    rows = list(rows)
+    keys = {(row.view_date, row.season_number, row.episode_number) for row in rows}
+    existing_by_key = {
+        (row.view_date, row.season_number, row.episode_number): row
+        for row in ViewHistory.objects.filter(show_id=canonical_id).prefetch_related('users')
+        if (row.view_date, row.season_number, row.episode_number) in keys
+    }
+
     for row in rows:
-        existing = ViewHistory.objects.filter(
-            show_id=canonical_id,
-            view_date=row.view_date,
-            season_number=row.season_number,
-            episode_number=row.episode_number,
-        ).first()
+        existing = existing_by_key.get((row.view_date, row.season_number, row.episode_number))
         if existing:
             existing.users.add(*row.users.all())
             changed_fields = []
@@ -222,13 +236,16 @@ def _merge_histories(canonical_id, duplicate_id, stats):
 
 
 def _merge_ratings(canonical_id, duplicate_id, stats):
-    for row in UserRating.objects.filter(show_id=duplicate_id).order_by('id'):
-        existing = UserRating.objects.filter(
-            user_id=row.user_id,
-            show_id=canonical_id,
-            season_number=row.season_number,
-            episode_number=row.episode_number,
-        ).first()
+    rows = list(UserRating.objects.filter(show_id=duplicate_id).order_by('id'))
+    keys = {(row.user_id, row.season_number, row.episode_number) for row in rows}
+    existing_by_key = {
+        (row.user_id, row.season_number, row.episode_number): row
+        for row in UserRating.objects.filter(show_id=canonical_id)
+        if (row.user_id, row.season_number, row.episode_number) in keys
+    }
+
+    for row in rows:
+        existing = existing_by_key.get((row.user_id, row.season_number, row.episode_number))
         if existing:
             if row.updated_at > existing.updated_at:
                 existing.rating = row.rating
@@ -280,11 +297,17 @@ def _merge_simple_relations(canonical_id, duplicate_id, stats):
         show_id=canonical_id
     )
 
-    for row in MutedShowNotification.objects.filter(show_id=duplicate_id).order_by('id'):
-        existing = MutedShowNotification.objects.filter(
-            show_id=canonical_id,
-            user_id=row.user_id,
-        ).first()
+    rows = list(MutedShowNotification.objects.filter(show_id=duplicate_id).order_by('id'))
+    user_ids = {row.user_id for row in rows}
+    existing_by_user = {
+        row.user_id: row
+        for row in MutedShowNotification.objects.filter(
+            show_id=canonical_id, user_id__in=user_ids
+        )
+    }
+
+    for row in rows:
+        existing = existing_by_user.get(row.user_id)
         if existing:
             if row.is_active and not existing.is_active:
                 existing.is_active = True

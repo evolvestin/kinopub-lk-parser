@@ -1,15 +1,20 @@
 from django.test import TestCase
 from django.utils import timezone
 
-from app.models import Person, Show, ShowCrew
+from app.models import ExternalRating, Person, Show, ShowCrew
 from app.services.metrics import (
     calculate_duplicate_photo_urls_metric,
     calculate_en_professions_stats_metric,
+    calculate_has_kp_metric,
     calculate_imdb_unrated_metric,
     calculate_kp_unrated_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
+    calculate_unused_persons_metric,
+    get_has_rating_list,
+    get_missing_status_list,
     get_profession_persons_list,
+    get_unused_persons_list,
 )
 
 
@@ -58,6 +63,45 @@ class ImdbMetricSplitTests(TestCase):
         self.assertEqual(calculate_missing_kp_metric(), [{'name': 'Фильм', 'value': 1}])
         self.assertEqual(calculate_kp_unrated_metric(), [{'name': 'Фильм', 'value': 1}])
 
+    def test_kp_rating_metric_and_details_use_the_same_authoritative_field(self):
+        rated = Show.objects.create(
+            title='KP rating in Show',
+            original_title='KP rating in Show',
+            type='Movie',
+        )
+        ExternalRating.objects.create(show=rated, kp=8.1)
+        legacy_only = Show.objects.create(
+            title='KP rating only in legacy row',
+            original_title='KP rating only in legacy row',
+            type='Movie',
+            kinopoisk_rating=7.2,
+        )
+
+        self.assertEqual(calculate_has_kp_metric(), [{'name': 'Фильм', 'value': 1}])
+        self.assertEqual(
+            list(get_has_rating_list('Movie', 'kp')),
+            [{'id': rated.id, 'title': rated.title, 'original_title': rated.original_title}],
+        )
+
+    def test_missing_status_metric_details_are_limited_to_series_types(self):
+        series = Show.objects.create(
+            title='Series without status',
+            original_title='Series without status',
+            type='Series',
+            kinopub_id=1001,
+        )
+        Show.objects.create(
+            title='Movie without status',
+            original_title='Movie without status',
+            type='Movie',
+            kinopub_id=1002,
+        )
+
+        self.assertEqual(
+            list(get_missing_status_list('Series')),
+            [{'id': series.id, 'title': series.title, 'original_title': series.original_title}],
+        )
+
     def test_duplicate_photo_metric_excludes_distinct_tmdb_identities(self):
         shared_photo = 'https://image.tmdb.org/t/p/w200/shared.jpg'
         Person.objects.create(name='Confirmed A', tmdb_id=10001, tmdb_photo_url=shared_photo)
@@ -91,3 +135,14 @@ class ProfessionMetricTests(TestCase):
         stats = calculate_en_professions_stats_metric()
         self.assertNotIn({'name': 'Неизвестно', 'value': 1}, stats)
         self.assertEqual(get_profession_persons_list('Actor', 'en').count(), 1)
+
+
+class UnusedPersonMetricTests(TestCase):
+    def test_roles_attached_to_an_alias_are_counted_for_the_canonical_person(self):
+        master = Person.objects.create(name='Canonical person')
+        alias = Person.objects.create(name='Alias person', master_person=master)
+        show = Show.objects.create(title='Show', original_title='Show', type='Movie')
+        ShowCrew.objects.create(show=show, person=alias, canonical_person=master)
+
+        self.assertEqual(calculate_unused_persons_metric(), [{'name': 'Без ролей', 'value': 0}])
+        self.assertFalse(get_unused_persons_list().filter(id=master.id).exists())

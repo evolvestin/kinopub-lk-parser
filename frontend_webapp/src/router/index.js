@@ -1,23 +1,19 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import SearchView from '../views/SearchView.vue'
-import WishlistView from '../views/WishlistView.vue'
-import StatsView from '../views/StatsView.vue'
-
 const routes = [
   {
     path: '/search/:layers*',
     name: 'search',
-    component: SearchView
+    component: () => import('../views/SearchView.vue')
   },
   {
     path: '/wishlist/:layers*',
     name: 'wishlist',
-    component: WishlistView
+    component: () => import('../views/WishlistView.vue')
   },
   {
     path: '/stats/:layers*',
     name: 'stats',
-    component: StatsView
+    component: () => import('../views/StatsView.vue')
   },
   { path: '/', redirect: '/search' }
 ]

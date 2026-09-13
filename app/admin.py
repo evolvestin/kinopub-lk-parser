@@ -634,13 +634,13 @@ class ShowAdmin(admin.ModelAdmin):
         if metric == 'missing_kp':
             return queryset.filter(
                 kinopoisk_url__gt='',
-                kinopoisk_rating__isnull=True,
+                ext_rating__kp__isnull=True,
                 kinopoisk_rating_available=True,
             ).exclude(kinopoisk_url__endswith='/film/0')
         if metric == 'kp_unrated':
             return queryset.filter(
                 kinopoisk_url__gt='',
-                kinopoisk_rating__isnull=True,
+                ext_rating__kp__isnull=True,
                 kinopoisk_rating_available=False,
                 poiskkino_updated_at__isnull=False,
             ).exclude(kinopoisk_url__endswith='/film/0')
@@ -677,7 +677,7 @@ class ShowAdmin(admin.ModelAdmin):
                 tmdb_id__isnull=False, kinopub_id__isnull=True, year__isnull=True
             )
         if metric == 'missing_status':
-            return queryset.filter(kinopub_id__isnull=False).filter(
+            return queryset.filter(kinopub_id__isnull=False, type__in=SERIES_TYPES).filter(
                 Q(status__isnull=True) | Q(status='')
             )
         if metric == 'tmdb_missing_status':
@@ -896,7 +896,7 @@ class ViewUserAdmin(admin.ModelAdmin):
     actions = ['resend_role_message']
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
+        qs = super().get_queryset(request).select_related('django_user')
         return qs.annotate(
             _role_rank=Case(
                 When(role=UserRole.GUEST, then=Value(1)),
@@ -1045,7 +1045,7 @@ class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
+        qs = super().get_queryset(request).select_related('show').prefetch_related('users')
         qs = qs.annotate(_first_user_id=Min('users__id'))
         return qs.order_by(
             F('view_date').desc(nulls_last=True), '-season_number', '-episode_number'
@@ -1088,7 +1088,7 @@ class ShowDurationAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
+        qs = super().get_queryset(request).select_related('show')
         return qs.order_by('-updated_at', '-season_number', '-episode_number')
 
 
@@ -2393,6 +2393,9 @@ class UserRatingAdmin(admin.ModelAdmin):
     autocomplete_fields = ('user', 'show')
     readonly_fields = ('created_at', 'updated_at')
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('user', 'show')
+
 
 @admin.register(ExternalRating, site=admin_site)
 class ExternalRatingAdmin(admin.ModelAdmin):
@@ -2400,6 +2403,9 @@ class ExternalRatingAdmin(admin.ModelAdmin):
     search_fields = ('show__title', 'show__original_title')
     autocomplete_fields = ('show',)
     readonly_fields = ('created_at', 'updated_at')
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('show')
 
 
 class ShowCrewProfessionFilter(admin.SimpleListFilter):
@@ -2520,6 +2526,7 @@ class WishlistFolderAdmin(admin.ModelAdmin):
         return (
             super()
             .get_queryset(request)
+            .select_related('user')
             .annotate(items_count=Count('items', filter=Q(items__is_active=True)))
         )
 
@@ -2551,6 +2558,9 @@ class CasinoSpinAdmin(admin.ModelAdmin):
     autocomplete_fields = ('user', 'show')
     readonly_fields = ('created_at', 'updated_at')
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('user', 'show')
+
     @admin.display(description='Активна', boolean=True, ordering='is_deleted')
     def get_is_active(self, obj):
         return not obj.is_deleted
@@ -2572,6 +2582,9 @@ class WishlistItemAdmin(admin.ModelAdmin):
     autocomplete_fields = ('user', 'folder', 'show')
     readonly_fields = ('created_at', 'updated_at')
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('show', 'folder', 'user')
+
 
 @admin.register(MutedShowNotification, site=admin_site)
 class MutedShowNotificationAdmin(admin.ModelAdmin):
@@ -2581,6 +2594,9 @@ class MutedShowNotificationAdmin(admin.ModelAdmin):
     autocomplete_fields = ('user', 'show')
     readonly_fields = ('created_at', 'updated_at')
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('user', 'show')
+
 
 @admin.register(RejectedPersonPhoto, site=admin_site)
 class RejectedPersonPhotoAdmin(admin.ModelAdmin):
@@ -2588,6 +2604,9 @@ class RejectedPersonPhotoAdmin(admin.ModelAdmin):
     autocomplete_fields = ('person',)
     search_fields = ('person__name', 'photo_url')
     readonly_fields = ('created_at', 'updated_at')
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('person')
 
     @admin.display(description='Photo URL')
     def photo_url_link(self, obj):

@@ -272,7 +272,12 @@ class Command(LoggableBaseCommand):
         }
         shows = list(
             Show.objects.filter(Q(imdb_id__in=ids) | Q(id__in=fallback_show_ids)).only(
-                'id', 'imdb_id', 'imdb_url', 'imdb_rating', 'imdb_votes'
+                'id',
+                'imdb_id',
+                'imdb_url',
+                'imdb_rating',
+                'imdb_votes',
+                'imdb_rating_updated_at',
             )
         )
         if not shows:
@@ -305,9 +310,19 @@ class Command(LoggableBaseCommand):
         if not shows_to_update:
             return {'updated': 0, 'url_fallback': 0, 'ids_backfilled': 0, 'external_updated': 0}
 
+        updated_at = timezone.now()
+        for show in shows_to_update:
+            show.imdb_rating_updated_at = updated_at
+
         Show.objects.bulk_update(
             shows_to_update,
-            ['imdb_id', 'imdb_rating', 'imdb_votes', 'imdb_rating_available'],
+            [
+                'imdb_id',
+                'imdb_rating',
+                'imdb_votes',
+                'imdb_rating_available',
+                'imdb_rating_updated_at',
+            ],
             batch_size=1000,
         )
 
@@ -317,7 +332,6 @@ class Command(LoggableBaseCommand):
                 'id', 'show_id', 'imdb', 'updated_at'
             )
         )
-        updated_at = timezone.now()
         for external in external_rows:
             external.imdb = show_id_to_rating[external.show_id]
             external.updated_at = updated_at
