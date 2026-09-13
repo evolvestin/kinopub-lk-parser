@@ -2320,6 +2320,81 @@ img {
 }
 
 /* Welcome Screen in Search */
+.app-viewport #view-search {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.app-viewport #search-results {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-height: 0;
+}
+.view-loading-fallback {
+  flex: 1;
+  min-height: 240px;
+  padding: 24px 16px;
+  background: var(--bg-main);
+}
+.view-loading-line,
+.view-loading-card {
+  background: linear-gradient(100deg, var(--bg-input) 30%, var(--bg-card) 50%, var(--bg-input) 70%);
+  background-size: 300% 100%;
+  animation: view-loading-shimmer 1.2s ease-in-out infinite;
+  border-radius: 16px;
+}
+.view-loading-line { height: 20px; width: 36%; margin: 8px 0 24px; }
+.view-loading-card { height: 120px; margin-bottom: 14px; }
+.view-loading-card-short { height: 82px; }
+@keyframes view-loading-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+.layer-loading-fallback {
+  min-height: 100%;
+  padding: 12px 16px 40px;
+  background: var(--bg-main);
+}
+.layer-loading-header {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-primary);
+  font-weight: 800;
+}
+.layer-loading-back,
+.layer-loading-title,
+.layer-loading-card {
+  background: linear-gradient(100deg, var(--bg-input) 30%, var(--bg-card) 50%, var(--bg-input) 70%);
+  background-size: 300% 100%;
+  animation: view-loading-shimmer 1.2s ease-in-out infinite;
+}
+.layer-loading-back {
+  width: 92px;
+  height: 34px;
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+.layer-loading-title {
+  width: 132px;
+  height: 20px;
+  border-radius: 8px;
+}
+.layer-loading-card {
+  height: 150px;
+  margin: 0 0 14px;
+  border-radius: 20px;
+}
+.layer-loading-card-tall { height: 220px; }
+.layer-loading-card-short { height: 96px; }
 .welcome-container {
   display: flex;
   flex-direction: column;
@@ -2521,4 +2596,80 @@ img {
 }
 .guide-tooltip-left.wishlist-guide::before {
   border-color: transparent transparent transparent var(--accent);
+}
+
+/* Critical chart layout. BouncyBarChart is lazy-loaded with StatsView; keep
+   its geometry available before the async component stylesheet arrives. */
+.bouncy-chart-container {
+  width: 100%;
+  height: 220px;
+  padding: 20px 4px 10px;
+  display: flex;
+  flex-direction: column;
+}
+.bars-wrapper {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 100%;
+  gap: clamp(4px, 2vw, 10px);
+  padding-bottom: 28px;
+}
+.bar-item-wrap {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  min-width: 0;
+  transition: transform 0.2s ease;
+}
+.bar-item-wrap.is-empty {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.3;
+}
+.bar-touch-area {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.bar-fill {
+  width: 100%;
+  max-width: 36px;
+  border-radius: 8px 8px 4px 4px;
+  position: relative;
+  transition: height 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s ease, filter 0.2s ease;
+  will-change: height;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.bar-item-wrap:active:not(.is-empty) { transform: scale(0.94); }
+.bar-item-wrap:active:not(.is-empty) .bar-fill { filter: brightness(1.2); }
+.bar-label {
+  position: absolute;
+  bottom: -24px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.2s ease;
+}
+.bar-value {
+  font-size: 10px;
+  font-weight: 900;
+  color: var(--text-secondary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.2px;
+  line-height: 1;
 }

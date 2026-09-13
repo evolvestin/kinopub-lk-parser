@@ -429,15 +429,41 @@ export const useStatsStore = defineStore('stats', () => {
             if (a.season_number !== b.season_number) return a.season_number - b.season_number
             return a.episode_number - b.episode_number
           })
-      case 'weekday':
+      case 'weekday': {
+        const targetDay = Number(idx)
+        const history = [...(D.history_movies || []), ...(D.history_episodes || [])]
+        const weekdayIndex = (item) => {
+          const rawDate = String(item.raw_date || item.view_date || '')
+          const isoMatch = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+          const date = isoMatch
+            ? new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])))
+            : new Date(rawDate)
+          if (Number.isNaN(date.getTime())) return null
+          const jsDay = isoMatch ? date.getUTCDay() : date.getDay()
+          return jsDay === 0 ? 6 : jsDay - 1
+        }
+        return history
+          .filter(item => weekdayIndex(item) === targetDay)
+          .sort((a, b) => String(b.raw_date || b.view_date || '').localeCompare(String(a.raw_date || a.view_date || '')))
+      }
+      case 'rating_filter': {
+        const targetRating = Number(idx)
+        const ratingHistory = D.ratings?.history || []
+        const filteredRatings = ratingHistory.filter(item => {
+          const rating = Number(item.rating)
+          return Number.isFinite(rating) && Math.floor(rating) === targetRating
+        })
+        if (filteredRatings.length || !Number.isFinite(targetRating)) return filteredRatings
+
+        // Some cached/statistical payloads contain the distribution before
+        // the denormalized ratings history is ready. Keep chart navigation
+        // useful by falling back to ratings attached to watched entries.
         return [...(D.history_movies || []), ...(D.history_episodes || [])]
           .filter(item => {
-            const d = new Date(item.view_date)
-            const jsDay = d.getDay()
-            return (jsDay === 0 ? 6 : jsDay - 1) === idx
-          }).sort((a, b) => b.view_date.localeCompare(a.view_date))
-      case 'rating_filter':
-        return (D.ratings?.history || []).filter(item => Math.floor(item.rating || 1) === idx)
+            const rating = Number(item.user_rating ?? item.user_show_rating)
+            return Number.isFinite(rating) && Math.floor(rating) === targetRating
+          })
+      }
       case 'group_member':
         const member = D.group?.members?.[idx]
         return [...(D.group?.history_movies || []), ...(D.group?.history_episodes || [])]

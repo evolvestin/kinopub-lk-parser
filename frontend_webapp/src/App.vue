@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed, nextTick, defineAsyncComponent } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed, nextTick, defineAsyncComponent, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUIStore } from './stores/uiStore'
 import { useStatsStore } from './stores/useStatsStore'
@@ -9,13 +9,51 @@ import { logger } from './utils/logger'
 import BottomNav from './components/layout/BottomNav.vue'
 import Loader from './components/layout/Loader.vue'
 import Toast from './components/layout/Toast.vue'
+import SearchView from './views/SearchView.vue'
 
-const SearchView = defineAsyncComponent(() => import('./views/SearchView.vue'))
-const WishlistView = defineAsyncComponent(() => import('./views/WishlistView.vue'))
-const StatsView = defineAsyncComponent(() => import('./views/StatsView.vue'))
-const ShowDetailsLayer = defineAsyncComponent(() => import('./components/layers/ShowDetailsLayer.vue'))
-const CollectionLayer = defineAsyncComponent(() => import('./components/layers/CollectionLayer.vue'))
-const HistoryLayer = defineAsyncComponent(() => import('./components/layers/HistoryLayer.vue'))
+const ViewLoading = {
+  render: () => h('div', { class: 'view-loading-fallback', 'aria-busy': 'true' }, [
+    h('div', { class: 'view-loading-line view-loading-line-wide' }),
+    h('div', { class: 'view-loading-card' }),
+    h('div', { class: 'view-loading-card view-loading-card-short' })
+  ])
+}
+const LayerLoading = {
+  render: () => h('div', { class: 'layer-loading-fallback', 'aria-busy': 'true' }, [
+    h('div', { class: 'layer-loading-header' }, [
+      h('div', { class: 'layer-loading-back' }, '‹ Назад'),
+      h('div', { class: 'layer-loading-title' }, 'Загрузка истории')
+    ]),
+    h('div', { class: 'layer-loading-card layer-loading-card-tall' }),
+    h('div', { class: 'layer-loading-card' }),
+    h('div', { class: 'layer-loading-card layer-loading-card-short' })
+  ])
+}
+const WishlistView = defineAsyncComponent({
+  loader: () => import('./views/WishlistView.vue'),
+  loadingComponent: ViewLoading,
+  delay: 0
+})
+const StatsView = defineAsyncComponent({
+  loader: () => import('./views/StatsView.vue'),
+  loadingComponent: ViewLoading,
+  delay: 0
+})
+const ShowDetailsLayer = defineAsyncComponent({
+  loader: () => import('./components/layers/ShowDetailsLayer.vue'),
+  loadingComponent: LayerLoading,
+  delay: 0
+})
+const CollectionLayer = defineAsyncComponent({
+  loader: () => import('./components/layers/CollectionLayer.vue'),
+  loadingComponent: LayerLoading,
+  delay: 0
+})
+const HistoryLayer = defineAsyncComponent({
+  loader: () => import('./components/layers/HistoryLayer.vue'),
+  loadingComponent: LayerLoading,
+  delay: 0
+})
 
 const ShareModal = defineAsyncComponent(() => import('./components/modals/ShareModal.vue'))
 const CasinoModal = defineAsyncComponent(() => import('./components/modals/CasinoModal.vue'))
@@ -191,6 +229,8 @@ onMounted(async () => {
   // already being prepared in the background.
   setTimeout(() => {
     import('./views/StatsView.vue').catch(() => {})
+    import('./views/WishlistView.vue').catch(() => {})
+    import('./components/layers/HistoryLayer.vue').catch(() => {})
     statsStore.prefetchInitialStats()
     wishlistStore.fetchWishlist()
   }, 0)
@@ -235,8 +275,8 @@ watch(() => uiStore.theme, (val) => {
         </template>
       </span>
     </div>
-    <div v-show="uiStore.isAppReady && !uiStore.hasOpenLayers" id="views-container" class="app-viewport">
-      <component :is="activeBaseComponent" :key="uiStore.activeView" v-if="uiStore.isAppReady" />
+    <div v-show="!uiStore.hasOpenLayers" id="views-container" class="app-viewport">
+      <component :is="activeBaseComponent" :key="uiStore.activeView" />
     </div>
 
     <div id="dynamic-layers">
