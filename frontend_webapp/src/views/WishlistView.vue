@@ -65,7 +65,11 @@ const arrowClass = computed(() => {
 })
 
 const isFakeMode = computed(() => {
-  return wishlistStore.folders.length === 0 || wishlistStore.folders.every(f => f.items.length === 0);
+  // Never show demo content while the real wishlist request is still in
+  // flight. That flash looked like a broken/empty screen on fast navigation.
+  return wishlistStore.isLoaded && (
+    wishlistStore.folders.length === 0 || wishlistStore.folders.every(f => f.items.length === 0)
+  );
 })
 
 const FAKE_FOLDERS = [

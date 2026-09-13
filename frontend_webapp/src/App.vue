@@ -3,12 +3,16 @@ import { ref, onMounted, onUnmounted, watch, computed, nextTick, defineAsyncComp
 import { useRouter } from 'vue-router'
 import { useUIStore } from './stores/uiStore'
 import { useStatsStore } from './stores/useStatsStore'
+import { useWishlistStore } from './stores/wishlistStore'
 import { useTelegram } from './composables/useTelegram'
 import { logger } from './utils/logger'
 import BottomNav from './components/layout/BottomNav.vue'
 import Loader from './components/layout/Loader.vue'
 import Toast from './components/layout/Toast.vue'
 
+const SearchView = defineAsyncComponent(() => import('./views/SearchView.vue'))
+const WishlistView = defineAsyncComponent(() => import('./views/WishlistView.vue'))
+const StatsView = defineAsyncComponent(() => import('./views/StatsView.vue'))
 const ShowDetailsLayer = defineAsyncComponent(() => import('./components/layers/ShowDetailsLayer.vue'))
 const CollectionLayer = defineAsyncComponent(() => import('./components/layers/CollectionLayer.vue'))
 const HistoryLayer = defineAsyncComponent(() => import('./components/layers/HistoryLayer.vue'))
@@ -27,6 +31,7 @@ const PrivacyModal = defineAsyncComponent(() => import('./components/modals/Priv
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
+const wishlistStore = useWishlistStore()
 const { tg, showConfirm } = useTelegram()
 const router = useRouter()
 
@@ -47,6 +52,12 @@ const showBackButton = computed(() => {
 
 const sharedUser = computed(() => {
   return statsStore.currentStats?.meta || null
+})
+
+const activeBaseComponent = computed(() => {
+  if (uiStore.activeView === 'wishlist') return WishlistView
+  if (uiStore.activeView === 'stats') return StatsView
+  return SearchView
 })
 
 const openTelegramLink = (url) => {
@@ -114,6 +125,7 @@ onMounted(async () => {
   }
 
   await router.isReady()
+  uiStore.syncActiveView()
 
   let startParam = tg?.initDataUnsafe?.start_param || ''
   if (!startParam) {
@@ -180,6 +192,7 @@ onMounted(async () => {
   setTimeout(() => {
     import('./views/StatsView.vue').catch(() => {})
     statsStore.prefetchInitialStats()
+    wishlistStore.fetchWishlist()
   }, 0)
 })
 
@@ -223,11 +236,7 @@ watch(() => uiStore.theme, (val) => {
       </span>
     </div>
     <div v-show="uiStore.isAppReady && !uiStore.hasOpenLayers" id="views-container" class="app-viewport">
-      <router-view v-if="uiStore.isAppReady" v-slot="{ Component }">
-        <keep-alive>
-          <component :is="Component" :key="uiStore.activeView" />
-        </keep-alive>
-      </router-view>
+      <component :is="activeBaseComponent" :key="uiStore.activeView" v-if="uiStore.isAppReady" />
     </div>
 
     <div id="dynamic-layers">

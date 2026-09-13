@@ -1,12 +1,21 @@
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from selenium.common.exceptions import StaleElementReferenceException
 
 from app import history_parser
 
 
 class HistoryParserRecoveryTests(SimpleTestCase):
+    @override_settings(ENVIRONMENT='DEV')
+    @patch('app.management.commands.runhistoryparser.history_parser.run_parser_session')
+    def test_manual_history_parser_is_disabled_outside_prod(self, run_parser_session):
+        from app.management.commands.runhistoryparser import Command
+
+        Command().handle()
+
+        run_parser_session.assert_not_called()
+
     @patch('app.history_parser._update_show_details_once')
     def test_show_update_reacquires_the_whole_page_after_browser_recovery(self, update_once):
         update_once.side_effect = [

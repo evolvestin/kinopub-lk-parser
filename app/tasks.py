@@ -205,6 +205,9 @@ def safe_execution(func):
 @shared_task
 @single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=7200)
 def run_history_parser_task():
+    if settings.ENVIRONMENT != 'PROD':
+        logging.warning('History parser is disabled outside PROD; skipping local run.')
+        return
     logging.info('Starting periodic history parser task.')
     history_parser.run_parser_session()
 

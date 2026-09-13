@@ -33,6 +33,11 @@ import ChartDataLabels from 'chartjs-plugin-datalabels'
 import { icons } from '../../utils/icons'
 import { useUIStore } from '../../stores/uiStore'
 
+// GenreDonut is loaded as its own async chunk. Register the doughnut
+// controller in that chunk as well; relying on BaseChart's registration made
+// the stats view fail with "doughnut is not a registered controller".
+Chart.register(...registerables)
+
 const props = defineProps({
   genres: { type: Array, required: true },
   totalMinutes: { type: Number, default: 0 },

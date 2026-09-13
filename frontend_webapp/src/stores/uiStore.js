@@ -72,13 +72,25 @@ export const useUIStore = defineStore('ui', () => {
 
   const hasOpenLayers = computed(() => layerStack.value.length > 0)
   
-  const activeView = computed(() => {
-    const path = router.currentRoute.value.path
+  const viewNameFromPath = (path) => {
     if (path.startsWith('/search')) return 'search'
     if (path.startsWith('/wishlist')) return 'wishlist'
     if (path.startsWith('/stats')) return 'stats'
     return 'search'
+  }
+
+  // Keep the shell's visible base screen as an explicit reactive value. The
+  // hash URL remains the source of navigation/deep-links, but rendering the
+  // whole screen directly from router-view can lag behind during a rapid tab
+  // switch while a lazy chunk is resolving.
+  const activeView = ref(viewNameFromPath(router.currentRoute.value.path))
+  router.afterEach((to) => {
+    activeView.value = viewNameFromPath(to.path)
   })
+
+  function syncActiveView() {
+    activeView.value = viewNameFromPath(router.currentRoute.value.path)
+  }
 
   function openLayer(type, id, query = {}) {
     if (window.IS_ADMIN_DASHBOARD) return
@@ -110,8 +122,16 @@ export const useUIStore = defineStore('ui', () => {
     const query = { ...router.currentRoute.value.query }
     if (viewName !== 'stats') {
       delete query.shared_id
+      delete query.tab
     }
-    router.push({ name: viewName, query })
+    if (viewName !== 'search') {
+      delete query.q
+    }
+    // Base navigation is a replacement of the current screen, not a nested
+    // history entry. This also prevents a fast sequence of tab clicks from
+    // leaving an obsolete kept-alive view visible while the hash catches up.
+    activeView.value = viewNameFromPath(`/${viewName}`)
+    router.replace({ name: viewName, query })
   }
 
   function showToast(text) {
@@ -210,7 +230,7 @@ export const useUIStore = defineStore('ui', () => {
   return {
     isLoading, isAppReady, theme, toast, layerStack, hasOpenLayers, activeView, modals,
     isHistoryEditMode, episodesCache, showsCache, dismissedHints, isCasinoHistoryOpen,
-    openLayer, popLayer, switchBaseView, showToast, toggleTheme, fitText, fitAll,
+    openLayer, popLayer, switchBaseView, syncActiveView, showToast, toggleTheme, fitText, fitAll,
     openModal, closeModal, dismissHint,
     setLoading: (v) => { isLoading.value = v },
     setAppReady: (v) => { isAppReady.value = v }
