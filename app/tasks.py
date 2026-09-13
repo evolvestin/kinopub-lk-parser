@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from datetime import timedelta
 
 from celery import shared_task
-from celery.exceptions import SoftTimeLimitExceeded
+from celery.exceptions import Retry, SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.cache import cache
 from django.core.management import call_command
@@ -38,7 +38,12 @@ from app.services.metrics import (
     generate_global_metrics_snapshot,
     warm_duplicate_photo_urls_cache,
 )
-from app.services.stats_calculator import generate_user_stats
+from app.services.stats_calculator import (
+    GLOBAL_STATS_REFRESH_COOLDOWN_KEY,
+    GLOBAL_STATS_SNAPSHOT_KEY,
+    generate_global_stats,
+    generate_user_stats,
+)
 from app.services.tmdb_client import sync_show_from_tmdb
 from app.telegram_bot import TelegramSender
 from app.utils import enqueue_show_update
@@ -167,6 +172,8 @@ def single_instance_task(lock_name, timeout):
                 except SoftTimeLimitExceeded:
                     logging.error(f'Task {func.__name__} hit SoftTimeLimit.')
                     raise
+                except Retry:
+                    raise
                 except Exception as e:
                     logging.error(f'Celery task {func.__name__} failed: {e}', exc_info=True)
 
@@ -264,7 +271,11 @@ def cleanup_old_data_task():
 
     # 3. Очистка метрик
     cutoff_metrics = now - timedelta(days=7)
-    deleted_metrics, _ = SiteMetric.objects.filter(created_at__lt=cutoff_metrics).delete()
+    deleted_metrics, _ = (
+        SiteMetric.objects.filter(created_at__lt=cutoff_metrics)
+        .exclude(key=GLOBAL_STATS_SNAPSHOT_KEY)
+        .delete()
+    )
 
     # 4. Очистка старых файлов heartbeat
     deleted_hb_files = 0
@@ -624,6 +635,29 @@ def precalculate_all_stats():
         precalculate_user_stats.delay(user.id, year=None)
 
 
+@shared_task(time_limit=3600, soft_time_limit=3300)
+@single_instance_task(lock_name='global_stats_snapshot_refresh', timeout=3600)
+def refresh_global_stats_task():
+    """Rebuild and persist the dashboard snapshot outside the HTTP request."""
+    logging.info('Starting global admin stats snapshot refresh.')
+    try:
+        stats = generate_global_stats(force=True)
+        snapshot, created = SiteMetric.objects.get_or_create(
+            key=GLOBAL_STATS_SNAPSHOT_KEY,
+            defaults={'data': stats},
+        )
+        if not created:
+            snapshot.data = stats
+            snapshot.save(update_fields=['data', 'updated_at'])
+        logging.info('Global admin stats snapshot refreshed.')
+    except Exception:
+        # Let the next admin visit retry immediately instead of waiting for
+        # the full cooldown after a failed refresh.
+        cache.delete(GLOBAL_STATS_REFRESH_COOLDOWN_KEY)
+        logging.exception('Global admin stats snapshot refresh failed.')
+        raise
+
+
 @shared_task
 @single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=21600)
 def run_gap_scanner_task():
@@ -658,22 +692,26 @@ def get_kp_mapping():
     return mapping
 
 
-@shared_task
+@shared_task(bind=True, max_retries=8)
 @single_instance_task(lock_name=RedisLock.SYNC_POISKKINO_RATINGS, timeout=7200)
-def sync_poiskkino_ratings_task():
+def sync_poiskkino_ratings_task(self):
     with _wait_for_redis_lock(
         RedisLock.KINOPUB_PARSER_GLOBAL,
         lock_timeout=14400,
         wait_timeout=SHARED_LOCK_WAIT_SECONDS,
     ) as catalog_acquired:
-        if catalog_acquired:
-            with _wait_for_redis_lock(
-                RedisLock.EXTERNAL_RATING_WRITES,
-                lock_timeout=14400,
-                wait_timeout=SHARED_LOCK_WAIT_SECONDS,
-            ) as rating_acquired:
-                if rating_acquired:
-                    call_command('syncpoiskkinoratings')
+        if not catalog_acquired:
+            raise self.retry(countdown=900)
+
+        with _wait_for_redis_lock(
+            RedisLock.EXTERNAL_RATING_WRITES,
+            lock_timeout=14400,
+            wait_timeout=SHARED_LOCK_WAIT_SECONDS,
+        ) as rating_acquired:
+            if not rating_acquired:
+                raise self.retry(countdown=900)
+
+            call_command('syncpoiskkinoratings')
 
 
 @shared_task

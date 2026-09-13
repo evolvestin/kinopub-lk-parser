@@ -1559,6 +1559,7 @@ class PersonAdmin(BaseNameAdmin):
                 'fields': (
                     'get_photo_display',
                     'tmdb_id',
+                    'kinopoisk_person_id',
                     'tmdb_photo_url',
                     'clear_tmdb_photo',
                     'kp_photo_url',

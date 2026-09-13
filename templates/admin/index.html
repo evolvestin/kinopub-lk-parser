@@ -34,6 +34,15 @@
     }
     .wa-nav-btn:hover { background: var(--border); transform: translateY(-2px); }
     .wa-nav-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .global-stats-status {
+        max-width: 1400px;
+        margin: 0 auto 12px;
+        color: var(--text-secondary);
+        font-size: 13px;
+        text-align: center;
+    }
+    .global-stats-status strong { color: var(--text-primary); }
+    .global-stats-status span { margin-left: 8px; color: var(--info); }
 </style>
 {% endblock %}
 
@@ -42,6 +51,16 @@
     window.GLOBAL_STATS = {{ global_stats_json|safe }};
 </script>
 <div class="webapp-container">
+    <div class="global-stats-status" role="status">
+        {% if global_stats_extracted_at %}
+            Статистика извлечена: <strong>{{ global_stats_extracted_at }}</strong>
+        {% else %}
+            Статистика ещё не извлекалась{% if global_stats_refresh_queued %} — обновление запущено в фоне{% endif %}.
+        {% endif %}
+        {% if global_stats_refresh_queued %}
+            <span>Идёт обновление снимка.</span>
+        {% endif %}
+    </div>
     <div class="wa-nav-links">
         <a href="{% url 'metrics' %}" class="wa-nav-btn">Метрики</a>
         <a href="/admin/" class="wa-nav-btn active">Админка</a>

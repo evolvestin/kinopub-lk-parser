@@ -9,6 +9,7 @@ from collections import defaultdict
 import requests
 from django.conf import settings
 from django.db.models import Q
+from django.utils import timezone
 
 from app.management.base import LoggableBaseCommand
 from app.models import ExternalRating, Show
@@ -313,13 +314,17 @@ class Command(LoggableBaseCommand):
         show_id_to_rating = {show.id: show.imdb_rating for show in shows_to_update}
         external_rows = list(
             ExternalRating.objects.filter(show_id__in=show_id_to_rating).only(
-                'id', 'show_id', 'imdb'
+                'id', 'show_id', 'imdb', 'updated_at'
             )
         )
+        updated_at = timezone.now()
         for external in external_rows:
             external.imdb = show_id_to_rating[external.show_id]
+            external.updated_at = updated_at
         if external_rows:
-            ExternalRating.objects.bulk_update(external_rows, ['imdb'], batch_size=1000)
+            ExternalRating.objects.bulk_update(
+                external_rows, ['imdb', 'updated_at'], batch_size=1000
+            )
 
         return {
             'updated': len(shows_to_update),

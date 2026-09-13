@@ -17,6 +17,13 @@ class PoiskkinoSyncHelperTests(SimpleTestCase):
             [{'name': 'Drama'}],
         )
 
+    def test_person_id_is_coerced_without_api_lookup(self):
+        self.assertEqual(Command._coerce_person_id(123), 123)
+        self.assertEqual(Command._coerce_person_id('123'), 123)
+        self.assertIsNone(Command._coerce_person_id(None))
+        self.assertIsNone(Command._coerce_person_id('not-an-id'))
+        self.assertIsNone(Command._coerce_person_id(0))
+
     def test_deadlock_is_detected_by_postgres_sqlstate_or_message(self):
         sqlstate_error = OperationalError('database operation failed')
         cause = OperationalError('postgres deadlock')

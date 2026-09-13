@@ -90,6 +90,13 @@ class Person(BaseModel):
     tmdb_id = models.IntegerField(
         null=True, blank=True, unique=True, db_index=True, verbose_name='TMDB ID'
     )
+    kinopoisk_person_id = models.IntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Kinopoisk person ID',
+        help_text='Source person ID from the existing Poiskkino movie response; not unique locally.',
+    )
     tmdb_photo_url = models.URLField(max_length=500, null=True, blank=True, db_index=True)
     kp_photo_url = models.URLField(max_length=500, null=True, blank=True, db_index=True)
     is_photo_fetched = models.BooleanField(default=False, db_index=True)

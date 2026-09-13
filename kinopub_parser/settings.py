@@ -472,9 +472,9 @@ if ENVIRONMENT == 'PROD':
             },
             'sync_imdb_data': {
                 'task': 'app.tasks.sync_imdb_data_task',
-                # The current run takes about 1h53m. Start it at 07:00 so
-                # the 09:00 TMDB window does not wait on external ratings.
-                'schedule': crontab(minute=0, hour=7),
+                # IMDb can take more than five hours. It must finish before
+                # the noon Poiskkino refresh, which uses the same rating lock.
+                'schedule': crontab(minute=0, hour=2),
             },
             'backup_database_hourly': {
                 'task': 'app.tasks.backup_database',

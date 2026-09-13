@@ -973,11 +973,16 @@ def generate_group_stats(user, year=None):
     return result
 
 
-def generate_global_stats(year=None):
+GLOBAL_STATS_SNAPSHOT_KEY = 'admin_global_stats_snapshot_v1'
+GLOBAL_STATS_REFRESH_COOLDOWN_KEY = 'admin_global_stats_refresh_cooldown_v1'
+
+
+def generate_global_stats(year=None, force=False):
     cache_key = f'global_stats_v2:{year or "all"}'
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
+    if not force:
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
 
     history_filter = Q(is_checked=True)
     if year:

@@ -41,6 +41,17 @@ class Command(LoggableBaseCommand):
         return [entry for entry in value if isinstance(entry, dict)]
 
     @staticmethod
+    def _coerce_person_id(value):
+        """Return a valid source person ID without making another API request."""
+        if value in (None, ''):
+            return None
+        try:
+            person_id = int(value)
+        except (TypeError, ValueError):
+            return None
+        return person_id if person_id > 0 else None
+
+    @staticmethod
     def _is_deadlock(error):
         cause = getattr(error, '__cause__', None)
         sqlstate = getattr(cause, 'sqlstate', None) or getattr(cause, 'pgcode', None)
@@ -209,6 +220,13 @@ class Command(LoggableBaseCommand):
             for person_data in self._object_list(item, 'persons')
             if person_data.get('name')
         }
+        person_ids_by_name = {}
+        for item in data_map.values():
+            for person_data in self._object_list(item, 'persons'):
+                person_name = person_data.get('name')
+                person_id = self._coerce_person_id(person_data.get('id'))
+                if person_name and person_id is not None:
+                    person_ids_by_name.setdefault(person_name, set()).add(person_id)
 
         existing_genres = {
             genre.name: genre for genre in Genre.objects.filter(name__in=all_genre_names)
@@ -241,7 +259,16 @@ class Command(LoggableBaseCommand):
             )
 
         new_persons = [
-            Person(name=name) for name in all_person_names if name not in existing_persons
+            Person(
+                name=name,
+                kinopoisk_person_id=(
+                    next(iter(person_ids_by_name[name]))
+                    if len(person_ids_by_name.get(name, set())) == 1
+                    else None
+                ),
+            )
+            for name in all_person_names
+            if name not in existing_persons
         ]
         if new_persons:
             existing_persons.update(
@@ -325,6 +352,11 @@ class Command(LoggableBaseCommand):
                     continue
 
                 needs_update = False
+                source_person_id = self._coerce_person_id(person_data.get('id'))
+                if source_person_id is not None and person.kinopoisk_person_id is None:
+                    person.kinopoisk_person_id = source_person_id
+                    needs_update = True
+
                 if person_data.get('enName') and person.en_name != person_data['enName']:
                     person.en_name = person_data['enName']
                     needs_update = True
@@ -392,7 +424,7 @@ class Command(LoggableBaseCommand):
                 person.auto_resolve_kp_duplicate()
             Person.objects.bulk_update(
                 persons_to_update.values(),
-                ['en_name', 'kp_photo_url', 'master_person'],
+                ['en_name', 'kp_photo_url', 'kinopoisk_person_id', 'master_person'],
                 batch_size=500,
             )
 

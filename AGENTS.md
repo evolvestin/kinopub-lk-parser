@@ -65,3 +65,22 @@ When `SITE_URL` is an HTTP alias such as `http://8i1n.pkr.ovh`, the HTTP
 driver may receive the login form over HTTP while the 2FA submission must be
 sent to the HTTPS form endpoint. Keep the HTTPS upgrade for the second POST;
 otherwise KinoPub can answer `400 Bad Request` even for a fresh valid code.
+
+## Person duplicate policy
+
+Kinopoisk-only person duplicates are real duplicates, but the metric remains
+useful as a backlog/health check for unresolved old records and any new records
+that have not yet been matched:
+
+* Continue to display and calculate the Kinopoisk duplicate metric, including
+  duplicate `kp_photo_url` groups.
+* Store the source `persons[].id` from the existing Poiskkino movie response as
+  `Person.kinopoisk_person_id`. Do not make this field unique: duplicate local
+  rows are allowed; do not merge or delete duplicate rows automatically.
+* Future person matching must first compare `kinopoisk_person_id`; only when
+  the source ID is unavailable may the existing avatar/name fallback be used.
+  The ID is stored from the current movie request and must not cause an extra
+  request to `/person/{id}` or otherwise increase Kinopoisk API traffic.
+* Do not use IMDb identity, IMDb fields, or IMDb duplicate findings as evidence
+  for person matching, and do not modify IMDb duplicates at all. IMDb is
+  explicitly out of scope for person deduplication.
