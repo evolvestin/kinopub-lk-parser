@@ -27,3 +27,8 @@ data/
 .DS_Store
 *.cache
 с
+
+# Frontend build artifacts and local package-manager state
+frontend_webapp/node_modules/
+frontend_webapp/dist/
+.pnpm-store/

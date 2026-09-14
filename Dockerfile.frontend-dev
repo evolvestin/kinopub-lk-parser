@@ -1,0 +1,10 @@
+FROM node:20-alpine
+
+WORKDIR /app/frontend_webapp
+
+COPY frontend_webapp/package*.json ./
+RUN npm install
+
+COPY frontend_webapp/ ./
+COPY kinopub_parser/static/css/ /app/kinopub_parser/static/css/
+
