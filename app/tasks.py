@@ -84,7 +84,15 @@ def _redis_lock(lock_name, timeout, warn_on_busy=True):
     acquired = redis_client.set(lock_key, lock_token, ex=timeout, nx=True)
 
     if not acquired and warn_on_busy:
-        logging.warning(f'Lock acquisition failed for "{lock_name}". Resource is busy.')
+        try:
+            ttl = redis_client.ttl(lock_key)
+        except Exception:
+            ttl = 'unknown'
+        logging.warning(
+            'Lock acquisition failed for "%s". Resource is busy (ttl=%s seconds).',
+            lock_name,
+            ttl,
+        )
 
     heartbeat_stop = threading.Event()
     heartbeat_thread = None
@@ -203,7 +211,7 @@ def safe_execution(func):
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=7200)
+@single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=7200)
 def run_history_parser_task():
     if settings.ENVIRONMENT != 'PROD':
         logging.warning('History parser is disabled outside PROD; skipping local run.')
@@ -213,7 +221,7 @@ def run_history_parser_task():
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=14400)
+@single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=14400)
 @safe_execution
 def run_full_scan_task():
     logging.info('Starting quarterly full scan task.')
@@ -305,19 +313,9 @@ def cleanup_old_data_task():
 @shared_task
 @single_instance_task(lock_name=RedisLock.BACKUP, timeout=7200)
 def backup_database():
-    # Keep the backup lock and serialize the dump with parser work so the
-    # snapshot does not overlap with long-running parser reads/writes.
-    # The task is intentionally delayed instead of being dropped when a
-    # parser task is active: Celery Beat invokes it once per hour.
-    # Beat runs this task hourly. Waiting here ties up a Celery worker and can
-    # outlive the parser task that currently owns the browser lock. Retry on
-    # the next hourly tick instead.
-    with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=21600) as acquired:
-        if acquired:
-            BackupManager().perform_backup()
-            return
-
-    logging.warning('Backup deferred: Kinopub parser lock is busy; the next hourly run will retry.')
+    # pg_dump uses a consistent MVCC snapshot.  It does not need to stop a
+    # browser session, and must never occupy the browser lock for six hours.
+    BackupManager().perform_backup()
 
 
 def _execute_admin_command_process(celery_task_id, task_run):
@@ -410,7 +408,7 @@ def run_admin_command(self, task_run_id):
         _execute_admin_command_process(self.request.id, task_run)
         return
 
-    parser_commands = {
+    browser_commands = {
         'runfullscan',
         'rungapscanner',
         'runhistoryparser',
@@ -419,35 +417,95 @@ def run_admin_command(self, task_run_id):
         'updatedetails',
         'updatedurations',
         'scanbyids',
+    }
+    catalog_commands = {
+        'fetchpersonphotos',
+        'importfromtmdb',
+    }
+    catalog_and_rating_commands = {
         'syncpoiskkinoratings',
-        'syncimdbdata',
         'enrichfromtmdb',
     }
+    rating_commands = {
+        'syncimdbdata',
+    }
 
-    if task_run.command in parser_commands:
-        with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=14400) as acquired:
+    if task_run.command in browser_commands:
+        with _redis_lock(RedisLock.KINOPUB_BROWSER, timeout=14400) as acquired:
             if not acquired:
                 task_run.status = TaskRunStatus.FAILURE
                 task_run.output = (
-                    '[System] Отменено: другая задача Kinopub-парсинга уже выполняется.'
+                    '[System] Отменено: другая браузерная задача KinoPub уже выполняется.'
                 )
-                task_run.error_message = 'Kinopub parser lock is busy'
+                task_run.error_message = 'KinoPub browser lock is busy'
                 task_run.save()
                 return
             _execute_admin_command_process(self.request.id, task_run)
+    elif task_run.command in catalog_and_rating_commands:
+        with _wait_for_redis_lock(
+            RedisLock.CATALOG_WRITES,
+            lock_timeout=14400,
+            wait_timeout=SHARED_LOCK_WAIT_SECONDS,
+        ) as catalog_acquired:
+            if not catalog_acquired:
+                task_run.status = TaskRunStatus.FAILURE
+                task_run.output = '[System] Отменено: каталог сейчас обновляется другой задачей.'
+                task_run.error_message = 'Catalog writes lock is busy'
+                task_run.save()
+                return
+            with _wait_for_redis_lock(
+                RedisLock.EXTERNAL_RATING_WRITES,
+                lock_timeout=14400,
+                wait_timeout=SHARED_LOCK_WAIT_SECONDS,
+            ) as rating_acquired:
+                if rating_acquired:
+                    _execute_admin_command_process(self.request.id, task_run)
+                else:
+                    task_run.status = TaskRunStatus.FAILURE
+                    task_run.output = (
+                        '[System] Отменено: рейтинги сейчас обновляются другой задачей.'
+                    )
+                    task_run.error_message = 'External rating writes lock is busy'
+                    task_run.save()
+    elif task_run.command in catalog_commands:
+        with _wait_for_redis_lock(
+            RedisLock.CATALOG_WRITES,
+            lock_timeout=14400,
+            wait_timeout=SHARED_LOCK_WAIT_SECONDS,
+        ) as acquired:
+            if acquired:
+                _execute_admin_command_process(self.request.id, task_run)
+            else:
+                task_run.status = TaskRunStatus.FAILURE
+                task_run.output = '[System] Отменено: каталог сейчас обновляется другой задачей.'
+                task_run.error_message = 'Catalog writes lock is busy'
+                task_run.save()
+    elif task_run.command in rating_commands:
+        with _wait_for_redis_lock(
+            RedisLock.EXTERNAL_RATING_WRITES,
+            lock_timeout=14400,
+            wait_timeout=SHARED_LOCK_WAIT_SECONDS,
+        ) as acquired:
+            if acquired:
+                _execute_admin_command_process(self.request.id, task_run)
+            else:
+                task_run.status = TaskRunStatus.FAILURE
+                task_run.output = '[System] Отменено: рейтинги сейчас обновляются другой задачей.'
+                task_run.error_message = 'External rating writes lock is busy'
+                task_run.save()
     else:
         _execute_admin_command_process(self.request.id, task_run)
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=3600)
+@single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=3600)
 def run_new_episodes_task():
     logging.info('Starting new episodes parser task.')
     call_command('runnewepisodes')
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=14400)
+@single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=14400)
 def run_daily_sync_task():
     logging.info('Starting Daily Synchronization Task via Celery.')
     call_command('rundailysync')
@@ -557,15 +615,16 @@ def process_queues_task(self):
         logging.error(f'Error checking Redis queues: {e}')
         return
 
-    # 2. Если есть задачи, пытаемся захватить глобальный лок Kinopub-парсера
+    # 2. Очереди используют только browser resource lock.  Они не должны
+    # блокироваться метриками, backup или внешними рейтингами.
     logging.info(
         f'Found items in queues (Details: {count_details}, Durations: {count_durations}). '
-        'Acquiring Kinopub parser lock...'
+        'Acquiring KinoPub browser lock...'
     )
 
-    with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=3600) as acquired:
+    with _redis_lock(RedisLock.KINOPUB_BROWSER, timeout=3600) as acquired:
         if not acquired:
-            logging.warning('Skipping process_queues_task: kinopub_parser_global_lock is busy.')
+            logging.warning('Skipping process_queues_task: KinoPub browser lock is busy.')
             return
 
         # 3. Processing Details (Aux account)
@@ -662,7 +721,7 @@ def refresh_global_stats_task():
 
 
 @shared_task
-@single_instance_task(lock_name=RedisLock.KINOPUB_PARSER_GLOBAL, timeout=21600)
+@single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=21600)
 def run_gap_scanner_task():
     logging.info('Starting monthly gap scanner task.')
     call_command('rungapscanner')
@@ -672,13 +731,9 @@ def run_gap_scanner_task():
 @single_instance_task(lock_name=RedisLock.FETCH_PERSON_PHOTOS, timeout=7200)
 @safe_execution
 def fetch_person_photos_task(limit=2000):
-    # Person photo writes share rows with TMDB enrichment and metrics scans.
-    # Serialize them through the same catalog lock as the other DB writers.
-    with _wait_for_redis_lock(
-        RedisLock.KINOPUB_PARSER_GLOBAL,
-        lock_timeout=7200,
-        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
-    ) as acquired:
+    # Person photo writes share Person rows with TMDB/Poiskkino catalog
+    # writers, but do not use a KinoPub browser.
+    with _redis_lock(RedisLock.CATALOG_WRITES, timeout=7200) as acquired:
         if acquired:
             call_command('fetchpersonphotos', limit=limit)
 
@@ -698,111 +753,94 @@ def get_kp_mapping():
 @shared_task(bind=True, max_retries=8)
 @single_instance_task(lock_name=RedisLock.SYNC_POISKKINO_RATINGS, timeout=7200)
 def sync_poiskkino_ratings_task(self):
-    with _wait_for_redis_lock(
-        RedisLock.KINOPUB_PARSER_GLOBAL,
-        lock_timeout=14400,
-        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
-    ) as catalog_acquired:
+    with _redis_lock(RedisLock.CATALOG_WRITES, timeout=14400) as catalog_acquired:
         if not catalog_acquired:
             raise self.retry(countdown=900)
 
-        with _wait_for_redis_lock(
-            RedisLock.EXTERNAL_RATING_WRITES,
-            lock_timeout=14400,
-            wait_timeout=SHARED_LOCK_WAIT_SECONDS,
-        ) as rating_acquired:
+        with _redis_lock(RedisLock.EXTERNAL_RATING_WRITES, timeout=14400) as rating_acquired:
             if not rating_acquired:
                 raise self.retry(countdown=900)
 
             call_command('syncpoiskkinoratings')
 
 
-@shared_task
+@shared_task(bind=True, max_retries=8)
 @single_instance_task(lock_name=RedisLock.SYNC_IMDB_DATA, timeout=14400)
-def sync_imdb_data_task():
+def sync_imdb_data_task(self):
     # IMDb datasets do not use the Kinopub browser. Keep this task out of the
-    # global parser lock so a daily ratings refresh does not block browser
-    # sessions or queue processing. The dedicated task lock prevents duplicate
-    # IMDb runs, while the ratings lock serializes writes with Poiskkino.
-    with _wait_for_redis_lock(
-        RedisLock.EXTERNAL_RATING_WRITES,
-        lock_timeout=14400,
-        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
-    ) as rating_acquired:
-        if rating_acquired:
-            call_command('syncimdbdata')
+    # browser resource so a daily ratings refresh does not block browser
+    # sessions or queue processing. The task lock prevents duplicate IMDb
+    # runs, while the ratings lock serializes writes with Poiskkino.
+    with _redis_lock(RedisLock.EXTERNAL_RATING_WRITES, timeout=14400) as rating_acquired:
+        if not rating_acquired:
+            raise self.retry(countdown=900)
+        call_command('syncimdbdata')
 
 
 @shared_task(time_limit=3600, soft_time_limit=3300)
-@single_instance_task(lock_name='update_site_metrics_lock', timeout=3600)
+@single_instance_task(lock_name=RedisLock.METRICS_SNAPSHOT, timeout=3600)
 @safe_execution
 def update_site_metrics_task():
-    # Metrics scan app_showcrew/app_person and must not overlap parser writes.
-    # This is a periodic task: do not occupy a worker for five minutes while
-    # a parser run owns the lock.  Beat will enqueue the next hourly attempt.
-    # The hard/soft limits also bound the lifetime of a lock if a DB query
-    # itself hangs; the Redis TTL is then the final cleanup mechanism.
-    with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=3600) as acquired:
-        if not acquired:
-            return
-
-        data = generate_global_metrics_snapshot()
-        SiteMetric.objects.create(key='global_snapshot', data=data)
-        cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
-        cache.delete('lock:queuing_global_snapshot')
-        logging.info('Global site metrics snapshot updated successfully.')
+    # This is a read/snapshot job.  A snapshot may observe a normal MVCC
+    # boundary while catalog writes are in progress; it must not block all
+    # browser work for an hour just to make the counts perfectly aligned.
+    data = generate_global_metrics_snapshot()
+    SiteMetric.objects.create(key='global_snapshot', data=data)
+    cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
+    cache.delete('lock:queuing_global_snapshot')
+    logging.info('Global site metrics snapshot updated successfully.')
 
 
-@shared_task
-@single_instance_task(lock_name='warm_duplicate_photo_urls', timeout=3600)
-@safe_execution
-def warm_duplicate_photo_urls_task():
-    with _wait_for_redis_lock(
-        RedisLock.KINOPUB_PARSER_GLOBAL,
-        lock_timeout=1800,
-        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
-    ) as acquired:
-        if acquired:
-            warm_duplicate_photo_urls_cache()
-
-
-@shared_task
-@single_instance_task(lock_name='warm_person_metric_pages', timeout=3600)
-@safe_execution
-def warm_person_metric_pages_task():
+def _warm_person_metric_pages():
+    """Warm person-detail pages from the latest immutable metrics snapshot."""
     from django.contrib.auth import get_user_model
     from django.test import RequestFactory
 
     from app.views import get_metric_details
 
-    with _wait_for_redis_lock(
-        RedisLock.KINOPUB_PARSER_GLOBAL,
-        lock_timeout=1800,
-        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
-    ) as acquired:
-        if not acquired:
-            return
+    snapshot = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
+    staff_user = get_user_model().objects.filter(is_staff=True).first()
+    if not snapshot or not staff_user:
+        return
 
-        snapshot = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
-        staff_user = get_user_model().objects.filter(is_staff=True).first()
-        if not snapshot or not staff_user:
-            return
-
-        factory = RequestFactory()
-        for key in PERSON_DETAIL_WARM_KEYS:
-            entries = snapshot.data.get(key, [])
-            if not isinstance(entries, list):
+    factory = RequestFactory()
+    for key in PERSON_DETAIL_WARM_KEYS:
+        entries = snapshot.data.get(key, [])
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            value = entry.get('name') or entry.get('type')
+            if not value or not entry.get('value', entry.get('collisions', 0)):
                 continue
-            for entry in entries:
-                value = entry.get('name') or entry.get('type')
-                if not value or not entry.get('value', entry.get('collisions', 0)):
-                    continue
-                request = factory.get(
-                    f'/api/metrics/details/{key}/',
-                    {'type': value, 'offset': 0, 'limit': 50},
-                )
-                request.user = staff_user
-                get_metric_details(request, key)
+            request = factory.get(
+                f'/api/metrics/details/{key}/',
+                {'type': value, 'offset': 0, 'limit': 50},
+            )
+            request.user = staff_user
+            get_metric_details(request, key)
+
+
+@shared_task
+@single_instance_task(lock_name=RedisLock.METRICS_CACHE_WARMUP, timeout=3600)
+@safe_execution
+def warm_metrics_caches_task():
+    """Warm all expensive metrics caches in one bounded background job."""
+    warm_duplicate_photo_urls_cache()
+    _warm_person_metric_pages()
+
+
+@shared_task(name='app.tasks.warm_duplicate_photo_urls_task')
+@safe_execution
+def warm_duplicate_photo_urls_task():
+    # Compatibility entrypoint for messages created by the previous release.
+    warm_metrics_caches_task()
+
+
+@shared_task(name='app.tasks.warm_person_metric_pages_task')
+@safe_execution
+def warm_person_metric_pages_task():
+    # Compatibility entrypoint for messages created by the previous release.
+    warm_metrics_caches_task()
 
 
 @shared_task
@@ -895,26 +933,29 @@ def sync_tmdb_metadata_task(
 
 @shared_task
 @safe_execution
+@single_instance_task(lock_name=RedisLock.TMDB_LIBRARY_IMPORT, timeout=14400)
 def parse_tmdb_library_task(media_type: str = 'all', batch_size: int = 5000):
-    logging.info(f'Starting TMDB dump import task (type={media_type}, batch_size={batch_size}).')
-    call_command('importfromtmdb', type=media_type, batch_size=batch_size)
+    with _wait_for_redis_lock(
+        RedisLock.CATALOG_WRITES,
+        lock_timeout=14400,
+        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
+    ) as acquired:
+        if acquired:
+            logging.info(
+                f'Starting TMDB dump import task (type={media_type}, batch_size={batch_size}).'
+            )
+            call_command('importfromtmdb', type=media_type, batch_size=batch_size)
 
 
 @shared_task(time_limit=3600, soft_time_limit=3300)
 @single_instance_task(lock_name=RedisLock.ENRICH_TMDB_SHOWS, timeout=7200)
 @safe_execution
 def enrich_tmdb_shows_task(limit: int = 5000):
-    with _wait_for_redis_lock(
-        RedisLock.KINOPUB_PARSER_GLOBAL,
-        lock_timeout=14400,
-        wait_timeout=300,
-    ) as catalog_acquired:
+    # This is scheduled periodically; do not hold a worker while another
+    # catalog writer finishes.  The next production window will retry it.
+    with _redis_lock(RedisLock.CATALOG_WRITES, timeout=14400) as catalog_acquired:
         if catalog_acquired:
-            with _wait_for_redis_lock(
-                RedisLock.EXTERNAL_RATING_WRITES,
-                lock_timeout=14400,
-                wait_timeout=300,
-            ) as rating_acquired:
+            with _redis_lock(RedisLock.EXTERNAL_RATING_WRITES, timeout=14400) as rating_acquired:
                 if rating_acquired:
                     logging.info(f'Starting scheduled TMDB shows enrichment task (limit={limit}).')
                     call_command('enrichfromtmdb', limit=limit)

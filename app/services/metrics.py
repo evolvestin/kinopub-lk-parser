@@ -328,10 +328,9 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     professions_stats, en_professions_stats = profession_stats
     duplicate_photo_stats = calculate_duplicate_photo_urls_metric()
     # Cache warming is deliberately kept off the snapshot path.  This
-    # function runs while the global parser lock is held, and the duplicate
-    # photo query scans a large person table.  Warming is handled by its
-    # dedicated metrics task instead, so a slow cache fill cannot pin the
-    # parser lock and make every other periodic task wait for five minutes.
+    # Cache warming is deliberately kept off the snapshot path.  The
+    # duplicate-photo query scans a large person table, so a slow cache fill
+    # must not pin the snapshot lock or any parser/browser resource.
     return {
         'missing_kp': calculate_missing_kp_metric(),
         'kp_unrated': calculate_kp_unrated_metric(),
@@ -1180,10 +1179,8 @@ def queue_duplicate_photo_urls_warmup():
         f'metrics:duplicate_photo_urls:v3:{version}:kp_photo_url:0:50',
         f'metrics:duplicate_photo_urls:v3:{version}:tmdb_photo_url:0:50',
     )
-    if any(cache.get(cache_key) is None for cache_key in cache_keys) and cache.add(
-        'metrics:duplicate_photo_urls:warmup_lock', True, timeout=300
-    ):
-        celery_app.send_task('app.tasks.warm_duplicate_photo_urls_task', queue='metrics')
+    if any(cache.get(cache_key) is None for cache_key in cache_keys):
+        queue_metric_caches_warmup()
 
 
 def person_detail_cache_key(key, value, offset, limit):
@@ -1193,8 +1190,13 @@ def person_detail_cache_key(key, value, offset, limit):
 
 
 def queue_person_detail_warmup():
-    if cache.add('metrics:person_detail:warmup_lock', True, timeout=900):
-        celery_app.send_task('app.tasks.warm_person_metric_pages_task', queue='metrics')
+    queue_metric_caches_warmup()
+
+
+def queue_metric_caches_warmup():
+    """Queue one job for all metrics caches instead of two competing jobs."""
+    if cache.add('metrics:all:warmup_lock', True, timeout=900):
+        celery_app.send_task('app.tasks.warm_metrics_caches_task', queue='metrics')
 
 
 def warm_duplicate_photo_urls_cache():
@@ -1207,6 +1209,7 @@ def invalidate_duplicate_photo_urls_cache():
     version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
     cache.set(DUPLICATE_PHOTO_CACHE_VERSION_KEY, int(version) + 1, timeout=None)
     cache.delete('metrics:duplicate_photo_urls:warmup_lock')
+    cache.delete('metrics:all:warmup_lock')
 
 
 def get_duplicate_photo_urls_list(source_type: str):

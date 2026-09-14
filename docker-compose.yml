@@ -37,7 +37,7 @@ services:
       - ./data:/data
     command: >
       sh -c "
-        if [ \"$ENVIRONMENT\" = \"DEV\" ] && [ \"$SKIP_DB_RESTORE\" != \"true\" ] && [ \"$SKIP_DB_RESTORE\" != \"True\" ]; then
+        if [ \"$$ENVIRONMENT\" = \"DEV\" ] && [ \"$$SKIP_DB_RESTORE\" != \"true\" ] && [ \"$$SKIP_DB_RESTORE\" != \"True\" ]; then
           echo \"Starting restore from backup...\" &&
           python manage.py restorebackup;
         fi &&

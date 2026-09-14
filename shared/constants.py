@@ -13,6 +13,17 @@ class RedisQueue(StrEnum):
 
 
 class RedisLock(StrEnum):
+    # Browser sessions are the scarce shared resource.  This lock must only
+    # be used by tasks that actually open KinoPub/Chrome sessions.
+    KINOPUB_BROWSER = 'kinopub_browser_lock'
+
+    # Non-browser catalog writers are serialized with one another because they
+    # update the same Show/Person/ShowCrew rows in bulk.  They do not block
+    # read-only metrics or the browser resource.
+    CATALOG_WRITES = 'catalog_writes_lock'
+
+    # Kept for reset/diagnostics compatibility with workers running the old
+    # release.  New code must not acquire this lock.
     KINOPUB_PARSER_GLOBAL = 'kinopub_parser_global_lock'
     BACKUP = 'backup_lock'
     PROCESS_QUEUES = 'process_queues_lock'
@@ -21,6 +32,9 @@ class RedisLock(StrEnum):
     SYNC_IMDB_DATA = 'sync_imdb_data'
     EXTERNAL_RATING_WRITES = 'external_rating_writes'
     ENRICH_TMDB_SHOWS = 'enrich_tmdb_shows_lock'
+    TMDB_LIBRARY_IMPORT = 'tmdb_library_import_lock'
+    METRICS_SNAPSHOT = 'metrics_snapshot_lock'
+    METRICS_CACHE_WARMUP = 'metrics_cache_warmup_lock'
 
 
 class ParserSessionType(StrEnum):
