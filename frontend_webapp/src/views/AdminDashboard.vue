@@ -192,6 +192,7 @@
                           <span class="person-name">{{ p.name }}</span>
                           <span class="person-id-badge">#{{ p.id }}</span>
                           <span v-if="p.tmdb_id" class="tmdb-id-badge">TMDB #{{ p.tmdb_id }}</span>
+                          <span v-if="p.kinopoisk_person_id" class="kinopoisk-id-badge">KP #{{ p.kinopoisk_person_id }}</span>
                         </div>
                         <div v-if="p.en_name" class="person-en-name">{{ p.en_name }}</div>
                         <div style="margin-top: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -1085,6 +1086,16 @@ onUnmounted(() => {
     background: rgba(56, 139, 253, 0.2);
     border: 1px solid var(--info);
     color: var(--info);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+.kinopoisk-id-badge {
+    font-size: 10px;
+    font-weight: 800;
+    font-family: monospace;
+    background: rgba(255, 121, 0, 0.16);
+    border: 1px solid #ff7900;
+    color: #ff9a4d;
     padding: 1px 5px;
     border-radius: 4px;
 }

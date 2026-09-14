@@ -1068,8 +1068,9 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
     """Return one page of duplicate-photo groups without materializing all groups."""
     field = 'tmdb_photo_url' if 'TMDB' in source_type else 'kp_photo_url'
     version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
-    # v2 excludes groups already disproved by distinct TMDB identities.
-    cache_key = f'metrics:duplicate_photo_urls:v2:{version}:{field}:{offset}:{limit}'
+    # v3 includes the source Kinopoisk person ID in each duplicate row.
+    # Keep this separate from older cached pages that do not have the field.
+    cache_key = f'metrics:duplicate_photo_urls:v3:{version}:{field}:{offset}:{limit}'
     cached_page = cache.get(cache_key)
     if cached_page is not None:
         return cached_page
@@ -1090,7 +1091,15 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
     persons_qs = (
         Person.objects.filter(master_person__isnull=True)
         .filter(**{f'{field}__in': urls})
-        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id')
+        .values(
+            'id',
+            'name',
+            'en_name',
+            'tmdb_photo_url',
+            'kp_photo_url',
+            'tmdb_id',
+            'kinopoisk_person_id',
+        )
     )
 
     grouped_persons = defaultdict(list)
@@ -1103,6 +1112,7 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
                 'tmdb_photo_url': get_proxied_image_url(p['tmdb_photo_url']),
                 'kp_photo_url': get_proxied_image_url(p['kp_photo_url']),
                 'tmdb_id': p['tmdb_id'],
+                'kinopoisk_person_id': p['kinopoisk_person_id'],
             }
         )
 
@@ -1167,8 +1177,8 @@ def queue_duplicate_photo_urls_warmup():
     """Queue duplicate pages before a user opens the corresponding modal."""
     version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
     cache_keys = (
-        f'metrics:duplicate_photo_urls:v2:{version}:kp_photo_url:0:50',
-        f'metrics:duplicate_photo_urls:v2:{version}:tmdb_photo_url:0:50',
+        f'metrics:duplicate_photo_urls:v3:{version}:kp_photo_url:0:50',
+        f'metrics:duplicate_photo_urls:v3:{version}:tmdb_photo_url:0:50',
     )
     if any(cache.get(cache_key) is None for cache_key in cache_keys) and cache.add(
         'metrics:duplicate_photo_urls:warmup_lock', True, timeout=300

@@ -12,6 +12,7 @@ from app.services.metrics import (
     calculate_missing_kp_metric,
     calculate_unused_persons_metric,
     get_has_rating_list,
+    get_duplicate_photo_urls_page,
     get_missing_status_list,
     get_profession_persons_list,
     get_unused_persons_list,
@@ -118,6 +119,24 @@ class ImdbMetricSplitTests(TestCase):
         self.assertEqual(
             calculate_duplicate_photo_urls_metric(),
             [{'name': 'TMDB дубликаты', 'value': 1}, {'name': 'KP дубликаты', 'value': 0}],
+        )
+
+    def test_duplicate_photo_details_include_kinopoisk_person_id(self):
+        shared_photo = 'https://image.kinopoisk.ru/kp/shared.jpg'
+        first = Person.objects.create(
+            name='KP Person A', kp_photo_url=shared_photo, kinopoisk_person_id=101
+        )
+        second = Person.objects.create(
+            name='KP Person B', kp_photo_url=shared_photo, kinopoisk_person_id=202
+        )
+
+        items, has_more = get_duplicate_photo_urls_page('KP', limit=10)
+
+        self.assertFalse(has_more)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(
+            [(person['id'], person['kinopoisk_person_id']) for person in items[0]['persons']],
+            [(first.id, 101), (second.id, 202)],
         )
 
 
