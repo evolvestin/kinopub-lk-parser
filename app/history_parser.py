@@ -165,6 +165,33 @@ def _extract_int_from_string(text):
     return int(digits)
 
 
+def _update_related_objects_from_details(elements_data, model, relation, kinopub_id, label):
+    if not elements_data:
+        return
+
+    related_objects = []
+    elements = elements_data.find_elements(By.TAG_NAME, 'a')
+    for el in elements:
+        name = el.get_attribute('textContent').strip()
+        if name:
+            if model is Country:
+                name = normalize_country_name(name)
+            obj, _ = model.objects.update_or_create(name=name)
+            related_objects.append(obj)
+
+    if related_objects:
+        relation.set(related_objects)
+    else:
+        # An empty result can mean that the KinoPub markup was not parsed,
+        # not that the show has no countries/genres. Never destroy values
+        # populated by another source on a failed or changed page layout.
+        logging.warning(
+            'Could not parse %s links for KinoPub show %s; preserving existing relations.',
+            label,
+            kinopub_id,
+        )
+
+
 def _update_show_details_once(
     driver,
     kinopub_id,
@@ -396,17 +423,7 @@ def _update_show_details_once(
             ('Жанр', Genre, show.genres),
         ]:
             elements_data = get_row_data(label)
-            if elements_data:
-                related_objects = []
-                elements = elements_data.find_elements(By.TAG_NAME, 'a')
-                for el in elements:
-                    name = el.get_attribute('textContent').strip()
-                    if name:
-                        if model is Country:
-                            name = normalize_country_name(name)
-                        obj, _ = model.objects.update_or_create(name=name)
-                        related_objects.append(obj)
-                relation.set(related_objects)
+            _update_related_objects_from_details(elements_data, model, relation, kinopub_id, label)
 
         crew_labels = ['Создатель', 'Режиссёр', 'В ролях']
         for label in crew_labels:

@@ -73,6 +73,23 @@ class HistoryParserRecoveryTests(SimpleTestCase):
 
         self.assertTrue(history_parser.is_empty_browser_page(driver))
 
+    @patch('app.history_parser.logging.warning')
+    def test_empty_relation_parse_does_not_clear_existing_values(self, warning):
+        details_cell = Mock()
+        details_cell.find_elements.return_value = []
+        relation = Mock()
+
+        history_parser._update_related_objects_from_details(
+            details_cell,
+            history_parser.Country,
+            relation,
+            12345,
+            'Страна',
+        )
+
+        relation.set.assert_not_called()
+        warning.assert_called_once()
+
     def test_two_factor_submission_sets_value_and_submits_the_form(self):
         driver = Mock()
         code_input = Mock()
