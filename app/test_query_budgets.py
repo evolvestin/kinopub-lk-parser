@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from unittest.mock import patch
 
@@ -9,7 +10,7 @@ from django.test.utils import CaptureQueriesContext
 from app.models import Country, Genre, Show, UserRating, ViewHistory, ViewUser, ViewUserGroup
 from app.services.metrics import calculate_missing_country_meta_metric, get_missing_country_meta_list
 from app.services.stats_calculator import generate_group_stats
-from app.views import _serialize_show_details, bot_search_shows
+from app.views import _serialize_show_details, bot_search_shows, webapp_search
 
 
 class QueryBudgetTests(TestCase):
@@ -165,3 +166,25 @@ class QueryBudgetTests(TestCase):
             three_show_queries,
             'bot search must batch prefetches instead of querying per matching show',
         )
+
+    def test_webapp_search_matches_imdb_id_without_title(self):
+        imdb_show = Show.objects.create(
+            title='Официальное русское название',
+            original_title='Monster',
+            imdb_id='tt13207736',
+            imdb_url='https://www.imdb.com/title/tt13207736/',
+            type='Series',
+            year=2022,
+        )
+        request = RequestFactory().post(
+            '/api/search',
+            data=json.dumps({'query': '13207736', 'offset': 0, 'limit': 30}),
+            content_type='application/json',
+        )
+
+        with patch('app.views.get_webapp_user', return_value=self.user):
+            response = webapp_search(request)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertIn(imdb_show.id, [item['id'] for item in payload['shows']])

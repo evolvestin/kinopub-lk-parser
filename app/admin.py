@@ -414,7 +414,15 @@ class ShowAdmin(admin.ModelAdmin):
         'year',
         'ignore_collision',
     )
-    search_fields = ('id', 'kinopub_id', 'title', 'original_title', 'plot')
+    search_fields = (
+        'id',
+        'kinopub_id',
+        'imdb_id',
+        'imdb_url',
+        'title',
+        'original_title',
+        'plot',
+    )
     inlines = [
         ExternalRatingInline,
         ShowDurationInline,

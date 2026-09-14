@@ -623,7 +623,12 @@ def bot_search_shows(request):
         return JsonResponse({'results': []})
 
     shows = (
-        Show.objects.filter(Q(title__icontains=query) | Q(original_title__icontains=query))
+        Show.objects.filter(
+            Q(title__icontains=query)
+            | Q(original_title__icontains=query)
+            | Q(imdb_id__icontains=query)
+            | Q(imdb_url__icontains=query)
+        )
         .prefetch_related('countries', 'genres', 'ratings__user')
         .distinct()[:20]
     )
@@ -692,8 +697,12 @@ def bot_get_show_details(request, show_id):
 @require_http_methods(['GET'])
 def bot_get_by_imdb(request, imdb_id):
     try:
+        normalized_imdb_id = imdb_id if imdb_id.lower().startswith('tt') else f'tt{imdb_id}'
         show = (
-            Show.objects.filter(imdb_url__icontains=f'tt{imdb_id}')
+            Show.objects.filter(
+                Q(imdb_id__iexact=normalized_imdb_id)
+                | Q(imdb_url__icontains=normalized_imdb_id)
+            )
             .prefetch_related('countries', 'genres')
             .first()
         )
@@ -1918,7 +1927,10 @@ def webapp_search(request):
             return JsonResponse({'shows': [], 'persons': []})
 
         shows_qs = Show.objects.filter(
-            Q(title__icontains=query) | Q(original_title__icontains=query)
+            Q(title__icontains=query)
+            | Q(original_title__icontains=query)
+            | Q(imdb_id__icontains=query)
+            | Q(imdb_url__icontains=query)
         ).order_by('-year', '-id')
 
         shows = shows_qs[offset : offset + limit]
