@@ -190,7 +190,13 @@ onMounted(async () => {
     }
   }
 
-  await router.replace({ path: targetPath, query: targetQuery })
+  // Bootstrap can still be finishing while the user has already switched a
+  // view or toggled a query-backed control. Do not replay the stale startup
+  // location over that newer interaction.
+  const targetLocation = router.resolve({ path: targetPath, query: targetQuery })
+  if (router.currentRoute.value.fullPath !== targetLocation.fullPath) {
+    await router.replace(targetLocation)
+  }
 
   // The shell and the search screen do not need either large dataset.  Do not
   // make first paint wait for statistics, wishlist rows, or remote images.

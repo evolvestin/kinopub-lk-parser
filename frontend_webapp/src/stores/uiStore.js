@@ -57,7 +57,8 @@ export const useUIStore = defineStore('ui', () => {
           props: { 
             [`${type}Id`]: id,
             itemId: id,
-            type: type 
+            type: type,
+            ...(type === 'history' ? { routeQuery: { ...route.query } } : {})
           },
           key: `${type}-${id}-${i}`
         })
@@ -149,7 +150,17 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   function replaceQuery(query) {
-    const nextQuery = { ...stableRouteQuery.value, ...query }
+    const nextQuery = { ...stableRouteQuery.value }
+    Object.entries(query || {}).forEach(([key, value]) => {
+      // Query setters pass null/undefined for an intentional removal. Keep
+      // the stable route snapshot for rapid navigation, but do not resurrect
+      // a flag that the user just turned off.
+      if (value === null || value === undefined) {
+        delete nextQuery[key]
+      } else {
+        nextQuery[key] = value
+      }
+    })
     stableRouteQuery.value = nextQuery
     return router.replace({
       path: stableRoutePath.value || router.currentRoute.value.path,

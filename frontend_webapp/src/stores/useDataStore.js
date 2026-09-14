@@ -25,7 +25,7 @@ export const useDataStore = defineStore('data', () => {
       if (oldVal === val) return
 
       if (!val) {
-        delete query.q
+        query.q = null
       } else {
         query.q = val
       }

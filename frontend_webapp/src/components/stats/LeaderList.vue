@@ -63,6 +63,7 @@ const openItemHistory = (item, index) => {
     uiStore.openLayer('history', 'filter', {
         key: `${props.category}_${activeTab.value}`,
         idx: index,
+        name: item.name,
         title: item.name
     })
 }

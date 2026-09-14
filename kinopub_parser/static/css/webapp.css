@@ -2327,6 +2327,28 @@ img {
   overflow: hidden;
   padding-bottom: 0;
 }
+
+.history-loading-card {
+    min-height: 184px;
+    border-radius: 18px;
+    background: linear-gradient(110deg, var(--bg-input) 8%, var(--bg-card) 18%, var(--bg-input) 33%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.25s linear infinite;
+}
+
+.history-empty-state {
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    color: var(--text-muted);
+}
+
+@keyframes skeleton-shimmer {
+    to { background-position: -200% 0; }
+}
 .app-viewport #search-results {
   flex: 1;
   display: flex;

@@ -56,20 +56,29 @@
       style="padding: 16px;" 
       id="layer-hist-container"
     >
-      <template v-for="(item, idx) in visibleList" :key="item.id || `hist-${idx}`">
-        <div 
-          v-if="shouldShowDivider(item, idx)" 
-          class="hist-group-divider anim-item js-group-divider" 
-          :data-label="getGroupKey(item).toUpperCase()"
-        >
-           <span class="hist-group-divider-text">{{ getGroupKey(item) }}</span>
-        </div>
-        <ShowCard 
-          :show="item" 
-          :view-mode="viewMode" 
-          context="history" 
-          :history-id="props.historyId"
-        />
+      <template v-if="!statsReady">
+        <div v-for="n in 3" :key="`history-skeleton-${n}`" class="history-loading-card" aria-hidden="true"></div>
+      </template>
+      <div v-else-if="!items.length" class="empty history-empty-state">
+        <div class="icon" v-html="icons.dash"></div>
+        Нет просмотров для этого фильтра
+      </div>
+      <template v-else>
+        <template v-for="(item, idx) in visibleList" :key="item.id || `hist-${idx}`">
+          <div 
+            v-if="shouldShowDivider(item, idx)" 
+            class="hist-group-divider anim-item js-group-divider" 
+            :data-label="getGroupKey(item).toUpperCase()"
+          >
+             <span class="hist-group-divider-text">{{ getGroupKey(item) }}</span>
+          </div>
+          <ShowCard 
+            :show="item" 
+            :view-mode="viewMode" 
+            context="history" 
+            :history-id="props.historyId"
+          />
+        </template>
       </template>
       
       <div ref="sentinelEl" id="layer-hist-sentinel" style="height: 100px; width: 100%; margin-top: -50px; pointer-events: none;"></div>
@@ -86,7 +95,13 @@ import { icons } from '../../utils/icons'
 import ShowCard from '../shared/ShowCard.vue'
 import PersonAvatar from '../shared/PersonAvatar.vue'
 
-const props = defineProps(['historyId'])
+const props = defineProps({
+  historyId: String,
+  routeQuery: {
+    type: Object,
+    default: () => ({})
+  }
+})
 const route = useRoute()
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -104,13 +119,21 @@ const cachedOffsets = ref([])
 const titleReady = ref(false)
 let ticking = false
 
-const isShared = computed(() => !!route.query.shared_id || window.location.hash.includes('shared_id'))
+const statsReady = computed(() => !!statsStore.currentStats)
+
+// A layer can be mounted while vue-router is still resolving a hash
+// navigation. The UI store snapshots the query with the layer so filters do
+// not disappear during that short transition.
+const layerQuery = computed(() => ({ ...route.query, ...props.routeQuery }))
+
+const isShared = computed(() => !!layerQuery.value.shared_id || window.location.hash.includes('shared_id'))
 const canEdit = computed(() => !isShared.value && props.historyId !== 'ratings')
 
 const personInfo = computed(() => {
-  if (props.historyId !== 'filter' || !route.query.key || route.query.idx === null) return null
-  const key = route.query.key
-  const idx = parseInt(route.query.idx)
+  const query = layerQuery.value
+  if (props.historyId !== 'filter' || !query.key || query.idx == null || query.idx === '') return null
+  const key = query.key
+  const idx = parseInt(query.idx, 10)
   const stats = statsStore.currentStats
   if (!stats) return null
   const keyParts = key.replace('group_', '').split('_')
@@ -123,17 +146,21 @@ const personInfo = computed(() => {
 })
 
 const items = computed(() => {
+  const query = layerQuery.value
+  const rawIdx = query.idx
+  const rawShowId = query.show_id
   const params = { 
-    date: route.query.date, 
-    idx: route.query.idx ? parseInt(route.query.idx) : null, 
-    key: route.query.key, 
-    showId: route.query.show_id ? parseInt(route.query.show_id) : null 
+    date: query.date,
+    idx: rawIdx !== undefined && rawIdx !== null && rawIdx !== '' ? parseInt(rawIdx, 10) : null,
+    key: query.key,
+    name: query.name,
+    showId: rawShowId !== undefined && rawShowId !== null && rawShowId !== '' ? parseInt(rawShowId, 10) : null
   }
   return statsStore.getHistoryByType(props.historyId, params)
 })
 
 const displayTitle = computed(() => {
-  if (route.query.title) return route.query.title
+  if (layerQuery.value.title) return layerQuery.value.title
   const titles = { all: 'Вся история', movies: 'Фильмы', episodes: 'Эпизоды', ratings: 'Все оценки', wishlist_watched: 'Просмотрено из избранного', casino: 'История рулетки' }
   return titles[props.historyId] || 'История'
 })
@@ -214,6 +241,9 @@ const onScroll = () => {
 }
 
 const checkAndFetchAdditionalData = async () => {
+  if (!statsStore.currentStats && !statsStore.isLoading) {
+    await statsStore.fetchStats(statsStore.currentYear, true)
+  }
   if (props.historyId === 'casino') {
     uiStore.setLoading(true)
     await statsStore.fetchCasinoHistory()

@@ -25,7 +25,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
       if (val) {
         query.reorder_folders = 'true'
       } else {
-        delete query.reorder_folders
+        query.reorder_folders = null
       }
       uiStore.replaceQuery(query).catch(() => {})
     }
@@ -40,7 +40,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
       if (val) {
         query.reorder_items = 'true'
       } else {
-        delete query.reorder_items
+        query.reorder_items = null
       }
       uiStore.replaceQuery(query).catch(() => {})
     }
@@ -118,7 +118,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
       if (oldVal === val) return
 
       if (!val) {
-        delete query.folder
+        query.folder = null
       } else {
         query.folder = String(val)
       }
@@ -137,7 +137,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
       localStorage.setItem('kp_wl_sort_mode', val)
       if (val === 'default') {
-        delete query.sort
+        query.sort = null
       } else {
         query.sort = val
       }
@@ -156,7 +156,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
 
       localStorage.setItem('kp_wl_view_mode', val)
       if (val === 'grid') {
-        delete query.view
+        query.view = null
       } else {
         query.view = val
       }

@@ -4,6 +4,7 @@ import { useApi } from '../composables/useApi'
 import { useUIStore } from './uiStore'
 import { useUserStore } from './userStore'
 import router from '../router'
+import { buildGenreFilterItems, findStatItem, getHistoryDate, getHistoryPool, sortHistory } from '../utils/historyFilters'
 
 export const useStatsStore = defineStore('stats', () => {
   const api = useApi()
@@ -446,14 +447,15 @@ export const useStatsStore = defineStore('stats', () => {
     }
   }
 
-  function getHistoryByType(type, { date, idx, key, showId }) {
+  function getHistoryByType(type, { date, idx, key, name, showId }) {
     const D = currentStats.value
     if (!D) return []
 
+    const history = getHistoryPool(D)
+
     switch (type) {
       case 'all':
-        return [...(D.history_movies || []), ...(D.history_episodes || [])]
-          .sort((a, b) => b.view_date.localeCompare(a.view_date))
+        return sortHistory(history)
       case 'movies':
         return D.history_movies || []
       case 'episodes':
@@ -465,20 +467,18 @@ export const useStatsStore = defineStore('stats', () => {
       case 'casino':
         return D.casino_history || []
       case 'day':
-        return [...(D.history_movies || []), ...(D.history_episodes || [])]
-          .filter(i => i.view_date === date)
+        return sortHistory(history.filter((item) => getHistoryDate(item) === String(date || '').slice(0, 10)))
       case 'binge':
         return (D.history_episodes || [])
-          .filter(i => i.show_id === showId && i.view_date === date)
+          .filter(i => i.show_id === showId && getHistoryDate(i) === String(date || '').slice(0, 10))
           .sort((a, b) => {
             if (a.season_number !== b.season_number) return a.season_number - b.season_number
             return a.episode_number - b.episode_number
           })
       case 'weekday': {
         const targetDay = Number(idx)
-        const history = [...(D.history_movies || []), ...(D.history_episodes || [])]
         const weekdayIndex = (item) => {
-          const rawDate = String(item.raw_date || item.view_date || '')
+          const rawDate = getHistoryDate(item)
           const isoMatch = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
           const date = isoMatch
             ? new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])))
@@ -489,7 +489,7 @@ export const useStatsStore = defineStore('stats', () => {
         }
         return history
           .filter(item => weekdayIndex(item) === targetDay)
-          .sort((a, b) => String(b.raw_date || b.view_date || '').localeCompare(String(a.raw_date || a.view_date || '')))
+          .sort((a, b) => getHistoryDate(b).localeCompare(getHistoryDate(a)))
       }
       case 'rating_filter': {
         const targetRating = Number(idx)
@@ -529,22 +529,21 @@ export const useStatsStore = defineStore('stats', () => {
         const isGroup = key?.startsWith('group_')
         const poolKey = key?.replace('group_', '')
         const source = isGroup ? D.group : D
-        const pool = [...(source.history_movies || []), ...(source.history_episodes || [])]
+        const pool = getHistoryPool(source)
 
         let targetItem = null
-        if (poolKey === 'genres_top') targetItem = source.genres?.[idx]
+        if (poolKey === 'genres_top') {
+          targetItem = findStatItem(buildGenreFilterItems(source.genres), idx, name)
+        }
         else if (poolKey?.includes('_')) {
           const [cat, sub] = poolKey.split('_')
-          targetItem = D[cat]?.[sub]?.[idx]
+          targetItem = findStatItem(source?.[cat]?.[sub], idx, name)
         } else {
-          targetItem = D[poolKey]?.[idx]
+          targetItem = findStatItem(source?.[poolKey], idx, name)
         }
 
-        const allowedIds = targetItem?.show_ids || []
-        return pool.filter(i => allowedIds.includes(i.show_id))
-          .sort((a, b) => b.view_date.localeCompare(a.view_date))
-      case 'show_history':
-        return key || []
+        const allowedIds = new Set((targetItem?.show_ids || []).map(String))
+        return sortHistory(pool.filter((item) => allowedIds.has(String(item.show_id))))
       default:
         return []
     }

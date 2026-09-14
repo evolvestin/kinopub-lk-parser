@@ -9,19 +9,6 @@
       </div>
     </div>
 
-    <!-- Keep period navigation visible while a cold year is loading. The
-         selected year's content is intentionally not replaced with stale
-         data; the skeleton below represents exactly that selected period. -->
-    <div class="years" v-if="statsStore.availableYears.length > 1">
-      <button
-        v-for="year in statsStore.availableYears"
-        :key="year"
-        class="yr clickable"
-        :class="{ on: String(statsStore.currentYear) === String(year) }"
-        @click="statsStore.setYear(year)"
-      >{{ year === 'all' ? 'Всё время' : year }}</button>
-    </div>
-
     <template v-if="currentStats">
       <div :class="{ 'blurred-content': isFakeMode }" style="display: flex; flex-direction: column; min-height: 100%;">
         <div class="header">
@@ -64,6 +51,17 @@
           <button class="tab" :class="{ on: isGroupTab }" @click="selectTab('group')">
             <div class="icon" v-html="icons.users"></div> Группа
           </button>
+        </div>
+
+        <!-- Keep the selector in its original position below the header/tabs. -->
+        <div class="years" v-if="statsStore.availableYears.length > 1">
+          <button
+            v-for="year in statsStore.availableYears"
+            :key="year"
+            class="yr clickable"
+            :class="{ on: String(statsStore.currentYear) === String(year) }"
+            @click="statsStore.setYear(year)"
+          >{{ year === 'all' ? 'Всё время' : year }}</button>
         </div>
 
         <div v-if="!isGroupTab" id="sec-personal">
@@ -206,7 +204,7 @@
                 v-for="(item, idx) in currentStats.countries" 
                 :key="item.name" 
                 class="li li-clickable clickable"
-                @click="openHistory('filter', { key: 'countries', idx, title: item.name })"
+                @click="openHistory('filter', { key: 'countries', idx, name: item.name, title: item.name })"
               >
                 <div class="li-l">
                   <span class="li-rank">{{ idx + 1 }}</span>
@@ -310,6 +308,17 @@
         <div class="stats-skeleton-header">
           <div class="stats-skeleton-avatar"></div>
           <div class="stats-skeleton-title"></div>
+        </div>
+        <!-- The loading shell keeps year navigation available without moving
+             it above the header when the selected year's data is cold. -->
+        <div class="years" v-if="statsStore.availableYears.length > 1">
+          <button
+            v-for="year in statsStore.availableYears"
+            :key="year"
+            class="yr clickable"
+            :class="{ on: String(statsStore.currentYear) === String(year) }"
+            @click="statsStore.setYear(year)"
+          >{{ year === 'all' ? 'Всё время' : year }}</button>
         </div>
         <div class="stats-skeleton-card"></div>
         <div class="stats-skeleton-card stats-skeleton-card-short"></div>

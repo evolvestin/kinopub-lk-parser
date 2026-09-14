@@ -97,6 +97,7 @@ const handleGenreClick = (genre, index) => {
   uiStore.openLayer('history', 'filter', {
     key: props.dataKey,
     idx: index,
+    name: genre.name,
     title: genre.name
   })
 }
