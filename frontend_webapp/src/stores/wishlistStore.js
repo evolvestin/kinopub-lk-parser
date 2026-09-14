@@ -27,7 +27,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
       } else {
         delete query.reorder_folders
       }
-      router.replace({ query }).catch(() => {})
+      uiStore.replaceQuery(query).catch(() => {})
     }
   })
 
@@ -42,7 +42,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
       } else {
         delete query.reorder_items
       }
-      router.replace({ query }).catch(() => {})
+      uiStore.replaceQuery(query).catch(() => {})
     }
   })
 
@@ -122,7 +122,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
       } else {
         query.folder = String(val)
       }
-      router.replace({ query }).catch(() => {})
+      uiStore.replaceQuery(query).catch(() => {})
     }
   })
 
@@ -141,7 +141,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
       } else {
         query.sort = val
       }
-      router.replace({ query }).catch(() => {})
+      uiStore.replaceQuery(query).catch(() => {})
     }
   })
 
@@ -160,7 +160,7 @@ export const useWishlistStore = defineStore('wishlist', () => {
       } else {
         query.view = val
       }
-      router.replace({ query }).catch(() => {})
+      uiStore.replaceQuery(query).catch(() => {})
     }
   })
 

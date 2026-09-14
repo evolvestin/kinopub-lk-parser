@@ -1,11 +1,20 @@
 <template>
-  <div class="layer-content" v-if="show">
+  <div class="layer-content">
     <div class="layer-header">
        <button class="tab clickable" @click="uiStore.popLayer">
          <span v-html="icons.chevron_left"></span> Назад
        </button>
-       <div class="layer-title-main">{{ show.title }}</div>
+       <div class="layer-title-main">{{ show?.title || 'Загрузка' }}</div>
     </div>
+
+    <div v-if="!show" class="show-data-loading" aria-busy="true">
+      <div class="show-data-loading-poster"></div>
+      <div class="show-data-loading-line show-data-loading-line-wide"></div>
+      <div class="show-data-loading-line"></div>
+      <div class="show-data-loading-card"></div>
+    </div>
+
+    <template v-if="show">
 
     <div class="hero-container">
       <div class="hero-bg" :style="{ backgroundImage: (activeBg && !isPosterBroken) ? `url(${activeBg})` : 'none' }"></div>
@@ -186,6 +195,7 @@
            <PersonPill v-for="person in group.persons" :key="person.id" :person="person" />
         </div>
       </div>
+    </template>
     </template>
   </div>
 </template>
@@ -573,6 +583,46 @@ const openRatingsDetails = (ratingType) => {
 </script>
 
 <style scoped>
+.show-data-loading {
+    padding: 20px 16px 40px;
+}
+
+.show-data-loading-poster,
+.show-data-loading-line,
+.show-data-loading-card {
+    background: linear-gradient(100deg, var(--bg-input) 30%, var(--bg-card) 50%, var(--bg-input) 70%);
+    background-size: 300% 100%;
+    animation: show-data-loading-shimmer 1.2s ease-in-out infinite;
+    border-radius: 16px;
+}
+
+.show-data-loading-poster {
+    width: min(58vw, 220px);
+    height: min(58vw, 300px);
+    margin: 0 auto 20px;
+    border-radius: 20px;
+}
+
+.show-data-loading-line {
+    width: 62%;
+    height: 18px;
+    margin: 0 auto 12px;
+}
+
+.show-data-loading-line-wide {
+    width: 82%;
+}
+
+.show-data-loading-card {
+    height: 110px;
+    margin-top: 24px;
+}
+
+@keyframes show-data-loading-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
 .ep-badge {
     display: flex;
     flex-direction: column;

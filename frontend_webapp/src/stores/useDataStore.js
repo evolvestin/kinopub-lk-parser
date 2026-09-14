@@ -29,7 +29,7 @@ export const useDataStore = defineStore('data', () => {
       } else {
         query.q = val
       }
-      router.replace({ query }).catch(() => {})
+      uiStore.replaceQuery(query).catch(() => {})
     }
   })
 

@@ -7,4 +7,5 @@ __pycache__/
 /kinopub_parser/static/logo.png
 celerybeat-schedule
 /frontend_webapp/node_modules/
+/frontend_webapp/dist/
 shared/tunnel_url.txt

@@ -9,6 +9,19 @@
       </div>
     </div>
 
+    <!-- Keep period navigation visible while a cold year is loading. The
+         selected year's content is intentionally not replaced with stale
+         data; the skeleton below represents exactly that selected period. -->
+    <div class="years" v-if="statsStore.availableYears.length > 1">
+      <button
+        v-for="year in statsStore.availableYears"
+        :key="year"
+        class="yr clickable"
+        :class="{ on: String(statsStore.currentYear) === String(year) }"
+        @click="statsStore.setYear(year)"
+      >{{ year === 'all' ? 'Всё время' : year }}</button>
+    </div>
+
     <template v-if="currentStats">
       <div :class="{ 'blurred-content': isFakeMode }" style="display: flex; flex-direction: column; min-height: 100%;">
         <div class="header">
@@ -51,16 +64,6 @@
           <button class="tab" :class="{ on: isGroupTab }" @click="selectTab('group')">
             <div class="icon" v-html="icons.users"></div> Группа
           </button>
-        </div>
-
-        <div class="years" v-if="statsStore.availableYears.length > 1">
-          <button 
-            v-for="year in statsStore.availableYears" 
-            :key="year"
-            class="yr clickable" 
-            :class="{ on: String(statsStore.currentYear) === String(year) }" 
-            @click="statsStore.setYear(year)"
-          >{{ year === 'all' ? 'Всё время' : year }}</button>
         </div>
 
         <div v-if="!isGroupTab" id="sec-personal">

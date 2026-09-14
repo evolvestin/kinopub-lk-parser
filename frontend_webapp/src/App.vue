@@ -10,40 +10,26 @@ import BottomNav from './components/layout/BottomNav.vue'
 import Loader from './components/layout/Loader.vue'
 import Toast from './components/layout/Toast.vue'
 import SearchView from './views/SearchView.vue'
+import ShowDetailsLayer from './components/layers/ShowDetailsLayer.vue'
+import CollectionLayer from './components/layers/CollectionLayer.vue'
+import HistoryLayer from './components/layers/HistoryLayer.vue'
+import UnsubscribeLayer from './components/layers/UnsubscribeLayer.vue'
+import ShareModal from './components/modals/ShareModal.vue'
+import CasinoModal from './components/modals/CasinoModal.vue'
+import RatingModal from './components/modals/RatingModal.vue'
+import AddViewModal from './components/modals/AddViewModal.vue'
+import WlFolderModal from './components/modals/WlFolderModal.vue'
+import WlEditModal from './components/modals/WlEditModal.vue'
+import WlLimitModal from './components/modals/WlLimitModal.vue'
+import WlDeleteModal from './components/modals/WlDeleteModal.vue'
+import RatingsDetailsModal from './components/modals/RatingsDetailsModal.vue'
+import PrivacyModal from './components/modals/PrivacyModal.vue'
 
 const ViewLoading = {
   render: () => h('div', { class: 'view-loading-fallback', 'aria-busy': 'true' }, [
     h('div', { class: 'view-loading-line view-loading-line-wide' }),
     h('div', { class: 'view-loading-card' }),
     h('div', { class: 'view-loading-card view-loading-card-short' })
-  ])
-}
-const LayerLoading = {
-  render: () => h('div', { class: 'layer-loading-fallback', 'aria-busy': 'true' }, [
-    h('div', { class: 'layer-loading-header' }, [
-      h('div', { class: 'layer-loading-back' }, '‹ Назад'),
-      h('div', { class: 'layer-loading-title' }, 'Загрузка истории')
-    ]),
-    h('div', { class: 'layer-loading-card layer-loading-card-tall' }),
-    h('div', { class: 'layer-loading-card' }),
-    h('div', { class: 'layer-loading-card layer-loading-card-short' })
-  ])
-}
-const ModalLoading = {
-  render: () => h('div', { class: 'modal-overlay show modal-loading-overlay', 'aria-busy': 'true' }, [
-    h('div', { class: 'modal-content modal-loading-content' }, [
-      h('div', { class: 'modal-loading-header' }, [
-        h('div', { class: 'modal-loading-title' }),
-        h('div', { class: 'modal-loading-close' })
-      ]),
-      h('div', { class: 'modal-loading-body' }, [
-        h('div', { class: 'modal-loading-line modal-loading-line-wide' }),
-        h('div', { class: 'modal-loading-line' }),
-        h('div', { class: 'modal-loading-row' }),
-        h('div', { class: 'modal-loading-row' }),
-        h('div', { class: 'modal-loading-button' })
-      ])
-    ])
   ])
 }
 const WishlistView = defineAsyncComponent({
@@ -56,38 +42,6 @@ const StatsView = defineAsyncComponent({
   loadingComponent: ViewLoading,
   delay: 0
 })
-const ShowDetailsLayer = defineAsyncComponent({
-  loader: () => import('./components/layers/ShowDetailsLayer.vue'),
-  loadingComponent: LayerLoading,
-  delay: 0
-})
-const CollectionLayer = defineAsyncComponent({
-  loader: () => import('./components/layers/CollectionLayer.vue'),
-  loadingComponent: LayerLoading,
-  delay: 0
-})
-const HistoryLayer = defineAsyncComponent({
-  loader: () => import('./components/layers/HistoryLayer.vue'),
-  loadingComponent: LayerLoading,
-  delay: 0
-})
-
-const asyncModal = (loader) => defineAsyncComponent({ loader, loadingComponent: ModalLoading, delay: 0 })
-const ShareModal = asyncModal(() => import('./components/modals/ShareModal.vue'))
-const CasinoModal = asyncModal(() => import('./components/modals/CasinoModal.vue'))
-const RatingModal = asyncModal(() => import('./components/modals/RatingModal.vue'))
-const AddViewModal = asyncModal(() => import('./components/modals/AddViewModal.vue'))
-const WlFolderModal = asyncModal(() => import('./components/modals/WlFolderModal.vue'))
-const WlEditModal = asyncModal(() => import('./components/modals/WlEditModal.vue'))
-const WlLimitModal = asyncModal(() => import('./components/modals/WlLimitModal.vue'))
-const WlDeleteModal = asyncModal(() => import('./components/modals/WlDeleteModal.vue'))
-const RatingsDetailsModal = asyncModal(() => import('./components/modals/RatingsDetailsModal.vue'))
-const UnsubscribeLayer = defineAsyncComponent({
-  loader: () => import('./components/layers/UnsubscribeLayer.vue'),
-  loadingComponent: LayerLoading,
-  delay: 0
-})
-const PrivacyModal = asyncModal(() => import('./components/modals/PrivacyModal.vue'))
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -252,21 +206,6 @@ onMounted(async () => {
   setTimeout(() => {
     import('./views/StatsView.vue').catch(() => {})
     import('./views/WishlistView.vue').catch(() => {})
-    import('./components/layers/HistoryLayer.vue').catch(() => {})
-    // Fetch every modal chunk after first paint, so the first user click never
-    // produces a blank overlay while the component code is still downloading.
-    ;[
-      './components/modals/ShareModal.vue',
-      './components/modals/CasinoModal.vue',
-      './components/modals/RatingModal.vue',
-      './components/modals/AddViewModal.vue',
-      './components/modals/WlFolderModal.vue',
-      './components/modals/WlEditModal.vue',
-      './components/modals/WlLimitModal.vue',
-      './components/modals/WlDeleteModal.vue',
-      './components/modals/RatingsDetailsModal.vue',
-      './components/modals/PrivacyModal.vue'
-    ].forEach((modulePath) => import(modulePath).catch(() => {}))
     statsStore.prefetchInitialStats()
     wishlistStore.fetchWishlist()
   }, 0)

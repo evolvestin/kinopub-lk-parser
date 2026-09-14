@@ -24,15 +24,23 @@ export const useStatsStore = defineStore('stats', () => {
     },
     set(val) {
       const query = { ...router.currentRoute.value.query }
-      const oldVal = query.y || 'all'
-      if (oldVal === val) return
+      const nextVal = String(val)
+      const oldVal = String(query.y || 'all')
+      if (oldVal === nextVal) return
 
-      if (val === 'all') {
+      if (nextVal === 'all') {
         delete query.y
       } else {
-        query.y = val
+        query.y = nextVal
       }
-      router.replace({ query }).catch(() => {})
+      // A query-only replace without an explicit path can race with the
+      // bottom-nav navigation (especially while the lazy stats chunk is
+      // resolving) and keep the old /search path. Year selection belongs to
+      // the stats screen, so preserve that path explicitly.
+      const path = router.currentRoute.value.path.startsWith('/stats')
+        ? router.currentRoute.value.path
+        : '/stats'
+      router.replace({ path, query }).catch(() => {})
     }
   })
 
@@ -128,6 +136,20 @@ export const useStatsStore = defineStore('stats', () => {
   }
 
   const activeRequests = {}
+  function normalizeYears(years) {
+    const normalized = (Array.isArray(years) ? years : [])
+      .map((year) => String(year))
+      .filter(Boolean)
+    return normalized.length > 0 && !normalized.includes('all')
+      ? ['all', ...normalized]
+      : normalized
+  }
+
+  function updateAvailableYears(years) {
+    const normalized = normalizeYears(years)
+    if (normalized.length > 0) availableYears.value = normalized
+    return normalized
+  }
 
   async function fetchSharedStats(statId, year = 'all', isBackground = false) {
     const cacheKey = `shared_${statId}_${year}`
@@ -144,11 +166,7 @@ export const useStatsStore = defineStore('stats', () => {
       if (!sharedDataMap.value[statId]) {
         const res = await api.get(`shared_stats/${statId}/`)
         sharedDataMap.value[statId] = res.data
-        if (res.metadata?.years) {
-          let years = res.metadata.years || []
-          if (years.length > 0 && !years.includes('all')) years = ['all', ...years]
-          availableYears.value = years
-        }
+        if (res.metadata?.years) updateAvailableYears(res.metadata.years)
       }
 
       const yearData = sharedDataMap.value[statId][year]
@@ -210,9 +228,7 @@ export const useStatsStore = defineStore('stats', () => {
         })
 
         if (data.meta) {
-          let years = data.meta.years || []
-          if (years.length > 0 && !years.includes('all')) years = ['all', ...years]
-          availableYears.value = years
+          updateAvailableYears(data.meta.years)
           if (data.meta.role) userStore.userRole = data.meta.role
           
           if (data.meta.is_anonymous !== undefined) userStore.isAnonymous = data.meta.is_anonymous
@@ -255,8 +271,37 @@ export const useStatsStore = defineStore('stats', () => {
       if (data?.meta?.has_group && !data.group) {
         await fetchStats(year, true, true, true)
       }
+
+      // `meta.years` used to be treated as a list of tabs only. That made the
+      // first click on any year replace a complete page with an empty
+      // skeleton while a second, expensive calculation ran. Warm every year
+      // after the first response, in small batches, so switching periods is a
+      // cache hit for the common path. This is Redis-only data and does not
+      // add rows or columns to the database.
+      void prefetchAvailableStats()
     } catch (error) {
       console.warn('[StatsStore] Background stats prefetch failed:', error)
+    }
+  }
+
+  async function prefetchAvailableStats() {
+    const current = String(currentYear.value)
+    const queue = availableYears.value
+      .map((year) => String(year))
+      .filter((year) => year !== current && !statsCache.value[year] && !activeRequests[year])
+
+    // Keep at most two heavy period calculations in flight. This makes the
+    // warm-up invisible to the user and avoids a request burst for accounts
+    // with a long history.
+    for (let i = 0; i < queue.length; i += 2) {
+      await Promise.all(
+        queue.slice(i, i + 2).map((year) =>
+          fetchStats(year, true, false, false).catch((error) => {
+            console.warn(`[StatsStore] Background year ${year} prefetch failed:`, error)
+            return null
+          })
+        )
+      )
     }
   }
 
@@ -522,8 +567,18 @@ export const useStatsStore = defineStore('stats', () => {
     statsCache, activeTab, currentYear, availableYears, currentStats, hasGroup, isShared, sharedId,
     isLoading, statsError,
     userShowRatings, sharedShowRatings, setOptimisticRating, clearOptimisticRatings,
-    fetchStats, prefetchInitialStats, getHistoryByType, removeHistoryItem, fetchCasinoHistory,
+    fetchStats, prefetchInitialStats, prefetchAvailableStats, getHistoryByType, removeHistoryItem, fetchCasinoHistory,
     setActiveTab: (tab) => { activeTab.value = tab },
-    setYear: (year) => { currentYear.value = year }
+    setYear: (year) => {
+      const nextYear = String(year)
+      if (String(currentYear.value) === nextYear) return statsCache.value[nextYear] || null
+
+      // Switch the visible period immediately. StatsView keeps the year
+      // selector outside the data template, so a cold period shows its own
+      // skeleton instead of the previous year's numbers and remains
+      // switchable while the background request is running.
+      currentYear.value = nextYear
+      return null
+    }
   }
 })
