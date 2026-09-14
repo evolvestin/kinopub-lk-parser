@@ -143,7 +143,7 @@ def is_recovery_stale_element_error(e):
 
 def close_driver(driver):
     if driver:
-        logging.info('Closing Selenium driver.')
+        logging.info('Closing browser session.')
         try:
             driver.quit()
         except Exception:

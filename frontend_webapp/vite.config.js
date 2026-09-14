@@ -9,10 +9,14 @@ const hmrProtocol = process.env.VITE_HMR_PROTOCOL || 'ws'
 const hmrPort = process.env.VITE_HMR_PORT ? parseInt(process.env.VITE_HMR_PORT) : 5173
 const hmrPath = process.env.VITE_HMR_PATH || 'hmr'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [vue()],
   root: __dirname,
-  base: '/__vite__/', 
+  // Django proxies the Vite dev server under /__vite__/.  Production assets
+  // are served by Django's staticfiles storage, so generated dynamic imports
+  // must stay relative to the hashed entry file; otherwise they keep the
+  // dev-only /__vite__/ prefix and every lazy-loaded admin view 404s.
+  base: command === 'build' ? './' : '/__vite__/',
   server: {
     host: '0.0.0.0',
     port: 5173,
@@ -41,4 +45,4 @@ export default defineConfig({
       input: 'src/main.js',
     },
   },
-})
+}))

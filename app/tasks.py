@@ -733,18 +733,16 @@ def sync_imdb_data_task():
             call_command('syncimdbdata')
 
 
-@shared_task
-@single_instance_task(lock_name='update_site_metrics_lock', timeout=7200)
+@shared_task(time_limit=3600, soft_time_limit=3300)
+@single_instance_task(lock_name='update_site_metrics_lock', timeout=3600)
 @safe_execution
 def update_site_metrics_task():
     # Metrics scan app_showcrew/app_person and must not overlap parser writes.
-    # Wait for the existing global resource lock instead of silently dropping
-    # the hourly snapshot when the parser is still active.
-    with _wait_for_redis_lock(
-        RedisLock.KINOPUB_PARSER_GLOBAL,
-        lock_timeout=7200,
-        wait_timeout=SHARED_LOCK_WAIT_SECONDS,
-    ) as acquired:
+    # This is a periodic task: do not occupy a worker for five minutes while
+    # a parser run owns the lock.  Beat will enqueue the next hourly attempt.
+    # The hard/soft limits also bound the lifetime of a lock if a DB query
+    # itself hangs; the Redis TTL is then the final cleanup mechanism.
+    with _redis_lock(RedisLock.KINOPUB_PARSER_GLOBAL, timeout=3600) as acquired:
         if not acquired:
             return
 

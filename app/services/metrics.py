@@ -327,7 +327,11 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
         profession_stats = _calculate_profession_stats()
     professions_stats, en_professions_stats = profession_stats
     duplicate_photo_stats = calculate_duplicate_photo_urls_metric()
-    warm_duplicate_photo_urls_cache()
+    # Cache warming is deliberately kept off the snapshot path.  This
+    # function runs while the global parser lock is held, and the duplicate
+    # photo query scans a large person table.  Warming is handled by its
+    # dedicated metrics task instead, so a slow cache fill cannot pin the
+    # parser lock and make every other periodic task wait for five minutes.
     return {
         'missing_kp': calculate_missing_kp_metric(),
         'kp_unrated': calculate_kp_unrated_metric(),

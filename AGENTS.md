@@ -1,5 +1,17 @@
 # Agent operational notes
 
+## Safety rule for local PROD database clones
+
+This repository is often run locally against a restored copy of the PROD
+database; that local environment is allowed and is not inherently dangerous.
+However, do not start or trigger Celery Beat queue processing, dispatch parser
+tasks, or run any parser/queue task (including history parser, full scan, daily
+sync, new episodes, gap scanner, `process_queues_task`, metadata/rating sync,
+or any task that can contact KinoPub or send Telegram/2FA traffic) without the
+user's explicit authorization for that exact run in a separate request.
+Starting or inspecting the local stack, and reading container logs, database
+records, or Redis state, is allowed without that authorization.
+
 ## KinoPub session end-to-end smoke test
 
 The project has a safe, repeatable check for the HTTP history session:
