@@ -46,6 +46,7 @@ from app.models import (
     Show,
     ShowCrew,
     ShowDuration,
+    ShowPoster,
     SiteMetric,
     TaskRun,
     TelegramLog,
@@ -1076,6 +1077,13 @@ class ViewHistoryAdmin(SeasonEpisodeDisplayMixin, admin.ModelAdmin):
     @admin.display(description='Учтено', boolean=True, ordering='is_checked')
     def get_is_checked_display(self, obj):
         return obj.is_checked
+
+
+@admin.register(ShowPoster, site=admin_site)
+class ShowPosterAdmin(admin.ModelAdmin):
+    list_display = ('show', 'source', 'variant', 'external_id', 'url')
+    list_filter = ('source', 'variant')
+    search_fields = ('show__title', 'show__original_title', 'external_id', 'url')
 
 
 @admin.register(ShowDuration, site=admin_site)

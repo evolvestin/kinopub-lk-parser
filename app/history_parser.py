@@ -38,11 +38,19 @@ from app.models import (
     Show,
     ShowCrew,
     ShowDuration,
+    ShowPoster,
     ViewHistory,
 )
 from app.remote_browser import RemoteBrowserDriver, RemoteBrowserError
 from app.services.person_matching import find_person_for_kinopub
 from app.services.show_duration import upsert_show_duration
+from app.services.show_identity import (
+    find_exact_movie_match,
+    get_show_by_kinopub_id,
+    normalize_show_type,
+    record_kinopub_source,
+)
+from app.services.show_merge import merge_show_records
 from app.signals import view_history_created
 from app.utils import enqueue_show_update, normalize_country_name
 from shared.constants import (
@@ -298,7 +306,8 @@ def _update_show_details_once(
             )
             return
 
-        show = Show.objects.filter(kinopub_id=kinopub_id).first()
+        show = get_show_by_kinopub_id(kinopub_id)
+        show_was_new = show is None
         if show:
             if not force:
                 three_months_ago = timezone.now() - timedelta(days=90)
@@ -312,6 +321,7 @@ def _update_show_details_once(
                 original_title=title_text,
             )
 
+        source_is_3d = False
         logging.info(f'Fetching extended details for show kinopub_id={kinopub_id}')
 
         if title_text:
@@ -364,7 +374,8 @@ def _update_show_details_once(
                 type_match = re.search(f'/({types_pattern})', href)
                 if type_match:
                     type_key = type_match.group(1)
-                    show.type = SHOW_TYPE_MAPPING.get(type_key, type_key.capitalize())
+                    show.type, source_is_3d = normalize_show_type(type_key)
+                    show.is_3d = show.is_3d or source_is_3d
             except NoSuchElementException:
                 pass
 
@@ -409,6 +420,7 @@ def _update_show_details_once(
             'kinopoisk_rating',
             'kinopoisk_votes',
             'imdb_url',
+            'is_3d',
         ]
         if show._state.adding:
             show.save()
@@ -417,6 +429,23 @@ def _update_show_details_once(
             # Field-scoped updates prevent a concurrent IMDb batch from being
             # overwritten by this stale Show instance.
             show.save(update_fields=[*show_fields, 'updated_at'])
+
+        if source_is_3d and show_was_new:
+            # A newly discovered 3D page must reuse an existing normal movie.
+            # The match is deliberately exact and year-scoped; ambiguous
+            # same-name films remain separate for manual review.
+            canonical = find_exact_movie_match(
+                show.title,
+                show.original_title,
+                show.year,
+                exclude_id=show.id,
+            )
+            if canonical and canonical.id != show.id:
+                duplicate_id = show.id
+                merge_show_records(canonical.id, duplicate_id)
+                show = Show.objects.get(pk=canonical.id)
+
+        record_kinopub_source(show, kinopub_id, is_3d=source_is_3d)
 
         for label, model, relation in [
             ('Страна', Country, show.countries),
@@ -446,6 +475,7 @@ def _update_show_details_once(
             f'An error occurred while updating show details for kinopub_id={kinopub_id}: {e}'
         )
         raise
+    return show
 
 
 def update_show_details(
@@ -1484,6 +1514,16 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
     existing_shows = {
         s.kinopub_id: s for s in Show.objects.filter(kinopub_id__in=kinopub_ids_on_page)
     }
+    existing_shows.update(
+        {
+            poster.external_id: poster.show
+            for poster in ShowPoster.objects.filter(
+                source=ShowPoster.SOURCE_KINOPUB,
+                external_id__in=kinopub_ids_on_page,
+            ).select_related('show')
+            if poster.external_id not in existing_shows
+        }
+    )
 
     shows_to_create = []
     for item in views_on_page:
@@ -1502,7 +1542,18 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
     if shows_to_create:
         Show.objects.bulk_create(shows_to_create, ignore_conflicts=True)
 
-    db_shows = {s.kinopub_id: s.id for s in Show.objects.filter(kinopub_id__in=kinopub_ids_on_page)}
+    db_shows = {
+        s.kinopub_id: s.id for s in Show.objects.filter(kinopub_id__in=kinopub_ids_on_page)
+    }
+    db_shows.update(
+        {
+            poster.external_id: poster.show_id
+            for poster in ShowPoster.objects.filter(
+                source=ShowPoster.SOURCE_KINOPUB,
+                external_id__in=kinopub_ids_on_page,
+            )
+        }
+    )
 
     for item in views_on_page:
         item['show_id'] = db_shows[item['kinopub_id']]

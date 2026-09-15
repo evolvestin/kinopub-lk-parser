@@ -1,5 +1,11 @@
 # Agent operational notes
 
+## Testing environment
+
+Run project checks, migrations, and tests inside the Docker Compose services.
+Do not use the host `.venv` for project verification; it may not match the
+container runtime and dependencies.
+
 ## Safety rule for local PROD database clones
 
 This repository is often run locally against a restored copy of the PROD

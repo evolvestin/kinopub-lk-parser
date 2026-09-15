@@ -7,7 +7,7 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from app.management.base import LoggableBaseCommand
-from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew
+from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew, ShowPoster
 from app.services.poiskkino_client import PoiskkinoClient
 from app.tasks import get_kp_mapping
 from app.utils import normalize_country_name
@@ -280,6 +280,7 @@ class Command(LoggableBaseCommand):
 
         shows_to_update = []
         ext_ratings_to_update = []
+        posters_to_update = []
         crew_objects = []
         persons_to_update = {}
 
@@ -333,6 +334,18 @@ class Command(LoggableBaseCommand):
                     updated_at=now,
                 )
             )
+
+            poster_url = self._extract_poster_url(item.get('poster'))
+            if poster_url:
+                posters_to_update.append(
+                    ShowPoster(
+                        show_id=show_id,
+                        source=ShowPoster.SOURCE_KINOPOISK,
+                        variant='main',
+                        external_id=kp_id,
+                        url=poster_url,
+                    )
+                )
 
             for genre_data in self._object_list(item, 'genres'):
                 genre = existing_genres.get(genre_data.get('name'))
@@ -419,6 +432,15 @@ class Command(LoggableBaseCommand):
                 batch_size=500,
             )
 
+        if posters_to_update:
+            ShowPoster.objects.bulk_create(
+                posters_to_update,
+                update_conflicts=True,
+                unique_fields=['show', 'source', 'variant'],
+                update_fields=['external_id', 'url', 'updated_at'],
+                batch_size=500,
+            )
+
         if persons_to_update:
             for person in persons_to_update.values():
                 person.auto_resolve_kp_duplicate()
@@ -429,3 +451,14 @@ class Command(LoggableBaseCommand):
             )
 
         logging.info('Successfully synchronized %s shows.', len(shows_to_update))
+
+    @staticmethod
+    def _extract_poster_url(value):
+        if isinstance(value, str):
+            return value.strip() or None
+        if isinstance(value, dict):
+            for key in ('url', 'original', 'big', 'medium', 'preview', 'src'):
+                result = Command._extract_poster_url(value.get(key))
+                if result:
+                    return result
+        return None

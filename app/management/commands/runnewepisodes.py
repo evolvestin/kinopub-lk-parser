@@ -13,6 +13,7 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import Show, ShowDuration
+from app.services.show_identity import get_show_by_kinopub_id
 from app.tasks import enqueue_show_update, notify_new_episode_task
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 
@@ -66,9 +67,8 @@ class Command(LoggableBaseCommand):
                         season = item['season']
                         episode = item['episode']
 
-                        show_qs = Show.objects.filter(kinopub_id=kinopub_id)
-                        show_exists = show_qs.exists()
-                        show_obj = show_qs.first() if show_exists else None
+                        show_obj = get_show_by_kinopub_id(kinopub_id)
+                        show_exists = show_obj is not None
                         show_has_details = show_exists and show_obj.year is not None
 
                         duration_exists = False
@@ -84,14 +84,17 @@ class Command(LoggableBaseCommand):
                             f'Processing update for: {item["title"]} (KinoPub ID: {kinopub_id})'
                         )
 
-                        show, created = Show.objects.get_or_create(
-                            kinopub_id=kinopub_id,
-                            defaults={
-                                'title': item['title'],
-                                'original_title': item['original_title'],
-                                'type': show_type,
-                            },
-                        )
+                        show = show_obj
+                        created = False
+                        if show is None:
+                            show, created = Show.objects.get_or_create(
+                                kinopub_id=kinopub_id,
+                                defaults={
+                                    'title': item['title'],
+                                    'original_title': item['original_title'],
+                                    'type': show_type,
+                                },
+                            )
 
                         if not created and show.type != show_type:
                             show.type = show_type

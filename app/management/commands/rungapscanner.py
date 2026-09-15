@@ -18,6 +18,7 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
+from app.services.show_identity import get_show_by_kinopub_id
 
 
 class Command(LoggableBaseCommand):
@@ -156,7 +157,9 @@ class Command(LoggableBaseCommand):
 
                             # Проверяем, создалось ли шоу на самом деле
                             try:
-                                show = Show.objects.get(kinopub_id=kinopub_id)
+                                show = get_show_by_kinopub_id(kinopub_id)
+                                if show is None:
+                                    raise Show.DoesNotExist
                                 process_show_durations(driver, show, session_type='aux')
                                 processed_count += 1
                                 found_count += 1

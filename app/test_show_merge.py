@@ -13,16 +13,97 @@ from app.models import (
     Show,
     ShowCrew,
     ShowDuration,
+    ShowPoster,
     UserRating,
     ViewHistory,
     ViewUser,
     WishlistItem,
 )
 from app.services.show_merge import merge_show_records
+from app.services.show_identity import normalize_show_type
 from app.services.tmdb_client import sync_show_from_tmdb
+from shared.media import build_show_poster_options
 
 
 class ShowMergeTests(TestCase):
+    def test_3d_type_is_stored_as_movie_with_a_separate_marker(self):
+        self.assertEqual(normalize_show_type('3d'), ('Movie', True))
+        self.assertEqual(normalize_show_type('3D Movie'), ('Movie', True))
+        self.assertEqual(normalize_show_type('movie'), ('Movie', False))
+
+    def test_merge_3d_copy_keeps_source_id_and_marks_canonical_movie(self):
+        canonical = Show.objects.create(
+            kinopub_id=1006,
+            title='Дюна',
+            original_title='Dune',
+            type='Movie',
+            year=2021,
+        )
+        duplicate = Show.objects.create(
+            kinopub_id=2006,
+            title='Дюна',
+            original_title='Dune',
+            type='Movie',
+            year=2021,
+            is_3d=True,
+        )
+
+        merge_show_records(canonical.id, duplicate.id)
+
+        merged = Show.objects.get(pk=canonical.id)
+        self.assertEqual(merged.type, 'Movie')
+        self.assertTrue(merged.is_3d)
+        self.assertEqual(merged.kinopub_id, 1006)
+        self.assertTrue(
+            ShowPoster.objects.filter(
+                show=merged,
+                source=ShowPoster.SOURCE_KINOPUB,
+                external_id=2006,
+                variant='3d',
+            ).exists()
+        )
+
+    def test_poster_options_keep_primary_and_show_source_alternatives(self):
+        show = Show.objects.create(
+            kinopub_id=3001,
+            title='Постеры',
+            original_title='Posters',
+            type='Movie',
+        )
+        ShowPoster.objects.create(
+            show=show,
+            source=ShowPoster.SOURCE_KINOPUB,
+            external_id=3001,
+            variant='main',
+            url='https://kinopub.example/main.jpg',
+        )
+        ShowPoster.objects.create(
+            show=show,
+            source=ShowPoster.SOURCE_KINOPUB,
+            external_id=3002,
+            variant='3d',
+            url='https://kinopub.example/3d.jpg',
+        )
+        ShowPoster.objects.create(
+            show=show,
+            source=ShowPoster.SOURCE_KINOPOISK,
+            external_id=4001,
+            variant='main',
+            url='https://kinopoisk.example/main.jpg',
+        )
+
+        options = build_show_poster_options(show)
+
+        self.assertTrue(options[0]['is_primary'])
+        self.assertEqual(len(options), 3)
+        self.assertEqual(
+            [(option['source'], option['variant']) for option in options[1:]],
+            [
+                (ShowPoster.SOURCE_KINOPUB, '3d'),
+                (ShowPoster.SOURCE_KINOPOISK, 'main'),
+            ],
+        )
+
     def test_merge_preserves_identity_and_all_show_relations(self):
         canonical = Show.objects.create(
             kinopub_id=1001,

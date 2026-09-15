@@ -394,6 +394,12 @@ class Show(BaseModel):
     title = models.CharField(max_length=255)
     original_title = models.CharField(max_length=255)
     type = models.CharField(max_length=50, default='Series', db_index=True)
+    is_3d = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name='Есть 3D-копия',
+        help_text='У фильма существует отдельная 3D-версия в источнике KinoPub.',
+    )
     year = models.IntegerField(null=True, blank=True, db_index=True)
     status = models.CharField(max_length=50, null=True, blank=True, db_index=True)
     kinopoisk_url = models.URLField(max_length=255, null=True, blank=True)
@@ -608,6 +614,46 @@ class Show(BaseModel):
                 name='idx_show_plot_upper_trgm',
             ),
         ]
+
+
+class ShowPoster(BaseModel):
+    SOURCE_KINOPUB = 'kinopub'
+    SOURCE_TMDB = 'tmdb'
+    SOURCE_KINOPOISK = 'kinopoisk'
+    SOURCE_CHOICES = (
+        (SOURCE_KINOPUB, 'KinoPub'),
+        (SOURCE_TMDB, 'TMDB'),
+        (SOURCE_KINOPOISK, 'Kinopoisk'),
+    )
+
+    show = models.ForeignKey(Show, on_delete=models.CASCADE, related_name='posters')
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
+    variant = models.CharField(
+        max_length=20,
+        default='',
+        blank=True,
+        help_text='Например, main или 3d для разных копий одного источника.',
+    )
+    external_id = models.BigIntegerField(null=True, blank=True, db_index=True)
+    url = models.URLField(max_length=1000, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['source', 'external_id'],
+                condition=models.Q(external_id__isnull=False),
+                name='uniq_show_poster_source_external_id',
+            ),
+            models.UniqueConstraint(
+                fields=['show', 'source', 'variant'],
+                name='uniq_show_poster_variant',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['show', 'source'], name='app_showpos_show_id_0d20d2_idx')
+        ]
+        verbose_name = 'Show poster'
+        verbose_name_plural = 'Show posters'
 
 
 class ViewHistory(BaseModel):

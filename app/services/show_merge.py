@@ -9,10 +9,12 @@ from app.models import (
     Show,
     ShowCrew,
     ShowDuration,
+    ShowPoster,
     UserRating,
     ViewHistory,
     WishlistItem,
 )
+from shared.media import build_poster_url
 
 
 class ShowMergeConflictError(Exception):
@@ -37,6 +39,8 @@ class ShowMergeStats:
     casino_spins_moved: int = 0
     muted_notifications_moved: int = 0
     muted_notifications_deduplicated: int = 0
+    posters_moved: int = 0
+    posters_deduplicated: int = 0
 
 
 def _same_or_fill(canonical, duplicate, field_name):
@@ -141,10 +145,54 @@ def _merge_show_fields(canonical, duplicate, allow_tmdb_conflict=False, preferre
             setattr(canonical, field_name, value)
             changed_fields.add(field_name)
 
+    if duplicate.is_3d and not canonical.is_3d:
+        canonical.is_3d = True
+        changed_fields.add('is_3d')
+
     if changed_fields:
         changed_fields.add('updated_at')
         canonical.save(update_fields=changed_fields)
 
+
+def _ensure_kinopub_poster(show):
+    if not show.kinopub_id:
+        return
+    variant = '3d' if show.is_3d else 'main'
+    ShowPoster.objects.get_or_create(
+        source=ShowPoster.SOURCE_KINOPUB,
+        external_id=show.kinopub_id,
+        defaults={
+            'show_id': show.id,
+            'variant': variant,
+            'url': build_poster_url(show.kinopub_id, None, 'big') or '',
+        },
+    )
+
+
+def _merge_posters(canonical_id, duplicate_id, stats):
+    rows = list(ShowPoster.objects.filter(show_id=duplicate_id).order_by('id'))
+    existing_by_key = {
+        (row.source, row.variant): row
+        for row in ShowPoster.objects.filter(show_id=canonical_id)
+    }
+    for row in rows:
+        existing = existing_by_key.get((row.source, row.variant))
+        if existing:
+            changed_fields = []
+            if not existing.url and row.url:
+                existing.url = row.url
+                changed_fields.append('url')
+            if existing.external_id is None and row.external_id is not None:
+                existing.external_id = row.external_id
+                changed_fields.append('external_id')
+            if changed_fields:
+                existing.save(update_fields=changed_fields + ['updated_at'])
+            row.delete()
+            stats.posters_deduplicated += 1
+        else:
+            ShowPoster.objects.filter(pk=row.pk).update(show_id=canonical_id)
+            existing_by_key[(row.source, row.variant)] = row
+            stats.posters_moved += 1
 
 def _merge_crew(canonical_id, duplicate_id, stats):
     rows = list(ShowCrew.objects.filter(show_id=duplicate_id).order_by('id'))
@@ -340,6 +388,22 @@ def merge_show_records(
     duplicate = shows[duplicate_id]
     stats = ShowMergeStats(canonical_id=canonical_id, duplicate_id=duplicate_id)
 
+    # A 3D KinoPub page is a second source item, not a second movie. Retain
+    # its source ID/poster before deleting the duplicate row. This also makes
+    # subsequent parser visits resolve back to the canonical show.
+    _ensure_kinopub_poster(canonical)
+    _ensure_kinopub_poster(duplicate)
+    if (
+        canonical.kinopub_id
+        and duplicate.kinopub_id
+        and canonical.kinopub_id != duplicate.kinopub_id
+        and canonical.type == 'Movie'
+        and duplicate.type == 'Movie'
+        and (canonical.is_3d or duplicate.is_3d)
+    ):
+        Show.objects.filter(pk=duplicate.id).update(kinopub_id=None)
+        duplicate.kinopub_id = None
+
     _merge_show_fields(
         canonical,
         duplicate,
@@ -348,6 +412,7 @@ def merge_show_records(
     )
     canonical.countries.add(*duplicate.countries.all())
     canonical.genres.add(*duplicate.genres.all())
+    _merge_posters(canonical_id, duplicate_id, stats)
     _merge_crew(canonical_id, duplicate_id, stats)
     _merge_durations(canonical_id, duplicate_id, stats)
     _merge_histories(canonical_id, duplicate_id, stats)

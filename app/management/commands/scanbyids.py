@@ -15,6 +15,7 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import Show
+from app.services.show_identity import get_show_by_kinopub_id
 
 
 class Command(LoggableBaseCommand):
@@ -81,7 +82,9 @@ class Command(LoggableBaseCommand):
                     update_show_details(driver, kinopub_id, force=True, session_type='aux')
 
                     try:
-                        show = Show.objects.get(kinopub_id=kinopub_id)
+                        show = get_show_by_kinopub_id(kinopub_id)
+                        if show is None:
+                            raise Show.DoesNotExist
                         process_show_durations(driver, show, session_type='aux')
                     except Show.DoesNotExist:
                         logging.warning(

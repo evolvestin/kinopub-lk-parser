@@ -45,6 +45,18 @@
           <div v-if="showRateGuide" class="guide-tooltip-left rate-guide">Поставить оценку</div>
         </button>
       </div>
+      <div v-if="posterOptions.length > 1" class="poster-switcher" role="group" aria-label="Постеры">
+        <button
+          v-for="(poster, index) in posterOptions"
+          :key="`${poster.source}-${poster.variant}-${index}`"
+          type="button"
+          class="poster-dot"
+          :class="{ active: activePosterIndex === index }"
+          :aria-label="`Постер: ${posterLabel(poster)}`"
+          :title="posterLabel(poster)"
+          @click="selectPoster(index)"
+        ></button>
+      </div>
     </div>
 
     <div class="show-info">
@@ -60,6 +72,7 @@
       <div class="show-meta-tags">
         <div v-if="show.year" class="sm-tag clickable" @click="uiStore.openLayer('year', show.year)">{{ show.year }}</div>
         <div v-if="show.type" class="sm-tag clickable" style="color:var(--info)" @click="uiStore.openLayer('show_type', show.type)">{{ showTypeRu }}</div>
+        <div v-if="show.is_3d" class="sm-tag" style="color:var(--accent); border-color:var(--accent);">3D-копия</div>
         <div v-if="shouldShowStatus" class="sm-tag clickable" @click="uiStore.openLayer('status', show.status)">{{ showStatusRu }}</div>
       </div>
 
@@ -219,6 +232,7 @@ const router = useRouter()
 const show = ref(null)
 const activePoster = ref('')
 const activeBg = ref('')
+const activePosterIndex = ref(0)
 const activeSeasonStr = ref(null)
 const isMuted = ref(false)
 const hasAnyMuted = ref(false)
@@ -244,6 +258,46 @@ const handlePosterError = () => {
     markImageAsBroken(activePoster.value)
   }
   isPosterBroken.value = true
+}
+
+const posterOptions = computed(() => {
+  if (show.value?.poster_options?.length) return show.value.poster_options
+  if (show.value?.poster_large) {
+    return [{ url: show.value.poster_large, source: 'main', variant: 'main', is_primary: true }]
+  }
+  return []
+})
+
+const posterLabel = (poster) => {
+  const sourceLabels = { kinopub: 'KinoPub', tmdb: 'TMDB', kinopoisk: 'Кинопоиск', main: 'Основной' }
+  const source = sourceLabels[poster.source] || poster.source || 'Источник'
+  return poster.variant === '3d' ? `${source} (3D)` : source
+}
+
+const selectPoster = (index) => {
+  const poster = posterOptions.value[index]
+  if (!poster?.url) return
+  activePosterIndex.value = index
+  activePoster.value = poster.url
+  activeBg.value = poster.url
+  isPosterBroken.value = isImageBroken(poster.url)
+}
+
+const setInitialPoster = (data) => {
+  activePosterIndex.value = 0
+  activePoster.value = data.poster_medium || posterOptions.value[0]?.url || ''
+  activeBg.value = activePoster.value
+  isPosterBroken.value = isImageBroken(activePoster.value)
+  if (data.poster_large && posterOptions.value.length) {
+    const img = new Image()
+    img.src = data.poster_large
+    img.onload = () => {
+      if (activePosterIndex.value === 0) {
+        activePoster.value = data.poster_large
+        activeBg.value = data.poster_large
+      }
+    }
+  }
 }
 
 const cacheKey = computed(() => {
@@ -380,12 +434,7 @@ const loadShowData = async () => {
     show.value = cachedData
     isMuted.value = cachedData.is_muted
     hasAnyMuted.value = cachedData.has_any_muted || false
-    activePoster.value = cachedData.poster_medium || ''
-    activeBg.value = cachedData.poster_medium || ''
-    if (cachedData.poster_large) {
-      activePoster.value = cachedData.poster_large
-      activeBg.value = cachedData.poster_large
-    }
+    setInitialPoster(cachedData)
     if (cachedData.title) {
       const query = { ...router.currentRoute.value.query }
       if (!query.q) {
@@ -423,17 +472,7 @@ const loadShowData = async () => {
       }
     }
 
-    activePoster.value = data.poster_medium || ''
-    activeBg.value = data.poster_medium || ''
-
-    if (data.poster_large) {
-      const img = new Image()
-      img.src = data.poster_large
-      img.onload = () => {
-        activePoster.value = data.poster_large
-        activeBg.value = data.poster_large
-      }
-    }
+    setInitialPoster(data)
   } catch (e) {
     if (!show.value) {
       console.error('[ShowDetailsLayer] Failed to load show:', e)
@@ -583,6 +622,35 @@ const openRatingsDetails = (ratingType) => {
 </script>
 
 <style scoped>
+.poster-switcher {
+    position: absolute;
+    z-index: 4;
+    left: 0;
+    right: 0;
+    bottom: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 7px;
+}
+
+.poster-dot {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.45);
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.poster-dot.active {
+    transform: scale(1.35);
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
 .show-data-loading {
     padding: 20px 16px 40px;
 }

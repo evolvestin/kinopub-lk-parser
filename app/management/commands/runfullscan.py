@@ -17,6 +17,12 @@ from app.history_parser import (
 )
 from app.management.base import LoggableBaseCommand
 from app.models import LogEntry, Show
+from app.services.show_identity import (
+    find_exact_movie_match,
+    get_show_by_kinopub_id,
+    normalize_show_type,
+    record_kinopub_source,
+)
 from app.utils import enqueue_show_update
 from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 
@@ -75,11 +81,13 @@ def parse_and_save_catalog_page(driver, mode):
                 if imdb_match:
                     extracted_imdb_id = imdb_match.group(1)
 
+            stored_type, is_3d = normalize_show_type(mode)
             show_data = {
                 'kinopub_id': kinopub_id,
                 'title': title,
                 'original_title': original_title,
-                'type': SHOW_TYPE_MAPPING.get(mode, mode.capitalize()),
+                'type': stored_type or SHOW_TYPE_MAPPING.get(mode, mode.capitalize()),
+                'is_3d': is_3d,
                 'kinopoisk_url': None,
                 'kinopoisk_rating': None,
                 'imdb_url': None,
@@ -120,12 +128,19 @@ def parse_and_save_catalog_page(driver, mode):
         k_id = data['kinopub_id']
         i_id = data.get('imdb_id')
 
-        existing_show = Show.objects.filter(kinopub_id=k_id).first()
+        existing_show = get_show_by_kinopub_id(k_id)
         if not existing_show and i_id:
             existing_show = Show.objects.filter(imdb_id=i_id).first()
+        if not existing_show and data['type'] == 'Movie':
+            existing_show = find_exact_movie_match(
+                data['title'],
+                data['original_title'],
+                include_3d=True,
+            )
 
         if existing_show:
-            if not existing_show.kinopub_id:
+            was_3d = existing_show.is_3d
+            if not existing_show.kinopub_id and not Show.objects.filter(kinopub_id=k_id).exists():
                 if not Show.objects.filter(kinopub_id=k_id).exclude(id=existing_show.id).exists():
                     existing_show.kinopub_id = k_id
             if data['title']:
@@ -145,10 +160,16 @@ def parse_and_save_catalog_page(driver, mode):
                     existing_show.imdb_id = i_id
 
             existing_show.save()
+            if data.get('is_3d') and not was_3d:
+                existing_show.is_3d = True
+                existing_show.save(update_fields=['is_3d', 'updated_at'])
+                enqueue_show_update([existing_show.id], details=True, durations=False, ratings=True)
+            record_kinopub_source(existing_show, k_id, is_3d=data.get('is_3d', False))
         else:
             if data.get('imdb_id') and Show.objects.filter(imdb_id=data['imdb_id']).exists():
                 data['imdb_id'] = None
             created_show = Show.objects.create(**data)
+            record_kinopub_source(created_show, k_id, is_3d=data.get('is_3d', False))
             new_created_count += 1
             enqueue_show_update([created_show.id], details=True, durations=True, ratings=True)
 

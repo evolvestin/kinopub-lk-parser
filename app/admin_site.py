@@ -68,6 +68,7 @@ class CustomAdminSite(admin.AdminSite):
                     'RejectedPersonPhoto',
                     'ShowCrew',
                     'ShowDuration',
+                    'ShowPoster',
                     'Country',
                     'Genre',
                 ],

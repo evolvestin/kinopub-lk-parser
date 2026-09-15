@@ -110,7 +110,7 @@ from shared.constants import (
     UserRole,
 )
 from shared.formatters import format_country_display_names, format_precision_date, format_se
-from shared.media import build_poster_url, get_poster_url
+from shared.media import build_poster_url, build_show_poster_options, get_poster_url
 
 logger = logging.getLogger('app')
 
@@ -300,6 +300,7 @@ def _serialize_show_details(show, user=None):
         'title': show.title,
         'original_title': show.original_title,
         'type': show.type,
+        'is_3d': show.is_3d,
         'year': show.year,
         'status': show.status,
         'kinopoisk_rating': show.kinopoisk_rating,
@@ -1484,7 +1485,12 @@ def webapp_get_show_full(request, show_id):
     try:
         show = (
             Show.objects.select_related('ext_rating')
-            .prefetch_related('countries', 'genres', 'showcrew_set__person__master_person')
+            .prefetch_related(
+                'countries',
+                'genres',
+                'posters',
+                'showcrew_set__person__master_person',
+            )
             .get(id=show_id)
         )
 
@@ -1767,11 +1773,13 @@ def webapp_get_show_full(request, show_id):
             'title': show.title,
             'original_title': show.original_title,
             'type': show.type,
+            'is_3d': show.is_3d,
             'year': show.year,
             'status': show.status,
             'plot': show.plot,
             'poster_large': build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'big'),
             'poster_medium': build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'medium'),
+            'poster_options': build_show_poster_options(show, 'big'),
             'kinopoisk_rating': show.kinopoisk_rating,
             'kinopoisk_votes': show.kinopoisk_votes,
             'kinopoisk_url': show.kinopoisk_url,
