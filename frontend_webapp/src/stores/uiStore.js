@@ -91,11 +91,43 @@ export const useUIStore = defineStore('ui', () => {
   // an open show/history layer.
   const stableRoutePath = ref(router.currentRoute.value.path || '/search')
   const stableRouteQuery = ref({ ...router.currentRoute.value.query })
+  // Several UI actions can update the hash in the same event loop (for
+  // example, the debounced search query and the click that opens a show).
+  // Keep the newest intended location authoritative until that navigation is
+  // committed, otherwise an older navigation can erase a just-opened layer.
+  let pendingNavigation = null
+
   router.afterEach((to) => {
     activeView.value = viewNameFromPath(to.path)
+    // Ignore an older navigation finishing after a newer UI intent. The
+    // promise handler below will commit the stable snapshot for the newest
+    // successful navigation.
+    if (pendingNavigation && to.fullPath !== pendingNavigation.fullPath) return
     stableRoutePath.value = to.path
     stableRouteQuery.value = { ...to.query }
+    if (pendingNavigation) pendingNavigation = null
   })
+
+  function navigate(method, location) {
+    const target = router.resolve(location)
+    pendingNavigation = target
+    return router[method](location).then(() => {
+      if (pendingNavigation === target && router.currentRoute.value.fullPath === target.fullPath) {
+        stableRoutePath.value = router.currentRoute.value.path
+        stableRouteQuery.value = { ...router.currentRoute.value.query }
+        pendingNavigation = null
+      }
+    }).catch((error) => {
+      if (pendingNavigation === target) {
+        pendingNavigation = null
+        stableRoutePath.value = router.currentRoute.value.path
+        stableRouteQuery.value = { ...router.currentRoute.value.query }
+      }
+      // A cancelled navigation is expected when two rapid UI actions happen;
+      // callers should not get an unhandled promise rejection for it.
+      return error
+    })
+  }
 
   function syncActiveView() {
     activeView.value = viewNameFromPath(router.currentRoute.value.path)
@@ -105,15 +137,22 @@ export const useUIStore = defineStore('ui', () => {
     if (window.IS_ADMIN_DASHBOARD) return
     const currentPath = stableRoutePath.value || router.currentRoute.value.path
     const newPath = `${currentPath}/${type}/${id}`.replace(/\/+/g, '/')
+    // Telegram/mobile touch handling can deliver both the native click and a
+    // synthetic click. Do not push the same layer twice while the first
+    // navigation is still settling.
+    if (currentPath.endsWith(`/${type}/${id}`)) return
     stableRoutePath.value = newPath
     const nextQuery = { ...stableRouteQuery.value, ...query }
     stableRouteQuery.value = nextQuery
-    router.push({ path: newPath, query: nextQuery })
+    navigate('push', { path: newPath, query: nextQuery })
   }
 
   function popLayer() {
     isHistoryEditMode.value = false
     if (window.history.state && window.history.state.back) {
+      // Back/forward is an external history transition from the store's
+      // perspective; let afterEach adopt the route selected by the browser.
+      pendingNavigation = null
       router.back()
     } else {
       const currentPath = stableRoutePath.value || router.currentRoute.value.path
@@ -121,10 +160,10 @@ export const useUIStore = defineStore('ui', () => {
       if (segments.length > 2) {
         const newPath = segments.slice(0, -2).join('/')
         stableRoutePath.value = newPath
-        router.replace({ path: newPath, query: stableRouteQuery.value })
+        navigate('replace', { path: newPath, query: stableRouteQuery.value })
       } else {
         stableRoutePath.value = '/search'
-        router.replace({ path: '/search', query: stableRouteQuery.value })
+        navigate('replace', { path: '/search', query: stableRouteQuery.value })
       }
     }
   }
@@ -134,19 +173,27 @@ export const useUIStore = defineStore('ui', () => {
     isHistoryEditMode.value = false
     localStorage.setItem('kp_last_active_view', viewName)
     const query = { ...stableRouteQuery.value }
+
+    // Base-tab navigation closes transient layers and edit modes, but keeps
+    // user navigation state such as the search text, stats tab/year, and
+    // wishlist folder/sort/view settings.
+    delete query.modal
+    Object.keys(query).forEach((key) => {
+      if (key.startsWith('modal_')) delete query[key]
+    })
+    const transientQueryKeys = ['reorder_folders', 'reorder_items', 'show_id', 'title', 'date', 'idx', 'key', 'name']
+    transientQueryKeys.forEach((key) => {
+      delete query[key]
+    })
     if (viewName !== 'stats') {
       delete query.shared_id
-      delete query.tab
-    }
-    if (viewName !== 'search') {
-      delete query.q
     }
     // Base navigation is a replacement of the current screen, not a nested
     // history entry. This also prevents a fast sequence of tab clicks from
     // leaving an obsolete kept-alive view visible while the hash catches up.
     activeView.value = viewNameFromPath(`/${viewName}`)
     stableRoutePath.value = `/${viewName}`
-    router.replace({ name: viewName, query })
+    navigate('replace', { name: viewName, query })
   }
 
   function replaceQuery(query) {
@@ -162,7 +209,7 @@ export const useUIStore = defineStore('ui', () => {
       }
     })
     stableRouteQuery.value = nextQuery
-    return router.replace({
+    return navigate('replace', {
       path: stableRoutePath.value || router.currentRoute.value.path,
       query: nextQuery
     })
@@ -180,7 +227,7 @@ export const useUIStore = defineStore('ui', () => {
       }
     })
     stableRouteQuery.value = nextQuery
-    return router.replace({
+    return navigate('replace', {
       path: stableRoutePath.value || router.currentRoute.value.path,
       query: nextQuery
     })
@@ -213,7 +260,7 @@ export const useUIStore = defineStore('ui', () => {
     // rapid close/open sequences atomic and prevents a stale modal_level from
     // being restored by an asynchronous router.back().
     stableRouteQuery.value = currentQuery
-    router.replace({
+    navigate('replace', {
       path: stableRoutePath.value || router.currentRoute.value.path,
       query: currentQuery
     })
@@ -227,7 +274,7 @@ export const useUIStore = defineStore('ui', () => {
         if (k.startsWith('modal_')) delete currentQuery[k]
       })
       stableRouteQuery.value = currentQuery
-      router.replace({
+      navigate('replace', {
         path: stableRoutePath.value || router.currentRoute.value.path,
         query: currentQuery
       })
