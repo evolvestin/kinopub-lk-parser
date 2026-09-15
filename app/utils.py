@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import urllib.parse
 from datetime import timedelta
 
@@ -17,6 +18,24 @@ _BROWSER_ONLY_IMAGE_HOSTS = (
     'avatars.mds.yandex.net',
     'avatars.mds.yandex.ru',
 )
+
+_IMDB_ID_RE = re.compile(r'^tt\d+$', re.IGNORECASE)
+_IMDB_URL_ID_RE = re.compile(r'/title/(tt\d+)(?:[/\\?#]|$)', re.IGNORECASE)
+
+
+def normalize_imdb_id(value: str | None) -> str | None:
+    """Return the canonical IMDb title ID from an ID, number, or IMDb URL."""
+    raw_value = str(value or '').strip()
+    if not raw_value:
+        return None
+
+    if raw_value.isdigit():
+        return f'tt{raw_value}'
+    if _IMDB_ID_RE.fullmatch(raw_value):
+        return raw_value.lower()
+
+    url_match = _IMDB_URL_ID_RE.search(raw_value)
+    return url_match.group(1).lower() if url_match else None
 
 
 def normalize_country_name(name: str) -> str:

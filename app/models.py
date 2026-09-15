@@ -604,14 +604,6 @@ class Show(BaseModel):
                 name='idx_show_original_upper_trgm',
             ),
             GinIndex(
-                OpClass(Upper('imdb_id'), name='gin_trgm_ops'),
-                name='idx_show_imdb_id_upper_trgm',
-            ),
-            GinIndex(
-                OpClass(Upper('imdb_url'), name='gin_trgm_ops'),
-                name='idx_show_imdb_url_upper_trgm',
-            ),
-            GinIndex(
                 OpClass(Upper('plot'), name='gin_trgm_ops'),
                 name='idx_show_plot_upper_trgm',
             ),

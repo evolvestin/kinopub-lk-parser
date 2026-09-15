@@ -97,7 +97,7 @@ from app.services.stats_calculator import (
 from app.services.telegram_auth import validate_telegram_init_data
 from app.tasks import send_view_confirmation_task
 from app.telegram_bot import TelegramSender
-from app.utils import format_user_for_rating
+from app.utils import format_user_for_rating, normalize_imdb_id
 from shared.constants import (
     GENRES_MAPPING,
     PROFESSIONS_PLURAL_MAP_RU,
@@ -622,13 +622,12 @@ def bot_search_shows(request):
     if not query:
         return JsonResponse({'results': []})
 
+    search_filter = Q(title__icontains=query) | Q(original_title__icontains=query)
+    if normalized_imdb_id := normalize_imdb_id(query):
+        search_filter |= Q(imdb_id=normalized_imdb_id)
+
     shows = (
-        Show.objects.filter(
-            Q(title__icontains=query)
-            | Q(original_title__icontains=query)
-            | Q(imdb_id__icontains=query)
-            | Q(imdb_url__icontains=query)
-        )
+        Show.objects.filter(search_filter)
         .prefetch_related('countries', 'genres', 'ratings__user')
         .distinct()[:20]
     )
@@ -697,14 +696,13 @@ def bot_get_show_details(request, show_id):
 @require_http_methods(['GET'])
 def bot_get_by_imdb(request, imdb_id):
     try:
-        normalized_imdb_id = imdb_id if imdb_id.lower().startswith('tt') else f'tt{imdb_id}'
+        normalized_imdb_id = normalize_imdb_id(imdb_id)
         show = (
-            Show.objects.filter(
-                Q(imdb_id__iexact=normalized_imdb_id)
-                | Q(imdb_url__icontains=normalized_imdb_id)
-            )
+            Show.objects.filter(imdb_id=normalized_imdb_id)
             .prefetch_related('countries', 'genres')
             .first()
+            if normalized_imdb_id
+            else None
         )
 
         if not show:
@@ -1926,12 +1924,11 @@ def webapp_search(request):
         if len(query) < 2:
             return JsonResponse({'shows': [], 'persons': []})
 
-        shows_qs = Show.objects.filter(
-            Q(title__icontains=query)
-            | Q(original_title__icontains=query)
-            | Q(imdb_id__icontains=query)
-            | Q(imdb_url__icontains=query)
-        ).order_by('-year', '-id')
+        search_filter = Q(title__icontains=query) | Q(original_title__icontains=query)
+        if normalized_imdb_id := normalize_imdb_id(query):
+            search_filter |= Q(imdb_id=normalized_imdb_id)
+
+        shows_qs = Show.objects.filter(search_filter).order_by('-year', '-id')
 
         shows = shows_qs[offset : offset + limit]
         user_ratings = _get_user_ratings_for_shows(view_user, [s.id for s in shows])

@@ -65,7 +65,7 @@ from app.services.metrics import (
 )
 from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender
-from app.utils import get_proxied_image_url
+from app.utils import get_proxied_image_url, normalize_imdb_id
 from app.views import sync_user_permissions
 from shared.constants import (
     ACTOR_ROLES,
@@ -417,8 +417,6 @@ class ShowAdmin(admin.ModelAdmin):
     search_fields = (
         'id',
         'kinopub_id',
-        'imdb_id',
-        'imdb_url',
         'title',
         'original_title',
         'plot',
@@ -519,6 +517,12 @@ class ShowAdmin(admin.ModelAdmin):
     )
     filter_horizontal = ('countries', 'genres')
     actions = ['action_update_details', 'action_update_durations']
+
+    def get_search_results(self, request, queryset, search_term):
+        """Use the existing exact IMDb index for ID/URL searches."""
+        if normalized_imdb_id := normalize_imdb_id(search_term):
+            return queryset.filter(imdb_id=normalized_imdb_id), False
+        return super().get_search_results(request, queryset, search_term)
 
     def _format_copyable_id_with_link(self, value, link_url=None, link_label=None, title='ID'):
         if not value:

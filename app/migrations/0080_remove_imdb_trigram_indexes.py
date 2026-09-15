@@ -2,10 +2,12 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
+    """Remove indexes left by the long-running IMDb search migration."""
+
     atomic = False
 
     dependencies = [
-        ('app', '0078_show_imdb_rating_updated_at'),
+        ('app', '0079_show_imdb_search_trigram_indexes'),
     ]
 
     operations = [
