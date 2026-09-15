@@ -1,3 +1,5 @@
+import { cleanTelegramHash, parseTelegramInitDataFromUrl } from '../utils/telegramHash'
+
 const getCookie = (name) => {
   try {
     const matches = document.cookie.match(new RegExp(
@@ -17,20 +19,10 @@ const setCookie = (name, value, days = 7) => {
   } catch (e) {}
 }
 
-const parseInitDataFromUrl = () => {
-  const sources = [window.location.hash, window.location.search];
-  for (const src of sources) {
-    if (!src) continue;
-    const cleanSrc = src.replace(/^[#?]/, '');
-    const params = new URLSearchParams(cleanSrc);
-    const data = params.get('tgWebAppData') || params.get('init_data');
-    if (data) return data;
-    if (params.has('hash') && (params.has('user') || params.has('query_id') || params.has('auth_date'))) {
-      return cleanSrc;
-    }
-  }
-  return '';
-}
+const parseInitDataFromUrl = () => parseTelegramInitDataFromUrl(
+  window.location.hash,
+  window.location.search
+)
 
 const earlyInitData = window.__telegram_init_data__ || parseInitDataFromUrl();
 if (earlyInitData) {
@@ -40,45 +32,10 @@ if (earlyInitData) {
   setCookie('tg_init_data', earlyInitData);
 }
 
-const cleanTelegramHash = () => {
-  const hash = window.location.hash;
-  if (!hash) return;
-  if (hash.includes('tgWebAppData=') || hash.includes('tgWebAppVersion=')) {
-    let path = '/';
-    let queryPart = hash.replace(/^[#]/, '');
-    if (queryPart.startsWith('/')) {
-      const qIdx = queryPart.indexOf('?');
-      const ampIdx = queryPart.indexOf('&');
-      let splitIdx = -1;
-      if (qIdx !== -1 && ampIdx !== -1) {
-        splitIdx = Math.min(qIdx, ampIdx);
-      } else {
-        splitIdx = qIdx !== -1 ? qIdx : ampIdx;
-      }
-      if (splitIdx !== -1) {
-        path = queryPart.substring(0, splitIdx);
-        queryPart = queryPart.substring(splitIdx + 1);
-      } else {
-        path = queryPart;
-        queryPart = '';
-      }
-    }
-    if (queryPart) {
-      const params = new URLSearchParams(queryPart);
-      const tgKeys = [
-        'tgWebAppData', 'tgWebAppVersion', 'tgWebAppPlatform', 
-        'tgWebAppBotInline', 'tgWebAppThemeParams', 'hash', 
-        'user', 'auth_date', 'query_id', 'signature'
-      ];
-      tgKeys.forEach(k => params.delete(k));
-      const remaining = params.toString();
-      window.location.hash = '#' + path + (remaining ? '?' + remaining : '');
-    } else {
-      window.location.hash = '#' + path;
-    }
-  }
+const cleanedHash = cleanTelegramHash(window.location.hash)
+if (cleanedHash !== window.location.hash) {
+  window.location.hash = cleanedHash
 }
-cleanTelegramHash();
 
 const getStoredInitData = () => {
   if (window.__telegram_init_data__ && window.__telegram_init_data__ !== 'undefined' && window.__telegram_init_data__ !== 'null') {

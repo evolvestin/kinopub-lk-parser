@@ -1,6 +1,7 @@
-from django.core.management.base import BaseCommand
-from django.db import connection
+from django.core.management.base import BaseCommand, CommandError
+from django.db import connection, transaction
 
+from app.models import Show
 from app.services.show_merge import ShowMergeConflictError, merge_show_records
 
 
@@ -13,6 +14,17 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--type', choices=['Movie', 'Series', 'all'], default='all')
         parser.add_argument('--limit', type=int, default=0)
+        parser.add_argument('--canonical-id', type=int)
+        parser.add_argument('--duplicate-id', type=int)
+        parser.add_argument(
+            '--preferred-imdb-id',
+            help='Verified IMDb ID to keep when applying an explicit pair.',
+        )
+        parser.add_argument(
+            '--preferred-tmdb-id',
+            type=int,
+            help='Verified TMDB ID to keep when applying an explicit pair.',
+        )
         parser.add_argument(
             '--show-id',
             type=int,
@@ -26,6 +38,18 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        explicit_ids = options['canonical_id'] is not None or options['duplicate_id'] is not None
+        if options['canonical_id'] is None and options['duplicate_id'] is not None:
+            raise CommandError('--canonical-id and --duplicate-id must be supplied together')
+        if options['canonical_id'] is not None and options['duplicate_id'] is None:
+            raise CommandError('--canonical-id and --duplicate-id must be supplied together')
+        if (options['preferred_imdb_id'] or options['preferred_tmdb_id']) and not explicit_ids:
+            raise CommandError('Preferred identity IDs require --canonical-id and --duplicate-id')
+
+        if explicit_ids:
+            self._handle_explicit_pair(options)
+            return
+
         candidates = self._find_candidates(
             show_type=options['type'],
             show_id=options['show_id'],
@@ -87,6 +111,56 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f'Merged shows: {merged}; skipped runtime conflicts: {skipped}; '
                 f'left identity conflicts: {len(candidates) - len(safe)}'
+            )
+        )
+
+    def _handle_explicit_pair(self, options):
+        canonical_id = options['canonical_id']
+        duplicate_id = options['duplicate_id']
+        if not options['apply']:
+            canonical, duplicate = Show.objects.filter(
+                id__in=[canonical_id, duplicate_id]
+            ).order_by('id')
+            self.stdout.write(
+                f'Explicit pair: canonical={canonical.id} duplicate={duplicate.id} '
+                f'canonical_imdb={canonical.imdb_id} duplicate_imdb={duplicate.imdb_id} '
+                f'canonical_tmdb={canonical.tmdb_id} duplicate_tmdb={duplicate.tmdb_id} '
+                'mode=DRY-RUN'
+            )
+            return
+
+        try:
+            with transaction.atomic():
+                if options['preferred_tmdb_id']:
+                    shows = {
+                        show.id: show
+                        for show in Show.objects.select_for_update().filter(
+                            id__in=[canonical_id, duplicate_id]
+                        )
+                    }
+                    if set(shows) != {canonical_id, duplicate_id}:
+                        raise CommandError('Both explicit show IDs must exist')
+                    if options['preferred_tmdb_id'] not in {
+                        shows[canonical_id].tmdb_id,
+                        shows[duplicate_id].tmdb_id,
+                    }:
+                        raise CommandError('--preferred-tmdb-id is not present on either show')
+                    for show in shows.values():
+                        if show.tmdb_id not in (None, options['preferred_tmdb_id']):
+                            Show.objects.filter(pk=show.id, tmdb_id=show.tmdb_id).update(tmdb_id=None)
+
+                stats = merge_show_records(
+                    canonical_id,
+                    duplicate_id,
+                    preferred_imdb_id=options['preferred_imdb_id'],
+                )
+        except ShowMergeConflictError as exc:
+            raise CommandError(f'Cannot merge {canonical_id} <- {duplicate_id}: {exc}') from exc
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Merged {stats.canonical_id} <- {stats.duplicate_id}; '
+                f'external ratings dedup={stats.external_ratings_deduplicated}'
             )
         )
 

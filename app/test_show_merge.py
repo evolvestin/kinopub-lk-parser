@@ -81,6 +81,44 @@ class ShowMergeTests(TestCase):
         self.assertTrue(Show.objects.filter(pk=conflict_duplicate.id).exists())
         self.assertTrue(Show.objects.filter(pk=conflict.id).exists())
 
+    def test_content_duplicate_command_applies_verified_imdb_and_tmdb_replacements(self):
+        canonical = Show.objects.create(
+            kinopub_id=11003,
+            imdb_id='tt11000004',
+            tmdb_id=11003,
+            title='Селфи',
+            original_title='Селфи',
+            type='Movie',
+            year=2017,
+        )
+        duplicate = Show.objects.create(
+            tmdb_id=11004,
+            title='Селфи',
+            original_title='Селфи',
+            type='Movie',
+            year=2018,
+            imdb_id='tt11000005',
+        )
+
+        call_command(
+            'merge_content_show_duplicates',
+            '--canonical-id',
+            str(canonical.id),
+            '--duplicate-id',
+            str(duplicate.id),
+            '--preferred-imdb-id',
+            'tt11000005',
+            '--preferred-tmdb-id',
+            str(duplicate.tmdb_id),
+            '--apply',
+            stdout=StringIO(),
+        )
+
+        merged = Show.objects.get(pk=canonical.id)
+        self.assertFalse(Show.objects.filter(pk=duplicate.id).exists())
+        self.assertEqual(merged.imdb_id, 'tt11000005')
+        self.assertEqual(merged.tmdb_id, 11004)
+
     def test_3d_type_is_stored_as_movie_with_a_separate_marker(self):
         self.assertEqual(normalize_show_type('3d'), ('Movie', True))
         self.assertEqual(normalize_show_type('3D Movie'), ('Movie', True))
