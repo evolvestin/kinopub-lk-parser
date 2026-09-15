@@ -137,6 +137,9 @@ export const useStatsStore = defineStore('stats', () => {
   }
 
   const activeRequests = {}
+  const statsRequestKey = (year, includeGroup) => `${year}:${includeGroup ? 'group' : 'personal'}`
+  const hasActiveRequest = (year) =>
+    Object.keys(activeRequests).some((key) => key.startsWith(`${year}:`))
   function normalizeYears(years) {
     const normalized = (Array.isArray(years) ? years : [])
       .map((year) => String(year))
@@ -198,15 +201,21 @@ export const useStatsStore = defineStore('stats', () => {
       return fetchSharedStats(sharedId.value, year, isBackground)
     }
 
-    if (statsCache.value[year] && !force) {
+    const cachedStats = statsCache.value[year]
+    const cacheHasRequestedScope = !includeGroup || cachedStats?.group || cachedStats?.meta?.has_group === false
+
+    if (cachedStats && !force && cacheHasRequestedScope) {
       if (!isBackground) {
         currentYear.value = year
       }
-      return statsCache.value[year]
+      return cachedStats
     }
 
-    if (activeRequests[year]) {
-      const promise = activeRequests[year]
+    const requestKey = statsRequestKey(year, includeGroup)
+    const broaderRequestKey = statsRequestKey(year, true)
+    const promiseInFlight = activeRequests[requestKey] || (!includeGroup && activeRequests[broaderRequestKey])
+    if (promiseInFlight) {
+      const promise = promiseInFlight
       if (!isBackground) {
         const data = await promise
         currentYear.value = year
@@ -236,15 +245,21 @@ export const useStatsStore = defineStore('stats', () => {
           if (data.meta.privacy_choice_made !== undefined) userStore.privacyChoiceMade = data.meta.privacy_choice_made
         }
 
-        statsCache.value[year] = markRaw(data)
-        return data
+        // A background personal prefetch must not erase a richer group
+        // payload that was loaded for the same year.
+        const previous = statsCache.value[year]
+        const nextData = !includeGroup && previous?.group
+          ? { ...data, group: previous.group }
+          : data
+        statsCache.value[year] = markRaw(nextData)
+        return nextData
       } finally {
-        delete activeRequests[year]
+        delete activeRequests[requestKey]
         pendingRequests.value = Math.max(0, pendingRequests.value - 1)
       }
     })()
 
-    activeRequests[year] = promise
+    activeRequests[requestKey] = promise
 
     try {
       const data = await promise
@@ -289,7 +304,7 @@ export const useStatsStore = defineStore('stats', () => {
     const current = String(currentYear.value)
     const queue = availableYears.value
       .map((year) => String(year))
-      .filter((year) => year !== current && !statsCache.value[year] && !activeRequests[year])
+      .filter((year) => year !== current && !statsCache.value[year] && !hasActiveRequest(year))
 
     // Keep at most two heavy period calculations in flight. This makes the
     // warm-up invisible to the user and avoids a request burst for accounts

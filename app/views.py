@@ -16,7 +16,7 @@ from django.contrib.auth.models import Permission, User
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Avg, Case, F, IntegerField, Max, Prefetch, Q, Subquery, Sum, Value, When
+from django.db.models import Avg, Case, F, IntegerField, Max, Prefetch, Q, Sum, Value, When
 from django.db.models.query import QuerySet
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
@@ -2890,14 +2890,14 @@ def webapp_add_view(request):
             users_to_add.add(view_user)
 
         if target_group:
-            group_member_ids = ViewUserGroup.objects.filter(users=view_user).values(
-                'users__id'
-            )
-            users_to_add.update(
-                ViewUser.objects.filter(id__in=Subquery(group_member_ids)).values_list(
-                    'id', flat=True
-                )
-            )
+            # Start from ViewUser so the filter finds groups containing the
+            # current user while the selected rows remain all members of
+            # those groups. Filtering ViewUserGroup.users and selecting
+            # users__id on the same M2M join only returns the current user.
+            group_member_ids = ViewUser.objects.filter(groups__users=view_user).values_list(
+                'id', flat=True
+            ).distinct()
+            users_to_add.update(group_member_ids)
 
         users_to_add_ids = {
             user_id if isinstance(user_id, int) else user_id.id for user_id in users_to_add
