@@ -10,6 +10,7 @@ from app.models import Country, Genre, Person, Show, ShowCrew
 from app.services.person_matching import find_person_for_tmdb
 from app.services.show_duration import upsert_show_duration
 from app.services.show_merge import merge_show_records
+from app.services.show_identity import find_exact_show_content_match
 from app.utils import normalize_country_name
 from shared.constants import SHOW_TYPE_MAPPING, ShowType
 
@@ -189,6 +190,15 @@ def sync_show_from_tmdb(
 
     external_ids = details.get('external_ids', {})
     found_imdb_id = external_ids.get('imdb_id') or target_imdb_id
+    raw_title = details.get('title') or details.get('name')
+    raw_orig_title = details.get('original_title') or details.get('original_name')
+    overview = details.get('overview')
+    resolved_type = (
+        SHOW_TYPE_MAPPING[ShowType.SERIES]
+        if media_type == 'tv'
+        else SHOW_TYPE_MAPPING[ShowType.MOVIE]
+    )
+    content_identity_conflict = False
 
     if found_imdb_id:
         show_with_imdb = Show.objects.filter(imdb_id=found_imdb_id).first()
@@ -219,21 +229,63 @@ def sync_show_from_tmdb(
         elif not show:
             show = show_with_imdb
 
+    # TMDB and KinoPub may publish different release years for the same title.
+    # Once details are available, use an unambiguous title/original-title/plot
+    # match as a fallback when one source identifier is missing. Explicit IMDb
+    # disagreement always wins and blocks this fallback.
+    content_match = None
+    if show and not show.kinopub_id:
+        content_match = find_exact_show_content_match(
+            raw_title,
+            raw_orig_title,
+            resolved_type,
+            plot=overview,
+            exclude_id=show.id,
+        )
+    elif not show:
+        content_match = find_exact_show_content_match(
+            raw_title,
+            raw_orig_title,
+            resolved_type,
+            plot=overview,
+        )
+
+    if content_match:
+        imdb_identity_conflict = bool(
+            found_imdb_id
+            and content_match.imdb_id
+            and found_imdb_id != content_match.imdb_id
+        )
+        tmdb_identity_conflict = bool(
+            show
+            and show.tmdb_id
+            and content_match.tmdb_id
+            and show.tmdb_id != content_match.tmdb_id
+        )
+        content_identity_conflict = imdb_identity_conflict or tmdb_identity_conflict
+        if not content_identity_conflict:
+            if show and show.id != content_match.id:
+                merge_show_records(
+                    content_match.id,
+                    show.id,
+                    preferred_imdb_id=found_imdb_id,
+                )
+            show = content_match
+            target_tmdb_id = show.tmdb_id or target_tmdb_id
+
     if not show:
         show = Show()
 
     show.tmdb_id = target_tmdb_id
-    if found_imdb_id:
+    if found_imdb_id and not content_identity_conflict:
         if not Show.objects.filter(imdb_id=found_imdb_id).exclude(id=show.id).exists():
             show.imdb_id = found_imdb_id
             if not show.imdb_url:
                 show.imdb_url = f'https://www.imdb.com/title/{found_imdb_id}/'
 
-    raw_title = details.get('title') or details.get('name')
     if raw_title:
         show.title = raw_title
 
-    raw_orig_title = details.get('original_title') or details.get('original_name')
     if raw_orig_title:
         show.original_title = raw_orig_title
 
@@ -241,7 +293,6 @@ def sync_show_from_tmdb(
     if date_str and len(date_str) >= 4 and date_str[:4].isdigit():
         show.year = int(date_str[:4])
 
-    overview = details.get('overview')
     if overview:
         show.plot = overview
 
@@ -256,11 +307,7 @@ def sync_show_from_tmdb(
     # TMDB's endpoint is authoritative for the media kind. Do not preserve a
     # stale value from an earlier dump import (movie IDs can be misclassified
     # as TV when the two daily dumps are processed independently).
-    show.type = (
-        SHOW_TYPE_MAPPING[ShowType.SERIES]
-        if media_type == 'tv'
-        else SHOW_TYPE_MAPPING[ShowType.MOVIE]
-    )
+    show.type = resolved_type
 
     show.save()
 

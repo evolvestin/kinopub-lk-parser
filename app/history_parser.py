@@ -47,6 +47,7 @@ from app.services.show_duration import upsert_show_duration
 from app.services.show_identity import (
     find_exact_movie_match,
     get_show_by_kinopub_id,
+    normalize_movie_title,
     normalize_show_type,
     record_kinopub_source,
 )
@@ -376,6 +377,9 @@ def _update_show_details_once(
                     type_key = type_match.group(1)
                     show.type, source_is_3d = normalize_show_type(type_key)
                     show.is_3d = show.is_3d or source_is_3d
+                    if source_is_3d:
+                        show.title = normalize_movie_title(show.title)
+                        show.original_title = normalize_movie_title(show.original_title)
             except NoSuchElementException:
                 pass
 

@@ -20,6 +20,7 @@ from app.models import LogEntry, Show
 from app.services.show_identity import (
     find_exact_movie_match,
     get_show_by_kinopub_id,
+    normalize_movie_title,
     normalize_show_type,
     record_kinopub_source,
 )
@@ -82,6 +83,9 @@ def parse_and_save_catalog_page(driver, mode):
                     extracted_imdb_id = imdb_match.group(1)
 
             stored_type, is_3d = normalize_show_type(mode)
+            if is_3d:
+                title = normalize_movie_title(title)
+                original_title = normalize_movie_title(original_title)
             show_data = {
                 'kinopub_id': kinopub_id,
                 'title': title,

@@ -1,6 +1,8 @@
 from datetime import date
+from io import StringIO
 from unittest.mock import patch
 
+from django.core.management import call_command
 from django.test import TestCase
 
 from app.models import (
@@ -20,16 +22,88 @@ from app.models import (
     WishlistItem,
 )
 from app.services.show_merge import merge_show_records
-from app.services.show_identity import normalize_show_type
+from app.services.show_identity import (
+    find_exact_movie_match,
+    normalize_movie_title,
+    normalize_show_type,
+)
 from app.services.tmdb_client import sync_show_from_tmdb
 from shared.media import build_show_poster_options
 
 
 class ShowMergeTests(TestCase):
+    def test_content_duplicate_command_merges_year_mismatch_and_keeps_conflicts(self):
+        canonical = Show.objects.create(
+            kinopub_id=11001,
+            imdb_id='tt11000001',
+            title='Рыцарь кубков',
+            original_title='Knight of Cups',
+            type='Movie',
+            year=2014,
+            plot='A man searches for meaning in Los Angeles.',
+        )
+        duplicate = Show.objects.create(
+            tmdb_id=11001,
+            title='Рыцарь кубков',
+            original_title='Knight of Cups',
+            type='Movie',
+            year=2015,
+            plot=' A man searches   for meaning in Los Angeles. ',
+        )
+        conflict = Show.objects.create(
+            kinopub_id=11002,
+            imdb_id='tt11000002',
+            title='Другой фильм',
+            original_title='Another Film',
+            type='Movie',
+            year=2014,
+            plot='Same plot.',
+        )
+        conflict_duplicate = Show.objects.create(
+            tmdb_id=11002,
+            imdb_id='tt11000003',
+            title='Другой фильм',
+            original_title='Another Film',
+            type='Movie',
+            year=2015,
+            plot='Same plot.',
+        )
+
+        output = StringIO()
+        call_command('merge_content_show_duplicates', stdout=output)
+        self.assertIn('Candidates: 2; safe: 1', output.getvalue())
+        self.assertTrue(Show.objects.filter(pk=duplicate.id).exists())
+
+        call_command('merge_content_show_duplicates', '--apply', stdout=StringIO())
+
+        self.assertFalse(Show.objects.filter(pk=duplicate.id).exists())
+        self.assertTrue(Show.objects.filter(pk=canonical.id).exists())
+        self.assertTrue(Show.objects.filter(pk=conflict_duplicate.id).exists())
+        self.assertTrue(Show.objects.filter(pk=conflict.id).exists())
+
     def test_3d_type_is_stored_as_movie_with_a_separate_marker(self):
         self.assertEqual(normalize_show_type('3d'), ('Movie', True))
         self.assertEqual(normalize_show_type('3D Movie'), ('Movie', True))
         self.assertEqual(normalize_show_type('movie'), ('Movie', False))
+
+    def test_3d_title_marker_is_ignored_when_finding_the_normal_movie(self):
+        normal = Show.objects.create(
+            title='300 спартанцев: Расцвет империи',
+            original_title='300: Rise of an Empire',
+            type='Movie',
+            year=2013,
+        )
+
+        self.assertEqual(
+            normalize_movie_title('300 спартанцев: Расцвет империи (3-D)'),
+            '300 спартанцев: Расцвет империи',
+        )
+        match = find_exact_movie_match(
+            '300 спартанцев: Расцвет империи 3D',
+            '300: Rise of an Empire',
+            year=2013,
+        )
+        self.assertEqual(match.id, normal.id)
 
     def test_merge_3d_copy_keeps_source_id_and_marks_canonical_movie(self):
         canonical = Show.objects.create(
@@ -353,3 +427,113 @@ class ShowMergeTests(TestCase):
         merged.refresh_from_db()
         self.assertEqual(merged.imdb_id, 'tt15565600')
         self.assertEqual(merged.tmdb_id, 270264)
+
+    @patch('app.services.tmdb_client.TMDBClient')
+    def test_tmdb_sync_merges_content_match_when_year_differs_and_imdb_is_missing(
+        self, client_class
+    ):
+        canonical = Show.objects.create(
+            kinopub_id=1007,
+            imdb_id='tt10000007',
+            title='Рыцарь кубков',
+            original_title='Knight of Cups',
+            type='Movie',
+            year=2014,
+            plot='A writer searches for love and meaning.',
+        )
+        duplicate = Show.objects.create(
+            tmdb_id=86835,
+            title='Рыцарь кубков',
+            original_title='Knight of Cups',
+            type='Movie',
+            year=2015,
+        )
+        client_class.return_value.get_details.return_value = {
+            'external_ids': {},
+            'title': 'Рыцарь кубков',
+            'original_title': 'Knight of Cups',
+            'release_date': '2015-01-01',
+            'overview': 'A writer searches for love and meaning.',
+            'genres': [],
+            'production_countries': [],
+            'credits': {'cast': [], 'crew': []},
+        }
+
+        merged = sync_show_from_tmdb(show_id=duplicate.id, tmdb_id=duplicate.tmdb_id)
+
+        self.assertEqual(merged.id, canonical.id)
+        self.assertFalse(Show.objects.filter(id=duplicate.id).exists())
+        self.assertEqual(Show.objects.get(id=canonical.id).tmdb_id, 86835)
+
+    @patch('app.services.tmdb_client.TMDBClient')
+    def test_tmdb_sync_does_not_merge_when_content_match_has_conflicting_imdb(
+        self, client_class
+    ):
+        canonical = Show.objects.create(
+            kinopub_id=1008,
+            imdb_id='tt10000008',
+            title='Один фильм',
+            original_title='One Film',
+            type='Movie',
+            year=2014,
+            plot='Same-looking description.',
+        )
+        duplicate = Show.objects.create(
+            tmdb_id=86836,
+            title='Один фильм',
+            original_title='One Film',
+            type='Movie',
+            year=2015,
+        )
+        client_class.return_value.get_details.return_value = {
+            'external_ids': {'imdb_id': 'tt10000009'},
+            'title': 'Один фильм',
+            'original_title': 'One Film',
+            'release_date': '2015-01-01',
+            'overview': 'Same-looking description.',
+            'genres': [],
+            'production_countries': [],
+            'credits': {'cast': [], 'crew': []},
+        }
+
+        sync_show_from_tmdb(show_id=duplicate.id, tmdb_id=duplicate.tmdb_id)
+
+        self.assertTrue(Show.objects.filter(id=canonical.id).exists())
+        duplicate.refresh_from_db()
+        self.assertIsNone(duplicate.imdb_id)
+
+    @patch('app.services.tmdb_client.TMDBClient')
+    def test_tmdb_sync_does_not_merge_when_content_match_has_conflicting_tmdb(
+        self, client_class
+    ):
+        canonical = Show.objects.create(
+            kinopub_id=1009,
+            tmdb_id=525471,
+            title='Селфи',
+            original_title='Селфи',
+            type='Movie',
+            year=2017,
+            plot='Same-looking description.',
+        )
+        duplicate = Show.objects.create(
+            tmdb_id=440627,
+            title='Селфи',
+            original_title='Селфи',
+            type='Movie',
+            year=2018,
+        )
+        client_class.return_value.get_details.return_value = {
+            'external_ids': {},
+            'title': 'Селфи',
+            'original_title': 'Селфи',
+            'release_date': '2018-01-01',
+            'overview': 'Same-looking description.',
+            'genres': [],
+            'production_countries': [],
+            'credits': {'cast': [], 'crew': []},
+        }
+
+        sync_show_from_tmdb(show_id=duplicate.id, tmdb_id=duplicate.tmdb_id)
+
+        self.assertTrue(Show.objects.filter(id=canonical.id).exists())
+        self.assertTrue(Show.objects.filter(id=duplicate.id).exists())
