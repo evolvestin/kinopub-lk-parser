@@ -93,40 +93,35 @@ class Command(BaseCommand):
     @staticmethod
     def _find_candidates(show_type='all', show_id=None):
         type_filter = '' if show_type == 'all' else 'AND type = %s'
-        params = [] if show_type == 'all' else [show_type, show_type]
+        params = [] if show_type == 'all' else [show_type]
         show_filter = ''
         if show_id:
             show_filter = 'AND (kp.id = %s OR tmdb.id = %s)'
             params.extend([show_id, show_id])
 
         sql = f'''
-            WITH kp_unique AS (
-                SELECT type,
+            WITH source_rows AS MATERIALIZED (
+                SELECT id, kinopub_id, tmdb_id, imdb_id, type, year,
                        lower(trim(title)) AS title_key,
-                       lower(trim(original_title)) AS original_title_key
+                       lower(trim(original_title)) AS original_title_key,
+                       md5(lower(regexp_replace(trim(plot), '\\s+', ' ', 'g'))) AS plot_key
                 FROM app_show
-                WHERE kinopub_id IS NOT NULL
-                  AND NOT ignore_collision
+                WHERE NOT ignore_collision
                   AND NOT is_3d
                   AND length(trim(coalesce(title, ''))) > 0
                   AND length(trim(coalesce(original_title, ''))) > 0
                   AND length(trim(coalesce(plot, ''))) > 0
                   {type_filter}
+            ), kp_unique AS (
+                SELECT type, title_key, original_title_key
+                FROM source_rows
+                WHERE kinopub_id IS NOT NULL
                 GROUP BY type, title_key, original_title_key
                 HAVING count(*) = 1
             ), tmdb_unique AS (
-                SELECT type,
-                       lower(trim(title)) AS title_key,
-                       lower(trim(original_title)) AS original_title_key
-                FROM app_show
-                WHERE kinopub_id IS NULL
-                  AND tmdb_id IS NOT NULL
-                  AND NOT ignore_collision
-                  AND NOT is_3d
-                  AND length(trim(coalesce(title, ''))) > 0
-                  AND length(trim(coalesce(original_title, ''))) > 0
-                  AND length(trim(coalesce(plot, ''))) > 0
-                  {type_filter}
+                SELECT type, title_key, original_title_key
+                FROM source_rows
+                WHERE kinopub_id IS NULL AND tmdb_id IS NOT NULL
                 GROUP BY type, title_key, original_title_key
                 HAVING count(*) = 1
             )
@@ -143,26 +138,23 @@ class Command(BaseCommand):
                         AND kp.tmdb_id <> tmdb.tmdb_id THEN 'tmdb'
                        ELSE NULL
                    END AS conflict
-            FROM app_show kp
-            JOIN app_show tmdb
+            FROM source_rows kp
+            JOIN source_rows tmdb
               ON tmdb.kinopub_id IS NULL
              AND tmdb.tmdb_id IS NOT NULL
              AND tmdb.type = kp.type
-             AND lower(trim(tmdb.title)) = lower(trim(kp.title))
-             AND lower(trim(tmdb.original_title)) = lower(trim(kp.original_title))
+             AND tmdb.title_key = kp.title_key
+             AND tmdb.original_title_key = kp.original_title_key
+             AND tmdb.plot_key = kp.plot_key
             JOIN kp_unique
               ON kp_unique.type = kp.type
-             AND kp_unique.title_key = lower(trim(kp.title))
-             AND kp_unique.original_title_key = lower(trim(kp.original_title))
+             AND kp_unique.title_key = kp.title_key
+             AND kp_unique.original_title_key = kp.original_title_key
             JOIN tmdb_unique
               ON tmdb_unique.type = tmdb.type
-             AND tmdb_unique.title_key = lower(trim(tmdb.title))
-             AND tmdb_unique.original_title_key = lower(trim(tmdb.original_title))
+             AND tmdb_unique.title_key = tmdb.title_key
+             AND tmdb_unique.original_title_key = tmdb.original_title_key
             WHERE kp.kinopub_id IS NOT NULL
-              AND length(trim(coalesce(kp.plot, ''))) > 0
-              AND length(trim(coalesce(tmdb.plot, ''))) > 0
-              AND lower(regexp_replace(trim(kp.plot), '\\s+', ' ', 'g'))
-                  = lower(regexp_replace(trim(tmdb.plot), '\\s+', ' ', 'g'))
               {show_filter}
             ORDER BY kp.id, tmdb.id
         '''
