@@ -130,6 +130,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useApi } from '../../composables/useApi'
 import { icons } from '../../utils/icons'
+import { isSeriesType } from '../../utils/showTypes'
 
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -137,7 +138,7 @@ const api = useApi()
 const router = useRouter()
 
 const context = computed(() => uiStore.modals.addView.context || {})
-const isSeries = computed(() => ['Series', 'Documentary Series', 'TV Show'].includes(context.value.type))
+const isSeries = computed(() => isSeriesType(context.value.type))
 
 const episodesData = ref([])
 const loading = ref(false)

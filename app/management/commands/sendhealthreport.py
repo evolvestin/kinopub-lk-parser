@@ -32,6 +32,7 @@ from app.services.metrics import (
     calculate_no_genres_metric,
     calculate_unmapped_genres_metric,
     calculate_unused_persons_metric,
+    metrics_statement_timeout,
 )
 from kinopub_parser import celery_app
 from shared.constants import RedisQueue
@@ -198,14 +199,17 @@ class Command(LoggableBaseCommand):
             ('Персоны без ролей', calculate_unused_persons_metric, 'value'),
         ]
 
-        for label, func, sum_key in data_checks:
-            try:
-                total = sum(item.get(sum_key, 0) for item in func())
-                if total > 0:
-                    metrics_lines.append(f'• {html_secure(label)}: <b>{total}</b>')
-                    has_warnings = True
-            except Exception as e:
-                metrics_lines.append(f'⚠️ Ошибка метрики {html_secure(label)}: {html_secure(e)}')
+        with metrics_statement_timeout():
+            for label, func, sum_key in data_checks:
+                try:
+                    total = sum(item.get(sum_key, 0) for item in func())
+                    if total > 0:
+                        metrics_lines.append(f'• {html_secure(label)}: <b>{total}</b>')
+                        has_warnings = True
+                except Exception as e:
+                    metrics_lines.append(
+                        f'⚠️ Ошибка метрики {html_secure(label)}: {html_secure(e)}'
+                    )
 
         components_lines = ['\n<b>Статусы:</b>']
 

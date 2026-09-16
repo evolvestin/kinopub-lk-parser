@@ -1,7 +1,9 @@
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import timedelta
 from hashlib import sha1
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.db.models import Case, CharField, Count, Exists, F, OuterRef, Q, Value, When
@@ -46,6 +48,27 @@ PERSON_DETAIL_WARM_KEYS = {
     'en_professions_stats',
     'unused_persons',
 }
+
+
+@contextmanager
+def metrics_statement_timeout():
+    """Bound each PostgreSQL statement issued by a metrics calculation."""
+    timeout_ms = settings.METRICS_STATEMENT_TIMEOUT_MS
+    with connection.cursor() as cursor:
+        cursor.execute('SHOW statement_timeout')
+        previous_timeout = cursor.fetchone()[0]
+        cursor.execute('SET statement_timeout = %s', [timeout_ms])
+
+    try:
+        yield
+    finally:
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute('SET statement_timeout = %s', [previous_timeout])
+        except Exception:
+            # A timed-out statement can leave the connection unusable. Closing
+            # it makes Django open a clean connection for the next calculation.
+            connection.close()
 
 
 def _format_type(t):
@@ -719,21 +742,15 @@ def get_profession_persons_list(normalized: str, language: str, max_items=None):
 
 def calculate_total_persons_by_show_type_metric():
     canonical_id = _canonical_person_id_expression()
-    with connection.cursor() as cursor:
-        cursor.execute('SET enable_sort TO off')
-    try:
-        stats = (
-            ShowCrew.objects.filter(show__type__isnull=False)
-            .exclude(show__type='')
-            .annotate(canonical_id=canonical_id)
-            .values('show__type')
-            .annotate(total=Count('canonical_id', distinct=True))
-            .order_by('-total')
-        )
-        return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
-    finally:
-        with connection.cursor() as cursor:
-            cursor.execute('SET enable_sort TO on')
+    stats = (
+        ShowCrew.objects.filter(show__type__isnull=False)
+        .exclude(show__type='')
+        .annotate(canonical_id=canonical_id)
+        .values('show__type')
+        .annotate(total=Count('canonical_id', distinct=True))
+        .order_by('-total')
+    )
+    return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
 
 
 def _canonical_person_id_expression():
@@ -1356,12 +1373,15 @@ def get_tmdb_missing_durations_list(show_type: str):
 
 
 def calculate_unused_persons_metric():
-    used_person_ids = (
-        ShowCrew.objects.annotate(canonical_id=_canonical_person_id_expression())
-        .values_list('canonical_id', flat=True)
-        .distinct()
+    canonical_id = _canonical_person_id_expression()
+    used_persons = ShowCrew.objects.annotate(canonical_id=canonical_id).filter(
+        canonical_id=OuterRef('pk')
     )
-    unused_count = (
-        Person.objects.filter(master_person__isnull=True).exclude(id__in=used_person_ids).count()
-    )
+    with metrics_statement_timeout():
+        unused_count = (
+            Person.objects.filter(master_person__isnull=True)
+            .annotate(has_crew=Exists(used_persons))
+            .filter(has_crew=False)
+            .count()
+        )
     return [{'name': 'Без ролей', 'value': unused_count}]

@@ -223,6 +223,9 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_ALWAYS_EAGER = False
+METRICS_STATEMENT_TIMEOUT_MS = max(
+    1000, int(os.getenv('METRICS_STATEMENT_TIMEOUT_MS', '300000'))
+)
 
 GMAIL_EMAIL = os.getenv('GMAIL_EMAIL')
 GMAIL_PASSWORD = os.getenv('GMAIL_PASSWORD')
@@ -425,7 +428,9 @@ CELERY_BEAT_SCHEDULE = {
             crontab(minute=10, hour='0-11,13-23'),
             crontab(minute=50, hour=12),
         ),
-        'options': {'queue': 'metrics'},
+        # Do not let an old snapshot wait in the metrics queue and run after
+        # the next hourly snapshot has already become more useful.
+        'options': {'queue': 'metrics', 'expires': 600},
     },
     'auto_enqueue_missing_metadata': {
         'task': 'app.tasks.auto_enqueue_missing_metadata_task',

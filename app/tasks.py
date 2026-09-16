@@ -36,6 +36,7 @@ from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
     PERSON_DETAIL_WARM_KEYS,
     generate_global_metrics_snapshot,
+    metrics_statement_timeout,
     warm_duplicate_photo_urls_cache,
 )
 from app.services.stats_calculator import (
@@ -777,14 +778,15 @@ def sync_imdb_data_task(self):
         call_command('syncimdbdata')
 
 
-@shared_task(time_limit=3600, soft_time_limit=3300)
-@single_instance_task(lock_name=RedisLock.METRICS_SNAPSHOT, timeout=3600)
+@shared_task(time_limit=900, soft_time_limit=840)
+@single_instance_task(lock_name=RedisLock.METRICS_SNAPSHOT, timeout=900)
 @safe_execution
 def update_site_metrics_task():
     # This is a read/snapshot job.  A snapshot may observe a normal MVCC
     # boundary while catalog writes are in progress; it must not block all
     # browser work for an hour just to make the counts perfectly aligned.
-    data = generate_global_metrics_snapshot()
+    with metrics_statement_timeout():
+        data = generate_global_metrics_snapshot()
     SiteMetric.objects.create(key='global_snapshot', data=data)
     cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
     cache.delete('lock:queuing_global_snapshot')

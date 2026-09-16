@@ -198,6 +198,7 @@ import { useStatsStore } from '../../stores/useStatsStore'
 import { useApi } from '../../composables/useApi'
 import { useTelegram } from '../../composables/useTelegram'
 import { icons } from '../../utils/icons'
+import { isSeriesType } from '../../utils/showTypes'
 import { getRatingClass } from '../../utils/helpers'
 
 const uiStore = useUIStore()
@@ -261,8 +262,7 @@ const lastUpdatedDate = computed(() => {
 })
 
 const isSeries = computed(() => {
-  const seriesTypes = ['Series', 'Documentary Series', 'TV Show']
-  return showData.value && seriesTypes.includes(showData.value.type)
+  return showData.value && isSeriesType(showData.value.type)
 })
 
 const activeRatingValue = computed(() => {

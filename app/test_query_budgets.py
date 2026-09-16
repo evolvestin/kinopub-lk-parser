@@ -173,7 +173,7 @@ class QueryBudgetTests(TestCase):
             original_title='Monster',
             imdb_id='tt13207736',
             imdb_url='https://www.imdb.com/title/tt13207736/',
-            type='Series',
+            type='serial',
             year=2022,
         )
         request = RequestFactory().post(
@@ -187,4 +187,5 @@ class QueryBudgetTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = json.loads(response.content)
-        self.assertIn(imdb_show.id, [item['id'] for item in payload['shows']])
+        result = next(item for item in payload['shows'] if item['id'] == imdb_show.id)
+        self.assertEqual(result['type'], 'Series')

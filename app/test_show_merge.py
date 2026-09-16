@@ -123,6 +123,8 @@ class ShowMergeTests(TestCase):
         self.assertEqual(normalize_show_type('3d'), ('Movie', True))
         self.assertEqual(normalize_show_type('3D Movie'), ('Movie', True))
         self.assertEqual(normalize_show_type('movie'), ('Movie', False))
+        self.assertEqual(normalize_show_type('serial'), ('Series', False))
+        self.assertEqual(normalize_show_type('Documentary Series'), ('Documentary Series', False))
 
     def test_3d_title_marker_is_ignored_when_finding_the_normal_movie(self):
         normal = Show.objects.create(

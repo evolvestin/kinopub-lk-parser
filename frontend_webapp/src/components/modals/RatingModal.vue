@@ -143,6 +143,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { useUserStore } from '../../stores/userStore'
 import { icons } from '../../utils/icons'
+import { isSeriesType } from '../../utils/showTypes'
 
 const props = defineProps(['showId', 'title', 'initialValue', 'type'])
 const emit = defineEmits(['close'])
@@ -275,8 +276,7 @@ const hasExistingRating = computed(() => {
 })
 
 const isSeries = computed(() => {
-  const seriesTypes = ['Series', 'Documentary Series', 'TV Show']
-  return props.type && seriesTypes.includes(props.type)
+  return isSeriesType(props.type)
 })
 
 const percent = computed(() => ((val.value - 1) / 9) * 100)

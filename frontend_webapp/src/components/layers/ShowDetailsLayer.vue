@@ -16,20 +16,34 @@
 
     <template v-if="show">
 
-    <div class="hero-container">
+    <div class="hero-container show-details-hero">
       <div class="hero-bg" :style="{ backgroundImage: (activeBg && !isPosterBroken) ? `url(${activeBg})` : 'none' }"></div>
       <div class="hero-gradient"></div>
       
       <div style="position: relative; z-index: 3; height: 95%; max-width: 85%; aspect-ratio: 2/3; display: flex; align-items: flex-end;">
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: flex-end;">
           <div v-if="isPosterBroken" class="hero-poster is-placeholder" v-html="icons.film"></div>
-          <img v-else :src="activePoster" class="hero-poster" style="margin: 0; box-shadow: none;" alt="poster" @load="validatePoster" @error="handlePosterError">
+          <img v-else :src="activePoster" class="hero-poster" style="margin: 0;" alt="poster" @load="validatePoster" @error="handlePosterError">
           
           <div class="grid-badges" style="position: absolute; top: 12px; left: 12px; right: auto; align-items: flex-start; z-index: 10;">
             <span v-if="currentPersonalRating" class="rating-badge" :class="getRatingClass(currentPersonalRating)" style="font-size: 20px; padding: 4px 10px; border-radius: 10px; gap: 5px; display: inline-flex; align-items: center; font-weight: 800; text-shadow: none;">
               <span v-html="icons.star" style="font-size: 20px; display: inline-flex; align-items: center;"></span>{{ currentPersonalRating }}
             </span>
           </div>
+
+        </div>
+
+        <div v-if="posterOptions.length > 1" class="poster-switcher" role="group" aria-label="Выбор постера">
+          <button
+            v-for="(poster, index) in posterOptions"
+            :key="`${poster.source}-${poster.variant}-${index}`"
+            type="button"
+            class="poster-dot"
+            :class="{ active: activePosterIndex === index }"
+            :aria-label="`Постер: ${posterLabel(poster)}`"
+            :aria-current="activePosterIndex === index ? 'true' : undefined"
+            @click="selectPoster(index)"
+          ></button>
         </div>
 
         <button class="detail-wishlist-btn anim-item" style="position: relative; animation-delay: 0s;" @click="openWishlistModal">
@@ -44,18 +58,6 @@
           <span v-html="icons.star"></span>
           <div v-if="showRateGuide" class="guide-tooltip-left rate-guide">Поставить оценку</div>
         </button>
-      </div>
-      <div v-if="posterOptions.length > 1" class="poster-switcher" role="group" aria-label="Постеры">
-        <button
-          v-for="(poster, index) in posterOptions"
-          :key="`${poster.source}-${poster.variant}-${index}`"
-          type="button"
-          class="poster-dot"
-          :class="{ active: activePosterIndex === index }"
-          :aria-label="`Постер: ${posterLabel(poster)}`"
-          :title="posterLabel(poster)"
-          @click="selectPoster(index)"
-        ></button>
       </div>
     </div>
 
@@ -221,6 +223,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useStatsStore } from '../../stores/useStatsStore'
 import { icons } from '../../utils/icons'
 import { getRatingClass, isImageBroken, markImageAsBroken } from '../../utils/helpers'
+import { isSeriesType, showTypeRu as formatShowTypeRu } from '../../utils/showTypes'
 import PersonPill from '../shared/PersonPill.vue'
 
 const props = defineProps(['showId'])
@@ -358,7 +361,7 @@ const viewerRating = computed(() => {
 })
 
 const isSeries = computed(() => {
-  return show.value && ['Series', 'Documentary Series', 'TV Show'].includes(show.value.type)
+  return show.value && isSeriesType(show.value.type)
 })
 
 const isSeasonFullyWatched = (s) => {
@@ -393,16 +396,7 @@ const isActiveSeasonFullyWatched = computed(() => {
 
 const showTypeRu = computed(() => {
   if (!show.value) return ''
-  const mapping = {
-    'Series': 'Сериал',
-    'Movie': 'Фильм',
-    'Concert': 'Концерт',
-    'Documentary Movie': 'Док. фильм',
-    'Documentary Series': 'Док. сериал',
-    'TV Show': 'ТВ-шоу',
-    '3D Movie': '3D фильм'
-  }
-  return mapping[show.value.type] || show.value.type || ''
+  return formatShowTypeRu(show.value.type)
 })
 
 const showStatusRu = computed(() => {
@@ -460,7 +454,7 @@ const loadShowData = async () => {
       }
     }
 
-    if (['Series', 'Documentary Series', 'TV Show'].includes(data.type)) {
+    if (isSeriesType(data.type)) {
       if (!uiStore.episodesCache[cacheKey.value]) {
         const payload = { show_id: props.showId }
         if (statsStore.isShared) {
@@ -622,33 +616,67 @@ const openRatingsDetails = (ratingType) => {
 </script>
 
 <style scoped>
+.show-details-hero {
+    /* Keep the poster fade at the top, but do not fade controls placed below it. */
+    mask-image: linear-gradient(to bottom, transparent, black 15%, black 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 100%);
+}
+
 .poster-switcher {
     position: absolute;
-    z-index: 4;
+    z-index: 20;
+    top: calc(100% + 7px);
+    bottom: auto;
     left: 0;
     right: 0;
-    bottom: 10px;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 7px;
+    gap: 3px;
+    width: max-content;
+    margin: 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .poster-dot {
-    width: 8px;
+    width: 16px;
     height: 8px;
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.45);
+    border: 0;
+    border-radius: 999px;
+    background: var(--border);
+    color: var(--text-muted);
     cursor: pointer;
-    transition: transform 0.2s ease, background 0.2s ease;
+    touch-action: manipulation;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.poster-dot::before {
+    content: none;
 }
 
 .poster-dot.active {
-    transform: scale(1.35);
+    width: 22px;
     background: var(--accent);
-    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.poster-dot:active {
+    transform: scale(0.94);
+}
+
+/* Keep the compact controls comfortable on narrow screens without making
+   them compete with the poster and primary actions. */
+@media (max-width: 420px) {
+    .poster-switcher {
+        top: calc(100% + 7px);
+    }
 }
 
 .show-data-loading {

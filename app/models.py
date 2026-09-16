@@ -233,6 +233,10 @@ class ShowCrew(BaseModel):
         verbose_name_plural = 'Show Crew Members'
         unique_together = ('show', 'person', 'profession')
         indexes = [
+            models.Index(
+                fields=['canonical_person'],
+                name='idx_crew_canonical_person',
+            ),
             models.Index(fields=['profession', 'show'], name='idx_crew_prof_show'),
             models.Index(fields=['en_profession', 'show'], name='idx_crew_enprof_show'),
             models.Index(fields=['profession', 'canonical_person'], name='idx_crew_prof_canonical'),

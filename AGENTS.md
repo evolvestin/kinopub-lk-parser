@@ -6,6 +6,29 @@ Run project checks, migrations, and tests inside the Docker Compose services.
 Do not use the host `.venv` for project verification; it may not match the
 container runtime and dependencies.
 
+## PROD access and execution policy
+
+The default environment for development, diagnostics, migrations, and tests is
+the local Docker Compose stack. Do not connect to PROD merely because SSH
+access is available or because PROD was mentioned earlier in the conversation.
+
+PROD connection details:
+
+```text
+SSH: ssh root@157.173.101.93
+Project: /root/kinopub-lk-parser
+```
+
+Connect to PROD or run any PROD command only after a separate, explicit user
+request for that specific action and scope. This includes inspection that can
+change state, deployments, migrations, service/container restarts or stops,
+process termination, queue/task operations, and database changes. A general
+request to investigate, test, or fix the project means use local Docker only
+unless PROD access is explicitly requested in that request.
+
+Never store or print SSH private keys, passwords, API tokens, 2FA codes, or
+other credentials in this file, command output, commits, or logs.
+
 ## Safety rule for local PROD database clones
 
 This repository is often run locally against a restored copy of the PROD

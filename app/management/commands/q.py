@@ -37,6 +37,7 @@ from app.services.metrics import (
     calculate_unmapped_genres_metric,
     calculate_unused_persons_metric,
     generate_global_metrics_snapshot,
+    metrics_statement_timeout,
 )
 
 
@@ -92,11 +93,12 @@ class Command(LoggableBaseCommand):
         results = []
         measured_values = {}
 
-        for name, func in metric_funcs:
-            start_time = time.perf_counter()
-            measured_values[name] = func()
-            elapsed = (time.perf_counter() - start_time) * 1000
-            results.append((name, elapsed))
+        with metrics_statement_timeout():
+            for name, func in metric_funcs:
+                start_time = time.perf_counter()
+                measured_values[name] = func()
+                elapsed = (time.perf_counter() - start_time) * 1000
+                results.append((name, elapsed))
 
         results.sort(key=lambda item: item[1], reverse=True)
 
@@ -106,12 +108,13 @@ class Command(LoggableBaseCommand):
 
         if options['repeat_snapshot']:
             start_snapshot = time.perf_counter()
-            generate_global_metrics_snapshot(
-                profession_stats=(
-                    measured_values.get('professions_stats'),
-                    measured_values.get('en_professions_stats'),
+            with metrics_statement_timeout():
+                generate_global_metrics_snapshot(
+                    profession_stats=(
+                        measured_values.get('professions_stats'),
+                        measured_values.get('en_professions_stats'),
+                    )
                 )
-            )
             total_snapshot_time = (time.perf_counter() - start_snapshot) * 1000
             snapshot_label = 'TOTAL generate_global_metrics_snapshot():'
         else:

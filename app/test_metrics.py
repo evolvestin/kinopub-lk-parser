@@ -1,4 +1,6 @@
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from app.models import ExternalRating, Person, Show, ShowCrew
@@ -165,3 +167,15 @@ class UnusedPersonMetricTests(TestCase):
 
         self.assertEqual(calculate_unused_persons_metric(), [{'name': 'Без ролей', 'value': 0}])
         self.assertFalse(get_unused_persons_list().filter(id=master.id).exists())
+
+    def test_unused_person_metric_uses_correlated_exists(self):
+        Person.objects.create(name='Unused person')
+        with CaptureQueriesContext(connection) as queries:
+            metric = calculate_unused_persons_metric()
+
+        self.assertEqual(metric, [{'name': 'Без ролей', 'value': 1}])
+        count_sql = next(
+            query['sql'] for query in queries if 'SELECT COUNT' in query['sql'].upper()
+        )
+        self.assertIn('EXISTS', count_sql.upper())
+        self.assertNotIn('IN (SELECT DISTINCT', count_sql.upper())

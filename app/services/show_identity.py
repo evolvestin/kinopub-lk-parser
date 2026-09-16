@@ -8,7 +8,6 @@ from shared.constants import SHOW_TYPE_MAPPING, ShowType
 
 
 MOVIE_TYPE = SHOW_TYPE_MAPPING[ShowType.MOVIE]
-THREED_TYPE = SHOW_TYPE_MAPPING[ShowType.MOVIE_3D]
 _THREED_TITLE_SUFFIX_RE = re.compile(
     r'\s*[\(\[\{]?\s*3\s*[-–—]?\s*[dд]\s*[\)\]\}]?\s*$',
     re.IGNORECASE,
@@ -21,15 +20,20 @@ def normalize_movie_title(value: str | None) -> str:
 
 
 def normalize_show_type(value: str | None) -> tuple[str | None, bool]:
-    """Return the stored type and whether the source item is a 3D copy."""
+    """Return the canonical UI type and whether the source item is a 3D copy.
+
+    KinoPub stores compact values such as ``serial`` and ``docuserial``, while
+    the web app uses the display-oriented values from ``SHOW_TYPE_MAPPING``.
+    Accept both forms so legacy records cannot leak their storage value into
+    API responses or change a series into a movie in the UI.
+    """
     raw = str(value or '').strip()
-    if raw.lower() in {
-        ShowType.MOVIE.value,
-        MOVIE_TYPE.lower(),
-        ShowType.MOVIE_3D.value,
-        THREED_TYPE.lower(),
-    }:
-        return MOVIE_TYPE, raw.lower() in {ShowType.MOVIE_3D.value, THREED_TYPE.lower()}
+    raw_key = raw.casefold()
+    for source_type, canonical_type in SHOW_TYPE_MAPPING.items():
+        if raw_key in {source_type.value.casefold(), canonical_type.casefold()}:
+            if source_type == ShowType.MOVIE_3D:
+                return MOVIE_TYPE, True
+            return canonical_type, False
     return raw or None, False
 
 

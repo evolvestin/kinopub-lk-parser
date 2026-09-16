@@ -94,6 +94,7 @@ from app.services.stats_calculator import (
     generate_group_stats,
     generate_user_stats,
 )
+from app.services.show_identity import normalize_show_type
 from app.services.telegram_auth import validate_telegram_init_data
 from app.tasks import send_view_confirmation_task
 from app.telegram_bot import TelegramSender
@@ -104,6 +105,7 @@ from shared.constants import (
     RAW_TO_NORMALIZED_COUNTRY,
     RAW_TO_NORMALIZED_GENRE,
     SHOW_STATUS_DISPLAY_RU,
+    SHOW_TYPE_MAPPING,
     SHOW_TYPE_DISPLAY_RU,
     DatePrecision,
     RedisQueue,
@@ -113,6 +115,12 @@ from shared.formatters import format_country_display_names, format_precision_dat
 from shared.media import build_poster_url, build_show_poster_options, get_poster_url
 
 logger = logging.getLogger('app')
+
+
+def _api_show_type(value):
+    """Expose the canonical show type even for legacy compact DB values."""
+    normalized, _ = normalize_show_type(value)
+    return normalized or value
 
 ALLOWED_PROXY_DOMAINS = (
     'image.tmdb.org',
@@ -299,7 +307,7 @@ def _serialize_show_details(show, user=None):
         'id': show.id,
         'title': show.title,
         'original_title': show.original_title,
-        'type': show.type,
+        'type': _api_show_type(show.type),
         'is_3d': show.is_3d,
         'year': show.year,
         'status': show.status,
@@ -653,7 +661,7 @@ def bot_search_shows(request):
                 'title': show.title,
                 'original_title': show.original_title,
                 'year': show.year,
-                'type': show.type,
+                'type': _api_show_type(show.type),
                 'status': show.status,
                 'poster_url': poster_url,
                 'imdb_rating': show.imdb_rating,
@@ -1772,7 +1780,7 @@ def webapp_get_show_full(request, show_id):
             'id': show.id,
             'title': show.title,
             'original_title': show.original_title,
-            'type': show.type,
+            'type': _api_show_type(show.type),
             'is_3d': show.is_3d,
             'year': show.year,
             'status': show.status,
@@ -1871,8 +1879,15 @@ def webapp_get_collection(request, collection_type, item_id):
             if country.emoji_flag:
                 title = f'{country.emoji_flag} {title}'
         elif collection_type == 'show_type':
-            shows = shows.filter(type=item_id)
-            title = f'Тип: {SHOW_TYPE_DISPLAY_RU.get(item_id, item_id)}'
+            normalized_type = _api_show_type(item_id)
+            stored_type_values = {item_id, normalized_type}
+            stored_type_values.update(
+                source_type.value
+                for source_type, canonical_type in SHOW_TYPE_MAPPING.items()
+                if canonical_type == normalized_type
+            )
+            shows = shows.filter(type__in=stored_type_values)
+            title = f'Тип: {SHOW_TYPE_DISPLAY_RU.get(normalized_type, normalized_type)}'
         elif collection_type == 'year':
             shows = shows.filter(year=int(item_id))
             title = f'Год: {item_id}'
@@ -1899,7 +1914,7 @@ def webapp_get_collection(request, collection_type, item_id):
                     'title': show.title,
                     'original_title': show.original_title,
                     'year': show.year,
-                    'type': show.type,
+                    'type': _api_show_type(show.type),
                     'poster_url': build_poster_url(
                         show.kinopub_id, show.tmdb_poster_path, 'medium'
                     ),
@@ -1957,7 +1972,7 @@ def webapp_search(request):
                     'title': s.title,
                     'original_title': s.original_title,
                     'year': s.year,
-                    'type': s.type,
+                    'type': _api_show_type(s.type),
                     'poster_url': build_poster_url(s.kinopub_id, s.tmdb_poster_path, 'medium'),
                     'user_rating': user_ratings.get(s.id),
                 }
@@ -2479,7 +2494,7 @@ def webapp_wishlist_data(request):
                             'title': item.show.title,
                             'original_title': item.show.original_title,
                             'year': item.show.year,
-                            'type': item.show.type,
+                            'type': _api_show_type(item.show.type),
                             'poster_url': build_poster_url(
                                 item.show.kinopub_id, item.show.tmdb_poster_path, 'small'
                             ),
@@ -2674,7 +2689,7 @@ def webapp_casino(request):
                                     'title': show.title,
                                     'original_title': show.original_title,
                                     'year': show.year,
-                                    'type': show.type,
+                                    'type': _api_show_type(show.type),
                                     'poster_url': build_poster_url(
                                         show.kinopub_id, show.tmdb_poster_path, 'small'
                                     ),
@@ -2732,7 +2747,7 @@ def webapp_casino(request):
                         'title': winner_show.title,
                         'original_title': winner_show.original_title,
                         'year': winner_show.year,
-                        'type': winner_show.type,
+                        'type': _api_show_type(winner_show.type),
                         'poster_url': build_poster_url(
                             winner_show.kinopub_id, winner_show.tmdb_poster_path, 'small'
                         ),
@@ -2817,7 +2832,7 @@ def admin_get_folder_content(request, folder_id):
                     'title': item.show.title,
                     'original_title': item.show.original_title,
                     'year': item.show.year,
-                    'type': item.show.type,
+                    'type': _api_show_type(item.show.type),
                         'poster_url': build_poster_url(
                             item.show.kinopub_id, item.show.tmdb_poster_path, 'small'
                         ),
