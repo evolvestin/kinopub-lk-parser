@@ -10,7 +10,7 @@ import imaplib2
 from django.conf import settings
 from django.utils import timezone
 
-from app.gdrive_backup import BackupManager
+from app.telegram_backup_manager import BackupManager
 from app.models import Code
 from app.telegram_bot import TelegramSender
 from shared.html_helper import code

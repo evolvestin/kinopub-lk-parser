@@ -4,7 +4,7 @@ import time
 
 from django.conf import settings
 
-from app.gdrive_backup import BackupManager
+from app.telegram_backup_manager import BackupManager
 from app.history_parser import (
     close_driver,
     initialize_driver_session,

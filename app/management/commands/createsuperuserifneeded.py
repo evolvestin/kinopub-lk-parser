@@ -3,7 +3,7 @@ import os
 
 from django.contrib.auth import get_user_model
 
-from app.gdrive_backup import BackupManager
+from app.telegram_backup_manager import BackupManager
 from app.management.base import LoggableBaseCommand
 
 

@@ -17,8 +17,11 @@ else:
     data_dir = BASE_DIR / 'data'
 os.makedirs(data_dir, exist_ok=True)
 
-GOOGLE_DRIVE_CREDENTIALS_JSON = os.getenv('GOOGLE_DRIVE_CREDENTIALS_JSON')
-GOOGLE_DRIVE_FOLDER_ID = '1mpco3I0v22hTklleYJkZZh0VNlhol9L3'
+
+def _env_bool(name, default=False):
+    return os.getenv(name, str(default)).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 DB_BACKUP_FILENAME = os.getenv('DB_BACKUP_FILENAME', 'data.json')
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
@@ -246,6 +249,19 @@ USER_MANAGEMENT_CHANNEL_ID = os.getenv('USER_MANAGEMENT_CHANNEL_ID')
 HISTORY_CHANNEL_ID = os.getenv('HISTORY_CHANNEL_ID')
 DEV_CHANNEL_ID = os.getenv('DEV_CHANNEL_ID')
 
+# PostgreSQL backups use the existing KinoPub bot.  The target channel and
+# transport settings are deployment constants; only the Telegram API
+# application credentials are needed in .env for the local Bot API service.
+TELEGRAM_BACKUP_ENABLED = _env_bool('TELEGRAM_BACKUP_ENABLED', ENVIRONMENT == 'PROD')
+TELEGRAM_BACKUP_CHAT_ID = -1004321355963
+TELEGRAM_BACKUP_API_BASE_URL = 'http://telegram-bot-api:8081'
+TELEGRAM_BACKUP_LOCAL_FILE_MODE = True
+TELEGRAM_BACKUP_SHARED_DIR = str(data_dir / 'telegram-backups')
+TELEGRAM_BACKUP_PART_SIZE_BYTES = 1_900 * 1024 * 1024
+TELEGRAM_BACKUP_SOURCE_FILENAME = DB_BACKUP_FILENAME
+TELEGRAM_API_ID = os.getenv('TELEGRAM_API_ID', '').strip()
+TELEGRAM_API_HASH = os.getenv('TELEGRAM_API_HASH', '').strip()
+
 LOG_IGNORE_PATTERNS = [
     'Connection reset by peer',
     'RemoteDisconnected',
@@ -266,10 +282,6 @@ SITE_AUX_URL = os.getenv('SITE_AUX_URL')
 BROWSER_GATEWAY_URL = os.getenv('BROWSER_GATEWAY_URL', '').strip()
 BROWSER_GATEWAY_TOKEN = os.getenv('BROWSER_GATEWAY_TOKEN', '').strip()
 BROWSER_GATEWAY_TASK_TIMEOUT_SECONDS = int(os.getenv('BROWSER_GATEWAY_TASK_TIMEOUT_SECONDS', '900'))
-
-
-def _env_bool(name, default=False):
-    return os.getenv(name, str(default)).strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
 # HTTP is the primary KinoPub transport.  Asset Hub remains available as an
@@ -501,7 +513,6 @@ REQUIRED_SETTINGS = (
     'BOT_TOKEN',
     'CODES_CHANNEL_ID',
     'ALLOWED_SENDER',
-    'GOOGLE_DRIVE_CREDENTIALS_JSON',
     'KINOPUB_LOGIN',
     'KINOPUB_PASSWORD',
 )

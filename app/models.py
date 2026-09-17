@@ -968,3 +968,59 @@ class RejectedPersonPhoto(BaseModel):
 
     def __str__(self):
         return f'{self.person.name} - {self.photo_url}'
+
+
+class TelegramBackup(models.Model):
+    class Status(models.TextChoices):
+        UPLOADING = 'uploading', 'Загружается'
+        UPLOADED = 'uploaded', 'Загружен'
+        FAILED = 'failed', 'Ошибка'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    source_filename = models.CharField(max_length=255)
+    size_bytes = models.PositiveBigIntegerField()
+    sha256 = models.CharField(max_length=64)
+    part_count = models.PositiveIntegerField(default=0)
+    manifest_message_id = models.BigIntegerField(null=True, blank=True)
+    manifest_file_id = models.CharField(max_length=512, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.UPLOADING)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+        verbose_name = 'Telegram backup'
+        verbose_name_plural = 'Telegram backups'
+
+    def __str__(self):
+        return f'{self.source_filename} · {self.created_at:%Y-%m-%d %H:%M:%S}'
+
+
+class TelegramBackupPart(models.Model):
+    backup = models.ForeignKey(
+        TelegramBackup,
+        on_delete=models.CASCADE,
+        related_name='parts',
+    )
+    part_number = models.PositiveIntegerField()
+    filename = models.CharField(max_length=255)
+    size_bytes = models.PositiveBigIntegerField()
+    sha256 = models.CharField(max_length=64)
+    message_id = models.BigIntegerField()
+    file_id = models.CharField(max_length=512)
+    file_unique_id = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ('part_number',)
+        verbose_name = 'Telegram backup part'
+        verbose_name_plural = 'Telegram backup parts'
+        constraints = [
+            models.UniqueConstraint(
+                fields=('backup', 'part_number'),
+                name='unique_telegram_backup_part',
+            )
+        ]
+
+    def __str__(self):
+        return f'{self.backup_id} · часть {self.part_number}'

@@ -41,6 +41,33 @@ only with the dedicated `X-Kinopub-Code-Token` header:
 `GET /api/internal/kinopub-code/`. The endpoint returns HTTP 404 after the
 configured code lifetime and disables caching.
 
+## PostgreSQL backups in Telegram
+
+PostgreSQL custom dumps are uploaded to the private channel `-1004321355963`
+using the existing KinoPub `BOT_TOKEN`. Each backup is stored as Telegram
+documents plus a portable JSON manifest; restore can use the manifest file ID
+without the local backup index.
+
+The local Telegram Bot API service is included in Compose by default and is
+required for the current 1,900 MiB part size. Add only these two Telegram API
+application credentials to `.env` when enabling the service:
+
+```ini
+TELEGRAM_API_ID=your_api_id
+TELEGRAM_API_HASH=your_api_hash
+```
+
+Useful commands:
+
+```bash
+docker compose exec web python manage.py telegram_backup_healthcheck
+docker compose exec web python manage.py backupdb
+docker compose exec web python manage.py restorebackup <manifest-file-id> --confirm
+```
+
+Local/non-production backup runs require an explicit `--force`. Restore always
+requires `--confirm`.
+
 ## Quick Start (Ubuntu)
 
 1.  **Clone or Copy Files**: Place all the project files (`Dockerfile`, `docker-compose.yml`, `app/` directory, etc.) onto your server.

@@ -7,7 +7,7 @@ from django.db.models import Max, Q
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 
-from app.gdrive_backup import BackupManager
+from app.telegram_backup_manager import BackupManager
 from app.history_parser import (
     close_driver,
     initialize_driver_session,

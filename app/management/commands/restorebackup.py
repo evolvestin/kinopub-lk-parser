@@ -1,104 +1,138 @@
-import logging
-import multiprocessing
 import os
 import subprocess
-import time
+import tempfile
+from urllib.parse import urlparse
 
 from django.conf import settings
-from django.db import connection, connections
+from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q
 
-from app.gdrive_backup import BackupManager
 from app.management.base import LoggableBaseCommand
+from app.models import TelegramBackup
+from app.telegram_backup import TelegramBackupError, download_backup, download_manifest_backup
 
 
 class Command(LoggableBaseCommand):
-    help = 'Restores data from a Google Drive backup using pg_restore (binary format).'
+    help = 'Restore PostgreSQL from a Telegram backup. Destructive.'
+
+    def add_arguments(self, parser):
+        parser.add_argument('--confirm', action='store_true')
+        parser.add_argument(
+            '--manifest-file-id',
+            help='Telegram file_id of the JSON manifest; local DB metadata is not required',
+        )
+        parser.add_argument(
+            'reference',
+            nargs='?',
+            help='Manifest file_id, message id, private-channel URL, or omitted for latest indexed backup',
+        )
 
     def handle(self, *args, **options):
-        root_logger = logging.getLogger()
-        for handler in root_logger.handlers[:]:
-            if handler.__class__.__name__ == 'DatabaseLogHandler':
-                root_logger.removeHandler(handler)
+        if not options.get('confirm', False):
+            raise CommandError('Refusing restore: pass --confirm')
+        if not settings.TELEGRAM_BACKUP_ENABLED:
+            raise CommandError('Telegram backup is disabled')
 
-        logging.info('Starting restore process...')
-        manager = BackupManager()
-        backup_file_path = manager.restore_from_backup()
+        manifest_file_id = options['manifest_file_id']
+        reference = options['reference']
+        if manifest_file_id and reference:
+            raise CommandError('Use either --manifest-file-id or a reference, not both')
+        if reference and not self._is_message_reference(reference):
+            manifest_file_id = reference.strip()
 
-        if not backup_file_path or not os.path.exists(backup_file_path):
-            logging.error('Backup file not found on Google Drive. Aborting.')
-            return
-
+        fd, path = tempfile.mkstemp(suffix='.dump')
+        os.close(fd)
         try:
+            try:
+                if manifest_file_id:
+                    download_manifest_backup(manifest_file_id, path)
+                else:
+                    backup = self._select_backup(reference)
+                    download_backup(backup, path)
+            except TelegramBackupError as error:
+                raise CommandError(f'Telegram restore download failed: {error}') from error
+
             db_conf = settings.DATABASES['default']
-            db_name = db_conf['NAME']
-
-            logging.info('Terminating other connections and dropping schema...')
-
-            with connection.cursor() as cursor:
-                cursor.execute(f"""
-                    SELECT pg_terminate_backend(pg_stat_activity.pid)
-                    FROM pg_stat_activity
-                    WHERE pg_stat_activity.datname = '{db_name}'
-                      AND pid <> pg_backend_pid();
-                """)
-
-                time.sleep(2)
-
-                cursor.execute('DROP SCHEMA public CASCADE;')
-                cursor.execute('CREATE SCHEMA public;')
-
-            connections.close_all()
-
-            env = os.environ.copy()
-            env['PGPASSWORD'] = db_conf['PASSWORD']
-            env['PGOPTIONS'] = (
-                '-c maintenance_work_mem=128MB '
-                '-c synchronous_commit=off '
-                '-c client_min_messages=warning'
+            env = {
+                **os.environ,
+                'PGPASSWORD': db_conf.get('PASSWORD', ''),
+                'PGHOST': db_conf.get('HOST', ''),
+                'PGPORT': str(db_conf.get('PORT', '5432')),
+                'PGUSER': db_conf.get('USER', ''),
+            }
+            result = subprocess.run(
+                [
+                    'pg_restore',
+                    '--clean',
+                    '--if-exists',
+                    '--no-owner',
+                    '--dbname',
+                    db_conf['NAME'],
+                    path,
+                ],
+                env=env,
+                capture_output=True,
+                text=True,
             )
-
-            jobs = max(2, multiprocessing.cpu_count())
-            cmd = [
-                'pg_restore',
-                '-h',
-                db_conf['HOST'],
-                '-p',
-                str(db_conf['PORT']),
-                '-U',
-                db_conf['USER'],
-                '-d',
-                db_name,
-                '-j',
-                str(jobs),
-                '--no-owner',
-                '--no-privileges',
-                '-v',
-                backup_file_path,
-            ]
-
-            logging.info(f'Executing pg_restore with {jobs} parallel jobs...')
-
-            process = subprocess.Popen(
-                cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
-            )
-
-            if process.stdout:
-                for line in process.stdout:
-                    line = line.strip()
-                    if line:
-                        logging.info(f'[pg_restore] {line}')
-
-            retcode = process.wait()
-
-            if retcode >= 2:
-                logging.error(f'pg_restore failed with exit code {retcode}')
-                raise subprocess.CalledProcessError(retcode, cmd)
-
-            logging.info('Restore successful.')
-
-        except Exception as e:
-            logging.error(f'Restore failed: {e}')
-            raise e
+            if result.returncode:
+                raise CommandError('pg_restore failed: ' + result.stderr[-500:])
+            self.stdout.write(self.style.SUCCESS('Restore complete'))
         finally:
-            if os.path.exists(backup_file_path):
-                os.remove(backup_file_path)
+            if os.path.exists(path):
+                os.unlink(path)
+
+    @staticmethod
+    def _is_message_reference(reference):
+        value = reference.strip()
+        if value.isdigit():
+            return True
+        parsed = urlparse(value)
+        return parsed.scheme in ('http', 'https') and parsed.netloc in (
+            't.me',
+            'www.t.me',
+            'telegram.me',
+            'www.telegram.me',
+        )
+
+    @staticmethod
+    def _parse_message_reference(reference):
+        reference = reference.strip()
+        if reference.isdigit():
+            return int(reference)
+        parsed = urlparse(reference)
+        if parsed.scheme not in ('http', 'https') or parsed.netloc not in (
+            't.me',
+            'www.t.me',
+            'telegram.me',
+            'www.telegram.me',
+        ):
+            raise CommandError('Reference must be a Telegram message id or t.me URL')
+        parts = [part for part in parsed.path.split('/') if part]
+        if len(parts) != 3 or parts[0] != 'c' or not parts[1].isdigit() or not parts[2].isdigit():
+            raise CommandError('Only private-channel URLs like https://t.me/c/4321355963/10 are supported')
+        if str(settings.TELEGRAM_BACKUP_CHAT_ID) != f'-100{parts[1]}':
+            raise CommandError('Telegram URL points to a different channel')
+        return int(parts[2])
+
+    def _select_backup(self, reference):
+        if not reference:
+            backup = TelegramBackup.objects.filter(
+                status=TelegramBackup.Status.UPLOADED
+            ).first()
+            if backup is None:
+                raise CommandError('No uploaded Telegram backup was found in the database')
+            return backup
+
+        message_id = self._parse_message_reference(reference)
+        backup = (
+            TelegramBackup.objects.filter(status=TelegramBackup.Status.UPLOADED)
+            .filter(Q(parts__message_id=message_id) | Q(manifest_message_id=message_id))
+            .distinct()
+            .first()
+        )
+        if backup is None:
+            raise CommandError(
+                f'Telegram message {message_id} is not indexed in this database; '
+                'use the manifest file_id for a portable restore'
+            )
+        return backup

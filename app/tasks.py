@@ -23,7 +23,7 @@ from redis import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 
 from app import history_parser
-from app.gdrive_backup import BackupManager
+from app.telegram_backup_manager import BackupManager
 from app.models import (
     Code,
     LogEntry,

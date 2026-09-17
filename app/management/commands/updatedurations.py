@@ -6,7 +6,7 @@ from datetime import datetime
 from django.core.management.base import CommandError
 from django.db.models import Q
 
-from app.gdrive_backup import BackupManager
+from app.telegram_backup_manager import BackupManager
 from app.history_parser import (
     close_driver,
     initialize_driver_session,

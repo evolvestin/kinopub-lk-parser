@@ -121,10 +121,10 @@ spelling, case, punctuation, and internal whitespace remain unchanged.
 
 ## Local Safety & Backup Policy
 
-**RULE**: Local and development environments are permitted to synchronize session cookies to maintain shared authentication, but must never overwrite the production database backup on Google Drive.
+**RULE**: Local and development environments are permitted to synchronize session cookies to maintain shared authentication, but must never publish a database backup unless an explicit backup command is requested.
 
 1. **Implementation**:
-    * In `perform_backup`, database upload to Google Drive must be skipped if `settings.ENVIRONMENT` is `'DEV'` or if `settings.LOCAL_RUN` is `True`.
+    * PostgreSQL backups are published to the fixed private Telegram backup channel only by the production schedule or an explicit `backupdb --force` run. The existing KinoPub `BOT_TOKEN` is used; no separate backup bot is introduced.
     * Browser execution and cookie persistence are provided by the AssetHub browser gateway. Kinopub no longer starts Chromium or stores local cookie files; the gateway owns one profile-aware cookie vault.
 
 

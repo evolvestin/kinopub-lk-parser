@@ -37,10 +37,6 @@ services:
       - ./data:/data
     command: >
       sh -c "
-        if [ \"$$ENVIRONMENT\" = \"DEV\" ] && [ \"$$SKIP_DB_RESTORE\" != \"true\" ] && [ \"$$SKIP_DB_RESTORE\" != \"True\" ]; then
-          echo \"Starting restore from backup...\" &&
-          python manage.py restorebackup;
-        fi &&
         python manage.py migrate --noinput &&
         python manage.py collectstatic --noinput &&
         python manage.py createsuperuserifneeded
@@ -63,6 +59,7 @@ services:
       - .:/app:delegated
       - /app/frontend_webapp/dist # Сохраняем билд фронта внутри контейнера
       - ./data:/data
+      - telegram_bot_api_data:/var/lib/telegram-bot-api:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - VITE_DEV_SERVER_HOST=frontend # Django должен искать Vite по имени контейнера
@@ -127,6 +124,7 @@ services:
       - .:/app:delegated
       - /app/frontend_webapp/dist
       - ./data:/data
+      - telegram_bot_api_data:/var/lib/telegram-bot-api:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       app-init:
@@ -214,6 +212,31 @@ services:
     networks:
       - kinopub-net
 
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api@sha256:a6cbb08dd181df11bbe4dc71ab8d74a6c97e0c1fa148f5c7c617affca42de9ef
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$${TELEGRAM_API_ID:-}" ] || [ -z "$${TELEGRAM_API_HASH:-}" ]; then
+          echo "Local Telegram Bot API is disabled: TELEGRAM_API_ID/HASH are not configured";
+          exec tail -f /dev/null;
+        fi
+        sed -i 's/^telegram-bot-api:x:101:101:/telegram-bot-api:x:1000:1000:/' /etc/passwd
+        sed -i 's/^telegram-bot-api:x:101:/telegram-bot-api:x:1000:/' /etc/group
+        exec /docker-entrypoint.sh
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TELEGRAM_LOCAL: "1"
+    volumes:
+      - telegram_bot_api_data:/var/lib/telegram-bot-api
+      - ./data:/data
+    tmpfs:
+      - /tmp/telegram-bot-api:uid=1000,gid=1000,mode=1777
+    networks:
+      - kinopub-net
+
   health-monitor:
     build: .
     restart: unless-stopped
@@ -259,6 +282,8 @@ services:
 volumes:
   pgdata:
     name: ${PG_VOLUME_NAME:-kinopub_parser_pgdata}
+  telegram_bot_api_data:
+    name: ${TELEGRAM_BOT_API_VOLUME_NAME:-kinopub_parser_telegram_bot_api}
 
 networks:
   kinopub-net:

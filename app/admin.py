@@ -49,6 +49,8 @@ from app.models import (
     ShowPoster,
     SiteMetric,
     TaskRun,
+    TelegramBackup,
+    TelegramBackupPart,
     TelegramLog,
     UserRating,
     ViewHistory,
@@ -2631,3 +2633,19 @@ class RejectedPersonPhotoAdmin(admin.ModelAdmin):
     @admin.display(description='Photo URL')
     def photo_url_link(self, obj):
         return format_html('<a href="{0}" target="_blank">{0}</a>', obj.photo_url)
+
+
+@admin.register(TelegramBackup, site=admin_site)
+class TelegramBackupAdmin(admin.ModelAdmin):
+    list_display = ('source_filename', 'created_at', 'size_bytes', 'part_count', 'status')
+    list_filter = ('status', 'created_at')
+    search_fields = ('source_filename', 'id')
+    readonly_fields = ('id', 'created_at', 'updated_at')
+
+
+@admin.register(TelegramBackupPart, site=admin_site)
+class TelegramBackupPartAdmin(admin.ModelAdmin):
+    list_display = ('backup', 'part_number', 'size_bytes', 'message_id')
+    list_filter = ('backup',)
+    search_fields = ('filename', 'file_id')
+    readonly_fields = ('backup', 'part_number', 'filename', 'size_bytes', 'sha256', 'message_id', 'file_id', 'file_unique_id')
