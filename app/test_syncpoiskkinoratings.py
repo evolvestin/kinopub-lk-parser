@@ -2,10 +2,11 @@ from unittest.mock import patch
 
 from django.db import OperationalError
 from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
 
 from app.management.commands.syncimdbdata import Command as ImdbCommand
 from app.management.commands.syncpoiskkinoratings import Command
-from app.models import Show, ShowCrew
+from app.models import Show, ShowCrew, ShowPoster
 from shared.formatters import format_country_display_names
 
 
@@ -87,3 +88,78 @@ class ImdbRatingTimestampTests(TestCase):
         self.assertEqual(result['updated'], 1)
         self.assertEqual(show.imdb_rating, 8.4)
         self.assertIsNotNone(show.imdb_rating_updated_at)
+
+
+class PoiskkinoPosterConflictTests(TestCase):
+    def test_conflicting_poster_does_not_abort_sync_write(self):
+        existing_show = Show.objects.create(
+            title='Existing show',
+            original_title='Existing show',
+            type='Movie',
+        )
+        incoming_show = Show.objects.create(
+            title='Incoming show',
+            original_title='Incoming show',
+            type='Movie',
+        )
+        existing_poster = ShowPoster.objects.create(
+            show=existing_show,
+            source=ShowPoster.SOURCE_KINOPOISK,
+            variant='main',
+            external_id=6695,
+            url='https://example.test/existing.jpg',
+        )
+
+        now = timezone.now()
+        Command._save_posters(
+            [
+                ShowPoster(
+                    show=incoming_show,
+                    source=ShowPoster.SOURCE_KINOPOISK,
+                    variant='main',
+                    external_id=6695,
+                    url='https://example.test/incoming.jpg',
+                )
+            ],
+            now,
+        )
+
+        existing_poster.refresh_from_db()
+        self.assertEqual(existing_poster.show_id, existing_show.id)
+        self.assertEqual(existing_poster.url, 'https://example.test/existing.jpg')
+        self.assertFalse(
+            ShowPoster.objects.filter(
+                show=incoming_show, source=ShowPoster.SOURCE_KINOPOISK
+            ).exists()
+        )
+
+    def test_existing_poster_for_same_show_is_updated(self):
+        show = Show.objects.create(
+            title='Poster update show',
+            original_title='Poster update show',
+            type='Movie',
+        )
+        poster = ShowPoster.objects.create(
+            show=show,
+            source=ShowPoster.SOURCE_KINOPOISK,
+            variant='main',
+            external_id=123,
+            url='https://example.test/old.jpg',
+        )
+
+        Command._save_posters(
+            [
+                ShowPoster(
+                    show=show,
+                    source=ShowPoster.SOURCE_KINOPOISK,
+                    variant='main',
+                    external_id=456,
+                    url='https://example.test/new.jpg',
+                )
+            ],
+            timezone.now(),
+        )
+
+        poster.refresh_from_db()
+        self.assertEqual(poster.external_id, 456)
+        self.assertEqual(poster.url, 'https://example.test/new.jpg')

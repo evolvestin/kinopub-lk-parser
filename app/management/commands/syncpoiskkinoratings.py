@@ -433,13 +433,7 @@ class Command(LoggableBaseCommand):
             )
 
         if posters_to_update:
-            ShowPoster.objects.bulk_create(
-                posters_to_update,
-                update_conflicts=True,
-                unique_fields=['show', 'source', 'variant'],
-                update_fields=['external_id', 'url', 'updated_at'],
-                batch_size=500,
-            )
+            self._save_posters(posters_to_update, now)
 
         if persons_to_update:
             for person in persons_to_update.values():
@@ -451,6 +445,81 @@ class Command(LoggableBaseCommand):
             )
 
         logging.info('Successfully synchronized %s shows.', len(shows_to_update))
+
+    @staticmethod
+    def _save_posters(posters, now):
+        """Save KP posters without letting an identity collision abort ratings."""
+        if not posters:
+            return
+
+        show_ids = {poster.show_id for poster in posters}
+        external_ids = {
+            poster.external_id for poster in posters if poster.external_id is not None
+        }
+        existing = ShowPoster.objects.filter(source=ShowPoster.SOURCE_KINOPOISK).filter(
+            Q(show_id__in=show_ids, variant='main') | Q(external_id__in=external_ids)
+        )
+        existing_by_variant = {(poster.show_id, poster.variant): poster for poster in existing}
+        existing_by_external_id = {
+            poster.external_id: poster
+            for poster in existing
+            if poster.external_id is not None
+        }
+
+        updates = []
+        creates = []
+        reserved_external_ids = set(existing_by_external_id)
+        skipped = 0
+
+        for poster in posters:
+            current = existing_by_variant.get((poster.show_id, poster.variant))
+            owner = existing_by_external_id.get(poster.external_id)
+
+            # Keep the existing source identity. A poster collision must not
+            # abort saving ratings and the rest of the Poiskkino payload.
+            if owner is not None and owner.pk != getattr(current, 'pk', None):
+                skipped += 1
+                logging.warning(
+                    'Skipping conflicting Kinopoisk poster: show=%s external_id=%s '
+                    'already belongs to show=%s.',
+                    poster.show_id,
+                    poster.external_id,
+                    owner.show_id,
+                )
+                continue
+
+            if current is not None:
+                current.external_id = poster.external_id
+                current.url = poster.url
+                current.updated_at = now
+                updates.append(current)
+                existing_by_external_id[poster.external_id] = current
+                continue
+
+            # Two records in one response can carry the same source ID. Keep
+            # the first deterministic owner and avoid a batch conflict.
+            if poster.external_id in reserved_external_ids:
+                skipped += 1
+                logging.warning(
+                    'Skipping duplicate Kinopoisk poster in batch: show=%s external_id=%s.',
+                    poster.show_id,
+                    poster.external_id,
+                )
+                continue
+
+            creates.append(poster)
+            reserved_external_ids.add(poster.external_id)
+
+        if updates:
+            ShowPoster.objects.bulk_update(
+                updates,
+                ['external_id', 'url', 'updated_at'],
+                batch_size=500,
+            )
+        if creates:
+            ShowPoster.objects.bulk_create(creates, batch_size=500)
+        if skipped:
+            logging.warning('Skipped %s conflicting Kinopoisk poster writes.', skipped)
 
     @staticmethod
     def _extract_poster_url(value):
