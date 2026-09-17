@@ -1,9 +1,40 @@
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from selenium.common.exceptions import StaleElementReferenceException
 
 from app import history_parser
+from app.models import Show
+
+
+class HistoryDetailsRefreshQueueTests(TestCase):
+    def _create_show(self, *, plot, updated_at):
+        show = Show.objects.create(
+            title='Test show',
+            original_title='Test show',
+            plot=plot,
+        )
+        Show.objects.filter(pk=show.pk).update(updated_at=updated_at)
+        return show
+
+    def test_history_refreshes_only_missing_or_stale_details(self):
+        now = history_parser.timezone.now()
+        fresh = self._create_show(plot='Fresh description', updated_at=now)
+        stale = self._create_show(
+            plot='Old description',
+            updated_at=now - history_parser.timedelta(days=15),
+        )
+        missing = self._create_show(plot='', updated_at=now)
+
+        result = history_parser._get_stale_history_detail_ids(
+            [fresh.id, stale.id, missing.id],
+            now=now,
+        )
+
+        self.assertEqual(set(result), {stale.id, missing.id})
+
+    def test_empty_input_does_not_query_or_enqueue(self):
+        self.assertEqual(history_parser._get_stale_history_detail_ids([]), [])
 
 
 class HistoryParserRecoveryTests(SimpleTestCase):

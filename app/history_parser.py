@@ -66,6 +66,22 @@ from shared.constants import (
 from shared.formatters import format_se
 
 
+DETAIL_REFRESH_INTERVAL = timedelta(days=14)
+
+
+def _get_stale_history_detail_ids(show_ids, now=None):
+    """Return history shows whose KinoPub description should be refreshed."""
+    if not show_ids:
+        return []
+
+    cutoff = (now or timezone.now()) - DETAIL_REFRESH_INTERVAL
+    return list(
+        Show.objects.filter(id__in=show_ids)
+        .filter(Q(plot__isnull=True) | Q(plot='') | Q(updated_at__lt=cutoff))
+        .values_list('id', flat=True)
+    )
+
+
 def is_cloudflare_page(driver):
     """Проверяет, является ли текущая страница заглушкой Cloudflare."""
     try:
@@ -1563,7 +1579,8 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
         item['show_id'] = db_shows[item['kinopub_id']]
 
     unique_show_ids = list({item['show_id'] for item in views_on_page})
-    enqueue_show_update(unique_show_ids, details=True, durations=False, ratings=True)
+    detail_ids = _get_stale_history_detail_ids(unique_show_ids)
+    enqueue_show_update(detail_ids, details=True, durations=False, ratings=False)
 
     q_objects = Q()
     for item in views_on_page:
