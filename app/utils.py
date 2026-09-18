@@ -64,6 +64,26 @@ def get_proxied_image_url(url: str | None) -> str | None:
     return f'/api/image_proxy/?url={urllib.parse.quote(url, safe="")}'
 
 
+def get_original_image_url(url: str | None) -> str | None:
+    """Return the source URL when given one of our image-proxy URLs.
+
+    Metrics return proxy URLs to the browser, but photo state is stored and
+    compared using the source URL.  Keeping this conversion in one place
+    prevents browser-facing URLs from being persisted as photo identities.
+    """
+    if not url:
+        return None
+
+    value = str(url).strip()
+    parsed = urllib.parse.urlparse(value)
+    if parsed.path.rstrip('/') == '/api/image_proxy':
+        source_url = urllib.parse.parse_qs(parsed.query).get('url', [None])[0]
+        if source_url:
+            return source_url
+
+    return value
+
+
 def format_user_for_rating(rater, current_user, override_public_user_id=None):
     is_me = current_user and rater.id == current_user.id
     is_admin = current_user and current_user.role == UserRole.ADMIN

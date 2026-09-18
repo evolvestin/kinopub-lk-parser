@@ -9,6 +9,7 @@ from django.db import DatabaseError
 
 from app.models import Person
 from app.services.tmdb_client import get_tmdb_session
+from app.utils import get_original_image_url
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,10 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
         logger.error('TMDB_API_KEY is not set.')
         return False
 
-    rejected_urls = set(person_instance.rejected_photos.values_list('photo_url', flat=True))
+    rejected_urls = {
+        get_original_image_url(url)
+        for url in person_instance.rejected_photos.values_list('photo_url', flat=True)
+    }
 
     def clean_name(n):
         if not n:

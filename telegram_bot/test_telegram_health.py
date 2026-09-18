@@ -4,7 +4,7 @@ from services.telegram_health import TelegramPollingIncident
 
 
 class TelegramPollingIncidentTests(unittest.TestCase):
-    def test_reports_start_summary_and_recovery(self):
+    def test_ignores_short_outage_and_recovery(self):
         current_time = [0.0]
         incident = TelegramPollingIncident(
             clock=lambda: current_time[0],
@@ -12,8 +12,29 @@ class TelegramPollingIncidentTests(unittest.TestCase):
         )
 
         first = incident.observe('Failed to fetch updates - Bad Gateway')
-        self.assertEqual(first.level, 'ERROR')
-        self.assertIn('Bad Gateway', first.message)
+        self.assertTrue(first.handled)
+        self.assertIsNone(first.message)
+
+        current_time[0] = 30
+        repeated = incident.observe('Failed to fetch updates - Request timeout')
+        self.assertTrue(repeated.handled)
+        self.assertIsNone(repeated.message)
+
+        current_time[0] = 53
+        recovered = incident.observe('Connection established (tryings = 3, bot id = 1)')
+        self.assertTrue(recovered.handled)
+        self.assertIsNone(recovered.message)
+        self.assertIsNone(incident.started_at)
+
+    def test_reports_long_outage_summary_and_recovery(self):
+        current_time = [0.0]
+        incident = TelegramPollingIncident(
+            clock=lambda: current_time[0],
+            report_interval=600,
+        )
+
+        first = incident.observe('Failed to fetch updates - Bad Gateway')
+        self.assertIsNone(first.message)
 
         current_time[0] = 30
         repeated = incident.observe('Failed to fetch updates - Request timeout')
@@ -22,7 +43,8 @@ class TelegramPollingIncidentTests(unittest.TestCase):
 
         current_time[0] = 600
         summary = incident.observe('Failed to fetch updates - Request timeout')
-        self.assertEqual(summary.level, 'WARNING')
+        self.assertEqual(summary.level, 'ERROR')
+        self.assertIn('10m', summary.message)
         self.assertIn('failed attempts: 3', summary.message)
 
         current_time[0] = 605

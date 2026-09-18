@@ -26,6 +26,7 @@ class TelegramPollingIncident:
         self.last_report_at = None
         self.failure_count = 0
         self.last_error = None
+        self.reported = False
 
     def observe(self, message: str) -> TelegramIncidentEvent | None:
         now = self.clock()
@@ -35,16 +36,24 @@ class TelegramPollingIncident:
 
             if self.started_at is None:
                 self.started_at = now
-                self.last_report_at = now
                 self.failure_count = 1
+                return TelegramIncidentEvent(handled=True)
+
+            self.failure_count += 1
+            if not self.reported and now - self.started_at >= self.report_interval:
+                self.reported = True
+                self.last_report_at = now
+                duration = _format_duration(now - self.started_at)
                 return TelegramIncidentEvent(
                     handled=True,
                     level='ERROR',
-                    message=f'Telegram polling unavailable: {self.last_error}',
+                    message=(
+                        f'Telegram polling unavailable for {duration}; '
+                        f'failed attempts: {self.failure_count}; last error: {self.last_error}'
+                    ),
                 )
 
-            self.failure_count += 1
-            if now - self.last_report_at >= self.report_interval:
+            if self.reported and now - self.last_report_at >= self.report_interval:
                 self.last_report_at = now
                 duration = _format_duration(now - self.started_at)
                 return TelegramIncidentEvent(
@@ -59,6 +68,13 @@ class TelegramPollingIncident:
             return TelegramIncidentEvent(handled=True)
 
         if message.startswith(self.RECOVERY_PREFIX) and self.started_at is not None:
+            if not self.reported:
+                self.started_at = None
+                self.last_report_at = None
+                self.failure_count = 0
+                self.last_error = None
+                return TelegramIncidentEvent(handled=True)
+
             duration = _format_duration(now - self.started_at)
             event = TelegramIncidentEvent(
                 handled=True,
@@ -72,6 +88,7 @@ class TelegramPollingIncident:
             self.last_report_at = None
             self.failure_count = 0
             self.last_error = None
+            self.reported = False
             return event
 
         return None

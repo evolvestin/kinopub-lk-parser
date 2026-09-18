@@ -98,7 +98,7 @@ from app.services.show_identity import normalize_show_type
 from app.services.telegram_auth import validate_telegram_init_data
 from app.tasks import send_view_confirmation_task
 from app.telegram_bot import TelegramSender
-from app.utils import format_user_for_rating, normalize_imdb_id
+from app.utils import format_user_for_rating, get_original_image_url, normalize_imdb_id
 from shared.constants import (
     GENRES_MAPPING,
     PROFESSIONS_PLURAL_MAP_RU,
@@ -2318,13 +2318,13 @@ def get_metric_details(request, key):
     if items and not is_person and not is_country and not is_genre:
         try:
             r = Redis.from_url(settings.CELERY_BROKER_URL)
+            queue_name = {
+                'priority_sync': RedisQueue.PRIORITY_RATINGS_SYNC,
+                'durations': RedisQueue.UPDATE_DURATIONS,
+            }.get(target_task, RedisQueue.UPDATE_DETAILS)
             all_queued = {
                 int(x)
-                for x in r.sunion(
-                    RedisQueue.UPDATE_DETAILS,
-                    RedisQueue.PRIORITY_RATINGS_SYNC,
-                    RedisQueue.UPDATE_DURATIONS,
-                )
+                for x in r.smembers(queue_name)
             }
         except Exception:
             pass
@@ -3417,7 +3417,7 @@ def reject_person_photo_api(request):
     try:
         data = json.loads(request.body)
         person_id = data.get('person_id')
-        photo_url = data.get('photo_url')
+        photo_url = get_original_image_url(data.get('photo_url'))
 
         if not person_id or not photo_url:
             return JsonResponse({'error': 'Person ID and Photo URL are required'}, status=400)
