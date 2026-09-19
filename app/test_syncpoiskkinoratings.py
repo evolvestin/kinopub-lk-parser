@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from app.management.commands.syncimdbdata import Command as ImdbCommand
 from app.management.commands.syncpoiskkinoratings import Command
-from app.models import Show, ShowCrew, ShowPoster
+from app.models import Person, Show, ShowCrew, ShowPoster
 from shared.formatters import format_country_display_names
 
 
@@ -163,3 +163,59 @@ class PoiskkinoPosterConflictTests(TestCase):
         poster.refresh_from_db()
         self.assertEqual(poster.external_id, 456)
         self.assertEqual(poster.url, 'https://example.test/new.jpg')
+
+
+class PoiskkinoPersonMatchingTests(TestCase):
+    def test_one_kp_id_with_name_variants_creates_one_person(self):
+        show = Show.objects.create(
+            title='KP person matching test',
+            original_title='KP person matching test',
+            type='Movie',
+        )
+
+        Command()._process_batch(
+            [
+                {
+                    'id': 900001,
+                    'persons': [
+                        {'id': 700001, 'name': 'Иван Иванов', 'profession': 'Актёр'},
+                        {'id': 700001, 'name': 'Иванов Иван', 'profession': 'Режиссёр'},
+                    ],
+                }
+            ],
+            {900001: show.id},
+            timezone.now(),
+        )
+
+        self.assertEqual(
+            Person.objects.filter(kinopoisk_person_id=700001).count(),
+            1,
+        )
+        self.assertEqual(
+            ShowCrew.objects.filter(show=show).values('person_id').distinct().count(),
+            1,
+        )
+
+    def test_existing_kp_id_wins_over_a_new_source_name(self):
+        show = Show.objects.create(
+            title='Existing KP person test',
+            original_title='Existing KP person test',
+            type='Movie',
+        )
+        person = Person.objects.create(name='Старое имя', kinopoisk_person_id=700002)
+
+        Command()._process_batch(
+            [
+                {
+                    'id': 900002,
+                    'persons': [
+                        {'id': 700002, 'name': 'Новое имя', 'profession': 'Актёр'},
+                    ],
+                }
+            ],
+            {900002: show.id},
+            timezone.now(),
+        )
+
+        self.assertEqual(Person.objects.filter(kinopoisk_person_id=700002).count(), 1)
+        self.assertTrue(ShowCrew.objects.filter(show=show, person=person).exists())

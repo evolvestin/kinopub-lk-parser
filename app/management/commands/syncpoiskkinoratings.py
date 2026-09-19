@@ -220,13 +220,12 @@ class Command(LoggableBaseCommand):
             for person_data in self._object_list(item, 'persons')
             if person_data.get('name')
         }
-        person_ids_by_name = {}
-        for item in data_map.values():
-            for person_data in self._object_list(item, 'persons'):
-                person_name = person_data.get('name')
-                person_id = self._coerce_person_id(person_data.get('id'))
-                if person_name and person_id is not None:
-                    person_ids_by_name.setdefault(person_name, set()).add(person_id)
+        person_ids = {
+            person_id
+            for item in data_map.values()
+            for person_data in self._object_list(item, 'persons')
+            if (person_id := self._coerce_person_id(person_data.get('id'))) is not None
+        }
 
         existing_genres = {
             genre.name: genre for genre in Genre.objects.filter(name__in=all_genre_names)
@@ -234,9 +233,19 @@ class Command(LoggableBaseCommand):
         existing_countries = {
             country.name: country for country in Country.objects.filter(name__in=all_country_names)
         }
-        existing_persons = {
+        persons_by_name = {
             person.name: person for person in Person.objects.filter(name__in=all_person_names)
         }
+        persons_by_kp_id = {}
+        if person_ids:
+            # The source ID is the primary identity.  Existing duplicate rows
+            # are allowed by policy, so choose a canonical row deterministically
+            # when more than one local row already has the same source ID.
+            existing_by_kp_id = Person.objects.filter(
+                kinopoisk_person_id__in=person_ids
+            ).order_by(F('master_person_id').asc(nulls_first=True), 'id')
+            for person in existing_by_kp_id:
+                persons_by_kp_id.setdefault(person.kinopoisk_person_id, person)
 
         new_genres = [Genre(name=name) for name in all_genre_names if name not in existing_genres]
         if new_genres:
@@ -258,25 +267,56 @@ class Command(LoggableBaseCommand):
                 }
             )
 
-        new_persons = [
-            Person(
-                name=name,
-                kinopoisk_person_id=(
-                    next(iter(person_ids_by_name[name]))
-                    if len(person_ids_by_name.get(name, set())) == 1
+        # Resolve every source person before creating anything.  This keeps a
+        # single local row for one KP ID even when a batch contains name
+        # variants for that person.
+        pending_persons = {}
+        resolved_persons = {}
+        for show_id in show_ids:
+            for person_index, person_data in enumerate(
+                self._object_list(data_map[show_id], 'persons')
+            ):
+                person_name = person_data.get('name')
+                if not person_name:
+                    continue
+
+                source_person_id = self._coerce_person_id(person_data.get('id'))
+                person = (
+                    persons_by_kp_id.get(source_person_id)
+                    if source_person_id is not None
                     else None
-                ),
+                )
+
+                if person is None:
+                    person = persons_by_name.get(person_name)
+
+                pending_key = (
+                    ('kp', source_person_id)
+                    if source_person_id is not None
+                    else ('name', person_name)
+                )
+                if person is None:
+                    person = pending_persons.get(pending_key)
+                if person is None:
+                    person = Person(
+                        name=person_name,
+                        kinopoisk_person_id=source_person_id,
+                    )
+                    pending_persons[pending_key] = person
+
+                if source_person_id is not None:
+                    persons_by_kp_id.setdefault(source_person_id, person)
+                persons_by_name.setdefault(person_name, person)
+                resolved_persons[(show_id, person_index)] = person
+
+        if pending_persons:
+            created_persons = Person.objects.bulk_create(
+                list(pending_persons.values()), batch_size=500
             )
-            for name in all_person_names
-            if name not in existing_persons
-        ]
-        if new_persons:
-            existing_persons.update(
-                {
-                    person.name: person
-                    for person in Person.objects.bulk_create(new_persons, batch_size=500)
-                }
-            )
+            for person in created_persons:
+                if person.kinopoisk_person_id is not None:
+                    persons_by_kp_id.setdefault(person.kinopoisk_person_id, person)
+                persons_by_name.setdefault(person.name, person)
 
         shows_to_update = []
         ext_ratings_to_update = []
@@ -358,9 +398,9 @@ class Command(LoggableBaseCommand):
                 if country:
                     show.countries.add(country)
 
-            for person_data in self._object_list(item, 'persons'):
+            for person_index, person_data in enumerate(self._object_list(item, 'persons')):
                 person_name = person_data.get('name')
-                person = existing_persons.get(person_name)
+                person = resolved_persons.get((show_id, person_index))
                 if not person_name or not person:
                     continue
 
