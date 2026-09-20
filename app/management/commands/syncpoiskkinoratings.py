@@ -119,9 +119,9 @@ class Command(LoggableBaseCommand):
         )
 
         checked_show_ids = {
-            reverse_kp_mapping[kp_id]
+            kp_mapping[kp_id]
             for kp_id in result.checked_values
-            if kp_id in reverse_kp_mapping
+            if kp_id in kp_mapping
         }
 
         logging.info(

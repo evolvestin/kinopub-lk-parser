@@ -6,7 +6,8 @@ from django.utils import timezone
 
 from app.management.commands.syncimdbdata import Command as ImdbCommand
 from app.management.commands.syncpoiskkinoratings import Command
-from app.models import Person, Show, ShowCrew, ShowPoster
+from app.models import ExternalRating, Person, Show, ShowCrew, ShowPoster
+from app.services.poiskkino_client import PoiskkinoFetchResult
 from shared.formatters import format_country_display_names
 
 
@@ -88,6 +89,56 @@ class ImdbRatingTimestampTests(TestCase):
         self.assertEqual(result['updated'], 1)
         self.assertEqual(show.imdb_rating, 8.4)
         self.assertIsNotNone(show.imdb_rating_updated_at)
+
+
+class PoiskkinoRefreshSelectionTests(TestCase):
+    def test_checked_kp_ids_update_their_mapped_shows(self):
+        rated_show = Show.objects.create(
+            title='Rated show',
+            original_title='Rated show',
+            type='Movie',
+            kinopoisk_url='https://www.kinopoisk.ru/film/900001/',
+        )
+        unrated_show = Show.objects.create(
+            title='Unrated show',
+            original_title='Unrated show',
+            type='Movie',
+            kinopoisk_url='https://www.kinopoisk.ru/film/900002/',
+        )
+        kp_mapping = {
+            900001: rated_show.id,
+            900002: unrated_show.id,
+        }
+        result = PoiskkinoFetchResult(
+            data=[
+                {'id': 900001, 'rating': {'kp': 8.2}},
+                {'id': 900002, 'rating': {}},
+            ],
+            checked_values=[900001, 900002],
+            completed=True,
+            requests_made=1,
+        )
+
+        with (
+            patch(
+                'app.management.commands.syncpoiskkinoratings.get_kp_mapping',
+                return_value=kp_mapping,
+            ),
+            patch(
+                'app.management.commands.syncpoiskkinoratings.PoiskkinoClient'
+            ) as client_class,
+        ):
+            client_class.return_value.fetch_ratings_by_ids.return_value = result
+            Command().handle(limit=2)
+
+        rated_show.refresh_from_db()
+        unrated_show.refresh_from_db()
+        self.assertIsNotNone(rated_show.poiskkino_updated_at)
+        self.assertIsNotNone(unrated_show.poiskkino_updated_at)
+        self.assertTrue(rated_show.kinopoisk_rating_available)
+        self.assertFalse(unrated_show.kinopoisk_rating_available)
+        self.assertEqual(ExternalRating.objects.get(show=rated_show).kp, 8.2)
+        self.assertIsNone(ExternalRating.objects.get(show=unrated_show).kp)
 
 
 class PoiskkinoPosterConflictTests(TestCase):
