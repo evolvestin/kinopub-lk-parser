@@ -92,6 +92,26 @@ class ImdbRatingTimestampTests(TestCase):
 
 
 class PoiskkinoRefreshSelectionTests(TestCase):
+    def test_batch_does_not_write_stale_status_when_source_omits_it(self):
+        show = Show.objects.create(
+            title='Status preservation test',
+            original_title='Status preservation test',
+            type='Series',
+            status='Finished',
+        )
+
+        with patch.object(Show.objects, 'bulk_update', wraps=Show.objects.bulk_update) as bulk_update:
+            Command()._process_batch(
+                [{'id': 900001, 'rating': {'kp': 8.2}}],
+                {900001: show.id},
+                timezone.now(),
+            )
+
+        show.refresh_from_db()
+        self.assertEqual(show.status, 'Finished')
+        self.assertTrue(bulk_update.called)
+        self.assertNotIn('status', bulk_update.call_args_list[0].args[1])
+
     def test_checked_kp_ids_update_their_mapped_shows(self):
         rated_show = Show.objects.create(
             title='Rated show',

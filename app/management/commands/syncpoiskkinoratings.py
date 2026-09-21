@@ -319,6 +319,7 @@ class Command(LoggableBaseCommand):
                 persons_by_name.setdefault(person.name, person)
 
         shows_to_update = []
+        shows_with_source_status = []
         ext_ratings_to_update = []
         posters_to_update = []
         crew_objects = []
@@ -357,6 +358,7 @@ class Command(LoggableBaseCommand):
             if item.get('status'):
                 show.status = SHOW_STATUS_MAPPING.get(item['status'], item['status'])
                 updated_fields.append('status')
+                shows_with_source_status.append(show)
 
             if updated_fields:
                 shows_to_update.append(show)
@@ -448,8 +450,18 @@ class Command(LoggableBaseCommand):
                     'kinopoisk_rating_available',
                     'year',
                     'plot',
-                    'status',
                 ],
+                batch_size=500,
+            )
+
+        # ``existing_shows`` is read before the rest of this batch is prepared.
+        # Do not include its stale status value in a later bulk update when
+        # Poiskkino omitted the field: a KinoPub details refresh may have
+        # populated it in the meantime.
+        if shows_with_source_status:
+            Show.objects.bulk_update(
+                shows_with_source_status,
+                ['status'],
                 batch_size=500,
             )
 
