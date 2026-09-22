@@ -290,3 +290,29 @@ class PoiskkinoPersonMatchingTests(TestCase):
 
         self.assertEqual(Person.objects.filter(kinopoisk_person_id=700002).count(), 1)
         self.assertTrue(ShowCrew.objects.filter(show=show, person=person).exists())
+
+    def test_normalized_name_fallback_reuses_existing_person(self):
+        show = Show.objects.create(
+            title='Normalized KP person test',
+            original_title='Normalized KP person test',
+            type='Movie',
+        )
+        person = Person.objects.create(name='Ёлка  Иванова', kinopoisk_person_id=None)
+
+        Command()._process_batch(
+            [
+                {
+                    'id': 900003,
+                    'persons': [
+                        {'id': 700003, 'name': 'Елка Иванова', 'profession': 'Актёр'},
+                    ],
+                }
+            ],
+            {900003: show.id},
+            timezone.now(),
+        )
+
+        person.refresh_from_db()
+        self.assertEqual(Person.objects.filter(kinopoisk_person_id=700003).count(), 1)
+        self.assertEqual(person.kinopoisk_person_id, 700003)
+        self.assertTrue(ShowCrew.objects.filter(show=show, person=person).exists())

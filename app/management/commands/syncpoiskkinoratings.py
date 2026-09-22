@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from app.management.base import LoggableBaseCommand
 from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew, ShowPoster
+from app.services.person_matching import _normalized_field, normalize_person_name
 from app.services.poiskkino_client import PoiskkinoClient
 from app.tasks import get_kp_mapping
 from app.utils import normalize_country_name
@@ -220,6 +221,11 @@ class Command(LoggableBaseCommand):
             for person_data in self._object_list(item, 'persons')
             if person_data.get('name')
         }
+        normalized_person_names = {
+            normalize_person_name(name)
+            for name in all_person_names
+            if normalize_person_name(name)
+        }
         person_ids = {
             person_id
             for item in data_map.values()
@@ -233,9 +239,14 @@ class Command(LoggableBaseCommand):
         existing_countries = {
             country.name: country for country in Country.objects.filter(name__in=all_country_names)
         }
-        persons_by_name = {
-            person.name: person for person in Person.objects.filter(name__in=all_person_names)
-        }
+        persons_by_name = {}
+        existing_by_name = Person.objects.annotate(
+            normalized_name=_normalized_field('name')
+        ).filter(normalized_name__in=normalized_person_names).order_by(
+            F('master_person_id').asc(nulls_first=True), 'id'
+        )
+        for person in existing_by_name:
+            persons_by_name.setdefault(normalize_person_name(person.name), person)
         persons_by_kp_id = {}
         if person_ids:
             # The source ID is the primary identity.  Existing duplicate rows
@@ -280,6 +291,7 @@ class Command(LoggableBaseCommand):
                 if not person_name:
                     continue
 
+                normalized_name = normalize_person_name(person_name)
                 source_person_id = self._coerce_person_id(person_data.get('id'))
                 person = (
                     persons_by_kp_id.get(source_person_id)
@@ -288,12 +300,12 @@ class Command(LoggableBaseCommand):
                 )
 
                 if person is None:
-                    person = persons_by_name.get(person_name)
+                    person = persons_by_name.get(normalized_name)
 
                 pending_key = (
                     ('kp', source_person_id)
                     if source_person_id is not None
-                    else ('name', person_name)
+                    else ('name', normalized_name)
                 )
                 if person is None:
                     person = pending_persons.get(pending_key)
@@ -306,7 +318,7 @@ class Command(LoggableBaseCommand):
 
                 if source_person_id is not None:
                     persons_by_kp_id.setdefault(source_person_id, person)
-                persons_by_name.setdefault(person_name, person)
+                persons_by_name.setdefault(normalized_name, person)
                 resolved_persons[(show_id, person_index)] = person
 
         if pending_persons:
@@ -316,7 +328,7 @@ class Command(LoggableBaseCommand):
             for person in created_persons:
                 if person.kinopoisk_person_id is not None:
                     persons_by_kp_id.setdefault(person.kinopoisk_person_id, person)
-                persons_by_name.setdefault(person.name, person)
+                persons_by_name.setdefault(normalize_person_name(person.name), person)
 
         shows_to_update = []
         shows_with_source_status = []
@@ -407,6 +419,7 @@ class Command(LoggableBaseCommand):
                     continue
 
                 needs_update = False
+                normalized_name = normalize_person_name(person_name)
                 source_person_id = self._coerce_person_id(person_data.get('id'))
                 if source_person_id is not None and person.kinopoisk_person_id is None:
                     person.kinopoisk_person_id = source_person_id

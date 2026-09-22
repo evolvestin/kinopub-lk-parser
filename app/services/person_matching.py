@@ -1,6 +1,6 @@
 """Helpers for matching imported people without creating avoidable aliases."""
 
-from django.db.models import Value
+from django.db.models import Func, Value
 from django.db.models.functions import Lower, Replace, Trim
 
 from app.models import Person
@@ -22,7 +22,8 @@ def normalize_person_name(value):
 def _normalized_field(field_name):
     expression = Lower(Trim(field_name))
     expression = Replace(Replace(expression, Value('ё'), Value('е')), Value('Ё'), Value('Е'))
-    return Replace(Replace(expression, Value('э'), Value('е')), Value('Э'), Value('Е'))
+    expression = Replace(Replace(expression, Value('э'), Value('е')), Value('Э'), Value('Е'))
+    return Func(expression, Value(r'\s+'), Value(' '), Value('g'), function='REGEXP_REPLACE')
 
 
 def _canonical_people_queryset(name, en_name=None):
