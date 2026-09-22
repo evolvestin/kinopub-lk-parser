@@ -211,11 +211,22 @@ def safe_execution(func):
     return wrapper
 
 
+def _allow_kinopub_task(manual=False):
+    """Allow KinoPub work in PROD or after an explicit manual DEV request."""
+    if settings.ENVIRONMENT == 'PROD' or manual:
+        return True
+
+    logging.warning(
+        'KinoPub task is disabled outside PROD; use an explicit manual=True '
+        'invocation for a local run.'
+    )
+    return False
+
+
 @shared_task
 @single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=7200)
-def run_history_parser_task():
-    if settings.ENVIRONMENT != 'PROD':
-        logging.warning('History parser is disabled outside PROD; skipping local run.')
+def run_history_parser_task(manual=False):
+    if not _allow_kinopub_task(manual=manual):
         return
     logging.info('Starting periodic history parser task.')
     history_parser.run_parser_session()
@@ -224,7 +235,9 @@ def run_history_parser_task():
 @shared_task
 @single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=14400)
 @safe_execution
-def run_full_scan_task():
+def run_full_scan_task(manual=False):
+    if not _allow_kinopub_task(manual=manual):
+        return
     logging.info('Starting quarterly full scan task.')
     call_command('runfullscan')
 
@@ -500,14 +513,18 @@ def run_admin_command(self, task_run_id):
 
 @shared_task
 @single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=3600)
-def run_new_episodes_task():
+def run_new_episodes_task(manual=False):
+    if not _allow_kinopub_task(manual=manual):
+        return
     logging.info('Starting new episodes parser task.')
     call_command('runnewepisodes')
 
 
 @shared_task
 @single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=14400)
-def run_daily_sync_task():
+def run_daily_sync_task(manual=False):
+    if not _allow_kinopub_task(manual=manual):
+        return
     logging.info('Starting Daily Synchronization Task via Celery.')
     call_command('rundailysync')
 
@@ -598,11 +615,14 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
     soft_time_limit=1100,  # Мягкий лимит
 )
 @single_instance_task(lock_name=RedisLock.PROCESS_QUEUES, timeout=1200)
-def process_queues_task(self):
+def process_queues_task(self, manual=False):
     """
     Объединенная задача для последовательной обработки очередей Redis.
     Блокировка занимается ТОЛЬКО если в очередях есть задачи.
     """
+    if not _allow_kinopub_task(manual=manual):
+        return
+
     # 1. Предварительная проверка наличия задач без захвата блокировки
     try:
         redis_client = Redis.from_url(settings.CELERY_BROKER_URL)
@@ -723,7 +743,9 @@ def refresh_global_stats_task():
 
 @shared_task
 @single_instance_task(lock_name=RedisLock.KINOPUB_BROWSER, timeout=21600)
-def run_gap_scanner_task():
+def run_gap_scanner_task(manual=False):
+    if not _allow_kinopub_task(manual=manual):
+        return
     logging.info('Starting monthly gap scanner task.')
     call_command('rungapscanner')
 

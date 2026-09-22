@@ -424,10 +424,6 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'app.tasks.cleanup_old_data_task',
         'schedule': crontab(minute=0, hour=0),  # every 24 hours
     },
-    'process_queues': {
-        'task': 'app.tasks.process_queues_task',
-        'schedule': crontab(minute='*/15'),  # Каждые 15 минут
-    },
     'process_errors': {
         'task': 'app.tasks.process_errors_task',
         'schedule': crontab(minute='*/1'),  # Проверяем каждую минуту (отправка раз в 10 мин)
@@ -444,15 +440,19 @@ CELERY_BEAT_SCHEDULE = {
         # the next hourly snapshot has already become more useful.
         'options': {'queue': 'metrics', 'expires': 600},
     },
-    'auto_enqueue_missing_metadata': {
-        'task': 'app.tasks.auto_enqueue_missing_metadata_task',
-        'schedule': crontab(minute=5, hour=9),  # every 24 hours
-    },
 }
 
 if ENVIRONMENT == 'PROD':
     CELERY_BEAT_SCHEDULE.update(
         {
+            'process_queues': {
+                'task': 'app.tasks.process_queues_task',
+                'schedule': crontab(minute='*/15'),  # Каждые 15 минут
+            },
+            'auto_enqueue_missing_metadata': {
+                'task': 'app.tasks.auto_enqueue_missing_metadata_task',
+                'schedule': crontab(minute=5, hour=9),  # every 24 hours
+            },
             'run_history_parser': {
                 'task': 'app.tasks.run_history_parser_task',
                 # Keep the history checks exactly on the established schedule.

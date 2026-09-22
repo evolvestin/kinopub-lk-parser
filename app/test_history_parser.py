@@ -40,12 +40,12 @@ class HistoryDetailsRefreshQueueTests(TestCase):
 class HistoryParserRecoveryTests(SimpleTestCase):
     @override_settings(ENVIRONMENT='DEV')
     @patch('app.management.commands.runhistoryparser.history_parser.run_parser_session')
-    def test_manual_history_parser_is_disabled_outside_prod(self, run_parser_session):
+    def test_manual_history_parser_requires_explicit_local_flag(self, run_parser_session):
         from app.management.commands.runhistoryparser import Command
 
-        Command().handle()
+        Command().handle(allow_kinopub=True)
 
-        run_parser_session.assert_not_called()
+        run_parser_session.assert_called_once_with()
 
     @patch('app.history_parser._update_show_details_once')
     def test_show_update_reacquires_the_whole_page_after_browser_recovery(self, update_once):
