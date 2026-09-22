@@ -16,6 +16,27 @@ from shared.formatters import format_se
 from shared.html_helper import bold, html_link, html_secure, italic
 
 
+def _is_viewer_in_show_history(show_data: dict | None, view_id: int) -> bool:
+    """Return whether the current user is attached to the requested history row."""
+    if not show_data:
+        return False
+
+    return any(
+        item.get('id') == view_id and item.get('is_viewer')
+        for item in show_data.get('view_history', [])
+    )
+
+
+def _get_added_group_ids(show_data: dict | None, view_id: int) -> set[int]:
+    if not show_data:
+        return set()
+
+    for item in show_data.get('view_history', []):
+        if item.get('id') == view_id:
+            return set(item.get('added_group_ids', []))
+    return set()
+
+
 async def bot_command_start_private(message: Message, bot: Bot, command: CommandObject = None):
     sender = MessageSender(bot)
     user = message.from_user
@@ -81,10 +102,21 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 groups = await client.get_user_groups(user.id)
 
                 if groups:
+                    show_data = (
+                        await client.get_show_details(show_id, telegram_id=user.id)
+                        if show_id
+                        else None
+                    )
                     await sender.send_message(
                         chat_id=user.id,
                         text=f'{bold("Выберите режим отметки просмотра:")}',
-                        keyboard=keyboards.get_claim_mode_keyboard(view_id, groups, show_id),
+                        keyboard=keyboards.get_claim_mode_keyboard(
+                            view_id,
+                            groups,
+                            show_id,
+                            is_viewer=_is_viewer_in_show_history(show_data, view_id),
+                            added_group_ids=_get_added_group_ids(show_data, view_id),
+                        ),
                     )
                 else:
                     result = await client.toggle_view_user(user.id, view_id)

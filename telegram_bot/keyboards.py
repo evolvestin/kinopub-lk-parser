@@ -228,15 +228,38 @@ def get_episodes_keyboard(
     )
 
 
-def get_claim_mode_keyboard(view_id: int, groups: list[dict], show_id: int = None):
-    buttons = [[InlineKeyboardButton(text='👤 Только я', callback_data=f'claim_self_{view_id}')]]
+def get_claim_mode_keyboard(
+    view_id: int,
+    groups: list[dict],
+    show_id: int = None,
+    is_viewer: bool = False,
+    added_group_ids: set[int] | None = None,
+):
+    added_group_ids = added_group_ids or set()
+    self_button = (
+        InlineKeyboardButton(
+            text='🗑 Убрать только себя', callback_data=f'unclaim_{view_id}'
+        )
+        if is_viewer
+        else InlineKeyboardButton(text='👤 Только я', callback_data=f'claim_self_{view_id}')
+    )
+    buttons = [[self_button]]
 
     for group in groups:
+        is_group_added = group['id'] in added_group_ids
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=f'👥 {group["name"]}',
-                    callback_data=f'claim_group_{view_id}_{group["id"]}',
+                    text=(
+                        f'🗑 Убрать группу {group["name"]}'
+                        if is_group_added
+                        else f'👥 {group["name"]}'
+                    ),
+                    callback_data=(
+                        f'unclaim_group_{view_id}_{group["id"]}'
+                        if is_group_added
+                        else f'claim_group_{view_id}_{group["id"]}'
+                    ),
                 )
             ]
         )

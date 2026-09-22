@@ -245,10 +245,12 @@ def _serialize_show_details(show, user=None):
 
     # Определяем ID пользователей, которых текущий пользователь имеет право видеть
     visible_ids = set()
+    viewer_groups = []
     if user:
         visible_ids.add(user.id)
         if user.role != UserRole.GUEST:
             # Получаем ID всех сокомандников (участников тех же групп)
+            viewer_groups = list(user.groups.prefetch_related('users').all())
             mate_ids = ViewUser.objects.filter(groups__users=user).values_list('id', flat=True)
             visible_ids.update(mate_ids)
 
@@ -286,6 +288,13 @@ def _serialize_show_details(show, user=None):
         if not h_users:
             continue
 
+        history_user_ids = {u.id for u in h_users}
+        added_group_ids = [
+            group.id
+            for group in viewer_groups
+            if any(member.id in history_user_ids for member in group.users.all())
+        ]
+
         view_history_list.append(
             {
                 'id': h.id,
@@ -297,7 +306,8 @@ def _serialize_show_details(show, user=None):
                     for u in h_users
                 ],
                 'message_id': h.telegram_message_id,
-                'is_viewer': user.id in {u.id for u in h_users} if user else False,
+                'is_viewer': user.id in history_user_ids if user else False,
+                'added_group_ids': added_group_ids,
             }
         )
 
@@ -1106,6 +1116,43 @@ def bot_assign_group_view(request):
 
         return JsonResponse({'status': 'ok', 'added_count': added_count, 'group_name': group.name})
 
+    except (ViewUser.DoesNotExist, ViewUserGroup.DoesNotExist, ViewHistory.DoesNotExist):
+        return JsonResponse({'error': 'Not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+
+@csrf_exempt
+@protected_bot_api
+@require_http_methods(['POST'])
+def bot_unassign_group_view(request):
+    try:
+        data = json.loads(request.body)
+        telegram_id = data.get('telegram_id')
+        view_id = data.get('view_id')
+        group_id = data.get('group_id')
+
+        user = ViewUser.objects.get(telegram_id=telegram_id)
+        group = ViewUserGroup.objects.get(id=group_id)
+        if not group.users.filter(id=user.id).exists():
+            return JsonResponse({'status': 'error', 'error': 'User not in group'}, status=403)
+
+        view_history = ViewHistory.objects.get(id=view_id)
+        group_user_ids = set(group.users.values_list('id', flat=True))
+        assigned_user_ids = set(
+            view_history.users.filter(id__in=group_user_ids).values_list('id', flat=True)
+        )
+        if assigned_user_ids:
+            view_history.users.remove(*assigned_user_ids)
+            TelegramSender().update_history_message(view_history)
+
+        return JsonResponse(
+            {
+                'status': 'ok',
+                'removed_count': len(assigned_user_ids),
+                'group_name': group.name,
+            }
+        )
     except (ViewUser.DoesNotExist, ViewUserGroup.DoesNotExist, ViewHistory.DoesNotExist):
         return JsonResponse({'error': 'Not found'}, status=404)
     except Exception as e:

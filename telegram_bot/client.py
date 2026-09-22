@@ -207,6 +207,11 @@ async def assign_group_view(telegram_id: int, group_id: int, view_id: int) -> di
     return await _execute_request('assign_group_view/', method='POST', payload=payload)
 
 
+async def unassign_group_view(telegram_id: int, group_id: int, view_id: int) -> dict | None:
+    payload = {'telegram_id': telegram_id, 'group_id': group_id, 'view_id': view_id}
+    return await _execute_request('unassign_group_view/', method='POST', payload=payload)
+
+
 async def get_shared_stats_meta(stat_id: str) -> dict | None:
     url = f'{BACKEND_URL}/api/webapp/shared_stats/{stat_id}/'
     try:

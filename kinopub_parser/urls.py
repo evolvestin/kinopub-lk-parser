@@ -105,6 +105,7 @@ urlpatterns = proxy_patterns + [
     path('api/bot/unassign_view/', views.bot_unassign_view),
     path('api/bot/toggle_claim/', views.bot_toggle_claim),
     path('api/bot/assign_group_view/', views.bot_assign_group_view),
+    path('api/bot/unassign_group_view/', views.bot_unassign_group_view),
     path('api/bot/get_user_groups/', views.bot_get_user_groups),
     path('api/bot/toggle_view_user/', views.bot_toggle_view_user),
     path('api/bot/toggle_check/', views.bot_toggle_view_check),

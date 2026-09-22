@@ -465,5 +465,24 @@ async def claim_self_handler(callback: CallbackQuery, bot: Bot):
 
 
 @safe_callback
+async def unclaim_group_handler(callback: CallbackQuery, bot: Bot):
+    if await _check_guest_restriction(callback, callback.from_user.id):
+        return
+
+    view_id, group_id = get_args(callback.data, 2, 3)
+    result = await client.unassign_group_view(callback.from_user.id, group_id, view_id)
+
+    if result and result.get('status') == 'ok':
+        removed = result.get('removed_count', 0)
+        group_name = result.get('group_name', 'группы')
+        await callback.message.edit_text(
+            f'🗑 Убрано участников группы {bold(group_name)}: {removed}.', reply_markup=None
+        )
+        await callback.answer('Группа убрана из просмотра')
+    else:
+        await callback.answer('Ошибка при удалении группы', show_alert=True)
+
+
+@safe_callback
 async def delete_msg_handler(callback: CallbackQuery, bot: Bot):
     await callback.message.delete()
