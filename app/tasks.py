@@ -209,6 +209,10 @@ def safe_execution(func):
             # Мы не ловим исключение здесь, чтобы Celery пометил задачу как Failed,
             # но логируем факт падения.
             raise
+        except Retry:
+            # Celery uses Retry as control flow. Do not turn a scheduled retry
+            # into a false ERROR or swallow it as a successful task.
+            raise
         except Exception as e:
             logging.error(f'Celery task: {func.__name__} failed: {e}', exc_info=True)
 
