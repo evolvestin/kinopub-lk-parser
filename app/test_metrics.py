@@ -120,10 +120,14 @@ class ImdbMetricSplitTests(TestCase):
             tmdb_photo_url='https://image.tmdb.org/t/p/w200/x.jpg',
         )
 
+        with CaptureQueriesContext(connection) as queries:
+            metric = calculate_duplicate_photo_urls_metric()
+
         self.assertEqual(
-            calculate_duplicate_photo_urls_metric(),
+            metric,
             [{'name': 'TMDB дубликаты', 'value': 1}, {'name': 'KP дубликаты', 'value': 0}],
         )
+        self.assertTrue(any('EXISTS' in query['sql'].upper() for query in queries))
 
     def test_duplicate_photo_details_include_kinopoisk_person_id(self):
         shared_photo = 'https://image.kinopoisk.ru/kp/shared.jpg'

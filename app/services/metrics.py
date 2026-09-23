@@ -1154,14 +1154,45 @@ def get_missing_status_list(show_type: str):
 
 
 def calculate_duplicate_photo_urls_metric():
-    tmdb_dupes = _potential_duplicate_photo_groups('tmdb_photo_url').count()
-    kp_dupes = _potential_duplicate_photo_groups('kp_photo_url').count()
+    tmdb_dupes = _count_duplicate_photo_groups('tmdb_photo_url')
+    kp_dupes = _count_duplicate_photo_groups('kp_photo_url')
 
     data = [
         {'name': 'TMDB дубликаты', 'value': tmdb_dupes},
         {'name': 'KP дубликаты', 'value': kp_dupes},
     ]
     return sorted(data, key=lambda x: x['value'], reverse=True)
+
+
+def _count_duplicate_photo_groups(field: str):
+    """Count duplicate-photo groups with an unresolved person exactly.
+
+    A candidate group is defined by the old GROUP BY query as: at least two
+    root persons share a non-empty photo URL and at least one row has no
+    TMDB identity.  Starting from unresolved rows and using a correlated
+    EXISTS preserves that definition while avoiding a full grouping of every
+    root person by a long text URL.
+    """
+    other_person = Person.objects.filter(
+        master_person__isnull=True,
+        **{field: OuterRef(field)},
+    ).exclude(
+        pk=OuterRef('pk')
+    ).filter(
+        **{f'{field}__gt': ''}
+    )
+    unresolved_persons = (
+        Person.objects.filter(
+            master_person__isnull=True,
+            tmdb_id__isnull=True,
+            **{f'{field}__gt': ''},
+        )
+        .annotate(has_other=Exists(other_person))
+        .filter(has_other=True)
+        .values(field)
+        .distinct()
+    )
+    return unresolved_persons.count()
 
 
 def _potential_duplicate_photo_groups(field: str):

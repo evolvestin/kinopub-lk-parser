@@ -6,6 +6,13 @@ Run project checks, migrations, and tests inside the Docker Compose services.
 Do not use the host `.venv` for project verification; it may not match the
 container runtime and dependencies.
 
+## Health report metric isolation
+
+Health reports are active diagnostics: every metric check must execute a
+fresh, independent database query. Do not replace a health-report query with
+a global snapshot, Redis cache, or another previously calculated result.
+Optimize the SQL itself while preserving this isolation and freshness.
+
 ## PROD access and execution policy
 
 The default environment for development, diagnostics, migrations, and tests is
