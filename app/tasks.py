@@ -75,6 +75,10 @@ return 0
 # Periodic tasks must not occupy a worker while waiting for a long-running
 # catalog writer. Celery Beat will enqueue them again on the next interval.
 SHARED_LOCK_WAIT_SECONDS = 300
+# _redis_lock renews an acquired lock periodically. Keep the lease short so
+# a worker killed without running context-manager cleanup cannot block metrics
+# for hours; a healthy long-running writer keeps renewing it.
+CATALOG_LOCK_TTL_SECONDS = 900
 
 
 @contextmanager
@@ -458,7 +462,7 @@ def run_admin_command(self, task_run_id):
     elif task_run.command in catalog_and_rating_commands:
         with _wait_for_redis_lock(
             RedisLock.CATALOG_WRITES,
-            lock_timeout=14400,
+            lock_timeout=CATALOG_LOCK_TTL_SECONDS,
             wait_timeout=SHARED_LOCK_WAIT_SECONDS,
         ) as catalog_acquired:
             if not catalog_acquired:
@@ -484,7 +488,7 @@ def run_admin_command(self, task_run_id):
     elif task_run.command in catalog_commands:
         with _wait_for_redis_lock(
             RedisLock.CATALOG_WRITES,
-            lock_timeout=14400,
+            lock_timeout=CATALOG_LOCK_TTL_SECONDS,
             wait_timeout=SHARED_LOCK_WAIT_SECONDS,
         ) as acquired:
             if acquired:
@@ -756,7 +760,7 @@ def run_gap_scanner_task(manual=False):
 def fetch_person_photos_task(limit=2000):
     # Person photo writes share Person rows with TMDB/Poiskkino catalog
     # writers, but do not use a KinoPub browser.
-    with _redis_lock(RedisLock.CATALOG_WRITES, timeout=7200) as acquired:
+    with _redis_lock(RedisLock.CATALOG_WRITES, timeout=CATALOG_LOCK_TTL_SECONDS) as acquired:
         if acquired:
             call_command('fetchpersonphotos', limit=limit)
 
@@ -776,7 +780,10 @@ def get_kp_mapping():
 @shared_task(bind=True, max_retries=8)
 @single_instance_task(lock_name=RedisLock.SYNC_POISKKINO_RATINGS, timeout=7200)
 def sync_poiskkino_ratings_task(self):
-    with _redis_lock(RedisLock.CATALOG_WRITES, timeout=14400) as catalog_acquired:
+    with _redis_lock(
+        RedisLock.CATALOG_WRITES,
+        timeout=CATALOG_LOCK_TTL_SECONDS,
+    ) as catalog_acquired:
         if not catalog_acquired:
             raise self.retry(countdown=900)
 
@@ -800,10 +807,10 @@ def sync_imdb_data_task(self):
         call_command('syncimdbdata')
 
 
-@shared_task(time_limit=900, soft_time_limit=840)
+@shared_task(bind=True, max_retries=12, time_limit=900, soft_time_limit=840)
 @single_instance_task(lock_name=RedisLock.METRICS_SNAPSHOT, timeout=900)
 @safe_execution
-def update_site_metrics_task():
+def update_site_metrics_task(self):
     # Do not run a database-wide aggregate while a long catalog/rating write
     # batch is active.  MVCC keeps the result consistent, but it does not keep
     # the competing scans cheap: on production the two workloads exhausted
@@ -816,7 +823,7 @@ def update_site_metrics_task():
     ) as catalog_acquired:
         if not catalog_acquired:
             logging.info('Skipping metrics snapshot because catalog writes are active.')
-            return
+            raise self.retry(countdown=300)
 
         with metrics_statement_timeout():
             data = generate_global_metrics_snapshot()
@@ -972,7 +979,7 @@ def sync_tmdb_metadata_task(
 def parse_tmdb_library_task(media_type: str = 'all', batch_size: int = 5000):
     with _wait_for_redis_lock(
         RedisLock.CATALOG_WRITES,
-        lock_timeout=14400,
+        lock_timeout=CATALOG_LOCK_TTL_SECONDS,
         wait_timeout=SHARED_LOCK_WAIT_SECONDS,
     ) as acquired:
         if acquired:
@@ -988,7 +995,10 @@ def parse_tmdb_library_task(media_type: str = 'all', batch_size: int = 5000):
 def enrich_tmdb_shows_task(limit: int = 5000):
     # This is scheduled periodically; do not hold a worker while another
     # catalog writer finishes.  The next production window will retry it.
-    with _redis_lock(RedisLock.CATALOG_WRITES, timeout=14400) as catalog_acquired:
+    with _redis_lock(
+        RedisLock.CATALOG_WRITES,
+        timeout=CATALOG_LOCK_TTL_SECONDS,
+    ) as catalog_acquired:
         if catalog_acquired:
             with _redis_lock(RedisLock.EXTERNAL_RATING_WRITES, timeout=14400) as rating_acquired:
                 if rating_acquired:
