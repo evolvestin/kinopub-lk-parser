@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 from contextlib import contextmanager
 from datetime import timedelta
@@ -6,7 +7,7 @@ from hashlib import sha1
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import Case, CharField, Count, Exists, F, OuterRef, Q, Value, When
+from django.db.models import Case, CharField, Count, Exists, F, Max, OuterRef, Q, Value, When
 from django.db.models.functions import Coalesce
 from django.db.utils import ProgrammingError
 from django.utils import timezone
@@ -14,11 +15,15 @@ from django.utils import timezone
 from app.models import (
     Country,
     Genre,
+    LogEntry,
     Person,
     Show,
     ShowCrew,
     ShowDuration,
     SiteMetric,
+    TelegramLog,
+    ViewHistory,
+    ViewUser,
 )
 from app.utils import get_proxied_image_url
 from kinopub_parser import celery_app
@@ -48,6 +53,7 @@ PERSON_DETAIL_WARM_KEYS = {
     'en_professions_stats',
     'unused_persons',
 }
+SYSTEM_STATUS_SNAPSHOT_KEY = '_system_status'
 
 
 @contextmanager
@@ -59,16 +65,26 @@ def metrics_statement_timeout():
         previous_timeout = cursor.fetchone()[0]
         cursor.execute('SET statement_timeout = %s', [timeout_ms])
 
+    interrupted = False
     try:
         yield
+    except BaseException:
+        # A Celery soft timeout can arrive while psycopg is waiting for a
+        # result. The connection then still has a command in flight; trying to
+        # restore statement_timeout on it masks the original timeout with
+        # "another command is already in progress".
+        interrupted = True
+        connection.close()
+        raise
     finally:
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute('SET statement_timeout = %s', [previous_timeout])
-        except Exception:
-            # A timed-out statement can leave the connection unusable. Closing
-            # it makes Django open a clean connection for the next calculation.
-            connection.close()
+        if not interrupted:
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute('SET statement_timeout = %s', [previous_timeout])
+            except Exception:
+                # A timed-out statement can leave the connection unusable.
+                # Closing it makes Django open a clean connection next time.
+                connection.close()
 
 
 def _format_type(t):
@@ -345,6 +361,73 @@ def get_tmdb_missing_status_list(show_type: str):
     )
 
 
+def _format_snapshot_datetime(value):
+    if not value:
+        return 'Никогда'
+    return timezone.localtime(value).strftime('%d.%m.%Y %H:%M')
+
+
+def calculate_system_status_snapshot() -> dict:
+    """Collect the values shown in the metrics-page status strip.
+
+    These values belong to the same immutable snapshot as the charts. Keeping
+    them here prevents a page GET from running live queries against the large
+    catalog tables.
+    """
+    cutoff_24h = timezone.now() - timedelta(days=1)
+    shows = Show.objects.aggregate(
+        latest=Max('created_at'),
+        ratings_kp=Max(
+            'poiskkino_updated_at',
+            filter=Q(poiskkino_updated_at__isnull=False),
+        ),
+        ratings_imdb=Max(
+            'imdb_rating_updated_at',
+            filter=Q(imdb_rating_updated_at__isnull=False),
+        ),
+    )
+    logs = LogEntry.objects.aggregate(
+        parser_run=Max(
+            'created_at',
+            filter=Q(message__contains='Parser session finished'),
+        ),
+        errors_24h=Count(
+            'id',
+            filter=Q(created_at__gte=cutoff_24h, level__in=['ERROR', 'CRITICAL']),
+        ),
+    )
+    users = ViewUser.objects.aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(is_bot_active=True)),
+    )
+
+    return {
+        'last_actions': {
+            'history': _format_snapshot_datetime(
+                ViewHistory.objects.aggregate(latest=Max('created_at'))['latest']
+            ),
+            'parser_run': _format_snapshot_datetime(logs['parser_run']),
+            'shows': _format_snapshot_datetime(shows['latest']),
+            'ratings_kp': _format_snapshot_datetime(shows['ratings_kp']),
+            'ratings_imdb': _format_snapshot_datetime(shows['ratings_imdb']),
+            'durations': _format_snapshot_datetime(
+                ShowDuration.objects.aggregate(latest=Max('updated_at'))['latest']
+            ),
+            'photos': _format_snapshot_datetime(
+                Person.objects.filter(is_photo_fetched=True).aggregate(
+                    latest=Max('updated_at')
+                )['latest']
+            ),
+            'tg': _format_snapshot_datetime(
+                TelegramLog.objects.aggregate(latest=Max('created_at'))['latest']
+            ),
+        },
+        'errors_24h_count': logs['errors_24h'] or 0,
+        'bot_users_active': users['active'] or 0,
+        'bot_users_total': users['total'] or 0,
+    }
+
+
 def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     if profession_stats is None:
         profession_stats = _calculate_profession_stats()
@@ -355,6 +438,7 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     # duplicate-photo query scans a large person table, so a slow cache fill
     # must not pin the snapshot lock or any parser/browser resource.
     return {
+        SYSTEM_STATUS_SNAPSHOT_KEY: calculate_system_status_snapshot(),
         'missing_kp': calculate_missing_kp_metric(),
         'kp_unrated': calculate_kp_unrated_metric(),
         'missing_imdb': calculate_missing_imdb_metric(),
@@ -395,45 +479,28 @@ def get_global_metrics_history() -> dict:
     now = timezone.now()
 
     try:
-        latest = SiteMetric.objects.filter(key='global_snapshot').order_by('-created_at').first()
+        snapshots = _get_global_snapshot_periods(now)
     except ProgrammingError:
         return {}
 
-    # Snapshots are refreshed by Celery Beat once per hour.  Do not enqueue a
-    # full database-wide recalculation from a user request when the cache is
-    # stale: several requests arriving together can otherwise create repeated
-    # expensive metric work.
-
+    latest = snapshots.get('now')
     if not latest:
         return {}
 
-    queue_duplicate_photo_urls_warmup()
-    queue_person_detail_warmup()
-
-    yesterday_cutoff = now - timedelta(days=1)
-    yesterday = (
-        SiteMetric.objects.filter(key='global_snapshot', created_at__lte=yesterday_cutoff)
-        .order_by('-created_at')
-        .first()
-    )
-
-    week_cutoff = now - timedelta(days=7)
-    week_ago = (
-        SiteMetric.objects.filter(key='global_snapshot', created_at__lte=week_cutoff)
-        .order_by('-created_at')
-        .first()
-    )
+    yesterday = snapshots.get('yesterday')
+    week_ago = snapshots.get('week_ago')
 
     def _format_entry(entry, metric_key):
-        if not entry or metric_key not in entry.data:
+        data = entry.get('data', {}) if entry else {}
+        if metric_key not in data:
             return {'data': [], 'timestamp': None}
         return {
-            'data': entry.data[metric_key],
-            'timestamp': entry.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'data': data[metric_key],
+            'timestamp': entry['created_at'].strftime('%Y-%m-%d %H:%M:%S'),
         }
 
     result = {}
-    for key in latest.data.keys():
+    for key in latest['data'].keys():
         result[key] = {
             'now': _format_entry(latest, key),
             'yesterday': _format_entry(yesterday, key),
@@ -441,6 +508,71 @@ def get_global_metrics_history() -> dict:
         }
 
     return result
+
+
+def _get_global_snapshot_periods(now):
+    """Load all three dashboard periods with one SQL round-trip on Postgres."""
+    yesterday_cutoff = now - timedelta(days=1)
+    week_cutoff = now - timedelta(days=7)
+
+    if connection.vendor != 'postgresql':
+        rows = {
+            'now': SiteMetric.objects.filter(key='global_snapshot')
+            .order_by('-created_at')
+            .values('data', 'created_at')
+            .first(),
+            'yesterday': SiteMetric.objects.filter(
+                key='global_snapshot', created_at__lte=yesterday_cutoff
+            )
+            .order_by('-created_at')
+            .values('data', 'created_at')
+            .first(),
+            'week_ago': SiteMetric.objects.filter(
+                key='global_snapshot', created_at__lte=week_cutoff
+            )
+            .order_by('-created_at')
+            .values('data', 'created_at')
+            .first(),
+        }
+        return rows
+
+    table = connection.ops.quote_name(SiteMetric._meta.db_table)
+    sql = f'''
+        SELECT period, data, created_at
+        FROM (
+            (SELECT %s::text AS period, data, created_at
+             FROM {table}
+             WHERE key = %s
+             ORDER BY created_at DESC
+             LIMIT 1)
+            UNION ALL
+            (SELECT %s::text AS period, data, created_at
+             FROM {table}
+             WHERE key = %s AND created_at <= %s
+             ORDER BY created_at DESC
+             LIMIT 1)
+            UNION ALL
+            (SELECT %s::text AS period, data, created_at
+             FROM {table}
+             WHERE key = %s AND created_at <= %s
+             ORDER BY created_at DESC
+             LIMIT 1)
+        ) AS selected_snapshots
+    '''
+    params = [
+        'now', 'global_snapshot',
+        'yesterday', 'global_snapshot', yesterday_cutoff,
+        'week_ago', 'global_snapshot', week_cutoff,
+    ]
+    with connection.cursor() as cursor:
+        cursor.execute(sql, params)
+        return {
+            period: {
+                'data': json.loads(data) if isinstance(data, str) else data,
+                'created_at': created_at,
+            }
+            for period, data, created_at in cursor.fetchall()
+        }
 
 
 def get_missing_kp_list(show_type: str):
@@ -787,44 +919,50 @@ def calculate_persons_avatar_stats_metric():
     has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
     tmdb_done = Q(is_photo_fetched=True)
 
-    # The old implementation issued seven full scans of Person and used a
-    # materialized ``IN (SELECT ...)`` for the KP waiting set.  On production
-    # this made one metric compete with itself and with the catalog writers.
-    # Annotating the correlated waiting flag lets PostgreSQL calculate all
-    # counters in one aggregate query while still using ShowCrew indexes.
-    kp_waiting_persons = ShowCrew.objects.filter(
-        person_id=OuterRef('pk'),
-        show__kinopoisk_url__isnull=False,
-        show__ext_rating__isnull=True,
-    ).exclude(
-        show__kinopoisk_url=''
-    ).exclude(
-        show__kinopoisk_url__endswith='/film/0'
+    # Build the waiting set once.  A correlated EXISTS here makes PostgreSQL
+    # re-check the 15M-row ShowCrew relation for every Person row and was the
+    # last metric to hit statement_timeout on production.
+    kp_waiting_person_ids = list(
+        ShowCrew.objects.filter(
+            show__kinopoisk_url__isnull=False,
+            show__ext_rating__isnull=True,
+        )
+        .exclude(show__kinopoisk_url='')
+        .exclude(show__kinopoisk_url__endswith='/film/0')
+        .values_list('person_id', flat=True)
+        .distinct()
     )
-    person_stats = Person.objects.annotate(kp_waiting=Exists(kp_waiting_persons))
-    counts = person_stats.aggregate(
+
+    person_stats = Person.objects.aggregate(
         has_tmdb=Count('id', filter=has_tmdb),
         kp_only=Count('id', filter=has_kp & ~has_tmdb),
         tmdb_none=Count('id', filter=tmdb_done & ~has_tmdb),
-        kp_none=Count('id', filter=~has_kp & ~Q(kp_waiting=True)),
+        no_kp=Count('id', filter=~has_kp),
         tmdb_wait=Count('id', filter=~(tmdb_done | has_tmdb)),
-        kp_wait=Count('id', filter=Q(kp_waiting=True) & ~has_kp),
-        all_none=Count(
-            'id',
-            filter=tmdb_done
-            & ~has_tmdb
-            & ~has_kp
-            & ~Q(kp_waiting=True),
-        ),
+        all_none=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
     )
+
+    waiting_stats = {'kp_wait': 0, 'all_none_wait': 0}
+    if kp_waiting_person_ids:
+        waiting_stats = Person.objects.filter(id__in=kp_waiting_person_ids).aggregate(
+            kp_wait=Count('id', filter=~has_kp),
+            all_none_wait=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
+        )
+
     data = [
-        {'name': 'Есть фото (TMDB)', 'value': counts['has_tmdb']},
-        {'name': 'Есть фото (KP)', 'value': counts['kp_only']},
-        {'name': 'TMDB не найдено', 'value': counts['tmdb_none']},
-        {'name': 'KP не найдено', 'value': counts['kp_none']},
-        {'name': 'В ожидании TMDB', 'value': counts['tmdb_wait']},
-        {'name': 'В ожидании KP', 'value': counts['kp_wait']},
-        {'name': 'Не найдено вообще', 'value': counts['all_none']},
+        {'name': 'Есть фото (TMDB)', 'value': person_stats['has_tmdb']},
+        {'name': 'Есть фото (KP)', 'value': person_stats['kp_only']},
+        {'name': 'TMDB не найдено', 'value': person_stats['tmdb_none']},
+        {
+            'name': 'KP не найдено',
+            'value': person_stats['no_kp'] - (waiting_stats['kp_wait'] or 0),
+        },
+        {'name': 'В ожидании TMDB', 'value': person_stats['tmdb_wait']},
+        {'name': 'В ожидании KP', 'value': waiting_stats['kp_wait'] or 0},
+        {
+            'name': 'Не найдено вообще',
+            'value': person_stats['all_none'] - (waiting_stats['all_none_wait'] or 0),
+        },
     ]
     return sorted(data, key=lambda x: x['value'], reverse=True)
 
@@ -972,50 +1110,40 @@ def _calculate_profession_stats_canonical():
         fallback_field='en_profession',
     ):
         if canonical_complete:
-            # A single CASE/GROUP BY over the whole ShowCrew table is elegant,
-            # but on production it still has to sort/hash millions of rows.
-            # The role/canonical covering indexes make one small DISTINCT
-            # count per normalized role substantially cheaper and, crucially,
-            # keep every statement below the metrics statement timeout.
-            primary_by_normalized = {}
-            for raw, normalized in primary_raw_to_normalized.items():
-                primary_by_normalized.setdefault(normalized, []).append(raw)
-            fallback_by_normalized = {}
-            for raw, normalized in fallback_raw_to_normalized.items():
-                fallback_by_normalized.setdefault(normalized, []).append(raw)
-
+            # Aggregate every normalized role in one CASE/GROUP BY query.
+            # The previous implementation issued one DISTINCT count per role
+            # (dozens of scans of the 15M-row ShowCrew table for each language)
+            # and was the direct cause of the production soft timeout.
             all_primary_raw = list(primary_raw_to_normalized)
-            role_stats = []
-            for normalized in dict.fromkeys(
-                [*primary_by_normalized, *fallback_by_normalized]
-            ):
-                primary_values = primary_by_normalized.get(normalized, [])
-                fallback_values = fallback_by_normalized.get(normalized, [])
-                role_filter = Q(pk__in=[])
-                if primary_values:
-                    role_filter |= Q(**{f'{primary_field}__in': primary_values})
-                if fallback_values:
-                    fallback_filter = Q(
-                        **{f'{fallback_field}__in': fallback_values}
-                    ) & (
-                        Q(**{f'{primary_field}__isnull': True})
-                        | ~Q(**{f'{primary_field}__in': all_primary_raw})
-                    )
-                    role_filter |= fallback_filter
-
-                value = (
-                    ShowCrew.objects.filter(role_filter)
-                    .values('canonical_person_id')
-                    .distinct()
-                    .count()
+            primary_known = Q(**{f'{primary_field}__in': all_primary_raw})
+            fallback_allowed = Q(**{f'{primary_field}__isnull': True}) | ~primary_known
+            whens = [
+                When(**{primary_field: raw}, then=Value(normalized))
+                for raw, normalized in primary_raw_to_normalized.items()
+            ]
+            whens.extend(
+                When(
+                    Q(**{fallback_field: raw}) & fallback_allowed,
+                    then=Value(normalized),
                 )
-                if value:
-                    role_stats.append({'name': normalized, 'value': value})
-
-            result = sorted(role_stats, key=lambda x: x['value'], reverse=True)
-            known_filter = Q(**{f'{primary_field}__in': primary_raw_to_normalized}) | Q(
+                for raw, normalized in fallback_raw_to_normalized.items()
+            )
+            role_case = Case(*whens, output_field=CharField())
+            known_filter = primary_known | Q(
                 **{f'{fallback_field}__in': fallback_raw_to_normalized}
             )
+            role_stats = (
+                ShowCrew.objects.filter(known_filter)
+                .annotate(normalized=role_case)
+                .values('normalized')
+                .annotate(value=Count('canonical_person_id', distinct=True))
+                .order_by('-value')
+            )
+            result = [
+                {'name': row['normalized'], 'value': row['value']}
+                for row in role_stats
+                if row['normalized']
+            ]
             known_count = (
                 ShowCrew.objects.filter(known_filter)
                 .values('canonical_person_id')
@@ -1092,18 +1220,12 @@ def _calculate_profession_stats_canonical():
         for raw, normalized in RAW_TO_NORMALIZED_EN.items()
         if normalized in en_to_ru
     }
-    with connection.cursor() as cursor:
-        cursor.execute('SET enable_sort TO off')
-    try:
-        return calculate(RAW_TO_NORMALIZED_RU, en_to_ru_raw), calculate(
-            RAW_TO_NORMALIZED_EN,
-            ru_to_en_raw,
-            primary_field='en_profession',
-            fallback_field='profession',
-        )
-    finally:
-        with connection.cursor() as cursor:
-            cursor.execute('SET enable_sort TO on')
+    return calculate(RAW_TO_NORMALIZED_RU, en_to_ru_raw), calculate(
+        RAW_TO_NORMALIZED_EN,
+        ru_to_en_raw,
+        primary_field='en_profession',
+        fallback_field='profession',
+    )
 
 
 def calculate_professions_stats_metric():

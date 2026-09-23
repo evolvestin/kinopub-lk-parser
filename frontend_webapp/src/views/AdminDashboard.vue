@@ -26,7 +26,7 @@
         Системный статус
         <span class="live-indicator-badge">
           <span class="live-dot"></span>
-          актуально сейчас
+          на момент снапшота
         </span>
       </div>
       <div class="status-grid">

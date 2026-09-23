@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
-from app.models import ExternalRating, Person, Show, ShowCrew
+from app.models import ExternalRating, Person, Show, ShowCrew, SiteMetric
 from app.services.metrics import (
     calculate_duplicate_photo_urls_metric,
     calculate_en_professions_stats_metric,
@@ -20,7 +20,26 @@ from app.services.metrics import (
     get_missing_status_list,
     get_profession_persons_list,
     get_unused_persons_list,
+    get_global_metrics_history,
 )
+
+
+class MetricsSnapshotPageTests(TestCase):
+    def test_metrics_history_reads_only_the_snapshot_table(self):
+        SiteMetric.objects.create(
+            key='global_snapshot',
+            data={
+                'total_shows': [{'name': 'Фильм', 'value': 3}],
+                '_system_status': {'errors_24h_count': 0},
+            },
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            history = get_global_metrics_history()
+
+        self.assertEqual(history['total_shows']['now']['data'][0]['value'], 3)
+        if connection.vendor == 'postgresql':
+            self.assertEqual(len(queries), 1)
 
 
 class ImdbMetricSplitTests(TestCase):
@@ -212,7 +231,13 @@ class AvatarMetricTests(TestCase):
         )
         self.assertEqual(
             sum('FROM "app_person"' in query['sql'] for query in queries),
-            1,
+            2,
+        )
+        self.assertFalse(
+            any(
+                'EXISTS' in query['sql'].upper() and 'FROM "app_person"' in query['sql']
+                for query in queries
+            )
         )
 
 

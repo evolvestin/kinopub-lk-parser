@@ -202,6 +202,11 @@ class Person(BaseModel):
                 & Q(kp_photo_url__isnull=False)
                 & ~Q(kp_photo_url=''),
             ),
+            models.Index(
+                fields=['-updated_at'],
+                name='idx_person_photo_updated',
+                condition=Q(is_photo_fetched=True),
+            ),
             GinIndex(
                 OpClass(Upper('name'), name='gin_trgm_ops'),
                 name='idx_person_name_upper_trgm',
@@ -712,6 +717,9 @@ class ShowDuration(BaseModel):
                 name='uniq_show_duration_position',
                 nulls_distinct=False,
             ),
+        ]
+        indexes = [
+            models.Index(fields=['-updated_at'], name='idx_showduration_updated'),
         ]
         verbose_name = 'Show duration'
         verbose_name_plural = 'Show durations'

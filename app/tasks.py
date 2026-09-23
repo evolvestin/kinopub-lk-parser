@@ -820,17 +820,21 @@ def update_site_metrics_task(self):
     # the competing scans cheap: on production the two workloads exhausted
     # the statement timeout and left stale snapshots behind.  Beat will try
     # again on the next interval when the writer has released the lock.
-    with _redis_lock(
-        RedisLock.CATALOG_WRITES,
-        timeout=900,
-        warn_on_busy=False,
-    ) as catalog_acquired:
-        if not catalog_acquired:
-            logging.info('Skipping metrics snapshot because catalog writes are active.')
-            raise self.retry(countdown=300)
+    try:
+        with _redis_lock(
+            RedisLock.CATALOG_WRITES,
+            timeout=900,
+            warn_on_busy=False,
+        ) as catalog_acquired:
+            if not catalog_acquired:
+                logging.info('Skipping metrics snapshot because catalog writes are active.')
+                raise self.retry(countdown=300)
 
-        with metrics_statement_timeout():
-            data = generate_global_metrics_snapshot()
+            with metrics_statement_timeout():
+                data = generate_global_metrics_snapshot()
+    except SoftTimeLimitExceeded:
+        logging.warning('Metrics snapshot timed out; retrying in 300 seconds.')
+        raise self.retry(countdown=300)
     SiteMetric.objects.create(key='global_snapshot', data=data)
     cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
     cache.delete('lock:queuing_global_snapshot')
