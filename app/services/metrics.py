@@ -787,43 +787,44 @@ def calculate_persons_avatar_stats_metric():
     has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
     tmdb_done = Q(is_photo_fetched=True)
 
-    waiting_shows = (
-        Show.objects.filter(
-            kinopoisk_url__isnull=False,
-            ext_rating__isnull=True,
-        )
-        .exclude(kinopoisk_url='')
-        .exclude(kinopoisk_url__endswith='/film/0')
+    # The old implementation issued seven full scans of Person and used a
+    # materialized ``IN (SELECT ...)`` for the KP waiting set.  On production
+    # this made one metric compete with itself and with the catalog writers.
+    # Annotating the correlated waiting flag lets PostgreSQL calculate all
+    # counters in one aggregate query while still using ShowCrew indexes.
+    kp_waiting_persons = ShowCrew.objects.filter(
+        person_id=OuterRef('pk'),
+        show__kinopoisk_url__isnull=False,
+        show__ext_rating__isnull=True,
+    ).exclude(
+        show__kinopoisk_url=''
+    ).exclude(
+        show__kinopoisk_url__endswith='/film/0'
     )
-    kp_waiting_ids = ShowCrew.objects.filter(show__in=waiting_shows).values('person_id')
-    kp_wait_filter = Q(id__in=kp_waiting_ids)
-
+    person_stats = Person.objects.annotate(kp_waiting=Exists(kp_waiting_persons))
+    counts = person_stats.aggregate(
+        has_tmdb=Count('id', filter=has_tmdb),
+        kp_only=Count('id', filter=has_kp & ~has_tmdb),
+        tmdb_none=Count('id', filter=tmdb_done & ~has_tmdb),
+        kp_none=Count('id', filter=~has_kp & ~Q(kp_waiting=True)),
+        tmdb_wait=Count('id', filter=~(tmdb_done | has_tmdb)),
+        kp_wait=Count('id', filter=Q(kp_waiting=True) & ~has_kp),
+        all_none=Count(
+            'id',
+            filter=tmdb_done
+            & ~has_tmdb
+            & ~has_kp
+            & ~Q(kp_waiting=True),
+        ),
+    )
     data = [
-        {'name': 'Есть фото (TMDB)', 'value': Person.objects.filter(has_tmdb).count()},
-        {
-            'name': 'Есть фото (KP)',
-            'value': Person.objects.filter(has_kp).exclude(has_tmdb).count(),
-        },
-        {
-            'name': 'TMDB не найдено',
-            'value': Person.objects.filter(tmdb_done).exclude(has_tmdb).count(),
-        },
-        {
-            'name': 'KP не найдено',
-            'value': Person.objects.exclude(has_kp).exclude(kp_wait_filter).count(),
-        },
-        {'name': 'В ожидании TMDB', 'value': Person.objects.exclude(tmdb_done | has_tmdb).count()},
-        {
-            'name': 'В ожидании KP',
-            'value': Person.objects.filter(kp_wait_filter).exclude(has_kp).count(),
-        },
-        {
-            'name': 'Не найдено вообще',
-            'value': Person.objects.filter(tmdb_done)
-            .exclude(has_tmdb | has_kp)
-            .exclude(kp_wait_filter)
-            .count(),
-        },
+        {'name': 'Есть фото (TMDB)', 'value': counts['has_tmdb']},
+        {'name': 'Есть фото (KP)', 'value': counts['kp_only']},
+        {'name': 'TMDB не найдено', 'value': counts['tmdb_none']},
+        {'name': 'KP не найдено', 'value': counts['kp_none']},
+        {'name': 'В ожидании TMDB', 'value': counts['tmdb_wait']},
+        {'name': 'В ожидании KP', 'value': counts['kp_wait']},
+        {'name': 'Не найдено вообще', 'value': counts['all_none']},
     ]
     return sorted(data, key=lambda x: x['value'], reverse=True)
 
@@ -958,7 +959,11 @@ def _calculate_profession_stats():
 
 def _calculate_profession_stats_canonical():
     ru_to_en = PROFESSION_TRANS_MAP
-    canonical_id = _canonical_person_id_expression()
+    canonical_complete = not ShowCrew.objects.filter(canonical_person__isnull=True).exists()
+    canonical_id = (
+        F('canonical_person_id') if canonical_complete else _canonical_person_id_expression()
+    )
+    total_masters = Person.objects.filter(master_person__isnull=True).count()
 
     def calculate(
         primary_raw_to_normalized,
@@ -966,6 +971,64 @@ def _calculate_profession_stats_canonical():
         primary_field='profession',
         fallback_field='en_profession',
     ):
+        if canonical_complete:
+            # A single CASE/GROUP BY over the whole ShowCrew table is elegant,
+            # but on production it still has to sort/hash millions of rows.
+            # The role/canonical covering indexes make one small DISTINCT
+            # count per normalized role substantially cheaper and, crucially,
+            # keep every statement below the metrics statement timeout.
+            primary_by_normalized = {}
+            for raw, normalized in primary_raw_to_normalized.items():
+                primary_by_normalized.setdefault(normalized, []).append(raw)
+            fallback_by_normalized = {}
+            for raw, normalized in fallback_raw_to_normalized.items():
+                fallback_by_normalized.setdefault(normalized, []).append(raw)
+
+            all_primary_raw = list(primary_raw_to_normalized)
+            role_stats = []
+            for normalized in dict.fromkeys(
+                [*primary_by_normalized, *fallback_by_normalized]
+            ):
+                primary_values = primary_by_normalized.get(normalized, [])
+                fallback_values = fallback_by_normalized.get(normalized, [])
+                role_filter = Q(pk__in=[])
+                if primary_values:
+                    role_filter |= Q(**{f'{primary_field}__in': primary_values})
+                if fallback_values:
+                    fallback_filter = Q(
+                        **{f'{fallback_field}__in': fallback_values}
+                    ) & (
+                        Q(**{f'{primary_field}__isnull': True})
+                        | ~Q(**{f'{primary_field}__in': all_primary_raw})
+                    )
+                    role_filter |= fallback_filter
+
+                value = (
+                    ShowCrew.objects.filter(role_filter)
+                    .values('canonical_person_id')
+                    .distinct()
+                    .count()
+                )
+                if value:
+                    role_stats.append({'name': normalized, 'value': value})
+
+            result = sorted(role_stats, key=lambda x: x['value'], reverse=True)
+            known_filter = Q(**{f'{primary_field}__in': primary_raw_to_normalized}) | Q(
+                **{f'{fallback_field}__in': fallback_raw_to_normalized}
+            )
+            known_count = (
+                ShowCrew.objects.filter(known_filter)
+                .values('canonical_person_id')
+                .distinct()
+                .count()
+            )
+            unknown_count = max(0, total_masters - known_count)
+            if unknown_count:
+                result.append(
+                    {'name': '\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e', 'value': unknown_count}
+                )
+            return result
+
         whens = [
             When(**{primary_field: raw}, then=Value(normalized))
             for raw, normalized in primary_raw_to_normalized.items()
@@ -990,12 +1053,25 @@ def _calculate_profession_stats_canonical():
             )
             if row['normalized']
         ]
-        unknown_count = (
-            Person.objects.filter(master_person__isnull=True)
-            .exclude(**{f'showcrew__{primary_field}__in': primary_raw_to_normalized})
-            .exclude(**{f'showcrew__{fallback_field}__in': fallback_raw_to_normalized})
-            .count()
-        )
+        if canonical_complete:
+            # With canonical_person backfilled, derive the unknown bucket from
+            # the same indexed ShowCrew population as the role aggregate.
+            # The previous reverse Person join scanned the whole Person table
+            # and timed out on the production catalogue.
+            known_count = (
+                ShowCrew.objects.filter(known_filter)
+                .values('canonical_person_id')
+                .distinct()
+                .count()
+            )
+            unknown_count = max(0, total_masters - known_count)
+        else:
+            unknown_count = (
+                Person.objects.filter(master_person__isnull=True)
+                .exclude(**{f'showcrew__{primary_field}__in': primary_raw_to_normalized})
+                .exclude(**{f'showcrew__{fallback_field}__in': fallback_raw_to_normalized})
+                .count()
+            )
         if unknown_count:
             result.append(
                 {

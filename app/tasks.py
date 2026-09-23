@@ -804,11 +804,22 @@ def sync_imdb_data_task(self):
 @single_instance_task(lock_name=RedisLock.METRICS_SNAPSHOT, timeout=900)
 @safe_execution
 def update_site_metrics_task():
-    # This is a read/snapshot job.  A snapshot may observe a normal MVCC
-    # boundary while catalog writes are in progress; it must not block all
-    # browser work for an hour just to make the counts perfectly aligned.
-    with metrics_statement_timeout():
-        data = generate_global_metrics_snapshot()
+    # Do not run a database-wide aggregate while a long catalog/rating write
+    # batch is active.  MVCC keeps the result consistent, but it does not keep
+    # the competing scans cheap: on production the two workloads exhausted
+    # the statement timeout and left stale snapshots behind.  Beat will try
+    # again on the next interval when the writer has released the lock.
+    with _redis_lock(
+        RedisLock.CATALOG_WRITES,
+        timeout=900,
+        warn_on_busy=False,
+    ) as catalog_acquired:
+        if not catalog_acquired:
+            logging.info('Skipping metrics snapshot because catalog writes are active.')
+            return
+
+        with metrics_statement_timeout():
+            data = generate_global_metrics_snapshot()
     SiteMetric.objects.create(key='global_snapshot', data=data)
     cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
     cache.delete('lock:queuing_global_snapshot')

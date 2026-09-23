@@ -17,9 +17,9 @@ class RedisLock(StrEnum):
     # be used by tasks that actually open KinoPub/Chrome sessions.
     KINOPUB_BROWSER = 'kinopub_browser_lock'
 
-    # Non-browser catalog writers are serialized with one another because they
-    # update the same Show/Person/ShowCrew rows in bulk.  They do not block
-    # read-only metrics or the browser resource.
+    # Bulk catalog writers and the database-wide metrics snapshot are
+    # serialized because they scan/update the same Show/Person/ShowCrew rows.
+    # This prevents the snapshot from competing with a long write batch.
     CATALOG_WRITES = 'catalog_writes_lock'
 
     # Kept for reset/diagnostics compatibility with workers running the old

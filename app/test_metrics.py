@@ -12,6 +12,7 @@ from app.services.metrics import (
     calculate_kp_unrated_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
+    calculate_persons_avatar_stats_metric,
     calculate_total_persons_by_show_type_metric,
     calculate_unused_persons_metric,
     get_has_rating_list,
@@ -157,6 +158,58 @@ class ProfessionMetricTests(TestCase):
         stats = calculate_en_professions_stats_metric()
         self.assertNotIn({'name': 'Неизвестно', 'value': 1}, stats)
         self.assertEqual(get_profession_persons_list('Actor', 'en').count(), 1)
+
+    def test_backfilled_canonical_people_use_indexed_role_counts(self):
+        person = Person.objects.create(name='Known actor', en_name='Known actor')
+        show = Show.objects.create(title='Test movie', original_title='Test movie', type='Movie')
+        ShowCrew.objects.create(
+            show=show,
+            person=person,
+            canonical_person=person,
+            profession='В ролях',
+            en_profession='Actor',
+        )
+
+        stats = calculate_en_professions_stats_metric()
+
+        self.assertIn({'name': 'Actor', 'value': 1}, stats)
+
+
+class AvatarMetricTests(TestCase):
+    def test_avatar_stats_are_calculated_in_one_aggregate(self):
+        Person.objects.create(name='TMDB', tmdb_photo_url='tmdb')
+        Person.objects.create(name='KP', kp_photo_url='kp')
+        Person.objects.create(name='TMDB not found', is_photo_fetched=True)
+        Person.objects.create(name='KP not found')
+        waiting_kp = Person.objects.create(name='Waiting KP')
+        Person.objects.create(name='Not found at all', is_photo_fetched=True)
+        show = Show.objects.create(
+            title='Waiting show',
+            original_title='Waiting show',
+            type='Movie',
+            kinopoisk_url='https://kinopoisk.ru/film/123/',
+        )
+        ShowCrew.objects.create(show=show, person=waiting_kp)
+
+        with CaptureQueriesContext(connection) as queries:
+            stats = calculate_persons_avatar_stats_metric()
+
+        self.assertEqual(
+            {entry['name']: entry['value'] for entry in stats},
+            {
+                'Есть фото (TMDB)': 1,
+                'Есть фото (KP)': 1,
+                'TMDB не найдено': 2,
+                'KP не найдено': 4,
+                'В ожидании TMDB': 3,
+                'В ожидании KP': 1,
+                'Не найдено вообще': 2,
+            },
+        )
+        self.assertEqual(
+            sum('FROM "app_person"' in query['sql'] for query in queries),
+            1,
+        )
 
 
 class UnusedPersonMetricTests(TestCase):
