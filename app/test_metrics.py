@@ -12,6 +12,7 @@ from app.services.metrics import (
     calculate_kp_unrated_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
+    calculate_total_persons_by_show_type_metric,
     calculate_unused_persons_metric,
     get_has_rating_list,
     get_duplicate_photo_urls_page,
@@ -179,3 +180,36 @@ class UnusedPersonMetricTests(TestCase):
         )
         self.assertIn('EXISTS', count_sql.upper())
         self.assertNotIn('IN (SELECT DISTINCT', count_sql.upper())
+
+    def test_unused_person_details_use_correlated_exists(self):
+        Person.objects.create(name='Unused person')
+        with CaptureQueriesContext(connection) as queries:
+            list(get_unused_persons_list()[:1])
+
+        detail_sql = next(
+            query['sql']
+            for query in queries
+            if 'SELECT "app_person"' in query['sql']
+        )
+        self.assertIn('EXISTS', detail_sql.upper())
+        self.assertNotIn('IN (SELECT DISTINCT', detail_sql.upper())
+
+
+class TotalPersonsMetricTests(TestCase):
+    def test_total_persons_uses_canonical_id_without_person_join_when_backfilled(self):
+        person = Person.objects.create(name='Canonical person')
+        show = Show.objects.create(
+            title='Show', original_title='Show', type='Movie'
+        )
+        ShowCrew.objects.create(show=show, person=person, canonical_person=person)
+
+        with CaptureQueriesContext(connection) as queries:
+            metric = calculate_total_persons_by_show_type_metric()
+
+        self.assertEqual(metric, [{'name': 'Фильм', 'value': 1}])
+        aggregate_sql = next(
+            query['sql']
+            for query in queries
+            if 'COUNT(DISTINCT' in query['sql'].upper()
+        )
+        self.assertNotIn('JOIN "app_person"', aggregate_sql.upper())

@@ -640,14 +640,22 @@ def get_total_persons_list(show_type: str, max_items=None):
 
 
 def get_unused_persons_list():
-    used_person_ids = (
-        ShowCrew.objects.annotate(canonical_id=_canonical_person_id_expression())
-        .values_list('canonical_id', flat=True)
-        .distinct()
-    )
+    # Keep this as a correlated anti-join.  The previous ``id__in`` form
+    # materialized a DISTINCT list of every crew member before PostgreSQL
+    # could return the first page.  On the production-sized catalogue that
+    # meant scanning 15M+ ShowCrew rows for every concurrent detail request.
+    if ShowCrew.objects.filter(canonical_person__isnull=True).exists():
+        used_persons = ShowCrew.objects.annotate(
+            canonical_id=_canonical_person_id_expression()
+        ).filter(canonical_id=OuterRef('pk'))
+    else:
+        # The canonical-person index makes this branch an indexed EXISTS
+        # lookup per root person and avoids joining the full Person table.
+        used_persons = ShowCrew.objects.filter(canonical_person_id=OuterRef('pk'))
+
     return (
         Person.objects.filter(master_person__isnull=True)
-        .exclude(id__in=used_person_ids)
+        .filter(~Exists(used_persons))
         .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id')
     )
 
@@ -741,15 +749,30 @@ def get_profession_persons_list(normalized: str, language: str, max_items=None):
 
 
 def calculate_total_persons_by_show_type_metric():
-    canonical_id = _canonical_person_id_expression()
-    stats = (
-        ShowCrew.objects.filter(show__type__isnull=False)
-        .exclude(show__type='')
-        .annotate(canonical_id=canonical_id)
-        .values('show__type')
-        .annotate(total=Count('canonical_id', distinct=True))
-        .order_by('-total')
-    )
+    if ShowCrew.objects.filter(canonical_person__isnull=True).exists():
+        # Preserve correctness for old/unbackfilled rows.  This is only a
+        # compatibility path; production data is expected to use the indexed
+        # canonical_person_id branch below after backfillcanonicalperson.
+        stats = (
+            ShowCrew.objects.filter(show__type__isnull=False)
+            .exclude(show__type='')
+            .annotate(canonical_id=_canonical_person_id_expression())
+            .values('show__type')
+            .annotate(total=Count('canonical_id', distinct=True))
+            .order_by('-total')
+        )
+    else:
+        # canonical_person_id is already the resolved identity, so joining
+        # app_person is unnecessary.  The old COALESCE expression forced a
+        # hash join with the 3.5M-row Person table before sorting 15M+ crew
+        # rows for COUNT(DISTINCT).
+        stats = (
+            ShowCrew.objects.filter(show__type__isnull=False)
+            .exclude(show__type='')
+            .values('show__type')
+            .annotate(total=Count('canonical_person', distinct=True))
+            .order_by('-total')
+        )
     return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
 
 
