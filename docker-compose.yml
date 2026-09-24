@@ -35,9 +35,11 @@ services:
       - .:/app:delegated
       - /app/frontend_webapp/dist # Сохраняем билд фронта внутри контейнера
       - ./data:/data
+    # Do not let app-init wait forever on an old PostgreSQL transaction.
+    # A timed-out migration fails visibly instead of hanging the deployment.
     command: >
       sh -c "
-        python manage.py migrate --noinput &&
+        timeout --signal=TERM --kill-after=30s 900s python manage.py migrate --noinput &&
         python manage.py collectstatic --noinput &&
         python manage.py createsuperuserifneeded
       "

@@ -291,13 +291,15 @@ class PoiskkinoPersonMatchingTests(TestCase):
         self.assertEqual(Person.objects.filter(kinopoisk_person_id=700002).count(), 1)
         self.assertTrue(ShowCrew.objects.filter(show=show, person=person).exists())
 
-    def test_normalized_name_fallback_reuses_existing_person(self):
+    def test_source_kp_id_does_not_fallback_to_same_name(self):
         show = Show.objects.create(
             title='Normalized KP person test',
             original_title='Normalized KP person test',
             type='Movie',
         )
-        person = Person.objects.create(name='Ёлка  Иванова', kinopoisk_person_id=None)
+        existing_person = Person.objects.create(
+            name='Ёлка  Иванова', kinopoisk_person_id=None
+        )
 
         Command()._process_batch(
             [
@@ -312,7 +314,41 @@ class PoiskkinoPersonMatchingTests(TestCase):
             timezone.now(),
         )
 
-        person.refresh_from_db()
+        person = Person.objects.get(kinopoisk_person_id=700003)
         self.assertEqual(Person.objects.filter(kinopoisk_person_id=700003).count(), 1)
-        self.assertEqual(person.kinopoisk_person_id, 700003)
+        self.assertNotEqual(person.pk, existing_person.pk)
         self.assertTrue(ShowCrew.objects.filter(show=show, person=person).exists())
+
+    def test_different_kp_ids_may_share_a_name(self):
+        show = Show.objects.create(
+            title='Duplicate KP names test',
+            original_title='Duplicate KP names test',
+            type='Movie',
+        )
+
+        Command()._process_batch(
+            [
+                {
+                    'id': 900004,
+                    'persons': [
+                        {'id': 700004, 'name': 'Джордж Скрэнтон', 'profession': 'Актёр'},
+                        {'id': 700005, 'name': 'Джордж Скрэнтон', 'profession': 'Режиссёр'},
+                    ],
+                }
+            ],
+            {900004: show.id},
+            timezone.now(),
+        )
+
+        self.assertEqual(
+            Person.objects.filter(name='Джордж Скрэнтон').count(),
+            2,
+        )
+        self.assertEqual(
+            set(
+                Person.objects.filter(name='Джордж Скрэнтон').values_list(
+                    'kinopoisk_person_id', flat=True
+                )
+            ),
+            {700004, 700005},
+        )

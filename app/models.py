@@ -85,7 +85,7 @@ class Genre(BaseModel):
 
 
 class Person(BaseModel):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     en_name = models.CharField(max_length=255, null=True, blank=True, db_index=True)
     tmdb_id = models.IntegerField(
         null=True, blank=True, unique=True, db_index=True, verbose_name='TMDB ID'

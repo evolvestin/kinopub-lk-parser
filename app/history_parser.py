@@ -484,8 +484,10 @@ def _update_show_details_once(
                     if name:
                         person = find_person_for_kinopub(name=name, show=show)
                         if not person:
-                            person, _ = Person.objects.get_or_create(name=name)
-                            person = person.canonical
+                            # Person names are not unique: create a new
+                            # source-less row when the normalized name is
+                            # ambiguous for this show.
+                            person = Person.objects.create(name=name)
                         ShowCrew.objects.update_or_create(
                             show=show, person=person, profession=label
                         )

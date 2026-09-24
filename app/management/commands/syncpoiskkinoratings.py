@@ -299,7 +299,10 @@ class Command(LoggableBaseCommand):
                     else None
                 )
 
-                if person is None:
+                # A source ID is authoritative.  Do not reuse a same-named
+                # local row that belongs to another or unknown source person.
+                # Name fallback is safe only when Poiskkino omitted the ID.
+                if person is None and source_person_id is None:
                     person = persons_by_name.get(normalized_name)
 
                 pending_key = (

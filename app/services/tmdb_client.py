@@ -341,8 +341,9 @@ def sync_show_from_tmdb(
             show=show,
         )
         if not person:
-            person, _ = Person.objects.get_or_create(name=p_name)
-            person = person.canonical
+            # Names are not identities.  Create a row when the TMDB-aware
+            # matcher cannot find an unambiguous existing person.
+            person = Person.objects.create(name=p_name)
 
         person = _save_tmdb_person(person, person_data)
 
@@ -371,8 +372,9 @@ def sync_show_from_tmdb(
             show=show,
         )
         if not person:
-            person, _ = Person.objects.get_or_create(name=p_name)
-            person = person.canonical
+            # Names are not identities.  Create a row when the TMDB-aware
+            # matcher cannot find an unambiguous existing person.
+            person = Person.objects.create(name=p_name)
 
         person = _save_tmdb_person(person, person_data)
 
