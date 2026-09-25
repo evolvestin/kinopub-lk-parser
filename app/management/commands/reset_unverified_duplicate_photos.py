@@ -3,16 +3,17 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.db.models import Count
 
 from app.models import Person
 from app.services.metrics import invalidate_duplicate_photo_urls_cache
+from app.utils import get_original_image_url
 
 
 class Command(BaseCommand):
     help = (
-        'Clear duplicate TMDB photos only from canonical Persons without a TMDB ID. '
-        'Dry-run by default; this does not delete Persons or relations.'
+        'Quarantine duplicate TMDB photos from canonical Persons without a TMDB ID '
+        'when a known TMDB identity owns the same URL. Dry-run by default; this '
+        'does not delete Persons or relations.'
     )
 
     def add_arguments(self, parser):
@@ -27,20 +28,19 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        duplicate_urls = (
+        known_tmdb_urls = (
             Person.objects.filter(master_person__isnull=True)
+            .filter(tmdb_id__isnull=False)
             .exclude(tmdb_photo_url__isnull=True)
             .exclude(tmdb_photo_url='')
             .values('tmdb_photo_url')
-            .annotate(row_count=Count('id'))
-            .filter(row_count__gt=1)
-            .values('tmdb_photo_url')
+            .distinct()
         )
         selected = (
             Person.objects.filter(
                 master_person__isnull=True,
                 tmdb_id__isnull=True,
-                tmdb_photo_url__in=duplicate_urls,
+                tmdb_photo_url__in=known_tmdb_urls,
             )
             .only(
                 'id',
@@ -74,6 +74,7 @@ class Command(BaseCommand):
                         'name',
                         'en_name',
                         'tmdb_photo_url',
+                        'rejected_photo_url',
                         'kp_photo_url',
                         'is_photo_fetched',
                     ]
@@ -85,6 +86,7 @@ class Command(BaseCommand):
                             person.name,
                             person.en_name,
                             person.tmdb_photo_url,
+                            get_original_image_url(person.tmdb_photo_url),
                             person.kp_photo_url,
                             person.is_photo_fetched,
                         ]
@@ -94,13 +96,19 @@ class Command(BaseCommand):
         if not options['apply']:
             return
 
+        rejected = 0
         with transaction.atomic():
-            updated = selected.update(
-                tmdb_photo_url=None,
-                is_photo_fetched=False,
-            )
+            for person in selected.iterator(chunk_size=5000):
+                photo_url = get_original_image_url(person.tmdb_photo_url)
+                if photo_url:
+                    _, created = person.rejected_photos.get_or_create(photo_url=photo_url)
+                    rejected += int(created)
+
+            updated = selected.update(tmdb_photo_url=None, is_photo_fetched=False)
         if updated != row_count:
             raise CommandError(f'Unexpected update count: selected={row_count}, updated={updated}')
 
         invalidate_duplicate_photo_urls_cache()
-        self.stdout.write(self.style.SUCCESS(f'Cleared TMDB photos: {updated}'))
+        self.stdout.write(
+            self.style.SUCCESS(f'Quarantined photos: {rejected}; cleared TMDB photos: {updated}')
+        )

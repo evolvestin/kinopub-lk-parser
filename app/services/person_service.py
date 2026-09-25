@@ -131,7 +131,7 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
                     profile_path = res.get('profile_path')
                     if profile_path:
                         full_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
-                        if full_url in rejected_urls:
+                        if get_original_image_url(full_url) in rejected_urls:
                             continue
 
                     if _is_valid_tmdb_match(query, res):
@@ -180,16 +180,29 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
                             f'has no filmography evidence. Skipping.'
                         )
 
-        if (
-            found_tmdb_id
-            and Person.objects.filter(tmdb_id=found_tmdb_id).exclude(id=person_instance.id).exists()
-        ):
+        conflicting_person = None
+        if found_tmdb_id:
+            conflicting_person = (
+                Person.objects.filter(tmdb_id=found_tmdb_id)
+                .exclude(id=person_instance.id)
+                .first()
+            )
+
+        if conflicting_person:
             logger.warning(
-                'TMDB person %s is already assigned to another Person row; '
-                'leaving photo empty for %s.',
+                'TMDB person %s is already assigned to Person %s; '
+                'rejecting the candidate photo for Person %s.',
                 found_tmdb_id,
+                conflicting_person.id,
                 person_instance.name,
             )
+            candidate_url = get_original_image_url(
+                f'https://image.tmdb.org/t/p/w200{found_path}' if found_path else None
+            )
+            if candidate_url:
+                # Clearing the photo without remembering the rejected source
+                # makes the next retry select the same wrong profile again.
+                person_instance.rejected_photos.get_or_create(photo_url=candidate_url)
             found_path = None
             found_tmdb_id = None
 

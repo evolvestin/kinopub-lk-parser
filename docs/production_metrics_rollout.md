@@ -41,6 +41,27 @@
    `tmdb_photo_url` is only a review candidate when the TMDB identity is unresolved. Never apply
    the KP-photo alias rule to TMDB records.
 
+   TMDB photo conflicts are handled differently from KP duplicates. A profile image URL is
+   evidence that two local rows received the same TMDB asset, but it is not a person identity:
+   different non-null `Person.tmdb_id` values always remain different people, and an unresolved
+   row must not be merged into the known row. When a TMDB search returns an identity already
+   assigned to another local person, the candidate URL is stored in `RejectedPersonPhoto` for
+   the target row before its photo is cleared. This prevents the next retry from selecting the
+   same rejected profile again.
+
+   Existing legacy photo-only conflicts are quarantined without deleting people or relations:
+
+   ```sh
+   python manage.py reset_unverified_duplicate_photos
+   python manage.py reset_unverified_duplicate_photos --apply --audit-file /tmp/tmdb-photo-conflicts.csv
+   ```
+
+   The command only selects canonical rows without a `tmdb_id` whose photo URL is also owned by
+   a canonical row with a known `tmdb_id`. It records the old URL as rejected, clears the active
+   photo, resets `is_photo_fetched`, and invalidates the duplicate-photo detail cache. Re-run the
+   photo fetch only after this quarantine; unresolved rows may legitimately remain without a
+   photo when TMDB cannot provide an unambiguous identity.
+
    For existing aliases, inspect the reconciliation command first:
 
    ```sh
