@@ -55,6 +55,42 @@ spelling, case, punctuation, and internal whitespace remain unchanged.
 3.  **Metrics Consistency**: Any metric displayed on the dashboard that counts "Unique" items must apply these normalization functions to avoid reporting duplicates caused by casing differences.
 
 
+## Kinopoisk Person Identity and Duplicate Metrics
+
+**RULE**: Within the Poiskkino catalog, an exact usable `Person.kp_photo_url` identifies one
+person. A new source `persons[].id` with an existing KP photo must not create another root
+`Person` row. The source ID is preserved on an alias row linked to the existing canonical row;
+rows are not deleted as part of ingestion.
+
+1. Match an incoming person by `kinopoisk_person_id` first. If that ID is new, match by the
+   exact usable KP photo before creating a root row.
+2. Preserve every source ID received from the existing Poiskkino movie response. Do not make
+   `Person.kinopoisk_person_id` unique and do not request `/person/{id}` to resolve identity.
+3. Use a transaction and the catalog write lock around bulk person resolution so concurrent
+   batches cannot create competing root rows for one KP photo.
+4. The KP duplicate-photo metric is intentionally unchanged. It must continue to show unresolved
+   root groups, including duplicate `kp_photo_url` groups, so a new ingestion regression remains
+   visible. Linking an alias removes it from the unresolved-root metric only after the duplicate
+   is actually reconciled.
+5. Person saves/deletes and bulk catalog writes must invalidate the duplicate-photo cache after
+   commit. A cache version bump makes the previous 24-hour detail pages unreachable, after which
+   the metrics worker may warm the first page again.
+
+TMDB person identity is separate: `tmdb_id` remains authoritative, and `tmdb_photo_url` is only a
+candidate signal for unresolved records. The KP-photo identity rule must never be applied to TMDB
+matching or used to merge TMDB records.
+
+
+## Metrics Snapshot Freshness
+
+The dashboard reads the latest persisted global metrics snapshot, while detail pages may use their
+own Redis page cache. Catalog writers must queue a snapshot refresh only after releasing
+`CATALOG_WRITES`; a refresh that encounters the lock retries instead of replacing the dashboard
+with a partially written view. The UI must expose the snapshot generation time. Health reports are
+active diagnostics: every metric check still runs a fresh independent database query and must not
+reuse the dashboard snapshot or a Redis result.
+
+
 ## Display-Level Translation Policy
 
 **RULE**: All user-facing metadata fields, specifically `type` (e.g., "Series", "Movie", "3D Movie") and `status` (e.g., "Finished", "Ongoing"), MUST be translated to Russian at the display layer before rendering in the UI.

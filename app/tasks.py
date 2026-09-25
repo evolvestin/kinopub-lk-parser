@@ -36,6 +36,7 @@ from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
     PERSON_DETAIL_WARM_KEYS,
     generate_global_metrics_snapshot,
+    invalidate_duplicate_photo_urls_cache,
     metrics_statement_timeout,
     warm_duplicate_photo_urls_cache,
 )
@@ -768,6 +769,10 @@ def fetch_person_photos_task(limit=2000):
         if acquired:
             call_command('fetchpersonphotos', limit=limit)
 
+    if acquired:
+        invalidate_duplicate_photo_urls_cache()
+        update_site_metrics_task.delay()
+
 
 def get_kp_mapping():
     qs = Show.objects.exclude(kinopoisk_url__isnull=True).exclude(kinopoisk_url='')
@@ -796,6 +801,11 @@ def sync_poiskkino_ratings_task(self):
                 raise self.retry(countdown=900)
 
             call_command('syncpoiskkinoratings')
+
+    # The catalog lock is released when both context managers above exit.
+    # Queue the snapshot refresh only then, so the metrics worker does not
+    # observe the writer lock and leave the dashboard on an old snapshot.
+    update_site_metrics_task.delay()
 
 
 @shared_task(bind=True, max_retries=8)
@@ -1003,6 +1013,7 @@ def parse_tmdb_library_task(media_type: str = 'all', batch_size: int = 5000):
 def enrich_tmdb_shows_task(limit: int = 5000):
     # This is scheduled periodically; do not hold a worker while another
     # catalog writer finishes.  The next production window will retry it.
+    rating_acquired = False
     with _redis_lock(
         RedisLock.CATALOG_WRITES,
         timeout=CATALOG_LOCK_TTL_SECONDS,
@@ -1012,3 +1023,7 @@ def enrich_tmdb_shows_task(limit: int = 5000):
                 if rating_acquired:
                     logging.info(f'Starting scheduled TMDB shows enrichment task (limit={limit}).')
                     call_command('enrichfromtmdb', limit=limit)
+
+    if catalog_acquired and rating_acquired:
+        invalidate_duplicate_photo_urls_cache()
+        update_site_metrics_task.delay()

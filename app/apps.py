@@ -25,4 +25,5 @@ class AppConfig(AppConfig):
     name = 'app'
 
     def ready(self):
-        pass
+        # Import signal handlers after Django has loaded the app models.
+        from app import signals  # noqa: F401

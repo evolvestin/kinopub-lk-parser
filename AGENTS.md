@@ -123,12 +123,16 @@ that have not yet been matched:
 * Continue to display and calculate the Kinopoisk duplicate metric, including
   duplicate `kp_photo_url` groups.
 * Store the source `persons[].id` from the existing Poiskkino movie response as
-  `Person.kinopoisk_person_id`. Do not make this field unique: duplicate local
-  rows are allowed; do not merge or delete duplicate rows automatically.
-* Future person matching must first compare `kinopoisk_person_id`; only when
-  the source ID is unavailable may the existing avatar/name fallback be used.
-  The ID is stored from the current movie request and must not cause an extra
-  request to `/person/{id}` or otherwise increase Kinopoisk API traffic.
+  `Person.kinopoisk_person_id`. Do not make this field unique: source IDs are
+  preserved on local alias rows when the same KP photo already has a canonical
+  row. Do not delete existing rows automatically.
+* Future person matching must first compare `kinopoisk_person_id`; when the ID
+  is new, an exact usable `kp_photo_url` is the authoritative identity fallback
+  and the new source ID must be linked as an alias instead of creating another
+  root row. Only when both source ID and KP photo are unavailable may the
+  existing name fallback be used. The ID is stored from the current movie
+  request and must not cause an extra request to `/person/{id}` or otherwise
+  increase Kinopoisk API traffic.
 * Do not use IMDb identity, IMDb fields, or IMDb duplicate findings as evidence
   for person matching, and do not modify IMDb duplicates at all. IMDb is
   explicitly out of scope for person deduplication.

@@ -2,12 +2,13 @@ import logging
 import time
 from datetime import timedelta
 
-from django.db import OperationalError
+from django.db import OperationalError, transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
 from app.management.base import LoggableBaseCommand
 from app.models import Country, ExternalRating, Genre, Person, Show, ShowCrew, ShowPoster
+from app.services.metrics import invalidate_duplicate_photo_urls_cache
 from app.services.person_matching import _normalized_field, normalize_person_name
 from app.services.poiskkino_client import PoiskkinoClient
 from app.tasks import get_kp_mapping
@@ -51,6 +52,15 @@ class Command(LoggableBaseCommand):
         except (TypeError, ValueError):
             return None
         return person_id if person_id > 0 else None
+
+    @staticmethod
+    def _usable_person_photo(value):
+        if not value or any(
+            marker in value
+            for marker in ('iphone360_0.jpeg', 'no-poster', 'no-photo', 'avatar_empty')
+        ):
+            return None
+        return value
 
     @staticmethod
     def _is_deadlock(error):
@@ -168,8 +178,15 @@ class Command(LoggableBaseCommand):
         total_processed = 0
         for i in range(0, len(data_list), 1000):
             batch = data_list[i : i + 1000]
+
+            def persist_batch(batch=batch):
+                with transaction.atomic():
+                    result = self._process_batch(batch, kp_mapping, now)
+                    transaction.on_commit(invalidate_duplicate_photo_urls_cache)
+                    return result
+
             self._with_deadlock_retry(
-                lambda batch=batch: self._process_batch(batch, kp_mapping, now),
+                persist_batch,
                 'saving a Poiskkino batch',
             )
             total_processed += len(batch)
@@ -258,6 +275,16 @@ class Command(LoggableBaseCommand):
             for person in existing_by_kp_id:
                 persons_by_kp_id.setdefault(person.kinopoisk_person_id, person)
 
+        # The Poiskkino KP photo is a stable identity in this catalog. Keep
+        # the first canonical row for each photo so a new source ID cannot
+        # create another root Person for the same person.
+        persons_by_photo = {}
+        existing_by_photo = Person.objects.filter(
+            master_person__isnull=True, kp_photo_url__isnull=False
+        ).exclude(kp_photo_url='').order_by('id')
+        for person in existing_by_photo:
+            persons_by_photo.setdefault(person.kp_photo_url, person)
+
         new_genres = [Genre(name=name) for name in all_genre_names if name not in existing_genres]
         if new_genres:
             existing_genres.update(
@@ -281,7 +308,10 @@ class Command(LoggableBaseCommand):
         # Resolve every source person before creating anything.  This keeps a
         # single local row for one KP ID even when a batch contains name
         # variants for that person.
-        pending_persons = {}
+        pending_people = {}
+        pending_roots = {}
+        pending_aliases = {}
+        pending_roots_by_photo = {}
         resolved_persons = {}
         for show_id in show_ids:
             for person_index, person_data in enumerate(
@@ -293,45 +323,76 @@ class Command(LoggableBaseCommand):
 
                 normalized_name = normalize_person_name(person_name)
                 source_person_id = self._coerce_person_id(person_data.get('id'))
+                source_photo = self._usable_person_photo(person_data.get('photo'))
                 person = (
                     persons_by_kp_id.get(source_person_id)
                     if source_person_id is not None
                     else None
                 )
 
-                # A source ID is authoritative.  Do not reuse a same-named
-                # local row that belongs to another or unknown source person.
-                # Name fallback is safe only when Poiskkino omitted the ID.
-                if person is None and source_person_id is None:
-                    person = persons_by_name.get(normalized_name)
-
                 pending_key = (
                     ('kp', source_person_id)
                     if source_person_id is not None
                     else ('name', normalized_name)
                 )
+
+                # The exact KP photo is the identity fallback for this
+                # catalog. When a source ID is new, preserve it on an alias
+                # row linked to the existing canonical Person instead of
+                # creating another root row.
+                if person is None and source_photo:
+                    canonical = persons_by_photo.get(source_photo) or pending_roots_by_photo.get(
+                        source_photo
+                    )
+                    if canonical is not None:
+                        if (
+                            source_person_id is None
+                            or canonical.kinopoisk_person_id == source_person_id
+                        ):
+                            person = canonical
+                        else:
+                            person = pending_people.get(pending_key)
+                            if person is None:
+                                person = Person(
+                                    name=person_name,
+                                    kinopoisk_person_id=source_person_id,
+                                    kp_photo_url=source_photo,
+                                    master_person=canonical,
+                                )
+                                pending_people[pending_key] = person
+                                pending_aliases[pending_key] = person
+
+                # Name fallback is safe only when the source omitted both
+                # identity signals.
+                if person is None and source_person_id is None and not source_photo:
+                    person = persons_by_name.get(normalized_name)
+
                 if person is None:
-                    person = pending_persons.get(pending_key)
+                    person = pending_people.get(pending_key)
                 if person is None:
                     person = Person(
                         name=person_name,
                         kinopoisk_person_id=source_person_id,
+                        kp_photo_url=source_photo,
                     )
-                    pending_persons[pending_key] = person
+                    pending_people[pending_key] = person
+                    pending_roots[pending_key] = person
+                    if source_photo:
+                        pending_roots_by_photo.setdefault(source_photo, person)
 
                 if source_person_id is not None:
                     persons_by_kp_id.setdefault(source_person_id, person)
                 persons_by_name.setdefault(normalized_name, person)
                 resolved_persons[(show_id, person_index)] = person
 
-        if pending_persons:
-            created_persons = Person.objects.bulk_create(
-                list(pending_persons.values()), batch_size=500
-            )
-            for person in created_persons:
-                if person.kinopoisk_person_id is not None:
-                    persons_by_kp_id.setdefault(person.kinopoisk_person_id, person)
-                persons_by_name.setdefault(normalize_person_name(person.name), person)
+        if pending_roots:
+            Person.objects.bulk_create(list(pending_roots.values()), batch_size=500)
+        if pending_aliases:
+            Person.objects.bulk_create(list(pending_aliases.values()), batch_size=500)
+        for person in pending_people.values():
+            if person.kinopoisk_person_id is not None:
+                persons_by_kp_id.setdefault(person.kinopoisk_person_id, person)
+            persons_by_name.setdefault(normalize_person_name(person.name), person)
 
         shows_to_update = []
         shows_with_source_status = []
@@ -432,15 +493,8 @@ class Command(LoggableBaseCommand):
                     person.en_name = person_data['enName']
                     needs_update = True
 
-                photo = person_data.get('photo')
-                if (
-                    photo
-                    and not any(
-                        marker in photo
-                        for marker in ('iphone360_0.jpeg', 'no-poster', 'no-photo', 'avatar_empty')
-                    )
-                    and person.kp_photo_url != photo
-                ):
+                photo = self._usable_person_photo(person_data.get('photo'))
+                if photo and person.kp_photo_url != photo:
                     person.kp_photo_url = photo
                     needs_update = True
 
@@ -505,7 +559,8 @@ class Command(LoggableBaseCommand):
 
         if persons_to_update:
             for person in persons_to_update.values():
-                person.auto_resolve_kp_duplicate()
+                if not person.master_person_id:
+                    person.auto_resolve_kp_duplicate()
             Person.objects.bulk_update(
                 persons_to_update.values(),
                 ['en_name', 'kp_photo_url', 'kinopoisk_person_id', 'master_person'],

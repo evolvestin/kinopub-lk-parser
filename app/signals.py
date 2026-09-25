@@ -6,16 +6,47 @@ from celery.signals import task_postrun, task_prerun
 from channels.layers import get_channel_layer
 from django.conf import settings
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import F
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import Signal, receiver
 from django.utils import timezone
 
-from app.models import TaskRun, UserRating, ViewHistory, ViewUser
+from app.models import Person, TaskRun, UserRating, ViewHistory, ViewUser
+from app.services.metrics import invalidate_duplicate_photo_urls_cache
 from app.telegram_bot import TelegramSender
 from shared.constants import DATETIME_FORMAT
 
 view_history_created = Signal()
+
+
+PERSON_DUPLICATE_CACHE_FIELDS = {
+    'name',
+    'en_name',
+    'tmdb_id',
+    'tmdb_photo_url',
+    'kp_photo_url',
+    'kinopoisk_person_id',
+    'master_person',
+}
+
+
+def _queue_duplicate_photo_cache_invalidation():
+    if transaction.get_autocommit():
+        invalidate_duplicate_photo_urls_cache()
+    else:
+        transaction.on_commit(invalidate_duplicate_photo_urls_cache)
+
+
+@receiver(post_save, sender=Person)
+def invalidate_duplicate_photo_cache_on_person_save(sender, instance, update_fields, **kwargs):
+    if update_fields is None or PERSON_DUPLICATE_CACHE_FIELDS.intersection(update_fields):
+        _queue_duplicate_photo_cache_invalidation()
+
+
+@receiver(post_delete, sender=Person)
+def invalidate_duplicate_photo_cache_on_person_delete(sender, instance, **kwargs):
+    _queue_duplicate_photo_cache_invalidation()
 
 
 @receiver(post_delete, sender=ViewUser)

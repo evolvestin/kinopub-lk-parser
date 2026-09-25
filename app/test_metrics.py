@@ -21,6 +21,7 @@ from app.services.metrics import (
     get_profession_persons_list,
     get_unused_persons_list,
     get_global_metrics_history,
+    invalidate_duplicate_photo_urls_cache,
 )
 
 
@@ -156,6 +157,7 @@ class ImdbMetricSplitTests(TestCase):
         second = Person.objects.create(
             name='KP Person B', kp_photo_url=shared_photo, kinopoisk_person_id=202
         )
+        invalidate_duplicate_photo_urls_cache()
 
         items, has_more = get_duplicate_photo_urls_page('KP', limit=10)
 

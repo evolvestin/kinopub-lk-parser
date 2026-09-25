@@ -319,6 +319,88 @@ class PoiskkinoPersonMatchingTests(TestCase):
         self.assertNotEqual(person.pk, existing_person.pk)
         self.assertTrue(ShowCrew.objects.filter(show=show, person=person).exists())
 
+    def test_same_kp_photo_reuses_canonical_person_and_preserves_source_id(self):
+        show = Show.objects.create(
+            title='KP photo identity test',
+            original_title='KP photo identity test',
+            type='Movie',
+        )
+        photo = 'https://st.kp.yandex.net/images/actor_iphone/iphone360_700006.jpg'
+        canonical = Person.objects.create(
+            name='Старое имя',
+            kinopoisk_person_id=700006,
+            kp_photo_url=photo,
+        )
+
+        Command()._process_batch(
+            [
+                {
+                    'id': 900005,
+                    'persons': [
+                        {
+                            'id': 700007,
+                            'name': 'Новое имя',
+                            'photo': photo,
+                            'profession': 'Актёр',
+                        }
+                    ],
+                }
+            ],
+            {900005: show.id},
+            timezone.now(),
+        )
+
+        alias = Person.objects.get(kinopoisk_person_id=700007)
+        self.assertEqual(alias.master_person_id, canonical.id)
+        self.assertEqual(
+            Person.objects.filter(master_person__isnull=True, kp_photo_url=photo).count(),
+            1,
+        )
+        self.assertTrue(ShowCrew.objects.filter(show=show, person=alias).exists())
+
+    def test_same_kp_photo_in_one_batch_creates_one_root_and_one_alias(self):
+        show = Show.objects.create(
+            title='KP photo batch identity test',
+            original_title='KP photo batch identity test',
+            type='Movie',
+        )
+        photo = 'https://st.kp.yandex.net/images/actor_iphone/iphone360_700008.jpg'
+
+        Command()._process_batch(
+            [
+                {
+                    'id': 900006,
+                    'persons': [
+                        {
+                            'id': 700008,
+                            'name': 'Один Человек',
+                            'photo': photo,
+                            'profession': 'Актёр',
+                        },
+                        {
+                            'id': 700009,
+                            'name': 'Один Человек',
+                            'photo': photo,
+                            'profession': 'Режиссёр',
+                        },
+                    ],
+                }
+            ],
+            {900006: show.id},
+            timezone.now(),
+        )
+
+        people = Person.objects.filter(kinopoisk_person_id__in=[700008, 700009])
+        self.assertEqual(people.count(), 2)
+        self.assertEqual(
+            people.filter(master_person__isnull=True).count(),
+            1,
+        )
+        self.assertEqual(
+            Person.objects.filter(master_person__isnull=True, kp_photo_url=photo).count(),
+            1,
+        )
+
     def test_different_kp_ids_may_share_a_name(self):
         show = Show.objects.create(
             title='Duplicate KP names test',
