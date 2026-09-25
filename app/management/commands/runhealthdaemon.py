@@ -9,6 +9,7 @@ from app.management.base import LoggableBaseCommand
 from app.utils import update_heartbeat
 
 logger = logging.getLogger(__name__)
+HEARTBEAT_SERVICE = 'health-monitor'
 
 
 class Command(LoggableBaseCommand):
@@ -20,7 +21,7 @@ class Command(LoggableBaseCommand):
 
         while True:
             try:
-                update_heartbeat()
+                update_heartbeat(HEARTBEAT_SERVICE)
                 now = timezone.now()
 
                 if now.hour == 15 and now.date() != last_run_date:

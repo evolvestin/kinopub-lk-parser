@@ -13,6 +13,8 @@ from app.utils import update_heartbeat
 
 # Глобальный флаг для завершения
 shutdown_flag = threading.Event()
+HEARTBEAT_SERVICE = 'email-listener'
+HEARTBEAT_FILE = settings.HEARTBEAT_FILES[HEARTBEAT_SERVICE]
 
 
 def _handle_signal(signum, _):
@@ -25,8 +27,8 @@ def _watchdog(stop_event):
     while not stop_event.is_set():
         time.sleep(30)
         try:
-            if os.path.exists(settings.HEARTBEAT_FILE):
-                stat = os.stat(settings.HEARTBEAT_FILE)
+            if os.path.exists(HEARTBEAT_FILE):
+                stat = os.stat(HEARTBEAT_FILE)
                 age = time.time() - stat.st_mtime
                 if age > threshold:
                     logging.error(
@@ -48,7 +50,7 @@ def run_idle_loop(mail, current_shutdown_flag):
                 'Entering IDLE mode. Waiting for updates for %d seconds...',
                 settings.IDLE_TIMEOUT,
             )
-            update_heartbeat()
+            update_heartbeat(HEARTBEAT_SERVICE)
             mail.idle(timeout=settings.IDLE_TIMEOUT)
         except (imaplib2.IMAP4.error, OSError) as e:
             logging.warning('Connection lost in IDLE mode. Reconnecting. Error: %s', e)
@@ -57,7 +59,7 @@ def run_idle_loop(mail, current_shutdown_flag):
 
 def run_email_listener(current_shutdown_flag):
     while not current_shutdown_flag.is_set():
-        update_heartbeat()
+        update_heartbeat(HEARTBEAT_SERVICE)
         try:
             with email_processor.imap_connection() as mail:
                 run_idle_loop(mail, current_shutdown_flag)
@@ -73,22 +75,22 @@ class Command(LoggableBaseCommand):
     help = 'Runs the email listener service to process incoming 2FA codes.'
 
     def handle(self, *args, **options):
-        update_heartbeat()
+        update_heartbeat(HEARTBEAT_SERVICE)
 
         for sig in (signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, _handle_signal)
 
         if settings.DEBUG:
             logging.info('DEBUG mode detected. Email listener disabled (idling).')
-            update_heartbeat()
+            update_heartbeat(HEARTBEAT_SERVICE)
             while not shutdown_flag.is_set():
                 shutdown_flag.wait(30)
-                update_heartbeat()
+                update_heartbeat(HEARTBEAT_SERVICE)
             return
 
         threading.Thread(target=_watchdog, args=(shutdown_flag,), daemon=True).start()
 
         logging.info('Starting email listener with Watchdog enabled...')
-        update_heartbeat()
+        update_heartbeat(HEARTBEAT_SERVICE)
         run_email_listener(shutdown_flag)
         logging.info('Email listener stopped.')

@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import shutil
 import time
@@ -39,6 +38,51 @@ from shared.constants import RedisQueue
 from shared.html_helper import html_secure
 
 logger = logging.getLogger(__name__)
+
+HEARTBEAT_STALE_SECONDS = 600
+HEARTBEAT_GHOST_SECONDS = 3600
+
+
+def collect_heartbeat_status(heartbeat_dir, expected_services=(), now=None):
+    """Return heartbeat status while ignoring files from replaced containers."""
+    now = time.time() if now is None else now
+    expected_services = tuple(dict.fromkeys(expected_services))
+    expected_files = {f'heartbeat_{service}': service for service in expected_services}
+    seen_files = set()
+    stale_services = []
+    active_count = 0
+    deleted_count = 0
+
+    for hb_file in heartbeat_dir.glob('heartbeat_*'):
+        try:
+            age = now - hb_file.stat().st_mtime
+        except FileNotFoundError:
+            continue
+
+        if age > HEARTBEAT_GHOST_SECONDS:
+            try:
+                hb_file.unlink(missing_ok=True)
+                deleted_count += 1
+            except OSError:
+                pass
+            continue
+
+        # Once services use stable names, a hostname-based file belongs to a
+        # replaced container and must not make the current service stale.
+        if expected_files and hb_file.name not in expected_files:
+            continue
+
+        seen_files.add(hb_file.name)
+        if age > HEARTBEAT_STALE_SECONDS:
+            stale_services.append(expected_files.get(hb_file.name, hb_file.name))
+        else:
+            active_count += 1
+
+    for file_name, service in expected_files.items():
+        if file_name not in seen_files:
+            stale_services.append(f'{service} missing')
+
+    return active_count, sorted(stale_services), deleted_count
 
 
 def _send_telegram_report(bot_token: str, chat_id: str, message_text: str) -> bool:
@@ -253,31 +297,15 @@ class Command(LoggableBaseCommand):
         try:
             heartbeat_dir = settings.HEARTBEAT_DIR
             hb_files = list(heartbeat_dir.glob('heartbeat_*'))
+            expected_services = getattr(settings, 'HEARTBEAT_SERVICES', ())
 
-            if not hb_files:
+            if not hb_files and not expected_services:
                 has_warnings = True
                 components_lines.append('⚠️ Heartbeat: <b>No services detected</b>')
             else:
-                stale_services = []
-                active_count = 0
-                deleted_count = 0
-
-                for hb_file in hb_files:
-                    age = time.time() - os.path.getmtime(hb_file)
-                    service_name = hb_file.name.replace('heartbeat_', '')
-
-                    if age > 3600:
-                        try:
-                            hb_file.unlink(missing_ok=True)
-                            deleted_count += 1
-                        except Exception:
-                            pass
-                        continue
-
-                    if age > 600:
-                        stale_services.append(service_name)
-                    else:
-                        active_count += 1
+                active_count, stale_services, deleted_count = collect_heartbeat_status(
+                    heartbeat_dir, expected_services
+                )
 
                 if stale_services:
                     has_warnings = True

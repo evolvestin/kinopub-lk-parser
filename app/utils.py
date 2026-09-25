@@ -140,16 +140,18 @@ def format_user_for_rating(rater, current_user, override_public_user_id=None):
             }
 
 
-def update_heartbeat():
+def update_heartbeat(service_name=None):
     if getattr(settings, 'LOCAL_RUN', False):
         return
     try:
-        heartbeat_file = settings.HEARTBEAT_FILE
+        heartbeat_file = getattr(settings, 'HEARTBEAT_FILES', {}).get(
+            service_name, settings.HEARTBEAT_FILE
+        )
         os.makedirs(os.path.dirname(heartbeat_file), exist_ok=True)
         with open(heartbeat_file, 'a'):
             os.utime(heartbeat_file, None)
     except Exception as e:
-        logger.warning('Could not update heartbeat file %s: %s', settings.HEARTBEAT_FILE, e)
+        logger.warning('Could not update heartbeat file %s: %s', heartbeat_file, e)
 
 
 def enqueue_show_update(

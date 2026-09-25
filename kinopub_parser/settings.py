@@ -322,6 +322,12 @@ _hostname = socket.gethostname()
 REGEX_CODE = r'\d{6}'
 CODE_LIFETIME_MINUTES = 15
 _heartbeat_base = os.getenv('HEARTBEAT_FILE', str(data_dir / 'heartbeat'))
+# These names are logical service identities, not container hostnames. Docker
+# assigns a new hostname whenever a service is recreated.
+HEARTBEAT_SERVICES = ('email-listener', 'health-monitor')
+HEARTBEAT_FILES = {
+    service: f'{_heartbeat_base}_{service}' for service in HEARTBEAT_SERVICES
+}
 HEARTBEAT_FILE = f'{_heartbeat_base}_{_hostname}'
 HEARTBEAT_DIR = Path(_heartbeat_base).parent
 REQUEST_TIMEOUT = 10
