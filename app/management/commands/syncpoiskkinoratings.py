@@ -63,6 +63,17 @@ class Command(LoggableBaseCommand):
         return value
 
     @staticmethod
+    def _published_kp_rating(value):
+        """Return a real published KP rating; zero is the source's no-rating value."""
+        if value in (None, ''):
+            return None
+        try:
+            rating = float(value)
+        except (TypeError, ValueError):
+            return None
+        return rating if rating > 0 else None
+
+    @staticmethod
     def _is_deadlock(error):
         cause = getattr(error, '__cause__', None)
         sqlstate = getattr(cause, 'sqlstate', None) or getattr(cause, 'pgcode', None)
@@ -410,6 +421,7 @@ class Command(LoggableBaseCommand):
             rating_data = item.get('rating') or {}
             votes_data = item.get('votes') or {}
             updated_fields = []
+            kp_rating = self._published_kp_rating(rating_data.get('kp'))
 
             if kp_id := item.get('id'):
                 kp_url = f'https://www.kinopoisk.ru/film/{kp_id}/'
@@ -417,8 +429,8 @@ class Command(LoggableBaseCommand):
                     show.kinopoisk_url = kp_url
                     updated_fields.append('kinopoisk_url')
 
-            if rating_data.get('kp') is not None:
-                show.kinopoisk_rating = rating_data['kp']
+            if kp_rating is not None:
+                show.kinopoisk_rating = kp_rating
                 show.kinopoisk_rating_available = True
                 updated_fields.append('kinopoisk_rating')
                 updated_fields.append('kinopoisk_rating_available')
@@ -443,7 +455,7 @@ class Command(LoggableBaseCommand):
             ext_ratings_to_update.append(
                 ExternalRating(
                     show_id=show_id,
-                    kp=rating_data.get('kp'),
+                    kp=kp_rating,
                     imdb=show.imdb_rating,
                     tmdb=rating_data.get('tmdb'),
                     film_critics=rating_data.get('filmCritics'),

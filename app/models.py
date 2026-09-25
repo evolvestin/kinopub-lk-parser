@@ -546,6 +546,13 @@ class Show(BaseModel):
             ),
             models.Index(
                 fields=['type', 'id'],
+                name='idx_show_kp_detail_available',
+                condition=Q(kinopoisk_url__isnull=False)
+                & ~Q(kinopoisk_url='')
+                & Q(kinopoisk_rating_available=True),
+            ),
+            models.Index(
+                fields=['type', 'id'],
                 name='idx_show_kp_unrated',
                 condition=Q(kinopoisk_url__isnull=False)
                 & ~Q(kinopoisk_url='')

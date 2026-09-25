@@ -160,6 +160,38 @@ class PoiskkinoRefreshSelectionTests(TestCase):
         self.assertEqual(ExternalRating.objects.get(show=rated_show).kp, 8.2)
         self.assertIsNone(ExternalRating.objects.get(show=unrated_show).kp)
 
+    def test_zero_kp_rating_is_treated_as_unrated(self):
+        show = Show.objects.create(
+            title='KP zero rating',
+            original_title='KP zero rating',
+            type='Movie',
+            kinopoisk_url='https://www.kinopoisk.ru/film/900003/',
+            kinopoisk_rating=0.0,
+            kinopoisk_rating_available=True,
+        )
+        kp_mapping = {900003: show.id}
+        result = PoiskkinoFetchResult(
+            data=[{'id': 900003, 'rating': {'kp': 0.0}}],
+            checked_values=[900003],
+            completed=True,
+            requests_made=1,
+        )
+
+        with (
+            patch(
+                'app.management.commands.syncpoiskkinoratings.get_kp_mapping',
+                return_value=kp_mapping,
+            ),
+            patch('app.management.commands.syncpoiskkinoratings.PoiskkinoClient') as client_class,
+        ):
+            client_class.return_value.fetch_ratings_by_ids.return_value = result
+            Command().handle(limit=1)
+
+        show.refresh_from_db()
+        self.assertFalse(show.kinopoisk_rating_available)
+        self.assertIsNone(show.kinopoisk_rating)
+        self.assertIsNone(ExternalRating.objects.get(show=show).kp)
+
 
 class PoiskkinoPosterConflictTests(TestCase):
     def test_conflicting_poster_does_not_abort_sync_write(self):
