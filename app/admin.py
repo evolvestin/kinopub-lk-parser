@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin, UserAdmin
 from django.contrib.auth.models import Group, User
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import (
     Avg,
     Case,
@@ -66,6 +67,7 @@ from app.services.metrics import (
     get_profession_persons_list,
     invalidate_duplicate_photo_urls_cache,
 )
+from app.services.person_photo_quarantine import quarantine_tmdb_photo_conflicts
 from app.services.person_service import fetch_person_photo_from_tmdb
 from app.telegram_bot import TelegramSender
 from app.utils import get_proxied_image_url, normalize_imdb_id
@@ -1733,6 +1735,10 @@ class PersonAdmin(BaseNameAdmin):
         super().save_model(request, obj, form, change)
         if {'master_person', 'tmdb_photo_url', 'kp_photo_url'} & set(form.changed_data):
             invalidate_duplicate_photo_urls_cache()
+        if {'master_person', 'tmdb_id', 'tmdb_photo_url'} & set(form.changed_data):
+            transaction.on_commit(
+                lambda person_id=obj.pk: quarantine_tmdb_photo_conflicts(person_id)
+            )
 
     def get_queryset(self, request):
         qs = super().get_queryset(request).select_related('master_person')

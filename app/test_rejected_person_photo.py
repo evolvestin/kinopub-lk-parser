@@ -125,3 +125,57 @@ class RejectedPersonPhotoTests(TestCase):
             ).exists()
         )
         self.assertIsNone(known.tmdb_photo_url)
+
+    @override_settings(
+        TMDB_API_KEY='test-key',
+        TMDB_API_BASE_URL='https://tmdb.test/3',
+    )
+    @patch('app.services.person_service.sleep', return_value=None)
+    @patch('app.services.person_service.get_tmdb_session')
+    def test_new_tmdb_identity_quarantines_legacy_row_with_shared_photo(
+        self, get_session, _sleep
+    ):
+        target = Person.objects.create(name='New Person', en_name='New Person')
+        show = Show.objects.create(
+            title='Known Movie', original_title='Known Movie', year=2020, type='Movie'
+        )
+        ShowCrew.objects.create(show=show, person=target)
+
+        response = Mock(status_code=200)
+        response.json.return_value = {
+            'results': [
+                {
+                    'id': 456,
+                    'name': 'New Person',
+                    'original_name': 'New Person',
+                    'profile_path': '/profile.jpg',
+                    'known_for': [
+                        {
+                            'title': 'Known Movie',
+                            'original_title': 'Known Movie',
+                            'release_date': '2020-01-01',
+                        }
+                    ],
+                }
+            ]
+        }
+        session = Mock()
+        session.get.return_value = response
+        get_session.return_value = session
+
+        self.assertTrue(fetch_person_photo_from_tmdb(target))
+
+        target.refresh_from_db()
+        self.person.refresh_from_db()
+        self.assertEqual(target.tmdb_id, 456)
+        self.assertEqual(
+            target.tmdb_photo_url,
+            'https://image.tmdb.org/t/p/w200/profile.jpg',
+        )
+        self.assertIsNone(self.person.tmdb_photo_url)
+        self.assertTrue(
+            RejectedPersonPhoto.objects.filter(
+                person=self.person,
+                photo_url='https://image.tmdb.org/t/p/w200/profile.jpg',
+            ).exists()
+        )

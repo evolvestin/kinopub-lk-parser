@@ -8,6 +8,7 @@ from urllib3.util.retry import Retry
 
 from app.models import Country, Genre, Person, Show, ShowCrew
 from app.services.person_matching import find_person_for_tmdb
+from app.services.person_photo_quarantine import quarantine_tmdb_photo_conflicts
 from app.services.show_duration import upsert_show_duration
 from app.services.show_merge import merge_show_records
 from app.services.show_identity import find_exact_show_content_match
@@ -117,6 +118,7 @@ class TMDBClient:
 def _save_tmdb_person(person: Person, person_data: dict) -> Person:
     """Apply TMDB data without breaking the unique person identity mapping."""
     p_tmdb_id = person_data.get('id')
+    identity_or_photo_changed = False
     if p_tmdb_id:
         # A matching row may have appeared after the initial lookup, or may be
         # an alias whose canonical parent was returned by name matching.
@@ -125,6 +127,7 @@ def _save_tmdb_person(person: Person, person_data: dict) -> Person:
             person = existing
         elif not person.tmdb_id:
             person.tmdb_id = p_tmdb_id
+            identity_or_photo_changed = True
 
     p_en_name = person_data.get('original_name')
     if p_en_name and not person.en_name:
@@ -134,6 +137,7 @@ def _save_tmdb_person(person: Person, person_data: dict) -> Person:
     if profile_path and not person.tmdb_photo_url:
         person.tmdb_photo_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
         person.is_photo_fetched = True
+        identity_or_photo_changed = True
 
     try:
         with transaction.atomic():
@@ -151,10 +155,16 @@ def _save_tmdb_person(person: Person, person_data: dict) -> Person:
         person = existing
         if p_en_name and not person.en_name:
             person.en_name = p_en_name
+        identity_or_photo_changed = False
         if profile_path and not person.tmdb_photo_url:
             person.tmdb_photo_url = f'https://image.tmdb.org/t/p/w200{profile_path}'
             person.is_photo_fetched = True
-        person.save()
+            identity_or_photo_changed = True
+        with transaction.atomic():
+            person.save()
+
+    if identity_or_photo_changed:
+        quarantine_tmdb_photo_conflicts(person.id)
 
     return person
 

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db import DatabaseError
 
 from app.models import Person
+from app.services.person_photo_quarantine import quarantine_tmdb_photo_conflicts
 from app.services.tmdb_client import get_tmdb_session
 from app.utils import get_original_image_url
 
@@ -206,6 +207,8 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
             found_path = None
             found_tmdb_id = None
 
+        previous_photo_url = person_instance.tmdb_photo_url
+        previous_tmdb_id = person_instance.tmdb_id
         person_instance.tmdb_photo_url = (
             f'https://image.tmdb.org/t/p/w200{found_path}' if found_path else None
         )
@@ -215,6 +218,14 @@ def fetch_person_photo_from_tmdb(person_instance) -> bool:
             person_instance.tmdb_id = found_tmdb_id
             update_fields.append('tmdb_id')
         person_instance.save(update_fields=update_fields)
+        if (
+            person_instance.tmdb_photo_url != previous_photo_url
+            or person_instance.tmdb_id != previous_tmdb_id
+        ):
+            quarantined = quarantine_tmdb_photo_conflicts(person_instance.id)
+            if quarantined and person_instance.tmdb_id is None:
+                person_instance.tmdb_photo_url = None
+                person_instance.is_photo_fetched = False
 
         if found_path:
             logger.info(f'Fetched photo for {person_instance.name}')
