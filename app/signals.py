@@ -70,15 +70,23 @@ def handle_new_view_history(sender, instance, **kwargs):
         sender_service = TelegramSender()
 
         if not instance.users.exists():
-            last_view = (
-                sender.objects.filter(show=instance.show, users__isnull=False)
+            previous_view = (
+                sender.objects.filter(show=instance.show)
                 .exclude(id=instance.id)
-                .order_by(F('view_date').desc(nulls_last=True), '-season_number', '-episode_number')
+                .prefetch_related('users')
+                .order_by(
+                    F('view_date').desc(nulls_last=True),
+                    '-season_number',
+                    '-episode_number',
+                    '-id',
+                )
                 .first()
             )
 
-            if last_view:
-                instance.users.set(last_view.users.all())
+            # An empty latest view is an explicit opt-out barrier. Do not skip
+            # it and resurrect users from an older non-empty view.
+            if previous_view and previous_view.users.exists():
+                instance.users.set(previous_view.users.all())
 
         sender_service.send_history_notification(instance)
 
