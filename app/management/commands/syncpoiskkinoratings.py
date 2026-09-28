@@ -443,10 +443,15 @@ class Command(LoggableBaseCommand):
             if item.get('description'):
                 show.plot = item['description']
                 updated_fields.append('plot')
-            if item.get('status'):
-                show.status = SHOW_STATUS_MAPPING.get(item['status'], item['status'])
-                updated_fields.append('status')
-                shows_with_source_status.append(show)
+            raw_status = item.get('status')
+            if raw_status:
+                mapped_status = SHOW_STATUS_MAPPING.get(raw_status, raw_status)
+                # An UNKNOWN/empty source value must not erase a status that
+                # was already learned from KinoPub or another trusted source.
+                if mapped_status:
+                    show.status = mapped_status
+                    updated_fields.append('status')
+                    shows_with_source_status.append(show)
 
             if updated_fields:
                 shows_to_update.append(show)

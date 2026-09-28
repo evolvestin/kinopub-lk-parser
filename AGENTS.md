@@ -36,6 +36,34 @@ unless PROD access is explicitly requested in that request.
 Never store or print SSH private keys, passwords, API tokens, 2FA codes, or
 other credentials in this file, command output, commits, or logs.
 
+## Required git-to-PROD deployment flow
+
+Never deploy source files by copying them directly to PROD. Do not use `scp`,
+`rsync`, `sftp`, `docker cp`, or equivalent commands to place a working-tree
+file into `/root/kinopub-lk-parser` or a PROD container. A deployment from
+uncommitted local files is prohibited, even when the user explicitly asks to
+update PROD.
+
+For a requested PROD deployment, follow this order:
+
+1. Make and review the change in the local repository.
+2. Run the relevant checks inside the local Docker Compose services.
+3. Confirm the intended files with `git status` and `git diff --check`.
+4. Commit the complete change to Git with a descriptive message. If the
+   commit cannot be created, stop and report the error; do not bypass Git by
+   copying files.
+5. Push the commit through the repository's normal remote/release flow. If a
+   pull request or CI deployment is the repository's configured release path,
+   use that path and wait for its result.
+6. On PROD, deploy only the exact committed revision (or the revision selected
+   by the approved release mechanism). Verify the revision before restarting
+   services; never overwrite PROD's working tree with local files.
+7. Recreate the affected services, verify `docker compose ps`, and report the
+   deployed commit and health result.
+
+If the normal remote, CI, or release mechanism is unavailable, stop before
+changing PROD and report the blocker. Do not improvise a direct file copy.
+
 ## Safety rule for local PROD database clones
 
 This repository is often run locally against a restored copy of the PROD

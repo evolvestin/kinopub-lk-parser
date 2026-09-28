@@ -81,6 +81,46 @@ SHARED_LOCK_WAIT_SECONDS = 300
 # for hours; a healthy long-running writer keeps renewing it.
 CATALOG_LOCK_TTL_SECONDS = 900
 
+# Queue items are removed with Redis SPOP before the browser call starts. Keep
+# transient failures retryable, but do not hammer KinoPub forever when a title
+# permanently has no playlist or details page.
+QUEUE_ITEM_RETRY_LIMIT = 3
+QUEUE_ITEM_RETRY_TTL_SECONDS = 7 * 24 * 60 * 60
+
+
+def _queue_item_retry_key(queue_name, show_id):
+    return f'queue:retry:{queue_name}:{show_id}'
+
+
+def _requeue_failed_item(redis_client, queue_name, show_id, reason):
+    retry_key = _queue_item_retry_key(queue_name, show_id)
+    attempts = int(redis_client.incr(retry_key))
+    redis_client.expire(retry_key, QUEUE_ITEM_RETRY_TTL_SECONDS)
+    if attempts <= QUEUE_ITEM_RETRY_LIMIT:
+        redis_client.sadd(queue_name, show_id)
+        logging.warning(
+            'Re-queued show %s in %s after failed processing (%d/%d): %s',
+            show_id,
+            queue_name,
+            attempts,
+            QUEUE_ITEM_RETRY_LIMIT,
+            reason,
+        )
+        return True
+
+    logging.error(
+        'Dropped show %s from %s after %d failed processing attempts: %s',
+        show_id,
+        queue_name,
+        attempts,
+        reason,
+    )
+    return False
+
+
+def _clear_item_retry_state(redis_client, queue_name, show_id):
+    redis_client.delete(_queue_item_retry_key(queue_name, show_id))
+
 
 @contextmanager
 def _redis_lock(lock_name, timeout, warn_on_busy=True):
@@ -589,13 +629,42 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
                             f'Show {show_id} has no kinopub_id, skipping details update.'
                         )
                         continue
-                    process_func(driver, show.kinopub_id, force=True, session_type=session_type)
+                    result = process_func(
+                        driver, show.kinopub_id, force=True, session_type=session_type
+                    )
+                    if result is None:
+                        _requeue_failed_item(
+                            redis_client,
+                            queue_name,
+                            show_id,
+                            'details update returned no result',
+                        )
+                        continue
                 else:
-                    process_func(driver, show, session_type=session_type)
+                    result = process_func(driver, show, session_type=session_type)
+                    if result is False:
+                        _requeue_failed_item(
+                            redis_client,
+                            queue_name,
+                            show_id,
+                            'duration update saved no rows',
+                        )
+                        continue
 
+                _clear_item_retry_state(redis_client, queue_name, show_id)
                 processed_count += 1
             except Exception as e:
                 logging.error(f'Error processing show {show_id} in batch: {e}')
+                if isinstance(e, SoftTimeLimitExceeded):
+                    # The soft limit can interrupt the current item and leave
+                    # the rest of the SPOP'ed batch in local memory. Restore
+                    # the whole unprocessed tail before stopping the batch.
+                    redis_client.sadd(queue_name, *show_ids[idx - 1 :])
+                    logging.warning(
+                        'Soft time limit interrupted %s; re-queued current and remaining items.',
+                        show_id,
+                    )
+                    break
                 if history_parser.is_fatal_selenium_error(e):
                     logging.critical('Fatal driver error. Stopping batch.')
                     redis_client.sadd(queue_name, *show_ids[idx - 1 :])
@@ -608,6 +677,7 @@ def _process_batch_from_queue(queue_name, session_type, process_func, batch_size
                     )
                     redis_client.sadd(queue_name, *show_ids[idx - 1 :])
                     break
+                _requeue_failed_item(redis_client, queue_name, show_id, str(e))
 
         if processed_count > 0:
             logging.info(f'Batch finished. Processed {processed_count}/{len(show_ids)} items.')

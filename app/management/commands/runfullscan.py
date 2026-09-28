@@ -16,7 +16,7 @@ from app.history_parser import (
     open_url_safe,
 )
 from app.management.base import LoggableBaseCommand
-from app.models import LogEntry, Show
+from app.models import LogEntry, Show, ShowDuration
 from app.services.show_identity import (
     find_exact_movie_match,
     get_show_by_kinopub_id,
@@ -25,7 +25,7 @@ from app.services.show_identity import (
     record_kinopub_source,
 )
 from app.utils import enqueue_show_update
-from shared.constants import SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
+from shared.constants import SERIES_TYPES, SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED_VIA_NEW_EPISODES
 
 
 def parse_and_save_catalog_page(driver, mode):
@@ -144,6 +144,7 @@ def parse_and_save_catalog_page(driver, mode):
 
         if existing_show:
             was_3d = existing_show.is_3d
+            had_kinopub_id = bool(existing_show.kinopub_id)
             if not existing_show.kinopub_id and not Show.objects.filter(kinopub_id=k_id).exists():
                 if not Show.objects.filter(kinopub_id=k_id).exclude(id=existing_show.id).exists():
                     existing_show.kinopub_id = k_id
@@ -164,6 +165,26 @@ def parse_and_save_catalog_page(driver, mode):
                     existing_show.imdb_id = i_id
 
             existing_show.save()
+            # Existing TMDB/IMDb rows can acquire a KinoPub ID during a full
+            # scan. They need the same deferred details/duration processing as
+            # a newly created row; historically only new rows were enqueued.
+            details_needed = (
+                not had_kinopub_id
+                or existing_show.year is None
+                or not existing_show.plot
+                or (
+                    existing_show.type in SERIES_TYPES
+                    and not existing_show.status
+                )
+            )
+            durations_needed = not ShowDuration.objects.filter(show_id=existing_show.id).exists()
+            if details_needed or durations_needed:
+                enqueue_show_update(
+                    [existing_show.id],
+                    details=details_needed,
+                    durations=durations_needed,
+                    ratings=False,
+                )
             if data.get('is_3d') and not was_3d:
                 existing_show.is_3d = True
                 existing_show.save(update_fields=['is_3d', 'updated_at'])

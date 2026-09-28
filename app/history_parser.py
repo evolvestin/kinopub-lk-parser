@@ -492,6 +492,14 @@ def _update_show_details_once(
                             show=show, person=person, profession=label
                         )
 
+        if show.type in SERIES_TYPES and not show.status:
+            logging.warning(
+                'KinoPub details for show %s contain no usable status; '
+                'the update will be retried.',
+                kinopub_id,
+            )
+            return None
+
     except Exception as e:
         logging.error(
             f'An error occurred while updating show details for kinopub_id={kinopub_id}: {e}'
@@ -1382,7 +1390,7 @@ def get_movie_duration_and_save(driver, show, session_type='main'):
 
     if not show.kinopub_id:
         logging.warning(f'Show ID {show.id} has no kinopub_id. Skipping duration fetch.')
-        return
+        return False
 
     base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
     movie_url = f'{base_url.rstrip("/")}/item/play/{show.kinopub_id}/s0e1'
@@ -1404,10 +1412,13 @@ def get_movie_duration_and_save(driver, show, session_type='main'):
                 is_estimated=False,
             )
             logging.info('Cached duration for movie id%d: %d seconds.', show.id, duration_sec)
+            return True
         else:
             logging.warning('Playlist data found but duration is missing for %s', movie_url)
+            return False
     else:
         logging.warning('Could not fetch playlist data for movie %s', movie_url)
+        return False
 
 
 def get_season_durations_and_save(driver, show, season, session_type='main'):
@@ -1416,14 +1427,14 @@ def get_season_durations_and_save(driver, show, season, session_type='main'):
 
     if not show.kinopub_id:
         logging.warning(f'Show ID {show.id} has no kinopub_id. Skipping season duration fetch.')
-        return
+        return False
 
     base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
     episode_url = f'{base_url.rstrip("/")}/item/play/{show.kinopub_id}/s{season}e1'
     playlist_data = _fetch_playlist_data(driver, episode_url, session_type=session_type)
 
     if not playlist_data:
-        return
+        return False
 
     updated_count = 0
     for item in playlist_data:
@@ -1448,8 +1459,10 @@ def get_season_durations_and_save(driver, show, season, session_type='main'):
             show.id,
             season,
         )
+        return True
     else:
         logging.warning('No episodes found in playlist for show id%d season %d', show.id, season)
+        return False
 
 
 def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main'):
@@ -1904,11 +1917,12 @@ def run_parser_session(headless=True, driver_instance=None, session_type=ParserS
 def process_show_durations(driver, show, session_type='main'):
     if not show.kinopub_id:
         logging.warning(f'Show ID {show.id} has no kinopub_id. Skipping duration fetch.')
-        return
+        return False
 
     if show.type not in SERIES_TYPES:
-        get_movie_duration_and_save(driver, show.id, session_type=session_type)
+        return get_movie_duration_and_save(driver, show.id, session_type=session_type)
     else:
+        updated_any = False
         try:
             base_url = settings.SITE_URL if session_type == 'main' else settings.SITE_AUX_URL
             player_url = f'{base_url.rstrip("/")}/item/play/{show.kinopub_id}/s1e1'
@@ -1935,10 +1949,18 @@ def process_show_durations(driver, show, session_type='main'):
             logging.info(f'Found seasons {sorted(list(seasons))} for show {show.id}')
 
             for season in sorted(list(seasons)):
-                get_season_durations_and_save(driver, show.id, season, session_type=session_type)
+                updated_any = (
+                    get_season_durations_and_save(
+                        driver, show.id, season, session_type=session_type
+                    )
+                    or updated_any
+                )
 
         except Exception as e:
             logging.error(f'Error processing seasons for show {show.id}: {e}')
+            return False
+
+        return updated_any
 
 
 def parse_new_episodes_list(driver):
