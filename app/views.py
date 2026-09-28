@@ -728,12 +728,28 @@ def _manage_view_assignment(request, action):
             info = show_title
             if view_history.season_number:
                 info += f' ({format_se(view_history.season_number, view_history.episode_number)})'
+            logger.info(
+                'View assignment action=add telegram_id=%s view_id=%s remaining_user_ids=%s',
+                telegram_id,
+                view_id,
+                list(view_history.users.values_list('telegram_id', flat=True)),
+            )
             return JsonResponse({'status': 'ok', 'info': info})
         elif action == 'remove':
+            before_user_ids = list(view_history.users.values_list('telegram_id', flat=True))
             view_history.users.remove(user)
             TelegramSender().update_history_message(view_history)
+            remaining_user_ids = list(view_history.users.values_list('telegram_id', flat=True))
+            logger.info(
+                'View assignment action=remove telegram_id=%s view_id=%s '
+                'before_user_ids=%s remaining_user_ids=%s',
+                telegram_id,
+                view_id,
+                before_user_ids,
+                remaining_user_ids,
+            )
 
-            return JsonResponse({'status': 'ok'})
+            return JsonResponse({'status': 'ok', 'remaining_user_ids': remaining_user_ids})
 
     except (ViewUser.DoesNotExist, ViewHistory.DoesNotExist):
         return JsonResponse({'error': 'Not found'}, status=404)
@@ -1113,15 +1129,34 @@ def bot_unassign_group_view(request):
         assigned_user_ids = set(
             view_history.users.filter(id__in=group_user_ids).values_list('id', flat=True)
         )
+        before_user_ids = list(view_history.users.values_list('telegram_id', flat=True))
         if assigned_user_ids:
             view_history.users.remove(*assigned_user_ids)
             TelegramSender().update_history_message(view_history)
+
+        remaining_user_ids = list(view_history.users.values_list('telegram_id', flat=True))
+        removed_telegram_ids = list(
+            ViewUser.objects.filter(id__in=assigned_user_ids).values_list('telegram_id', flat=True)
+        )
+        logger.info(
+            'View group assignment action=remove telegram_id=%s view_id=%s group_id=%s '
+            'group_user_ids=%s before_user_ids=%s removed_telegram_ids=%s '
+            'remaining_user_ids=%s',
+            telegram_id,
+            view_id,
+            group_id,
+            sorted(group_user_ids),
+            before_user_ids,
+            removed_telegram_ids,
+            remaining_user_ids,
+        )
 
         return JsonResponse(
             {
                 'status': 'ok',
                 'removed_count': len(assigned_user_ids),
                 'group_name': group.name,
+                'remaining_user_ids': remaining_user_ids,
             }
         )
     except (ViewUser.DoesNotExist, ViewUserGroup.DoesNotExist, ViewHistory.DoesNotExist):

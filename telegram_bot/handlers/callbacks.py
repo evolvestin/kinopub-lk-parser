@@ -48,6 +48,19 @@ def safe_callback(func):
     return wrapper
 
 
+async def _log_view_callback(callback: CallbackQuery, action: str, result) -> None:
+    """Persist the outcome of view assignment callbacks for end-to-end debugging."""
+    message = (
+        f'View callback action={action} callback_data={callback.data!r} '
+        f'telegram_id={callback.from_user.id} result={result!r}'
+    )
+    logging.info(message)
+    try:
+        await client.send_log_entry(level='INFO', module='telegram.callback', message=message)
+    except Exception:
+        logging.exception('Failed to persist view callback log')
+
+
 async def _get_show_data_safe(callback: CallbackQuery, show_id: int):
     show_data = await client.get_show_details(show_id, telegram_id=callback.from_user.id)
     if not show_data:
@@ -167,9 +180,15 @@ async def cancel_claim_handler(callback: CallbackQuery, bot: Bot):
 
     view_id = get_args(callback.data, -1)
     success = await client.unassign_view(callback.from_user.id, view_id)
+    await _log_view_callback(callback, 'unassign_self', success)
     if success:
         await callback.message.edit_text(
             f'🗑 {italic("Привязка просмотра отменена.")}', reply_markup=None
+        )
+        await _log_view_callback(
+            callback,
+            'unassign_self_message_edit',
+            {'status': 'ok', 'message_id': callback.message.message_id},
         )
         await callback.answer('Отменено')
     else:
@@ -452,6 +471,7 @@ async def claim_self_handler(callback: CallbackQuery, bot: Bot):
     view_id = get_args(callback.data, -1)
     # Используем старую логику переключения для себя
     result = await client.toggle_view_user(callback.from_user.id, view_id)
+    await _log_view_callback(callback, 'toggle_self', result)
 
     if result and result.get('status') == 'ok':
         text = (
@@ -471,12 +491,18 @@ async def unclaim_group_handler(callback: CallbackQuery, bot: Bot):
 
     view_id, group_id = get_args(callback.data, 2, 3)
     result = await client.unassign_group_view(callback.from_user.id, group_id, view_id)
+    await _log_view_callback(callback, 'unassign_group', result)
 
     if result and result.get('status') == 'ok':
         removed = result.get('removed_count', 0)
         group_name = result.get('group_name', 'группы')
         await callback.message.edit_text(
             f'🗑 Убрано участников группы {bold(group_name)}: {removed}.', reply_markup=None
+        )
+        await _log_view_callback(
+            callback,
+            'unassign_group_message_edit',
+            {'status': 'ok', 'message_id': callback.message.message_id},
         )
         await callback.answer('Группа убрана из просмотра')
     else:
