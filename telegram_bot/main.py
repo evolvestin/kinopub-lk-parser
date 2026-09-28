@@ -113,7 +113,13 @@ def register_router() -> Router:
 
     # --- Callbacks ---
     router.callback_query.register(callbacks.role_switch_handler, F.data.startswith('setrole_'))
-    router.callback_query.register(callbacks.cancel_claim_handler, F.data.startswith('unclaim_'))
+    # Keep the self-unclaim handler from catching unclaim_group_<view>_<group>.
+    router.callback_query.register(
+        callbacks.unclaim_group_handler, F.data.startswith('unclaim_group_')
+    )
+    router.callback_query.register(
+        callbacks.cancel_claim_handler, F.data.regexp(r'^unclaim_\d+$')
+    )
     router.callback_query.register(
         callbacks.toggle_check_handler, F.data.startswith('toggle_check_')
     )
@@ -121,9 +127,6 @@ def register_router() -> Router:
         callbacks.claim_toggle_handler, F.data.startswith('claim_toggle_')
     )
     router.callback_query.register(callbacks.claim_group_handler, F.data.startswith('claim_group_'))
-    router.callback_query.register(
-        callbacks.unclaim_group_handler, F.data.startswith('unclaim_group_')
-    )
     router.callback_query.register(callbacks.claim_self_handler, F.data.startswith('claim_self_'))
     router.callback_query.register(callbacks.delete_msg_handler, F.data == 'delete_msg')
 
