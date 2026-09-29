@@ -1,10 +1,15 @@
+import logging
 import re
 
+from django.db import transaction
 from django.db.models import Q
 
 from app.models import Show, ShowPoster
 from shared.media import build_poster_url
 from shared.constants import SHOW_TYPE_MAPPING, ShowType
+
+
+logger = logging.getLogger(__name__)
 
 
 MOVIE_TYPE = SHOW_TYPE_MAPPING[ShowType.MOVIE]
@@ -153,13 +158,68 @@ def kinopub_poster_variant(is_3d: bool) -> str:
 def record_kinopub_source(show, kinopub_id: int, is_3d: bool = False):
     """Retain a KinoPub item ID and its poster without changing the main ID."""
     if not kinopub_id:
-        return
-    ShowPoster.objects.update_or_create(
-        source=ShowPoster.SOURCE_KINOPUB,
-        external_id=kinopub_id,
-        defaults={
-            'show_id': show.id,
-            'variant': kinopub_poster_variant(is_3d),
-            'url': build_poster_url(kinopub_id, None, 'big') or '',
-        },
-    )
+        return None
+
+    source = ShowPoster.SOURCE_KINOPUB
+    variant = kinopub_poster_variant(is_3d)
+    poster_url = build_poster_url(kinopub_id, None, 'big') or ''
+
+    # A show can be encountered through more than one KinoPub item (most
+    # commonly when the catalog contains several copies of a 3D title). The
+    # database has two independent uniqueness rules: one for source IDs and
+    # one for a show's source/variant slot. Looking up only by external_id
+    # therefore attempts an invalid INSERT when the slot already exists.
+    with transaction.atomic():
+        # Serialize poster writes for this show. This closes the race where
+        # two parser processes both observe an empty source/variant slot and
+        # then try to insert it simultaneously.
+        Show.objects.select_for_update().get(pk=show.id)
+        current = ShowPoster.objects.select_for_update().filter(
+            show_id=show.id,
+            source=source,
+            variant=variant,
+        ).first()
+        owner = ShowPoster.objects.select_for_update().filter(
+            source=source,
+            external_id=kinopub_id,
+        ).first()
+
+        if owner is not None and owner.show_id != show.id:
+            logger.warning(
+                'Skipping conflicting KinoPub poster: show=%s external_id=%s '
+                'already belongs to show=%s.',
+                show.id,
+                kinopub_id,
+                owner.show_id,
+            )
+            return owner
+
+        if owner is not None:
+            # The source ID is already retained for this show. If it is in the
+            # requested slot, refresh only its URL; if another slot already
+            # owns it, keep that existing identity rather than violating the
+            # slot constraint or silently moving a source ID between variants.
+            if current is not None and current.pk != owner.pk:
+                return owner
+            owner.variant = variant
+            owner.url = poster_url
+            owner.save(update_fields=['variant', 'url', 'updated_at'])
+            return owner
+
+        if current is not None:
+            # Replace the retained ID for this logical source/variant. This is
+            # the same conflict-safe policy used by the Kinopoisk poster sync:
+            # keep one deterministic poster slot and never let a second row
+            # crash the surrounding scan.
+            current.external_id = kinopub_id
+            current.url = poster_url
+            current.save(update_fields=['external_id', 'url', 'updated_at'])
+            return current
+
+        return ShowPoster.objects.create(
+            show_id=show.id,
+            source=source,
+            external_id=kinopub_id,
+            variant=variant,
+            url=poster_url,
+        )

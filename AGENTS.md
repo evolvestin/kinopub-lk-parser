@@ -38,6 +38,13 @@ other credentials in this file, command output, commits, or logs.
 
 ## Required git-to-PROD deployment flow
 
+When Codex runs in a sandbox where `.git` metadata is read-only, Git metadata
+operations must be run through an explicitly approved elevated command using
+the existing local Git identity and signing configuration. Do not create an
+alternate clone, bypass signing, or commit as the agent. Source edits may stay
+in the normal workspace; only the Git command that needs metadata write access
+should be elevated.
+
 Never deploy source files by copying them directly to PROD. Do not use `scp`,
 `rsync`, `sftp`, `docker cp`, or equivalent commands to place a working-tree
 file into `/root/kinopub-lk-parser` or a PROD container. A deployment from
