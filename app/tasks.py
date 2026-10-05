@@ -1020,7 +1020,8 @@ def notify_new_episode_task(show_id, season, episode):
 def auto_enqueue_missing_metadata_task():
     logging.info('Starting auto-enqueue task for shows with missing metadata.')
 
-    recent_cutoff = timezone.now() - timedelta(days=7)
+    metadata_cutoff = timezone.now() - timedelta(days=1)
+    duration_cutoff = metadata_cutoff
 
     detail_ids = list(
         Show.objects.filter(
@@ -1032,7 +1033,7 @@ def auto_enqueue_missing_metadata_task():
             | (Q(type__in=SERIES_TYPES) & (Q(status__isnull=True) | Q(status='')))
         )
         .filter(kinopub_id__isnull=False)
-        .filter(updated_at__lt=recent_cutoff)
+        .filter(updated_at__lt=metadata_cutoff)
         .values_list('id', flat=True)
         .distinct()
     )
@@ -1040,7 +1041,7 @@ def auto_enqueue_missing_metadata_task():
     duration_ids = list(
         Show.objects.filter(showduration__isnull=True)
         .filter(kinopub_id__isnull=False)
-        .filter(updated_at__lt=recent_cutoff)
+        .filter(updated_at__lt=duration_cutoff)
         .values_list('id', flat=True)
         .distinct()
     )
