@@ -45,6 +45,15 @@ alternate clone, bypass signing, or commit as the agent. Source edits may stay
 in the normal workspace; only the Git command that needs metadata write access
 should be elevated.
 
+Every release commit must have a valid GPG signature from the configured,
+non-expiring signing key. Verify the created commit with `git verify-commit
+HEAD` before pushing. Never use `--no-gpg-sign` or override
+`commit.gpgsign=false` to get a release through. If the configured key is
+missing, expired, or unusable, stop the release. Create or replace it with a
+non-expiring signing-only key only when the user explicitly requests that key
+change, then update the local Git signing-key configuration and verify a test
+signature before continuing.
+
 Never deploy source files by copying them directly to PROD. Do not use `scp`,
 `rsync`, `sftp`, `docker cp`, or equivalent commands to place a working-tree
 file into `/root/kinopub-lk-parser` or a PROD container. A deployment from

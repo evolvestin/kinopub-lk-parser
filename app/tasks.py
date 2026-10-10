@@ -21,6 +21,8 @@ from django.db.models import Q
 from django.utils import timezone
 from redis import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import Timeout as RequestsTimeout
 
 from app import history_parser
 from app.telegram_backup_manager import BackupManager
@@ -888,7 +890,20 @@ def sync_imdb_data_task(self):
     with _redis_lock(RedisLock.EXTERNAL_RATING_WRITES, timeout=14400) as rating_acquired:
         if not rating_acquired:
             raise self.retry(countdown=900)
-        call_command('syncimdbdata')
+        try:
+            call_command('syncimdbdata')
+        except (RequestsConnectionError, RequestsTimeout) as exc:
+            attempt = self.request.retries + 1
+            if self.request.retries < 2:
+                logging.warning(
+                    'IMDb dataset download failed (attempt %s/3); retrying in 20 minutes: %s',
+                    attempt,
+                    exc,
+                )
+                raise self.retry(exc=exc, countdown=20 * 60, max_retries=2)
+
+            logging.error('IMDb dataset download failed after %s attempts: %s', attempt, exc)
+            raise
 
 
 @shared_task(bind=True, max_retries=12, time_limit=900, soft_time_limit=840)

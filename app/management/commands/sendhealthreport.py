@@ -201,7 +201,6 @@ class Command(LoggableBaseCommand):
             ),
             48,
             'Рейтинги IMDb',
-            False,
         )
         _check_delay(
             _get_latest_dt(ShowDuration.objects.all(), 'updated_at'), 24, 'Хронометраж', False
