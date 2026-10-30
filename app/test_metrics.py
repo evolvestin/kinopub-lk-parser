@@ -15,12 +15,13 @@ from app.services.metrics import (
     calculate_persons_avatar_stats_metric,
     calculate_total_persons_by_show_type_metric,
     calculate_unused_persons_metric,
-    get_has_rating_list,
     get_duplicate_photo_urls_page,
+    get_global_metrics_history,
+    get_has_rating_list,
     get_missing_status_list,
     get_profession_persons_list,
+    get_total_persons_list,
     get_unused_persons_list,
-    get_global_metrics_history,
     invalidate_duplicate_photo_urls_cache,
 )
 
@@ -199,6 +200,45 @@ class ProfessionMetricTests(TestCase):
 
         self.assertIn({'name': 'Actor', 'value': 1}, stats)
 
+    def test_backfilled_profession_counts_share_one_distinct_scan_per_language(self):
+        actor = Person.objects.create(name='Known actor', en_name='Known actor')
+        alias = Person.objects.create(name='Actor alias', master_person=actor)
+        unknown = Person.objects.create(name='Unknown crew member')
+        show = Show.objects.create(title='Test show', original_title='Test show', type='Movie')
+        ShowCrew.objects.create(
+            show=show,
+            person=actor,
+            canonical_person=actor,
+            profession='В ролях',
+            en_profession='Actor',
+        )
+        ShowCrew.objects.create(
+            show=show,
+            person=alias,
+            canonical_person=actor,
+            profession='В ролях',
+            en_profession='Actor',
+        )
+        ShowCrew.objects.create(
+            show=show,
+            person=unknown,
+            canonical_person=unknown,
+            profession='Unmapped role',
+            en_profession='Unmapped role',
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            stats = calculate_en_professions_stats_metric()
+
+        self.assertIn({'name': 'Actor', 'value': 1}, stats)
+        self.assertIn({'name': 'Неизвестно', 'value': 1}, stats)
+        grouped_queries = [
+            query['sql']
+            for query in queries
+            if 'GROUPING SETS' in query['sql'].upper()
+        ]
+        self.assertEqual(len(grouped_queries), 2)
+
 
 class AvatarMetricTests(TestCase):
     def test_avatar_stats_are_calculated_in_one_aggregate(self):
@@ -297,3 +337,39 @@ class TotalPersonsMetricTests(TestCase):
             if 'COUNT(DISTINCT' in query['sql'].upper()
         )
         self.assertNotIn('JOIN "app_person"', aggregate_sql.upper())
+
+    def test_total_person_details_use_correlated_exists_for_first_page(self):
+        canonical = Person.objects.create(name='Canonical person')
+        alias = Person.objects.create(name='Alias person', master_person=canonical)
+        tv_show = Show.objects.create(title='TV show', original_title='TV show', type='TV Show')
+        movie = Show.objects.create(title='Movie', original_title='Movie', type='Movie')
+        ShowCrew.objects.create(
+            show=tv_show,
+            person=canonical,
+            canonical_person=canonical,
+        )
+        ShowCrew.objects.create(show=tv_show, person=alias, canonical_person=canonical)
+        ShowCrew.objects.create(show=movie, person=alias, canonical_person=canonical)
+
+        with CaptureQueriesContext(connection) as queries:
+            people = list(get_total_persons_list('TV Show', max_items=1))
+
+        self.assertEqual([person['id'] for person in people], [canonical.id])
+        detail_sql = next(
+            query['sql']
+            for query in queries
+            if 'SELECT "app_person"' in query['sql']
+        )
+        self.assertIn('EXISTS', detail_sql.upper())
+        self.assertNotIn('IN (SELECT DISTINCT', detail_sql.upper())
+
+    def test_total_person_details_keep_legacy_alias_fallback(self):
+        canonical = Person.objects.create(name='Canonical person')
+        alias = Person.objects.create(name='Alias person', master_person=canonical)
+        show = Show.objects.create(title='TV show', original_title='TV show', type='TV Show')
+        ShowCrew.objects.create(show=show, person=alias)
+
+        self.assertEqual(
+            [person['id'] for person in get_total_persons_list('TV Show')],
+            [canonical.id],
+        )

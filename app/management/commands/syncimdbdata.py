@@ -287,6 +287,7 @@ class Command(LoggableBaseCommand):
         url_fallback = 0
         ids_backfilled = 0
         shows_to_update = []
+        shows_with_backfilled_ids = []
 
         for show in shows:
             direct_value = values.get(show.imdb_id)
@@ -305,6 +306,7 @@ class Command(LoggableBaseCommand):
                 show.imdb_id = url_imdb_id
                 owned_ids.add(url_imdb_id)
                 ids_backfilled += 1
+                shows_with_backfilled_ids.append(show)
             shows_to_update.append(show)
 
         if not shows_to_update:
@@ -314,10 +316,15 @@ class Command(LoggableBaseCommand):
         for show in shows_to_update:
             show.imdb_rating_updated_at = updated_at
 
+        # Keep the unique/indexed imdb_id column out of the large rating CASE
+        # update. Most matched shows already have the same ID; update it only
+        # for the small URL-fallback subset that actually needs backfilling.
+        if shows_with_backfilled_ids:
+            Show.objects.bulk_update(shows_with_backfilled_ids, ['imdb_id'], batch_size=1000)
+
         Show.objects.bulk_update(
             shows_to_update,
             [
-                'imdb_id',
                 'imdb_rating',
                 'imdb_votes',
                 'imdb_rating_available',
@@ -332,12 +339,17 @@ class Command(LoggableBaseCommand):
                 'id', 'show_id', 'imdb', 'updated_at'
             )
         )
+        external_rows_to_update = []
         for external in external_rows:
-            external.imdb = show_id_to_rating[external.show_id]
+            rating = show_id_to_rating[external.show_id]
+            if external.imdb == rating:
+                continue
+            external.imdb = rating
             external.updated_at = updated_at
-        if external_rows:
+            external_rows_to_update.append(external)
+        if external_rows_to_update:
             ExternalRating.objects.bulk_update(
-                external_rows, ['imdb', 'updated_at'], batch_size=1000
+                external_rows_to_update, ['imdb', 'updated_at'], batch_size=1000
             )
 
         return {

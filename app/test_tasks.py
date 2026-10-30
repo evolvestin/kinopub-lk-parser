@@ -1,10 +1,12 @@
+from contextlib import contextmanager
 from unittest.mock import Mock, patch
 
-from django.test import TestCase
+from celery.exceptions import Retry
+from django.test import SimpleTestCase, TestCase
 
 from app import tasks
 from app.models import Show
-from shared.constants import ParserSessionType, RedisQueue
+from shared.constants import ParserSessionType, RedisLock, RedisQueue
 
 
 class FakeQueueRedis:
@@ -94,3 +96,31 @@ class QueueRetryTests(TestCase):
         self.assertEqual(redis_client.cleared_keys, [
             tasks._queue_item_retry_key(RedisQueue.UPDATE_DURATIONS, show.id),
         ])
+
+
+class MetricsSnapshotCoordinationTests(SimpleTestCase):
+    def test_snapshot_retries_when_rating_writer_holds_shared_lock(self):
+        acquired_locks = []
+
+        @contextmanager
+        def fake_lock(lock_name, _timeout=None, **_kwargs):
+            acquired_locks.append(lock_name)
+            yield lock_name != RedisLock.EXTERNAL_RATING_WRITES
+
+        with (
+            patch('app.tasks._redis_lock', side_effect=fake_lock),
+            patch('app.tasks.generate_global_metrics_snapshot') as generate_snapshot,
+            patch.object(tasks.update_site_metrics_task, 'retry', side_effect=Retry()),
+        ):
+            with self.assertRaises(Retry):
+                tasks.update_site_metrics_task.run()
+
+        self.assertEqual(
+            acquired_locks,
+            [
+                RedisLock.METRICS_SNAPSHOT,
+                RedisLock.CATALOG_WRITES,
+                RedisLock.EXTERNAL_RATING_WRITES,
+            ],
+        )
+        generate_snapshot.assert_not_called()

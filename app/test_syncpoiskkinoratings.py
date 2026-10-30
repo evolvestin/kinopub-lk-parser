@@ -90,6 +90,76 @@ class ImdbRatingTimestampTests(TestCase):
         self.assertEqual(show.imdb_rating, 8.4)
         self.assertIsNotNone(show.imdb_rating_updated_at)
 
+    def test_rating_batch_does_not_rewrite_existing_imdb_id(self):
+        show = Show.objects.create(
+            title='IMDb ID preservation test',
+            original_title='IMDb ID preservation test',
+            type='Movie',
+            imdb_id='tt12345678',
+        )
+
+        with patch.object(
+            Show.objects,
+            'bulk_update',
+            wraps=Show.objects.bulk_update,
+        ) as bulk_update:
+            ImdbCommand._save_rating_batch(
+                [('tt12345678', 8.4, 1234)], {'tt12345678': [show.id]}
+            )
+
+        self.assertEqual(bulk_update.call_count, 1)
+        self.assertEqual(
+            bulk_update.call_args.args[1],
+            ['imdb_rating', 'imdb_votes', 'imdb_rating_available', 'imdb_rating_updated_at'],
+        )
+        show.refresh_from_db()
+        self.assertEqual(show.imdb_id, 'tt12345678')
+
+    def test_rating_batch_updates_imdb_id_only_for_url_backfill(self):
+        show = Show.objects.create(
+            title='IMDb URL backfill test',
+            original_title='IMDb URL backfill test',
+            type='Movie',
+            imdb_url='https://www.imdb.com/title/tt12345678/',
+        )
+
+        with patch.object(
+            Show.objects,
+            'bulk_update',
+            wraps=Show.objects.bulk_update,
+        ) as bulk_update:
+            ImdbCommand._save_rating_batch(
+                [('tt12345678', 8.4, 1234)], {'tt12345678': [show.id]}
+            )
+
+        self.assertEqual(bulk_update.call_count, 2)
+        self.assertEqual(bulk_update.call_args_list[0].args[1], ['imdb_id'])
+        self.assertNotIn('imdb_id', bulk_update.call_args_list[1].args[1])
+        show.refresh_from_db()
+        self.assertEqual(show.imdb_id, 'tt12345678')
+
+    def test_rating_batch_skips_unchanged_external_rating_rows(self):
+        show = Show.objects.create(
+            title='IMDb external rating no-op test',
+            original_title='IMDb external rating no-op test',
+            type='Movie',
+            imdb_id='tt12345678',
+        )
+        external = ExternalRating.objects.create(show=show, imdb=8.4)
+        old_updated_at = external.updated_at
+
+        with patch.object(
+            ExternalRating.objects,
+            'bulk_update',
+            wraps=ExternalRating.objects.bulk_update,
+        ) as bulk_update:
+            ImdbCommand._save_rating_batch([('tt12345678', 8.4, 1234)], {})
+
+        bulk_update.assert_not_called()
+        external.refresh_from_db()
+        self.assertEqual(external.imdb, 8.4)
+        self.assertEqual(external.updated_at, old_updated_at)
+
 
 class PoiskkinoRefreshSelectionTests(TestCase):
     def test_batch_does_not_write_stale_status_when_source_omits_it(self):

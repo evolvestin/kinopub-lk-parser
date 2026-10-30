@@ -765,10 +765,28 @@ def _person_values_queryset(person_ids):
 
 
 def get_total_persons_list(show_type: str, max_items=None):
-    person_ids = _canonical_person_ids(
-        ShowCrew.objects.filter(show__type=show_type), max_items=max_items
+    if ShowCrew.objects.filter(canonical_person__isnull=True).exists():
+        canonical_id = Coalesce('canonical_person_id', 'person__master_person_id', 'person_id')
+        crew_rows = (
+            ShowCrew.objects.filter(show__type=show_type)
+            .annotate(canonical_id=canonical_id)
+            .filter(canonical_id=OuterRef('pk'))
+        )
+    else:
+        crew_rows = ShowCrew.objects.filter(
+            show__type=show_type,
+            canonical_person_id=OuterRef('pk'),
+        )
+
+    # Start from the ordered Person primary-key index and probe crew rows with
+    # EXISTS. The old DISTINCT subquery scanned millions of crew rows to find
+    # the first 51 IDs even though the detail page only needs one page.
+    persons = (
+        Person.objects.filter(Exists(crew_rows))
+        .order_by('id')
+        .values('id', 'name', 'en_name', 'tmdb_photo_url', 'kp_photo_url', 'tmdb_id')
     )
-    return _person_values_queryset(person_ids)
+    return persons[:max_items] if max_items is not None else persons
 
 
 def get_unused_persons_list():
@@ -1110,6 +1128,72 @@ def _calculate_profession_stats_canonical():
         fallback_field='en_profession',
     ):
         if canonical_complete:
+            if connection.vendor == 'postgresql':
+                primary_values = list(primary_raw_to_normalized)
+                fallback_values = list(fallback_raw_to_normalized)
+                primary_column = connection.ops.quote_name(primary_field)
+                fallback_column = connection.ops.quote_name(fallback_field)
+                canonical_column = connection.ops.quote_name('canonical_person_id')
+                crew_table = connection.ops.quote_name(ShowCrew._meta.db_table)
+
+                def case_expression(column, mapping):
+                    if not mapping:
+                        return 'NULL'
+                    cases = ' '.join('WHEN %s THEN %s' for _ in mapping)
+                    return f'CASE {column} {cases} END'
+
+                sql = f"""
+                    WITH role_rows AS (
+                        SELECT {canonical_column},
+                            CASE
+                                WHEN {primary_column} = ANY(%s) THEN
+                                    {case_expression(primary_column, primary_raw_to_normalized)}
+                                WHEN {fallback_column} = ANY(%s) THEN
+                                    {case_expression(fallback_column, fallback_raw_to_normalized)}
+                            END AS normalized
+                        FROM {crew_table}
+                        WHERE {primary_column} = ANY(%s)
+                           OR {fallback_column} = ANY(%s)
+                    )
+                    SELECT normalized,
+                           COUNT(DISTINCT {canonical_column}) AS value,
+                           GROUPING(normalized) AS is_total
+                    FROM role_rows
+                    GROUP BY GROUPING SETS ((normalized), ())
+                    ORDER BY is_total DESC, value DESC
+                """
+                params = [primary_values]
+                params.extend(
+                    value
+                    for raw, normalized in primary_raw_to_normalized.items()
+                    for value in (raw, normalized)
+                )
+                params.append(fallback_values)
+                params.extend(
+                    value
+                    for raw, normalized in fallback_raw_to_normalized.items()
+                    for value in (raw, normalized)
+                )
+                params.extend((primary_values, fallback_values))
+
+                with connection.cursor() as cursor:
+                    cursor.execute(sql, params)
+                    rows = cursor.fetchall()
+
+                result = [
+                    {'name': normalized, 'value': value}
+                    for normalized, value, is_total in rows
+                    if not is_total and normalized
+                ]
+                known_count = next(
+                    (value for _normalized, value, is_total in rows if is_total),
+                    0,
+                )
+                unknown_count = max(0, total_masters - known_count)
+                if unknown_count:
+                    result.append({'name': 'Неизвестно', 'value': unknown_count})
+                return result
+
             # Aggregate every normalized role in one CASE/GROUP BY query.
             # The previous implementation issued one DISTINCT count per role
             # (dozens of scans of the 15M-row ShowCrew table for each language)

@@ -910,11 +910,9 @@ def sync_imdb_data_task(self):
 @single_instance_task(lock_name=RedisLock.METRICS_SNAPSHOT, timeout=900)
 @safe_execution
 def update_site_metrics_task(self):
-    # Do not run a database-wide aggregate while a long catalog/rating write
-    # batch is active.  MVCC keeps the result consistent, but it does not keep
-    # the competing scans cheap: on production the two workloads exhausted
-    # the statement timeout and left stale snapshots behind.  Beat will try
-    # again on the next interval when the writer has released the lock.
+    # Do not run database-wide aggregates alongside catalog or external-rating
+    # writes. IMDb sync uses EXTERNAL_RATING_WRITES without CATALOG_WRITES, so
+    # both locks are required to keep the large scans off its write batches.
     try:
         with _redis_lock(
             RedisLock.CATALOG_WRITES,
@@ -925,8 +923,17 @@ def update_site_metrics_task(self):
                 logging.info('Skipping metrics snapshot because catalog writes are active.')
                 raise self.retry(countdown=300)
 
-            with metrics_statement_timeout():
-                data = generate_global_metrics_snapshot()
+            with _redis_lock(
+                RedisLock.EXTERNAL_RATING_WRITES,
+                timeout=14400,
+                warn_on_busy=False,
+            ) as rating_acquired:
+                if not rating_acquired:
+                    logging.info('Skipping metrics snapshot because rating writes are active.')
+                    raise self.retry(countdown=300)
+
+                with metrics_statement_timeout():
+                    data = generate_global_metrics_snapshot()
     except SoftTimeLimitExceeded:
         logging.warning('Metrics snapshot timed out; retrying in 300 seconds.')
         raise self.retry(countdown=300)
