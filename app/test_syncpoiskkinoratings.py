@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.db import OperationalError
@@ -96,6 +97,7 @@ class ImdbRatingTimestampTests(TestCase):
             original_title='IMDb ID preservation test',
             type='Movie',
             imdb_id='tt12345678',
+            imdb_rating_available=True,
         )
 
         with patch.object(
@@ -110,7 +112,7 @@ class ImdbRatingTimestampTests(TestCase):
         self.assertEqual(bulk_update.call_count, 1)
         self.assertEqual(
             bulk_update.call_args.args[1],
-            ['imdb_rating', 'imdb_votes', 'imdb_rating_available', 'imdb_rating_updated_at'],
+            ['imdb_rating', 'imdb_votes', 'imdb_rating_updated_at'],
         )
         show.refresh_from_db()
         self.assertEqual(show.imdb_id, 'tt12345678')
@@ -135,8 +137,61 @@ class ImdbRatingTimestampTests(TestCase):
         self.assertEqual(bulk_update.call_count, 2)
         self.assertEqual(bulk_update.call_args_list[0].args[1], ['imdb_id'])
         self.assertNotIn('imdb_id', bulk_update.call_args_list[1].args[1])
+        self.assertEqual(
+            bulk_update.call_args_list[1].args[1],
+            ['imdb_rating', 'imdb_votes', 'imdb_rating_updated_at'],
+        )
         show.refresh_from_db()
         self.assertEqual(show.imdb_id, 'tt12345678')
+        self.assertTrue(show.imdb_rating_available)
+
+    def test_rating_batch_sets_availability_only_for_false_rows(self):
+        show = Show.objects.create(
+            title='IMDb availability update test',
+            original_title='IMDb availability update test',
+            type='Movie',
+            imdb_id='tt12345678',
+        )
+
+        with patch.object(
+            Show.objects, 'bulk_update', wraps=Show.objects.bulk_update
+        ) as bulk_update:
+            ImdbCommand._save_rating_batch([('tt12345678', 8.4, 1234)], {})
+
+        self.assertEqual(bulk_update.call_count, 1)
+        self.assertEqual(
+            bulk_update.call_args.args[1],
+            ['imdb_rating', 'imdb_votes', 'imdb_rating_updated_at'],
+        )
+        show.refresh_from_db()
+        self.assertTrue(show.imdb_rating_available)
+
+    def test_completed_sync_marks_only_stale_available_ratings_unavailable(self):
+        sync_started_at = timezone.now()
+        stale = Show.objects.create(
+            title='Stale IMDb availability test',
+            original_title='Stale IMDb availability test',
+            type='Movie',
+            imdb_id='tt12345678',
+            imdb_rating_available=True,
+            imdb_rating_updated_at=sync_started_at - timedelta(days=1),
+        )
+        refreshed = Show.objects.create(
+            title='Refreshed IMDb availability test',
+            original_title='Refreshed IMDb availability test',
+            type='Movie',
+            imdb_id='tt12345679',
+            imdb_rating_available=True,
+            imdb_rating_updated_at=sync_started_at,
+        )
+
+        updated = ImdbCommand._mark_stale_imdb_rating_availability(sync_started_at)
+
+        self.assertEqual(updated, 1)
+        stale.refresh_from_db()
+        refreshed.refresh_from_db()
+        self.assertFalse(stale.imdb_rating_available)
+        self.assertTrue(refreshed.imdb_rating_available)
 
     def test_rating_batch_skips_unchanged_external_rating_rows(self):
         show = Show.objects.create(
