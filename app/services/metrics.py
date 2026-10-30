@@ -7,7 +7,19 @@ from hashlib import sha1
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import Case, CharField, Count, Exists, F, Max, OuterRef, Q, Value, When
+from django.db.models import (
+    Case,
+    CharField,
+    Count,
+    Exists,
+    F,
+    Max,
+    OuterRef,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
 from django.db.models.functions import Coalesce
 from django.db.utils import ProgrammingError
 from django.utils import timezone
@@ -937,10 +949,10 @@ def calculate_persons_avatar_stats_metric():
     has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
     tmdb_done = Q(is_photo_fetched=True)
 
-    # Build the waiting set once.  A correlated EXISTS here makes PostgreSQL
-    # re-check the 15M-row ShowCrew relation for every Person row and was the
-    # last metric to hit statement_timeout on production.
-    kp_waiting_person_ids = list(
+    # Keep this as a database subquery. Materializing all matching crew person
+    # IDs in Python is expensive on the 15M-row production table and can make
+    # the snapshot worker spend its time transferring a large intermediate set.
+    kp_waiting_person_ids = (
         ShowCrew.objects.filter(
             show__kinopoisk_url__isnull=False,
             show__ext_rating__isnull=True,
@@ -948,7 +960,6 @@ def calculate_persons_avatar_stats_metric():
         .exclude(show__kinopoisk_url='')
         .exclude(show__kinopoisk_url__endswith='/film/0')
         .values_list('person_id', flat=True)
-        .distinct()
     )
 
     person_stats = Person.objects.aggregate(
@@ -961,11 +972,10 @@ def calculate_persons_avatar_stats_metric():
     )
 
     waiting_stats = {'kp_wait': 0, 'all_none_wait': 0}
-    if kp_waiting_person_ids:
-        waiting_stats = Person.objects.filter(id__in=kp_waiting_person_ids).aggregate(
-            kp_wait=Count('id', filter=~has_kp),
-            all_none_wait=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
-        )
+    waiting_stats = Person.objects.filter(id__in=Subquery(kp_waiting_person_ids)).aggregate(
+        kp_wait=Count('id', filter=~has_kp),
+        all_none_wait=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
+    )
 
     data = [
         {'name': 'Есть фото (TMDB)', 'value': person_stats['has_tmdb']},

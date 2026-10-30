@@ -275,6 +275,13 @@ class AvatarMetricTests(TestCase):
             sum('FROM "app_person"' in query['sql'] for query in queries),
             2,
         )
+        waiting_stats_sql = [
+            query['sql']
+            for query in queries
+            if 'FROM "app_person"' in query['sql']
+        ][-1]
+        self.assertIn('IN (SELECT', waiting_stats_sql.upper())
+        self.assertNotIn('PERSON_ID IN (', waiting_stats_sql.upper())
         self.assertFalse(
             any(
                 'EXISTS' in query['sql'].upper() and 'FROM "app_person"' in query['sql']

@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from unittest.mock import Mock, patch
 
-from celery.exceptions import Retry
+from celery.exceptions import Retry, SoftTimeLimitExceeded
 from django.test import SimpleTestCase, TestCase
 
 from app import tasks
@@ -124,3 +124,86 @@ class MetricsSnapshotCoordinationTests(SimpleTestCase):
             ],
         )
         generate_snapshot.assert_not_called()
+        self.assertIsNone(tasks.update_site_metrics_task.max_retries)
+
+    def test_snapshot_timeout_retry_count_is_separate_from_lock_retries(self):
+        @contextmanager
+        def acquired_lock(_lock_name, _timeout=None, **_kwargs):
+            yield True
+
+        with (
+            patch('app.tasks._redis_lock', side_effect=acquired_lock),
+            patch('app.tasks.metrics_statement_timeout'),
+            patch(
+                'app.tasks.generate_global_metrics_snapshot',
+                side_effect=SoftTimeLimitExceeded(),
+            ),
+            patch.object(tasks.update_site_metrics_task, 'retry', side_effect=Retry()) as retry,
+        ):
+            with self.assertRaises(Retry):
+                tasks.update_site_metrics_task.run(timeout_retries=1)
+
+        self.assertEqual(retry.call_args.kwargs['kwargs'], {'timeout_retries': 2})
+
+    def test_snapshot_timeout_limit_raises_original_timeout(self):
+        @contextmanager
+        def acquired_lock(_lock_name, _timeout=None, **_kwargs):
+            yield True
+
+        with (
+            patch('app.tasks._redis_lock', side_effect=acquired_lock),
+            patch('app.tasks.metrics_statement_timeout'),
+            patch(
+                'app.tasks.generate_global_metrics_snapshot',
+                side_effect=SoftTimeLimitExceeded(),
+            ),
+            patch.object(tasks.update_site_metrics_task, 'retry') as retry,
+        ):
+            with self.assertRaises(SoftTimeLimitExceeded):
+                tasks.update_site_metrics_task.run(timeout_retries=2)
+
+        retry.assert_not_called()
+
+
+class RatingWriterLockRetryTests(SimpleTestCase):
+    def _assert_unbounded_retry(self, task, expected_locks):
+        acquired = iter([True] + [True] * (len(expected_locks) - 2) + [False])
+        seen_locks = []
+
+        @contextmanager
+        def fake_lock(lock_name, _timeout=None, **_kwargs):
+            seen_locks.append(lock_name)
+            yield next(acquired)
+
+        retry = patch.object(task, 'retry', side_effect=Retry())
+        with (
+            patch('app.tasks._redis_lock', side_effect=fake_lock),
+            retry as retry_mock,
+        ):
+            with self.assertRaises(Retry):
+                task.run()
+
+        self.assertEqual(seen_locks, expected_locks)
+        retry_mock.assert_called_once_with(countdown=900, max_retries=None)
+
+    def test_poiskkino_catalog_lock_contention_does_not_exhaust_retries(self):
+        self._assert_unbounded_retry(
+            tasks.sync_poiskkino_ratings_task,
+            [RedisLock.SYNC_POISKKINO_RATINGS, RedisLock.CATALOG_WRITES],
+        )
+
+    def test_poiskkino_rating_lock_contention_does_not_exhaust_retries(self):
+        self._assert_unbounded_retry(
+            tasks.sync_poiskkino_ratings_task,
+            [
+                RedisLock.SYNC_POISKKINO_RATINGS,
+                RedisLock.CATALOG_WRITES,
+                RedisLock.EXTERNAL_RATING_WRITES,
+            ],
+        )
+
+    def test_imdb_rating_lock_contention_does_not_exhaust_retries(self):
+        self._assert_unbounded_retry(
+            tasks.sync_imdb_data_task,
+            [RedisLock.SYNC_IMDB_DATA, RedisLock.EXTERNAL_RATING_WRITES],
+        )

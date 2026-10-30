@@ -88,6 +88,7 @@ CATALOG_LOCK_TTL_SECONDS = 900
 # permanently has no playlist or details page.
 QUEUE_ITEM_RETRY_LIMIT = 3
 QUEUE_ITEM_RETRY_TTL_SECONDS = 7 * 24 * 60 * 60
+METRICS_TIMEOUT_RETRY_LIMIT = 2
 
 
 def _queue_item_retry_key(queue_name, show_id):
@@ -858,7 +859,9 @@ def get_kp_mapping():
     return mapping
 
 
-@shared_task(bind=True, max_retries=8)
+# Shared-lock contention is a deferral, not a failed rating sync. Keep retrying
+# until the scheduled writer can acquire both shared resources.
+@shared_task(bind=True, max_retries=None)
 @single_instance_task(lock_name=RedisLock.SYNC_POISKKINO_RATINGS, timeout=7200)
 def sync_poiskkino_ratings_task(self):
     with _redis_lock(
@@ -866,11 +869,11 @@ def sync_poiskkino_ratings_task(self):
         timeout=CATALOG_LOCK_TTL_SECONDS,
     ) as catalog_acquired:
         if not catalog_acquired:
-            raise self.retry(countdown=900)
+            raise self.retry(countdown=900, max_retries=None)
 
         with _redis_lock(RedisLock.EXTERNAL_RATING_WRITES, timeout=14400) as rating_acquired:
             if not rating_acquired:
-                raise self.retry(countdown=900)
+                raise self.retry(countdown=900, max_retries=None)
 
             call_command('syncpoiskkinoratings')
 
@@ -880,7 +883,7 @@ def sync_poiskkino_ratings_task(self):
     update_site_metrics_task.delay()
 
 
-@shared_task(bind=True, max_retries=8)
+@shared_task(bind=True, max_retries=None)
 @single_instance_task(lock_name=RedisLock.SYNC_IMDB_DATA, timeout=14400)
 def sync_imdb_data_task(self):
     # IMDb datasets do not use the Kinopub browser. Keep this task out of the
@@ -889,7 +892,7 @@ def sync_imdb_data_task(self):
     # runs, while the ratings lock serializes writes with Poiskkino.
     with _redis_lock(RedisLock.EXTERNAL_RATING_WRITES, timeout=14400) as rating_acquired:
         if not rating_acquired:
-            raise self.retry(countdown=900)
+            raise self.retry(countdown=900, max_retries=None)
         try:
             call_command('syncimdbdata')
         except (RequestsConnectionError, RequestsTimeout) as exc:
@@ -906,10 +909,12 @@ def sync_imdb_data_task(self):
             raise
 
 
-@shared_task(bind=True, max_retries=12, time_limit=900, soft_time_limit=840)
+# Lock contention retries are unbounded; query timeouts are separately bounded
+# by METRICS_TIMEOUT_RETRY_LIMIT so a broken snapshot cannot loop forever.
+@shared_task(bind=True, max_retries=None, time_limit=3600, soft_time_limit=3300)
 @single_instance_task(lock_name=RedisLock.METRICS_SNAPSHOT, timeout=900)
 @safe_execution
-def update_site_metrics_task(self):
+def update_site_metrics_task(self, timeout_retries=0):
     # Do not run database-wide aggregates alongside catalog or external-rating
     # writes. IMDb sync uses EXTERNAL_RATING_WRITES without CATALOG_WRITES, so
     # both locks are required to keep the large scans off its write batches.
@@ -935,8 +940,17 @@ def update_site_metrics_task(self):
                 with metrics_statement_timeout():
                     data = generate_global_metrics_snapshot()
     except SoftTimeLimitExceeded:
+        if timeout_retries >= METRICS_TIMEOUT_RETRY_LIMIT:
+            logging.error(
+                'Metrics snapshot timed out after %s retries.',
+                timeout_retries,
+            )
+            raise
+
         logging.warning('Metrics snapshot timed out; retrying in 300 seconds.')
-        raise self.retry(countdown=300)
+        retry_kwargs = dict(self.request.kwargs or {})
+        retry_kwargs['timeout_retries'] = timeout_retries + 1
+        raise self.retry(countdown=300, kwargs=retry_kwargs)
     SiteMetric.objects.create(key='global_snapshot', data=data)
     cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
     cache.delete('lock:queuing_global_snapshot')
