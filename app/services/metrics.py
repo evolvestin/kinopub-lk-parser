@@ -278,10 +278,10 @@ def get_has_rating_list(show_type: str, source: str):
 
 def calculate_missing_kp_metric():
     qs = Show.objects.filter(
-        kinopoisk_url__gt='',
+        kinopoisk_url__isnull=False,
         ext_rating__kp__isnull=True,
         kinopoisk_rating_available=True,
-    ).exclude(kinopoisk_url__endswith='/film/0')
+    ).exclude(kinopoisk_url='').exclude(kinopoisk_url__endswith='/film/0')
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
     return _aggregate_by_display_type(stats)
 
@@ -289,11 +289,11 @@ def calculate_missing_kp_metric():
 def calculate_kp_unrated_metric():
     """Titles checked by Poiskkino where KinoPoisk has no published rating."""
     qs = Show.objects.filter(
-        kinopoisk_url__gt='',
+        kinopoisk_url__isnull=False,
         ext_rating__kp__isnull=True,
         kinopoisk_rating_available=False,
         poiskkino_updated_at__isnull=False,
-    ).exclude(kinopoisk_url__endswith='/film/0')
+    ).exclude(kinopoisk_url='').exclude(kinopoisk_url__endswith='/film/0')
     stats = qs.values('type').annotate(total=Count('id')).order_by('-total')
     return _aggregate_by_display_type(stats)
 

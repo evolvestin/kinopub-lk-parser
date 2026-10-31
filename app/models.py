@@ -538,10 +538,9 @@ class Show(BaseModel):
             ),
             models.Index(
                 fields=['type', 'id'],
-                name='idx_show_missing_kp_rating',
+                name='idx_show_missing_kp_v2',
                 condition=Q(kinopoisk_url__isnull=False)
                 & ~Q(kinopoisk_url='')
-                & Q(kinopoisk_rating__isnull=True)
                 & Q(kinopoisk_rating_available=True),
             ),
             models.Index(
@@ -553,10 +552,9 @@ class Show(BaseModel):
             ),
             models.Index(
                 fields=['type', 'id'],
-                name='idx_show_kp_unrated',
+                name='idx_show_kp_unrated_v2',
                 condition=Q(kinopoisk_url__isnull=False)
                 & ~Q(kinopoisk_url='')
-                & Q(kinopoisk_rating__isnull=True)
                 & Q(kinopoisk_rating_available=False)
                 & Q(poiskkino_updated_at__isnull=False),
             ),
