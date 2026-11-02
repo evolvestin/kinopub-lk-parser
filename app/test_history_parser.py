@@ -1,9 +1,11 @@
 from unittest.mock import Mock, patch
 
+from bs4 import BeautifulSoup
 from django.test import SimpleTestCase, TestCase, override_settings
 from selenium.common.exceptions import StaleElementReferenceException
 
 from app import history_parser
+from app.kinopub_http import KinopubHttpDriver
 from app.models import Show
 
 
@@ -179,3 +181,106 @@ class HistoryParserRecoveryTests(SimpleTestCase):
             history_parser.run_parser_session()
 
         close_driver.assert_called_once_with(None)
+
+
+class HistoryParserRedesignTests(TestCase):
+    def _driver_for_html(self, html):
+        driver = object.__new__(KinopubHttpDriver)
+        driver._soup = BeautifulSoup(html, 'html.parser')
+        return driver
+
+    def test_new_episode_history_cards_keep_date_and_season_episode(self):
+        driver = self._driver_for_html(
+            '<section data-kp-history-group>'
+            '<h2 class="kp-section-title">29 октября 2026</h2>'
+            '<div class="kp-episode is-watched">'
+            '<a class="kp-episode-thumb" href="/item/view/108010/s1e9">'
+            'Сезон 1. Эпизод 9</a>'
+            '<a class="kp-episode-meta" href="/item/view/108010/s1e9">'
+            '<span class="kp-episode-title">Питт</span>'
+            '<span class="kp-episode-sub">The Pitt</span></a>'
+            '</div></section>'
+        )
+
+        with (
+            patch('app.history_parser._get_stale_history_detail_ids', return_value=[]),
+            patch('app.history_parser.enqueue_show_update'),
+            patch('app.history_parser.view_history_created.send'),
+            patch('app.history_parser.get_season_durations_and_save'),
+        ):
+            views_added, stop_parsing = history_parser.parse_and_save_history(
+                driver, 'episodes'
+            )
+
+        view = history_parser.ViewHistory.objects.get()
+        show = Show.objects.get(pk=view.show_id)
+        self.assertEqual((views_added, stop_parsing), (1, False))
+        self.assertEqual(view.view_date.isoformat(), '2026-10-29')
+        self.assertEqual((view.season_number, view.episode_number), (1, 9))
+        self.assertEqual((show.title, show.original_title), ('Питт', 'The Pitt'))
+
+    def test_new_movie_history_rows_keep_date_and_title(self):
+        driver = self._driver_for_html(
+            '<section data-kp-history-group>'
+            '<h2 class="kp-section-title">2 ноября 2026</h2>'
+            '<div class="kp-item-rows"><div class="kp-item-row">'
+            '<div class="kp-item-row-body"><div class="kp-item-row-title">'
+            '<span class="kp-type">Фильм</span>'
+            '<span class="kp-item-row-name"><a href="/item/view/6589/YA-budu-ryadom">'
+            'Я буду рядом</a></span></div></div></div></div></section>'
+        )
+
+        with (
+            patch('app.history_parser._get_stale_history_detail_ids', return_value=[]),
+            patch('app.history_parser.enqueue_show_update'),
+            patch('app.history_parser.view_history_created.send'),
+            patch('app.history_parser.get_movie_duration_and_save'),
+        ):
+            views_added, stop_parsing = history_parser.parse_and_save_history(
+                driver, 'movies'
+            )
+
+        view = history_parser.ViewHistory.objects.get()
+        show = Show.objects.get(pk=view.show_id)
+        self.assertEqual((views_added, stop_parsing), (1, False))
+        self.assertEqual(view.view_date.isoformat(), '2026-11-02')
+        self.assertEqual((view.season_number, view.episode_number), (0, 0))
+        self.assertEqual((show.title, show.original_title), ('Я буду рядом', 'Я буду рядом'))
+
+    @override_settings(SITE_URL='https://kinopub.test/')
+    def test_new_item_details_layout_updates_metadata_and_plot(self):
+        driver = self._driver_for_html(
+            '<main><div class="kp-head-titles"><h1>Путешествие на поезде!</h1>'
+            '<div class="kp-head-orig">Tetsuryou! Meet with Tetsudou Musume</div></div>'
+            '<dl class="kp-dl">'
+            '<dt>Статус</dt><dd>в эфире</dd>'
+            '<dt>Год выхода</dt><dd><a href="/serial?years=2026%3B2026">2026</a></dd>'
+            '<dt>Страна</dt><dd><a href="/serial?country=7">Япония</a></dd>'
+            '<dt>Жанр</dt><dd><a href="/serial?genre=25">Аниме</a></dd>'
+            '</dl><div id="kpPlot">Описание нового сериала.</div></main>'
+        )
+        driver._last_url = 'https://kinopub.test/item/view/128476'
+        show = Show.objects.create(
+            kinopub_id=128476,
+            title='Old title',
+            original_title='Old title',
+            type='Series',
+        )
+
+        with (
+            patch('app.history_parser.open_url_safe', return_value=driver),
+            patch('app.history_parser.record_kinopub_source'),
+            patch('app.history_parser._update_related_objects_from_details'),
+        ):
+            updated = history_parser.update_show_details(
+                driver, 128476, force=True, session_type='main'
+            )
+
+        show.refresh_from_db()
+        self.assertEqual(updated.pk, show.pk)
+        self.assertEqual(show.title, 'Путешествие на поезде!')
+        self.assertEqual(show.original_title, 'Tetsuryou! Meet with Tetsudou Musume')
+        self.assertEqual(show.year, 2026)
+        self.assertEqual(show.type, 'Series')
+        self.assertEqual(show.status, 'Ongoing')
+        self.assertEqual(show.plot, 'Описание нового сериала.')

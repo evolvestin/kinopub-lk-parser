@@ -48,6 +48,62 @@ class KinopubHttpDriverTests(SimpleTestCase):
         self.assertEqual(result[0]['href'], '/item/view/12/X')
         self.assertEqual(result[0]['title'], 'Title')
 
+    def test_catalog_script_parses_new_kinopub_poster_cards(self):
+        driver = self._driver_for_html(
+            '<div id="items" class="kp-grid">'
+            '<a class="kp-poster" href="/item/view/127777/Get-Jiro">'
+            '<span class="kp-rating-pill">8.7</span>'
+            '<span class="kp-rating-pill">IMDb 6.9</span>'
+            '<span class="kp-poster-title" title="Схватить Дзиро!">Схватить Дзиро!</span>'
+            '<span class="kp-poster-sub" title="Get Jiro!">Get Jiro!</span>'
+            '</a></div>'
+        )
+
+        result = driver.execute_script(
+            'const blocks = document.querySelectorAll('
+            '"#items > div[class*=\'col-\'], #items > a.kp-poster");'
+            'const isKpPoster = block.matches(\'.kp-poster\');'
+            'const oldSelector = \'.item-poster a\';'
+            'const results = blocks;'
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['href'], '/item/view/127777/Get-Jiro')
+        self.assertEqual(result[0]['title'], 'Схватить Дзиро!')
+        self.assertEqual(result[0]['original_title'], 'Get Jiro!')
+        self.assertEqual(result[0]['kinopoisk_rating'], '8.7')
+        self.assertEqual(result[0]['imdb_rating'], '6.9')
+
+    def test_new_episodes_page_parses_kp_episode_cards(self):
+        driver = self._driver_for_html(
+            '<div class="kp-episode">'
+            '<a class="kp-episode-thumb" href="/item/view/128476/s1e4">Сезон 1. Эпизод 4</a>'
+            '<a class="kp-episode-meta" href="/item/view/128476/s1e4">'
+            '<span class="kp-episode-title">Путешествие на поезде!</span>'
+            '<span class="kp-episode-sub">Tetsuryou! Meet with Tetsudou Musume</span>'
+            '<span>Эпизод 4 02 ноября 2026, 08:51</span></a>'
+            '</div>'
+        )
+
+        result = history_parser.parse_new_episodes_list(driver)
+
+        self.assertEqual(
+            result,
+            [
+                {
+                    'show_id': 128476,
+                    'title': 'Путешествие на поезде!',
+                    'original_title': 'Tetsuryou! Meet with Tetsudou Musume',
+                    'season': 1,
+                    'episode': 4,
+                    'href': '/item/view/128476/s1e4',
+                }
+            ],
+        )
+
+    def test_history_date_parser_accepts_kp_russian_genitive_months(self):
+        self.assertEqual(history_parser._month_number('октября'), '10')
+
     def test_window_json_is_read_from_server_rendered_script(self):
         driver = self._driver_for_html(
             '<script>window.PLAYER_PLAYLIST = [{"season": 1, "episode": 2, "duration": 123}];</script>'

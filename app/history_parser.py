@@ -67,6 +67,29 @@ from shared.formatters import format_se
 
 
 DETAIL_REFRESH_INTERVAL = timedelta(days=14)
+RUSSIAN_GENITIVE_MONTHS = {
+    'января': '01',
+    'февраля': '02',
+    'марта': '03',
+    'апреля': '04',
+    'мая': '05',
+    'июня': '06',
+    'июля': '07',
+    'августа': '08',
+    'сентября': '09',
+    'октября': '10',
+    'ноября': '11',
+    'декабря': '12',
+}
+
+
+def _month_number(month_name):
+    normalized = str(month_name).strip().lower()
+    return (
+        MONTHS_MAP.get(month_name)
+        or MONTHS_MAP.get(normalized.capitalize())
+        or RUSSIAN_GENITIVE_MONTHS.get(normalized)
+    )
 
 
 def _get_stale_history_detail_ids(show_ids, now=None):
@@ -264,7 +287,7 @@ def _update_show_details_once(
         try:
             info_table = wait.until(
                 expected_conditions.presence_of_element_located(
-                    (By.CSS_SELECTOR, 'table.table-striped')
+                    (By.CSS_SELECTOR, 'table.table-striped, dl.kp-dl')
                 )
             )
         except TimeoutException:
@@ -349,6 +372,10 @@ def _update_show_details_once(
             raw_orig = small_elem.text
         except NoSuchElementException:
             original_title_elements = driver.find_elements(By.CSS_SELECTOR, '.iv-title-orig')
+            if not original_title_elements:
+                original_title_elements = driver.find_elements(
+                    By.CSS_SELECTOR, '.kp-head-orig'
+                )
             raw_orig = original_title_elements[0].text if original_title_elements else ''
 
         try:
@@ -367,9 +394,23 @@ def _update_show_details_once(
             if p_text:
                 show.plot = p_text
         except NoSuchElementException:
-            pass
+            try:
+                plot_elem = driver.find_element(By.ID, 'kpPlot')
+                p_text = plot_elem.text.strip()
+                if p_text:
+                    show.plot = p_text
+            except NoSuchElementException:
+                pass
 
         def get_row_data(text_label):
+            labels = info_table.find_elements(By.TAG_NAME, 'dt')
+            if labels:
+                values = info_table.find_elements(By.TAG_NAME, 'dd')
+                for index, label in enumerate(labels):
+                    if text_label in label.text and index < len(values):
+                        return values[index]
+                return None
+
             try:
                 row = info_table.find_element(
                     By.XPATH,
@@ -1467,7 +1508,11 @@ def get_season_durations_and_save(driver, show, season, session_type='main'):
 
 def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main'):
     wait = WebDriverWait(driver, 20)
-    wait.until(expected_conditions.presence_of_element_located((By.CSS_SELECTOR, '.item-list')))
+    wait.until(
+        lambda current_driver: current_driver.find_elements(
+            By.CSS_SELECTOR, '.item-list, [data-kp-history-group]'
+        )
+    )
 
     stop_parsing = False
     latest_date_in_db = None
@@ -1476,12 +1521,46 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
 
     views_on_page = []
     item_blocks = driver.find_elements(By.CSS_SELECTOR, '.item-list .col-md-3')
-    for block in reversed(item_blocks):
+    blocks_with_dates = [(block, None) for block in item_blocks]
+    if not blocks_with_dates:
+        for section in driver.find_elements(
+            By.CSS_SELECTOR, '[data-kp-history-group]'
+        ):
+            try:
+                date_text = section.find_element(
+                    By.CSS_SELECTOR, '.kp-section-title'
+                ).text.strip()
+            except NoSuchElementException:
+                logging.warning('History group is missing its date heading.')
+                continue
+            blocks_with_dates.extend(
+                (block, date_text)
+                for block in section.find_elements(
+                    By.CSS_SELECTOR, '.kp-episode, .kp-item-row'
+                )
+            )
+
+    for block, history_date_text in reversed(blocks_with_dates):
         try:
-            date_header = block.find_element(By.XPATH, 'preceding-sibling::h4[1]')
-            year = date_header.find_element(By.TAG_NAME, 'small').text.strip()
-            match = re.match(r'(\d{1,2})\s+([А-Яа-яA-Za-z]+)', date_header.text)
-            formatted_date = f'{year}-{MONTHS_MAP[match.group(2)]}-{match.group(1).zfill(2)}'
+            if history_date_text:
+                match = re.match(
+                    r'(\d{1,2})\s+([А-Яа-яЁёA-Za-z]+)\s+(\d{4})',
+                    history_date_text,
+                )
+                if not match or not _month_number(match.group(2)):
+                    logging.warning('Could not parse KinoPub history date: %s', history_date_text)
+                    continue
+                day, month, year = match.groups()
+            else:
+                date_header = block.find_element(By.XPATH, 'preceding-sibling::h4[1]')
+                year = date_header.find_element(By.TAG_NAME, 'small').text.strip()
+                match = re.match(r'(\d{1,2})\s+([А-Яа-яA-Za-z]+)', date_header.text)
+                day, month = match.groups()
+            month_number = _month_number(month)
+            if not month_number:
+                logging.warning('Unknown KinoPub history month: %s', month)
+                continue
+            formatted_date = f'{year}-{month_number}-{day.zfill(2)}'
             current_date_from_site = datetime.strptime(formatted_date, DATE_FORMAT).date()
 
             if latest_date_in_db and current_date_from_site < latest_date_in_db:
@@ -1496,15 +1575,45 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
                     )
                 stop_parsing = True
 
-            link_element = block.find_element(By.CSS_SELECTOR, '.item-title a')
-            title = link_element.text.strip()
+            is_new_episode_card = bool(
+                block.find_elements(By.CSS_SELECTOR, '.kp-episode-meta')
+            )
+            is_new_movie_card = bool(
+                block.find_elements(By.CSS_SELECTOR, '.kp-item-row')
+                or block.find_elements(By.CSS_SELECTOR, '.kp-item-row-name')
+            )
+            if is_new_episode_card:
+                link_element = block.find_element(
+                    By.CSS_SELECTOR, '.kp-episode-meta[href*="/item/view/"]'
+                )
+                title_elements = block.find_elements(
+                    By.CSS_SELECTOR, '.kp-episode-title'
+                )
+                title = title_elements[0].text.strip() if title_elements else link_element.text.strip()
+                original_elements = block.find_elements(
+                    By.CSS_SELECTOR, '.kp-episode-sub'
+                )
+                original_title = (
+                    original_elements[0].text.strip() if original_elements else title
+                )
+            elif is_new_movie_card:
+                link_element = block.find_element(
+                    By.CSS_SELECTOR, '.kp-item-row-name a[href*="/item/view/"]'
+                )
+                title = link_element.text.strip()
+                original_title = title
+            else:
+                link_element = block.find_element(By.CSS_SELECTOR, '.item-title a')
+                title = link_element.text.strip()
+                try:
+                    original_title = block.find_element(
+                        By.CSS_SELECTOR, '.item-author a'
+                    ).text.strip()
+                except NoSuchElementException:
+                    original_title = title
+
             href = link_element.get_attribute('href')
             kinopub_id = int(re.search(r'/item/view/(\d+)', href).group(1))
-
-            try:
-                original_title = block.find_element(By.CSS_SELECTOR, '.item-author a').text.strip()
-            except NoSuchElementException:
-                original_title = title
             if not original_title:
                 original_title = title
 
@@ -1517,11 +1626,17 @@ def parse_and_save_history(driver, mode, latest_db_date=None, session_type='main
 
             if mode == 'episodes':
                 try:
+                    season_selector = (
+                        '.kp-episode-thumb'
+                        if is_new_episode_card
+                        else '.topleft-2x .label-success'
+                    )
                     season_episode_text = block.find_element(
-                        By.CSS_SELECTOR, '.topleft-2x .label-success'
+                        By.CSS_SELECTOR, season_selector
                     ).text.strip()
                     season_episode_match = re.search(
-                        r'Сезон (\d+)\. Эпизод (\d+)', season_episode_text
+                        r'(?:Сезон\s*)?(\d+)\s*[.e]\s*(?:Эпизод\s*)?(\d+)',
+                        season_episode_text,
                     )
                     if season_episode_match:
                         season = int(season_episode_match.group(1))
@@ -1965,10 +2080,35 @@ def process_show_durations(driver, show, session_type='main'):
 
 def parse_new_episodes_list(driver):
     """
-    Parses the /media/new-serial-episodes page table.
+    Parses the /media/new-serial-episodes episode list.
+
+    KinoPub previously rendered this list as a table. The current page uses
+    ``.kp-episode`` cards, so support both layouts while the site rollout is
+    in progress.
     Returns a list of dictionaries with basic episode info.
     """
     episodes = []
+
+    def append_episode(href, title, original_title):
+        if not href:
+            return
+        match = re.search(r'/item/view/(\d+)/s(\d+)e(\d+)', href, re.IGNORECASE)
+        if not match:
+            return
+        show_id, season_num, episode_num = map(int, match.groups())
+        title = (title or '').strip() or f'Show {show_id}'
+        original_title = (original_title or '').strip() or title
+        episodes.append(
+            {
+                'show_id': show_id,
+                'title': title,
+                'original_title': original_title,
+                'season': season_num,
+                'episode': episode_num,
+                'href': href,
+            }
+        )
+
     try:
         rows = driver.find_elements(By.CSS_SELECTOR, 'table.table tbody tr')
         logging.debug(f'Found {len(rows)} rows on new episodes page.')
@@ -1993,16 +2133,6 @@ def parse_new_episodes_list(driver):
                     except NoSuchElementException:
                         continue
 
-                # Parse ID, Season, Episode from URL: /item/view/104191/s2e3/Daddy-Issues
-                # Regex must handle: /item/view/<id>/s<S>e<E>...
-                url_match_result = re.search(r'/item/view/(\d+)/s(\d+)e(\d+)', href)
-                if not url_match_result:
-                    continue
-
-                show_id = int(url_match_result.group(1))
-                season_num = int(url_match_result.group(2))
-                episode_num = int(url_match_result.group(3))
-
                 # Parse Titles
                 try:
                     title_cell = row.find_element(By.CSS_SELECTOR, 'td:nth-child(2)')
@@ -2014,25 +2144,61 @@ def parse_new_episodes_list(driver):
                     if not original_title:
                         original_title = title
                 except NoSuchElementException:
-                    title = f'Show {show_id}'
+                    title = ''
                     original_title = title
 
-                episodes.append(
-                    {
-                        'show_id': show_id,
-                        'title': title,
-                        'original_title': original_title,
-                        'season': season_num,
-                        'episode': episode_num,
-                        'href': href,
-                    }
-                )
+                append_episode(href, title, original_title)
 
             except Exception as e:
                 logging.error(f'Error parsing row in new episodes list: {e}')
                 continue
 
+        if not episodes:
+            cards = driver.find_elements(By.CSS_SELECTOR, '.kp-episode')
+            logging.debug('Found %d episode cards on new episodes page.', len(cards))
+            for card in cards:
+                try:
+                    try:
+                        link = card.find_element(
+                            By.CSS_SELECTOR,
+                            '.kp-episode-meta[href*="/item/view/"]',
+                        )
+                    except NoSuchElementException:
+                        link = card.find_element(
+                            By.CSS_SELECTOR,
+                            'a[href*="/item/view/"]',
+                        )
+                    href = link.get_attribute('href')
+                    title_elements = card.find_elements(
+                        By.CSS_SELECTOR, '.kp-episode-title'
+                    )
+                    original_elements = card.find_elements(
+                        By.CSS_SELECTOR, '.kp-episode-sub'
+                    )
+                    title = (
+                        title_elements[0].text.strip()
+                        if title_elements
+                        else link.text.strip()
+                    )
+                    # The card's metadata link appends the episode label and
+                    # publication date after the show title.
+                    if not title_elements:
+                        title = re.split(
+                            r'\s+(?:Эпизод|Episode)\s+\d+\b',
+                            title,
+                            maxsplit=1,
+                            flags=re.IGNORECASE,
+                        )[0].strip()
+                    original_title = (
+                        original_elements[0].text.strip()
+                        if original_elements
+                        else title
+                    )
+                    append_episode(href, title, original_title)
+                except NoSuchElementException:
+                    continue
+
     except NoSuchElementException:
-        logging.warning('Table not found on new episodes page.')
+        logging.warning('Episode list not found on new episodes page.')
 
     return episodes

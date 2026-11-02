@@ -83,7 +83,10 @@ class Command(BaseCommand):
             unique_ids = set()
             try:
                 # Парсим ссылки из плиток каталога
-                elements = driver.find_elements(By.CSS_SELECTOR, '.item-title a')
+                elements = driver.find_elements(
+                    By.CSS_SELECTOR,
+                    '#items > a.kp-poster[href*="/item/view/"], .item-title a',
+                )
                 for el in elements:
                     href = el.get_attribute('href')
                     match = re.search(r'/item/view/(\d+)', href)

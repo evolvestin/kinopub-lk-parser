@@ -43,6 +43,7 @@ class Command(LoggableBaseCommand):
                 logging.info(f'Found {total_pages} pages of new episodes for {show_type}.')
 
                 stop_parsing = False
+                consecutive_empty_pages = 0
 
                 for page in range(1, total_pages + 1):
                     if stop_parsing:
@@ -58,7 +59,17 @@ class Command(LoggableBaseCommand):
                     items = parse_new_episodes_list(driver)
                     if not items:
                         logging.warning(f'No items found on page {page}.')
+                        consecutive_empty_pages += 1
+                        if consecutive_empty_pages >= 3:
+                            logging.error(
+                                'Stopping %s scan after %d consecutive empty pages; '
+                                'the page markup or response may have changed.',
+                                show_type,
+                                consecutive_empty_pages,
+                            )
+                            stop_parsing = True
                         continue
+                    consecutive_empty_pages = 0
 
                     new_items_on_page = 0
 

@@ -31,25 +31,41 @@ from shared.constants import SERIES_TYPES, SHOW_TYPE_MAPPING, SHOW_TYPES_TRACKED
 def parse_and_save_catalog_page(driver, mode):
     script = """
     const results = [];
-    const blocks = document.querySelectorAll("#items > div[class*='col-']");
+    const blocks = document.querySelectorAll(
+        "#items > div[class*='col-'], #items > a.kp-poster"
+    );
 
     blocks.forEach(block => {
-        const linkElement = block.querySelector('.item-poster a');
+        const isKpPoster = block.matches('.kp-poster');
+        const linkElement = isKpPoster ? block : block.querySelector('.item-poster a');
         if (!linkElement) return;
 
-        const titleElement = block.querySelector('.item-title a');
-        const originalTitleElement = block.querySelector('.item-author a');
+        const titleElement = block.querySelector(
+            isKpPoster ? '.kp-poster-title' : '.item-title a'
+        );
+        const originalTitleElement = block.querySelector(
+            isKpPoster ? '.kp-poster-sub' : '.item-author a'
+        );
         const kinopoiskLink = block.querySelector(".bottomcenter-2x a[href*='kinopoisk.ru']");
         const imdbLink = block.querySelector(".bottomcenter-2x a[href*='imdb.com']");
+        const ratingPills = Array.from(block.querySelectorAll('.kp-rating-pill'));
+        const kinopoiskRating = isKpPoster
+            ? ratingPills.find(pill => !/IMDb/i.test(pill.textContent))
+            : kinopoiskLink;
+        const imdbRating = isKpPoster
+            ? ratingPills.find(pill => /IMDb/i.test(pill.textContent))
+            : imdbLink;
 
         results.push({
             href: linkElement.getAttribute('href'),
             title: titleElement ? titleElement.textContent.trim() : '',
             original_title: originalTitleElement ? originalTitleElement.textContent.trim() : '',
             kinopoisk_url: kinopoiskLink ? kinopoiskLink.getAttribute('href') : null,
-            kinopoisk_rating: kinopoiskLink ? kinopoiskLink.textContent.trim() : null,
+            kinopoisk_rating: kinopoiskRating ? kinopoiskRating.textContent.trim() : null,
             imdb_url: imdbLink ? imdbLink.getAttribute('href') : null,
-            imdb_rating: imdbLink ? imdbLink.textContent.trim() : null
+            imdb_rating: imdbRating
+                ? imdbRating.textContent.trim().replace(/^IMDb\\s*/i, '')
+                : null
         });
     });
     return results;

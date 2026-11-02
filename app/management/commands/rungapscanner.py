@@ -120,7 +120,12 @@ class Command(LoggableBaseCommand):
                         content_title = f'ID {kinopub_id}'
 
                         try:
-                            title_el = driver.find_element(By.TAG_NAME, 'h3')
+                            title_elements = driver.find_elements(
+                                By.CSS_SELECTOR, 'h3, h1.iv-title-ru, h1'
+                            )
+                            if not title_elements:
+                                raise NoSuchElementException('Show title not found')
+                            title_el = title_elements[0]
                             title_text = driver.execute_script(
                                 'return Array.from(arguments[0].childNodes)'
                                 '.filter(n => n.nodeType === Node.TEXT_NODE)'
@@ -138,7 +143,10 @@ class Command(LoggableBaseCommand):
                             ):
                                 has_info_table = (
                                     len(
-                                        driver.find_elements(By.CSS_SELECTOR, 'table.table-striped')
+                                        driver.find_elements(
+                                            By.CSS_SELECTOR,
+                                            'table.table-striped, dl.kp-dl',
+                                        )
                                     )
                                     > 0
                                 )

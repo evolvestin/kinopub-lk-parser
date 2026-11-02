@@ -517,25 +517,53 @@ class KinopubHttpDriver:
 
     def execute_script(self, script, *args):
         script = str(script)
-        if '#items > div[class*=' in script and 'item-poster' in script:
+        if (
+            '#items' in script
+            and 'item-poster' in script
+            and ('kp-poster' in script or '#items > div[class*=' in script)
+        ):
             results = []
-            for block in self._soup.select('#items > div[class*="col-"]'):
-                link = block.select_one('.item-poster a')
+            for block in self._soup.select(
+                '#items > div[class*="col-"], #items > a.kp-poster'
+            ):
+                is_kp_poster = 'kp-poster' in block.get('class', [])
+                link = block if is_kp_poster else block.select_one('.item-poster a')
                 if not link:
                     continue
-                title = block.select_one('.item-title a')
-                original = block.select_one('.item-author a')
+                title = block.select_one(
+                    '.kp-poster-title' if is_kp_poster else '.item-title a'
+                )
+                original = block.select_one(
+                    '.kp-poster-sub' if is_kp_poster else '.item-author a'
+                )
                 kinopoisk = block.select_one('.bottomcenter-2x a[href*="kinopoisk.ru"]')
                 imdb = block.select_one('.bottomcenter-2x a[href*="imdb.com"]')
+                rating_pills = block.select('.kp-rating-pill')
+                kinopoisk_rating = kinopoisk
+                imdb_rating = imdb
+                if is_kp_poster:
+                    kinopoisk_rating = next(
+                        (pill for pill in rating_pills if 'IMDb' not in pill.get_text()),
+                        None,
+                    )
+                    imdb_rating = next(
+                        (pill for pill in rating_pills if 'IMDb' in pill.get_text()),
+                        None,
+                    )
+                imdb_rating_text = imdb_rating.get_text(strip=True) if imdb_rating else None
+                if is_kp_poster and imdb_rating_text:
+                    imdb_rating_text = re.sub(r'^IMDb\s*', '', imdb_rating_text, flags=re.I)
                 results.append(
                     {
                         'href': link.get('href'),
                         'title': title.get_text(strip=True) if title else '',
                         'original_title': original.get_text(strip=True) if original else '',
                         'kinopoisk_url': kinopoisk.get('href') if kinopoisk else None,
-                        'kinopoisk_rating': kinopoisk.get_text(strip=True) if kinopoisk else None,
+                        'kinopoisk_rating': (
+                            kinopoisk_rating.get_text(strip=True) if kinopoisk_rating else None
+                        ),
                         'imdb_url': imdb.get('href') if imdb else None,
-                        'imdb_rating': imdb.get_text(strip=True) if imdb else None,
+                        'imdb_rating': imdb_rating_text,
                     }
                 )
             return results
