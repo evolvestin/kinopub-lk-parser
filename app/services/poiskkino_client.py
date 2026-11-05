@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import date
+from typing import Callable
 
 import requests
 from django.conf import settings
@@ -94,7 +95,10 @@ class PoiskkinoClient:
         return PoiskkinoFetchResult(results, [], completed, request_count)
 
     def fetch_ratings_by_ids(
-        self, show_ids: list[int], max_requests: int = 200
+        self,
+        show_ids: list[int],
+        max_requests: int = 200,
+        on_batch: Callable[[list[dict], list[int]], None] | None = None,
     ) -> PoiskkinoFetchResult:
         if not self.api_key or not show_ids:
             return PoiskkinoFetchResult([], [], False, 0)
@@ -126,9 +130,13 @@ class PoiskkinoClient:
 
                 response.raise_for_status()
                 data = response.json()
-                results.extend(data.get('docs', []))
+                docs = data.get('docs', [])
+                if on_batch is None:
+                    results.extend(docs)
                 checked_values.extend(chunk)
                 requests_made += 1
+                if on_batch is not None:
+                    on_batch(docs, chunk)
             except requests.RequestException as e:
                 logging.error(f'Poiskkino fetch_ratings_by_ids error: {e}')
                 break

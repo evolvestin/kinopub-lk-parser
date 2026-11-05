@@ -135,16 +135,68 @@ class Command(LoggableBaseCommand):
             return
 
         client = PoiskkinoClient()
+        pending_items = []
+        pending_kp_ids = []
+        total_processed = 0
+
+        def flush_batch():
+            nonlocal total_processed
+            if not pending_items and not pending_kp_ids:
+                return
+
+            # Keep only one small API window in memory, even when the daily
+            # request budget selects tens of thousands of shows.
+            unique_items = {
+                item['id']: item
+                for item in pending_items
+                if isinstance(item, dict) and item.get('id')
+            }
+            checked_show_ids = {
+                kp_mapping[kp_id] for kp_id in pending_kp_ids if kp_id in kp_mapping
+            }
+
+            def persist_batch():
+                with transaction.atomic():
+                    if checked_show_ids:
+                        Show.objects.filter(id__in=checked_show_ids).update(
+                            kinopoisk_rating_available=False,
+                            kinopoisk_rating=None,
+                            kinopoisk_votes=None,
+                        )
+                    if unique_items:
+                        self._process_batch(list(unique_items.values()), kp_mapping, now)
+                        transaction.on_commit(invalidate_duplicate_photo_urls_cache)
+                    if checked_show_ids:
+                        Show.objects.filter(id__in=checked_show_ids).update(
+                            poiskkino_updated_at=now
+                        )
+
+            self._with_deadlock_retry(persist_batch, 'saving a Poiskkino batch')
+            total_processed += len(unique_items)
+            logging.info(
+                'Saved batch; synchronized %s unique Poiskkino records so far.',
+                total_processed,
+            )
+            pending_items.clear()
+            pending_kp_ids.clear()
+
+        def receive_batch(items, checked_kp_ids):
+            pending_items.extend(items)
+            pending_kp_ids.extend(checked_kp_ids)
+            if len(pending_kp_ids) >= 1000:
+                flush_batch()
+
         result = client.fetch_ratings_by_ids(
             kp_ids,
             max_requests=FREE_DAILY_REQUEST_LIMIT,
+            on_batch=receive_batch,
         )
-
-        checked_show_ids = {
-            kp_mapping[kp_id]
-            for kp_id in result.checked_values
-            if kp_id in kp_mapping
-        }
+        # Preserve compatibility with clients that return a collected result
+        # instead of invoking the streaming callback.
+        if result.data and not pending_items and not pending_kp_ids:
+            pending_items.extend(result.data)
+            pending_kp_ids.extend(result.checked_values)
+        flush_batch()
 
         logging.info(
             'Poiskkino checked %s/%s IDs in %s requests; completed=%s.',
@@ -154,62 +206,9 @@ class Command(LoggableBaseCommand):
             result.completed,
         )
 
-        if not result.data:
-            if checked_show_ids:
-                self._with_deadlock_retry(
-                    lambda: Show.objects.filter(id__in=checked_show_ids).update(
-                        poiskkino_updated_at=now,
-                        kinopoisk_rating_available=False,
-                        kinopoisk_rating=None,
-                        kinopoisk_votes=None,
-                    ),
-                    'clearing empty Poiskkino ratings',
-                )
+        if not result.checked_values:
             logging.info('Poiskkino returned no records for the selected IDs.')
             return
-
-        unique_data = {
-            item['id']: item for item in result.data if isinstance(item, dict) and item.get('id')
-        }.values()
-        data_list = list(unique_data)
-        logging.info('Saving %s unique Poiskkino records.', len(data_list))
-
-        # Start from the authoritative negative state. Returned items with a
-        # rating set the flag back to True in _process_batch below.
-        if checked_show_ids:
-            self._with_deadlock_retry(
-                lambda: Show.objects.filter(id__in=checked_show_ids).update(
-                    kinopoisk_rating_available=False,
-                    kinopoisk_rating=None,
-                    kinopoisk_votes=None,
-                ),
-                'clearing stale Poiskkino ratings',
-            )
-
-        total_processed = 0
-        for i in range(0, len(data_list), 1000):
-            batch = data_list[i : i + 1000]
-
-            def persist_batch(batch=batch):
-                with transaction.atomic():
-                    result = self._process_batch(batch, kp_mapping, now)
-                    transaction.on_commit(invalidate_duplicate_photo_urls_cache)
-                    return result
-
-            self._with_deadlock_retry(
-                persist_batch,
-                'saving a Poiskkino batch',
-            )
-            total_processed += len(batch)
-            logging.info('Saved batch %s/%s.', total_processed, len(data_list))
-
-        if checked_show_ids:
-            self._with_deadlock_retry(
-                lambda: Show.objects.filter(id__in=checked_show_ids).update(
-                    poiskkino_updated_at=now
-                ),
-                'marking Poiskkino records as refreshed',
-            )
         logging.info('Successfully synchronized %s Poiskkino records.', total_processed)
 
     def _process_batch(self, batch_data, kp_mapping, now):
@@ -260,6 +259,12 @@ class Command(LoggableBaseCommand):
             for person_data in self._object_list(item, 'persons')
             if (person_id := self._coerce_person_id(person_data.get('id'))) is not None
         }
+        person_photos = {
+            photo
+            for item in data_map.values()
+            for person_data in self._object_list(item, 'persons')
+            if (photo := self._usable_person_photo(person_data.get('photo'))) is not None
+        }
 
         existing_genres = {
             genre.name: genre for genre in Genre.objects.filter(name__in=all_genre_names)
@@ -291,8 +296,8 @@ class Command(LoggableBaseCommand):
         # create another root Person for the same person.
         persons_by_photo = {}
         existing_by_photo = Person.objects.filter(
-            master_person__isnull=True, kp_photo_url__isnull=False
-        ).exclude(kp_photo_url='').order_by('id')
+            master_person__isnull=True, kp_photo_url__in=person_photos
+        ).order_by('id')
         for person in existing_by_photo:
             persons_by_photo.setdefault(person.kp_photo_url, person)
 
