@@ -44,6 +44,8 @@ if WEBAPP_PUBLIC_URL := os.getenv('WEBAPP_PUBLIC_URL'):
     if clean_url not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(clean_url)
 
+PUBLIC_SITE_URL = os.getenv('PUBLIC_SITE_URL', os.getenv('WEBAPP_PUBLIC_URL', '')).strip().rstrip('/')
+
 TIME_ZONE = 'UTC'
 USE_TZ = True
 USE_I18N = True
@@ -68,6 +70,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.middleware.gzip.GZipMiddleware',
     'app.middleware.NoIndexMiddleware',
+    'app.middleware.PublicCanonicalHostMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

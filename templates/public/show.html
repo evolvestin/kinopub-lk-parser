@@ -1,7 +1,8 @@
 {% extends 'public/base.html' %}
 {% block title %}{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %} — KinoPub Observer{% endblock %}
-{% block description %}{% if show.plot %}{{ show.plot|truncatechars:155 }}{% else %}{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %}: сведения о фильме или сериале. Сезоны, эпизоды и участники съёмочной группы.{% endif %}{% endblock %}
-{% block social_meta %}<meta property="og:title" content="{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %}"><meta property="og:description" content="{% if show.plot %}{{ show.plot|truncatechars:155 }}{% else %}Карточка фильма или сериала «{{ show.title }}»{% endif %}"><meta property="og:type" content="{% if show.type == 'Movie' %}video.movie{% else %}video.tv_show{% endif %}">{% if show.public_poster %}<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ show.public_poster }}">{% endif %}{% endblock %}
+{% block description %}{% if show.plot %}{{ show.plot|truncatechars:155 }}{% else %}{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %}{% if show.original_title and show.original_title != show.title %} — {{ show.original_title }}{% endif %}. {% if show.public_type_label %}{{ show.public_type_label }}. {% endif %}Откройте карточку в KinoPub Observer и добавьте в избранное.{% endif %}{% endblock %}
+{% block og_type %}{% if show.public_is_series %}video.tv_show{% elif show.type == 'Movie' or show.type == 'Documentary Movie' or show.type == '3D Movie' %}video.movie{% else %}video.other{% endif %}{% endblock %}
+{% block social_meta %}<meta property="og:title" content="{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %}"><meta property="og:description" content="{% if show.plot %}{{ show.plot|truncatechars:155 }}{% else %}Карточка «{{ show.title }}» в каталоге KinoPub Observer{% endif %}">{% if show.public_poster %}<meta property="og:image" content="{{ show.public_poster_absolute }}">{% endif %}{% endblock %}
 {% block structured_data %}<script type="application/ld+json">{{ structured_json|safe }}</script>{% endblock %}
 {% block content %}
 <section class="wrap section show-page">
@@ -29,6 +30,7 @@
           {% if show.public_internal_rating != None %}<span class="rating-chip"><b>LR</b> {{ show.public_internal_rating|floatformat:1 }}</span>{% endif %}
         </div>
         {% if show.plot %}<p class="show-detail-plot">{{ show.plot }}</p>{% endif %}
+        {% if show.imdb_id %}<p class="show-detail-hint">Идентификатор IMDb: {{ show.imdb_id }} · <a href="https://www.imdb.com/title/{{ show.imdb_id }}/" rel="noopener noreferrer">Карточка на IMDb</a></p>{% endif %}
         {% if show.public_genres %}<div class="show-genres" aria-label="Жанры">{% for genre in show.public_genres %}<span>{{ genre }}</span>{% endfor %}</div>{% endif %}
         <a class="button show-detail-cta" href="{{ bot_url }}?start=site_show_{{ show.id }}">Открыть карточку в Telegram {% include 'public/arrow.html' with external=True %}</a>
         <p class="show-detail-hint">В боте можно добавить тайтл в избранное{% if show.public_is_series %} и следить за новыми сериями{% endif %}.</p>

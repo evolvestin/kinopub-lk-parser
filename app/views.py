@@ -181,8 +181,8 @@ def robots_txt(request):
     lines = [
         'User-agent: *',
         'Disallow: /admin/',
+        'Allow: /api/image_proxy/',
         'Disallow: /api/',
-        'Disallow: /metrics/',
         'Disallow: /webapp/',
         'Disallow: /webapp-preview/',
         'Disallow: /webapp-preview-app/',
@@ -3523,11 +3523,14 @@ def proxy_image_view(request):
     parsed = urllib.parse.urlparse(image_url)
     allowed_domains = ALLOWED_PROXY_DOMAINS
     if settings.POSTER_BASE_URL:
-        poster_netloc = urllib.parse.urlparse(settings.POSTER_BASE_URL).netloc
-        if poster_netloc and poster_netloc not in allowed_domains:
-            allowed_domains = allowed_domains + (poster_netloc,)
+        poster_hostname = urllib.parse.urlparse(settings.POSTER_BASE_URL).hostname
+        if poster_hostname and poster_hostname not in allowed_domains:
+            allowed_domains = allowed_domains + (poster_hostname,)
 
-    if not parsed.netloc or not any(domain in parsed.netloc for domain in allowed_domains):
+    hostname = parsed.hostname or ''
+    if parsed.scheme not in ('http', 'https') or parsed.username or parsed.password or not any(
+        hostname == domain or hostname.endswith('.' + domain) for domain in allowed_domains
+    ):
         return HttpResponse(status=204)
 
     cache_key = f'img_proxy:{hashlib.md5(image_url.encode()).hexdigest()}'

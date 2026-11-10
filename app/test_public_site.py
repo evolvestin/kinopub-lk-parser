@@ -18,7 +18,7 @@ class PublicSiteTests(TestCase):
     def setUp(self):
         cache.delete(f'public_sitemap_ranges:{settings.DATABASES["default"]["NAME"]}')
         cache.delete(f'public_catalog_type_counts:{settings.DATABASES["default"]["NAME"]}')
-        cache.delete('public_usage_counts_v3')
+        cache.delete('public_usage_counts_v4')
         self.show = Show.objects.create(title='Тестовый сериал', original_title='Test Series', year=2024)
 
     def test_catalog_and_show_link_to_bot(self):
@@ -27,6 +27,39 @@ class PublicSiteTests(TestCase):
         self.assertContains(response, reverse('public_show', args=[self.show.pk]))
         response = self.client.get(reverse('public_show', args=[self.show.pk]))
         self.assertContains(response, f'https://t.me/kinopub_observer_bot?start=site_show_{self.show.pk}')
+
+    @override_settings(PUBLIC_SITE_URL='https://kinopub.webredirect.org')
+    def test_public_ip_redirects_to_canonical_domain_but_services_do_not(self):
+        response = self.client.get('/catalog/', {'page': 2}, HTTP_HOST='157.173.101.93:8012')
+        self.assertEqual(response.status_code, 301)
+        self.assertEqual(response['Location'], 'https://kinopub.webredirect.org/catalog/?page=2')
+        self.assertNotIn('noindex', response.get('X-Robots-Tag', ''))
+        self.assertEqual(self.client.get('/metrics/', HTTP_HOST='157.173.101.93:8012').status_code, 200)
+        self.assertEqual(self.client.get('/', HTTP_HOST='localhost:8022').status_code, 200)
+
+    def test_missing_metadata_does_not_claim_seasons_or_cast(self):
+        movie = Show.objects.create(title='Новый фильм', type='Movie', imdb_id='tt13918446')
+        response = self.client.get(reverse('public_show', args=[movie.pk]))
+        self.assertContains(response, 'https://www.imdb.com/title/tt13918446/')
+        self.assertNotContains(response, 'Сезоны, эпизоды и участники съёмочной группы')
+        self.assertContains(response, 'property="og:type"', count=1)
+        concert = Show.objects.create(title='Концерт', type='Concert')
+        self.assertContains(self.client.get(reverse('public_show', args=[concert.pk])), '"@type": "CreativeWork"')
+
+    @patch('app.views._get_image_proxy_session')
+    @patch('app.views.cache')
+    def test_public_poster_proxy_allows_indexing_and_rejects_spoofed_hosts(self, proxy_cache, session_factory):
+        proxy_cache.get.return_value = None
+        result = session_factory.return_value.get.return_value
+        result.status_code = 200
+        result.content = b'image data'
+        result.headers = {'Content-Type': 'image/jpeg'}
+        response = self.client.get('/api/image_proxy/', {'url': 'https://image.tmdb.org/t/p/w200/test.jpg'})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('noindex', response.get('X-Robots-Tag', ''))
+        response = self.client.get('/api/image_proxy/', {'url': 'https://image.tmdb.org.evil.example/poster.jpg'})
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(session_factory.return_value.get.call_count, 1)
 
     def test_catalog_and_detail_show_webapp_local_rating(self):
         user = ViewUser.objects.create(telegram_id=12345)
@@ -109,17 +142,20 @@ class PublicSiteTests(TestCase):
         response = self.client.get('/about/')
         self.assertContains(response, 'kino.pub')
         self.assertContains(response, 'kino.watch')
+        self.assertNotIn('noindex', response.get('X-Robots-Tag', ''))
         self.assertContains(self.client.get('/sitemap-shows-0.xml'), '/about/')
 
     def test_robots_and_sitemap(self):
         response = self.client.get('/robots.txt')
         self.assertNotContains(response, 'Disallow: /\n')
-        self.assertContains(response, 'Disallow: /metrics/')
+        self.assertNotContains(response, 'Disallow: /metrics/')
         self.assertContains(self.client.get('/sitemap.xml'), '/sitemap-shows-1.xml')
         self.assertContains(self.client.get('/sitemap-shows-1.xml'), reverse('public_show', args=[self.show.pk]))
         parser = RobotFileParser()
         parser.parse(response.content.decode().splitlines())
         self.assertTrue(parser.can_fetch('OAI-SearchBot', '/guide/notifications/'))
+        self.assertTrue(parser.can_fetch('OAI-SearchBot', '/api/image_proxy/?url=test'))
+        self.assertTrue(parser.can_fetch('Googlebot', '/metrics/'))
         self.assertFalse(parser.can_fetch('OAI-SearchBot', '/api/internal/articles/example/'))
 
     def test_public_pages_allow_indexing_but_internal_pages_do_not(self):
@@ -127,7 +163,7 @@ class PublicSiteTests(TestCase):
             slug='indexed-guide', title='Индексируемая статья', description='Описание',
             body='Короткий текст', published_at=timezone.now(),
         )
-        for path in ['/', '/catalog/', '/catalog/1/', '/guide/', f'/guide/{article.slug}/']:
+        for path in ['/', '/catalog/', '/catalog/1/', '/guide/', '/about/', '/offer/', '/privacy/', f'/guide/{article.slug}/']:
             if path == '/catalog/1/':
                 path = reverse('public_show', args=[self.show.pk])
             response = self.client.get(path)
@@ -149,7 +185,7 @@ class PublicSiteTests(TestCase):
         self.assertRedirects(response, '/guide/new-episode-notifications/', status_code=301, fetch_redirect_response=False)
 
     @patch('app.public_site.cache.get_or_set')
-    def test_home_shows_rounded_catalog_and_adjusted_usage_counts(self, cached_counts):
+    def test_home_shows_rounded_catalog_and_actual_usage_counts(self, cached_counts):
         cached_counts.side_effect = lambda key, fallback, timeout: ({'total': 1514860, 'movies': 1316939, 'series': 186263} if key.startswith('public_catalog') else fallback())
         user = ViewUser.objects.create(telegram_id=12345)
         ViewUser.objects.create(telegram_id=None)
@@ -160,10 +196,10 @@ class PublicSiteTests(TestCase):
         response = self.client.get('/')
         self.assertContains(response, '1,5')
         self.assertContains(response, 'пользователей')
-        self.assertEqual(response.context['users_count'], 431)
-        self.assertEqual(response.context['recorded_views'], 8001)
-        self.assertEqual(response.context['favorites_count'], 1946)
-        self.assertEqual(response.context['ratings_count'], 5435)
+        self.assertEqual(response.context['users_count'], 1)
+        self.assertEqual(response.context['recorded_views'], 1)
+        self.assertEqual(response.context['favorites_count'], 1)
+        self.assertEqual(response.context['ratings_count'], 1)
         self.assertNotContains(response, 'фильмов в каталоге')
         self.assertContains(response, 'data-decimals="1"')
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import BigIntegerField, Case, Count, ExpressionWrapper, F, IntegerField, Q, Value, When
+from django.db.models import BigIntegerField, Case, ExpressionWrapper, F, IntegerField, Q, Value, When
 from django.http import FileResponse, Http404, HttpResponse, HttpResponsePermanentRedirect, JsonResponse
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, render
@@ -122,11 +122,7 @@ def _catalog_stats():
     db_name = settings.DATABASES['default']['NAME']
     return cache.get_or_set(
         f'public_catalog_type_counts:{db_name}',
-        lambda: Show.objects.aggregate(
-            total=Count('id'),
-            movies=Count('id', filter=Q(type='Movie')),
-            series=Count('id', filter=Q(type='Series')),
-        ),
+        lambda: {'total': Show.objects.count()},
         3600,
     )
 
@@ -163,12 +159,12 @@ def home(request):
     rounded_total = (total // 100000) / 10
     def usage_counts():
         return {
-            'users': 430 + ViewUser.objects.filter(telegram_id__isnull=False).count(),
-            'views': 8000 + ViewHistory.objects.filter(is_checked=True).count(),
-            'favorites': 1945 + WishlistItem.objects.filter(is_active=True, folder__is_deleted=False).count(),
-            'ratings': 5434 + UserRating.objects.count(),
+            'users': ViewUser.objects.filter(telegram_id__isnull=False).count(),
+            'views': ViewHistory.objects.filter(is_checked=True).count(),
+            'favorites': WishlistItem.objects.filter(is_active=True, folder__is_deleted=False).count(),
+            'ratings': UserRating.objects.count(),
         }
-    usage = cache.get_or_set('public_usage_counts_v3', usage_counts, 300)
+    usage = cache.get_or_set('public_usage_counts_v4', usage_counts, 300)
     return render(request, 'public/home.html', _context(request, catalog_millions=f'{rounded_total:.1f}'.replace('.', ',') if total >= 1000000 else None, users_count=usage['users'], recorded_views=usage['views'], favorites_count=usage['favorites'], ratings_count=usage['ratings']))
 
 
@@ -241,6 +237,7 @@ def show_detail(request, show_id):
         pk=show_id,
     )
     show.public_poster = build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'big')
+    show.public_poster_absolute = request.build_absolute_uri(show.public_poster) if show.public_poster else None
     show.public_internal_rating, _ = show.get_internal_rating_data()
     show.public_type_label = SHOW_TYPE_DISPLAY_RU.get(show.type, show.type)
     show.public_status_label = SHOW_STATUS_DISPLAY_RU.get(show.status, show.status) if show.type in SERIES_TYPES else ''
@@ -308,7 +305,7 @@ def show_detail(request, show_id):
 
     structured = {
         '@context': 'https://schema.org',
-        '@type': 'Movie' if show.type == 'Movie' else 'TVSeries',
+        '@type': 'TVSeries' if show.public_is_series else 'Movie' if show.type in ('Movie', 'Documentary Movie', '3D Movie') else 'CreativeWork',
         'name': show.title,
         'alternateName': show.original_title if show.original_title != show.title else None,
         'description': show.plot[:500] if show.plot else None,
@@ -454,7 +451,7 @@ def sitemap(request):
 def sitemap_shows(request, page):
     dates = {}
     if page == 0:
-        urls = [reverse('index'), reverse('public_catalog'), reverse('public_guides'), reverse('public_about')]
+        urls = [reverse('index'), reverse('public_catalog'), reverse('public_guides'), reverse('public_about'), reverse('public_offer'), reverse('public_privacy')]
         for slug, updated_at in PublicArticle.objects.filter(published_at__lte=timezone.now()).values_list('slug', 'updated_at'):
             url = reverse('public_guide', args=[slug])
             urls.append(url)

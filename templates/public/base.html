@@ -2,7 +2,7 @@
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}KinoPub Observer — сериалы, фильмы и уведомления{% endblock %}</title>
 <meta name="description" content="{% block description %}Следите за сериалами, сохраняйте фильмы и получайте уведомления о новых сериях в Telegram.{% endblock %}">
-<meta property="og:type" content="website"><meta property="og:site_name" content="KinoPub Observer"><meta name="theme-color" content="#14181f">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}"><meta property="og:site_name" content="KinoPub Observer"><meta name="theme-color" content="#14181f">
 {% block social_meta %}{% endblock %}
 {% block structured_data %}{% endblock %}
 {% if query %}<meta name="robots" content="noindex, follow">{% endif %}<link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}{% if page.number > 1 and not query %}?page={{ page.number }}{% endif %}">
