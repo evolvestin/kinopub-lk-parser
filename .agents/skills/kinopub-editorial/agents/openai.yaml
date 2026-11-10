@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kinopub Editorial"
+  short_description: "Write screenshot-rich GEO guides"
+  default_prompt: "Create a useful KinoPub Observer guide with a real webapp screenshot, then publish it through the protected article API."

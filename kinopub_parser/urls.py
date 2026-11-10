@@ -28,6 +28,8 @@ urlpatterns = proxy_patterns + [
     path('sitemap.xml', public_site.sitemap, name='public_sitemap'),
     path('sitemap-shows-<int:page>.xml', public_site.sitemap_shows, name='public_sitemap_shows'),
     path('api/internal/articles/<slug:slug>/', public_site.article_api),
+    path('api/internal/articles/assets/<slug:slug>/', public_site.article_asset_api),
+    re_path(r'^articles/assets/(?P<slug>[a-z0-9-]+)/(?P<filename>[a-f0-9-]+\.(?:png|jpg|webp))$', public_site.article_asset),
     path('api/public/visit/', public_site.visit_event),
     path('metrics/', views.metrics, name='metrics'),
     path('admin/', admin_site.urls),

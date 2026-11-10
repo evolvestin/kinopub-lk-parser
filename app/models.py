@@ -868,6 +868,7 @@ class PublicArticle(BaseModel):
     title = models.CharField(max_length=255)
     description = models.CharField(max_length=300)
     body = models.TextField()
+    content_blocks = JSONField(default=list, blank=True)
     published_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
 

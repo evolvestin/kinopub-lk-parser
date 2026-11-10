@@ -3,12 +3,14 @@ import os
 import json
 import secrets
 import uuid
+import mimetypes
 from xml.sax.saxutils import escape
+from pathlib import Path
 
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import BigIntegerField, Case, Count, ExpressionWrapper, F, IntegerField, Q, Value, When
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, HttpResponsePermanentRedirect, JsonResponse
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -31,7 +33,7 @@ from shared.constants import (
 )
 
 
-GUIDES = {
+LEGACY_GUIDES = {
     'favorites': {
         'title': 'Как добавить фильм или сериал в избранное',
         'description': 'Сохраняйте фильмы и сериалы в избранное, чтобы вернуться к ним позже.',
@@ -135,7 +137,8 @@ def _context(request, **extra):
     return {
         'bot_url': bot_url,
         'site_bot_url': f'{bot_url}?start=site' if bot_url else '',
-        'guides': GUIDES,
+        'guides': {},
+        'guide_previews': articles[:3],
         'articles': articles,
         **extra,
     }
@@ -286,20 +289,81 @@ def show_detail(request, show_id):
 
 
 def guide_index(request):
-    return render(request, 'public/guides.html', _context(request))
+    articles = PublicArticle.objects.filter(published_at__lte=timezone.now()).order_by('-published_at')
+    return render(request, 'public/guides.html', _context(request, articles=articles))
 
 
 def guide_detail(request, slug):
-    guide = GUIDES.get(slug)
-    if not guide:
-        article = get_object_or_404(PublicArticle, slug=slug, published_at__lte=timezone.now())
-        structured = {'@context': 'https://schema.org', '@type': 'Article', 'headline': article.title, 'description': article.description, 'datePublished': article.published_at.isoformat(), 'mainEntityOfPage': request.build_absolute_uri(request.path)}
-        if article.updated_at >= article.published_at:
-            structured['dateModified'] = article.updated_at.isoformat()
-        structured_json = json.dumps(structured, ensure_ascii=True).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
-        return render(request, 'public/article.html', _context(request, article=article, structured_json=structured_json))
-    related = [(key, item) for key, item in GUIDES.items() if key != slug][:3]
-    return render(request, 'public/guide.html', _context(request, guide=guide, sections=GUIDE_DETAILS.get(slug, []), related=related))
+    legacy_slugs = {
+        'favorites': 'add-show-to-favorites',
+        'folders': 'organize-favorite-folders',
+        'notifications': 'new-episode-notifications',
+        'statistics': 'viewing-statistics',
+        'search': 'find-movie-in-catalog',
+        'roulette': 'choose-from-favorites',
+    }
+    if slug in legacy_slugs:
+        return HttpResponsePermanentRedirect(reverse('public_guide', args=[legacy_slugs[slug]]))
+    article = get_object_or_404(PublicArticle, slug=slug, published_at__lte=timezone.now())
+    structured = {
+        '@context': 'https://schema.org', '@type': 'Article',
+        'headline': article.title, 'description': article.description,
+        'datePublished': article.published_at.isoformat(),
+        'dateModified': article.updated_at.isoformat(),
+        'inLanguage': 'ru',
+        'mainEntityOfPage': request.build_absolute_uri(request.path),
+        'author': {'@type': 'Organization', 'name': 'KinoPub Observer'},
+        'publisher': {'@type': 'Organization', 'name': 'KinoPub Observer'},
+    }
+    images = [block.get('src') for block in article.content_blocks if block.get('type') == 'image' and block.get('src', '').startswith('/')]
+    article_images = [request.build_absolute_uri(src) for src in images[:3]]
+    if images:
+        structured['image'] = article_images
+    structured_json = json.dumps(structured, ensure_ascii=True).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+    related = PublicArticle.objects.filter(published_at__lte=timezone.now()).exclude(pk=article.pk).order_by('-published_at')[:3]
+    return render(request, 'public/article.html', _context(request, article=article, related=related, structured_json=structured_json, article_images=article_images))
+
+
+def _article_token_valid(request):
+    token = getattr(settings, 'PUBLIC_ARTICLE_API_TOKEN', '')
+    supplied = request.headers.get('Authorization', '')
+    return bool(token and secrets.compare_digest(supplied, 'Bearer ' + token))
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def article_asset_api(request, slug):
+    if not _article_token_valid(request):
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+    uploaded = request.FILES.get('image')
+    if not uploaded or uploaded.size > 12 * 1024 * 1024:
+        return JsonResponse({'error': 'Image required; maximum size is 12 MB'}, status=400)
+    signature = uploaded.read(12)
+    uploaded.seek(0)
+    image_types = ((b'\x89PNG\r\n\x1a\n', 'png', 'image/png'), (b'\xff\xd8\xff', 'jpg', 'image/jpeg'))
+    image = next(((ext, mime) for magic, ext, mime in image_types if signature.startswith(magic)), None)
+    if not image and signature[:4] == b'RIFF' and signature[8:12] == b'WEBP':
+        image = ('webp', 'image/webp')
+    if not image:
+        return JsonResponse({'error': 'Only PNG, JPEG and WebP images are supported'}, status=400)
+    filename = f'{uuid.uuid4().hex}.{image[0]}'
+    directory = Path(settings.PUBLIC_ARTICLE_MEDIA_ROOT) / slug
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / filename
+    with target.open('wb') as output:
+        for chunk in uploaded.chunks():
+            output.write(chunk)
+    return JsonResponse({'src': f'/articles/assets/{slug}/{filename}', 'content_type': image[1]}, status=201)
+
+
+def article_asset(request, slug, filename):
+    path = Path(settings.PUBLIC_ARTICLE_MEDIA_ROOT) / slug / filename
+    if not path.is_file():
+        raise Http404
+    response = FileResponse(path.open('rb'), content_type=mimetypes.guess_type(path.name)[0] or 'application/octet-stream')
+    response['Cache-Control'] = 'public, max-age=31536000, immutable'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 
 def sitemap(request):
@@ -320,7 +384,6 @@ def sitemap_shows(request, page):
     dates = {}
     if page == 0:
         urls = [reverse('index'), reverse('public_catalog'), reverse('public_guides')]
-        urls += [reverse('public_guide', args=[slug]) for slug in GUIDES]
         for slug, updated_at in PublicArticle.objects.filter(published_at__lte=timezone.now()).values_list('slug', 'updated_at'):
             url = reverse('public_guide', args=[slug])
             urls.append(url)
@@ -337,29 +400,41 @@ def sitemap_shows(request, page):
 @csrf_exempt
 @require_http_methods(['GET', 'PUT'])
 def article_api(request, slug):
-    token = getattr(settings, 'PUBLIC_ARTICLE_API_TOKEN', '')
-    supplied = request.headers.get('Authorization', '')
-    if not token or not secrets.compare_digest(supplied, 'Bearer ' + token):
+    if not _article_token_valid(request):
         return JsonResponse({'error': 'Unauthorized'}, status=401)
-    if slug in GUIDES:
-        return JsonResponse({'error': 'Reserved slug'}, status=400)
     if request.method == 'GET':
         article = get_object_or_404(PublicArticle, slug=slug)
-        return JsonResponse({'slug': article.slug, 'title': article.title, 'description': article.description, 'body': article.body, 'published_at': article.published_at, 'updated_at': article.updated_at})
+        return JsonResponse({'slug': article.slug, 'title': article.title, 'description': article.description, 'body': article.body, 'content_blocks': article.content_blocks, 'published_at': article.published_at, 'updated_at': article.updated_at})
     try:
-        if len(request.body) > 200000:
+        if len(request.body) > 2_000_000:
             raise ValueError('Request too large')
         data = json.loads(request.body)
-        title, description, body = (data[k].strip() for k in ('title', 'description', 'body'))
-        if not title or len(title) > 255 or not description or len(description) > 300 or not body:
+        title, description = (data[k].strip() for k in ('title', 'description'))
+        blocks = data.get('content_blocks', [])
+        body = data.get('body', '')
+        if not title or len(title) > 255 or not description or len(description) > 300 or not isinstance(blocks, list) or len(blocks) > 100 or (not body and not blocks):
             raise ValueError('Invalid article fields')
+        valid_types = {'lead', 'paragraph', 'heading', 'image', 'steps', 'list', 'callout', 'quote'}
+        for block in blocks:
+            if not isinstance(block, dict) or block.get('type') not in valid_types:
+                raise ValueError('Invalid content block')
+            if block['type'] == 'image':
+                src, alt, caption = block.get('src'), block.get('alt'), block.get('caption')
+                if not isinstance(src, str) or not src.startswith('/articles/assets/') or '..' in src:
+                    raise ValueError('Images must use uploaded article assets')
+                if not isinstance(alt, str) or not alt.strip() or len(alt) > 300 or not isinstance(caption, str) or not caption.strip() or len(caption) > 500:
+                    raise ValueError('Images require a concise alt text and caption')
+            if block['type'] in {'steps', 'list'} and (not isinstance(block.get('items'), list) or not block['items'] or len(block['items']) > 30 or not all(isinstance(item, str) and item.strip() and len(item) <= 1000 for item in block['items'])):
+                raise ValueError('List blocks require text items')
+            if block['type'] in {'lead', 'paragraph', 'heading', 'callout', 'quote'} and (not isinstance(block.get('text'), str) or not block['text'].strip() or len(block['text']) > 10000):
+                raise ValueError('Text block requires non-empty text under 10000 characters')
         published = data.get('published_at')
         published_at = parse_datetime(published) if published else None
         if published and (published_at is None or timezone.is_naive(published_at)):
             raise ValueError('published_at requires an ISO 8601 timestamp with timezone')
     except (KeyError, TypeError, ValueError, AttributeError, json.JSONDecodeError) as exc:
         return JsonResponse({'error': str(exc)}, status=400)
-    article, created = PublicArticle.objects.update_or_create(slug=slug, defaults={'title': title, 'description': description, 'body': body, 'published_at': published_at})
+    article, created = PublicArticle.objects.update_or_create(slug=slug, defaults={'title': title, 'description': description, 'body': body, 'content_blocks': blocks, 'published_at': published_at})
     return JsonResponse({'slug': article.slug, 'published_at': article.published_at, 'updated_at': article.updated_at}, status=201 if created else 200)
 
 

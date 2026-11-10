@@ -1,1 +1,29 @@
-{% extends 'public/base.html' %}{% block title %}{{ article.title }} — KinoPub Observer{% endblock %}{% block description %}{{ article.description }}{% endblock %}{% block structured_data %}<script type="application/ld+json">{{ structured_json|safe }}</script>{% endblock %}{% block content %}<article class="wrap article section"><nav aria-label="Навигация"><a class="back" href="/guide/">Все инструкции</a></nav><div class="eyebrow">ИНСТРУКЦИЯ · <time datetime="{{ article.published_at|date:'c' }}">{{ article.published_at|date:'d.m.Y' }}</time></div><h1 class="page-title">{{ article.title }}</h1><p class="lead">{{ article.description }}</p><div class="detail-text">{{ article.body|linebreaks }}</div><div class="article-cta"><h2>Открыть в Telegram</h2><a class="button" href="{{ site_bot_url }}">Открыть бота {% include 'public/arrow.html' %}</a></div></article>{% endblock %}
+{% extends 'public/base.html' %}{% block title %}{{ article.title }} — KinoPub Observer{% endblock %}{% block description %}{{ article.description }}{% endblock %}{% block social_meta %}<meta property="og:title" content="{{ article.title }}"><meta property="og:description" content="{{ article.description }}"><meta property="og:type" content="article"><meta name="twitter:card" content="{% if article_images %}summary_large_image{% else %}summary{% endif %}">{% if article_images %}<meta property="og:image" content="{{ article_images.0 }}">{% endif %}{% endblock %}{% block structured_data %}<script type="application/ld+json">{{ structured_json|safe }}</script>{% endblock %}{% block content %}
+<article class="editorial-article">
+  <header class="editorial-hero wrap">
+    <a class="editorial-back" href="/guide/">← Все инструкции</a>
+    <div class="editorial-meta"><span>ПРАКТИЧЕСКОЕ РУКОВОДСТВО</span><time datetime="{{ article.published_at|date:'c' }}">{{ article.published_at|date:'d.m.Y' }}</time></div>
+    <h1>{{ article.title }}</h1><p class="editorial-deck">{{ article.description }}</p>
+    <div class="editorial-byline"><span class="editorial-dot"></span> KinoPub Observer <span>·</span> Пошаговая инструкция</div>
+  </header>
+  <div class="editorial-layout wrap">
+    <aside class="editorial-rail"><span class="reading-label">РУКОВОДСТВО</span><div class="reading-line"><span></span></div><a href="{{ site_bot_url }}">Открыть бота {% include 'public/arrow.html' with external=True %}</a></aside>
+    <div class="editorial-content">
+      {% if article.content_blocks %}
+        {% for block in article.content_blocks %}
+          {% if block.type == 'lead' %}<p class="editorial-lead">{{ block.text }}</p>
+          {% elif block.type == 'paragraph' %}<p>{{ block.text }}</p>
+          {% elif block.type == 'heading' %}<h2>{{ block.text }}</h2>
+          {% elif block.type == 'image' %}<figure class="editorial-figure"><img src="{{ block.src }}" alt="{{ block.alt }}"{% if block.width and block.height %} width="{{ block.width }}" height="{{ block.height }}"{% endif %} loading="lazy" decoding="async"><figcaption>{{ block.caption }}</figcaption></figure>
+          {% elif block.type == 'steps' %}<ol class="editorial-steps">{% for item in block.items %}<li><span>{{ forloop.counter|stringformat:'02d' }}</span><p>{{ item }}</p></li>{% endfor %}</ol>
+          {% elif block.type == 'list' %}<ul class="editorial-list">{% for item in block.items %}<li>{{ item }}</li>{% endfor %}</ul>
+          {% elif block.type == 'callout' %}<aside class="editorial-callout"><span>КРАТКО</span><p>{{ block.text }}</p></aside>
+          {% elif block.type == 'quote' %}<blockquote>{{ block.text }}</blockquote>{% endif %}
+        {% endfor %}
+      {% else %}<div class="editorial-content">{{ article.body|linebreaks }}</div>{% endif %}
+      <section class="editorial-end"><span>ВАШИ СЕРИАЛЫ — ПОД РУКОЙ</span><h2>Продолжите в Telegram</h2><p>Сохраните подборки, настройте уведомления и возвращайтесь к просмотру в удобное время.</p><a class="button" href="{{ site_bot_url }}">Открыть KinoPub Observer {% include 'public/arrow.html' with external=True %}</a></section>
+      <p class="editorial-updated">Опубликовано {{ article.published_at|date:'d.m.Y' }} · Обновлено {{ article.updated_at|date:'d.m.Y' }}</p>
+      {% if related %}<nav class="editorial-related" aria-label="Другие инструкции"><h2>Продолжить чтение</h2><div>{% for item in related %}<a href="{% url 'public_guide' item.slug %}"><span>{{ item.published_at|date:'d.m.Y' }}</span><strong>{{ item.title }}</strong><i>↗</i></a>{% endfor %}</div></nav>{% endif %}
+    </div>
+  </div>
+</article>{% endblock %}

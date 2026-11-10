@@ -9,8 +9,9 @@ from django.core.cache import cache
 from django.db import connection
 from django.urls import reverse
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 
-from app.models import Person, PublicVisit, Show, ShowCrew, ShowDuration
+from app.models import Person, PublicArticle, PublicVisit, Show, ShowCrew, ShowDuration
 
 
 class PublicSiteTests(TestCase):
@@ -47,7 +48,7 @@ class PublicSiteTests(TestCase):
         self.assertContains(response, '"@type": "TVSeries"')
 
     def test_public_ctas_mark_site_traffic(self):
-        for path in ['/', '/catalog/', '/guide/', '/guide/notifications/']:
+        for path in ['/', '/catalog/', '/guide/']:
             self.assertContains(self.client.get(path), 'https://t.me/kinopub_observer_bot?start=site')
 
     def test_robots_and_sitemap(self):
@@ -62,7 +63,11 @@ class PublicSiteTests(TestCase):
         self.assertFalse(parser.can_fetch('OAI-SearchBot', '/api/internal/articles/example/'))
 
     def test_public_pages_allow_indexing_but_internal_pages_do_not(self):
-        for path in ['/', '/catalog/', '/catalog/1/', '/guide/', '/guide/notifications/']:
+        article = PublicArticle.objects.create(
+            slug='indexed-guide', title='Индексируемая статья', description='Описание',
+            body='Короткий текст', published_at=timezone.now(),
+        )
+        for path in ['/', '/catalog/', '/catalog/1/', '/guide/', f'/guide/{article.slug}/']:
             if path == '/catalog/1/':
                 path = reverse('public_show', args=[self.show.pk])
             response = self.client.get(path)
@@ -79,10 +84,9 @@ class PublicSiteTests(TestCase):
         self.assertContains(self.client.get('/sitemap-shows-3.xml'), reverse('public_show', args=[show.id]))
         self.assertNotContains(self.client.get('/sitemap-shows-1.xml'), reverse('public_show', args=[show.id]))
 
-    def test_guides_include_context_and_related_links(self):
+    def test_legacy_guide_urls_redirect_to_editorial_articles(self):
         response = self.client.get('/guide/notifications/')
-        self.assertContains(response, 'Почему сообщение может не прийти')
-        self.assertContains(response, 'Читайте также')
+        self.assertRedirects(response, '/guide/new-episode-notifications/', status_code=301, fetch_redirect_response=False)
 
     @patch('app.public_site.cache.get_or_set')
     def test_home_shows_rounded_real_catalog_counts(self, cached_counts):
@@ -100,7 +104,7 @@ class PublicSiteTests(TestCase):
         self.assertIn('noindex', response['X-Robots-Tag'])
 
     def test_public_pages_do_not_link_metrics(self):
-        for path in ['/', '/catalog/', '/guide/', '/guide/folders/']:
+        for path in ['/', '/catalog/', '/guide/']:
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertNotContains(response, '/metrics/')
@@ -137,6 +141,23 @@ class PublicSiteTests(TestCase):
         self.assertContains(page, 'application/ld+json')
         self.assertContains(page, 'datePublished')
         self.assertContains(self.client.get('/sitemap-shows-0.xml'), '/guide/example/')
+
+    @override_settings(PUBLIC_ARTICLE_API_TOKEN='example-test-token')
+    def test_article_renders_typed_content_and_photo(self):
+        published = timezone.now().isoformat()
+        blocks = [
+            {'type': 'lead', 'text': '<script>not markup</script>'},
+            {'type': 'image', 'src': '/articles/assets/example/0123456789abcdef0123456789abcdef.jpg', 'alt': 'Фото карточки', 'caption': 'Подпись фото'},
+            {'type': 'steps', 'items': ['Шаг первый', 'Шаг второй']},
+        ]
+        payload = json.dumps({'title': 'Статья с блоками', 'description': 'Ответ на вопрос', 'body': '', 'content_blocks': blocks, 'published_at': published})
+        response = self.client.put('/api/internal/articles/rich-example/', payload, content_type='application/json', HTTP_AUTHORIZATION='Bearer example-test-token')
+        self.assertEqual(response.status_code, 201)
+        page = self.client.get('/guide/rich-example/')
+        self.assertContains(page, '&lt;script&gt;not markup&lt;/script&gt;')
+        self.assertContains(page, 'Фото карточки')
+        self.assertContains(page, 'Подпись фото')
+        self.assertContains(page, 'Шаг первый')
 
     def test_visit_events_count_pageviews_and_time(self):
         session = str(uuid.uuid4())
