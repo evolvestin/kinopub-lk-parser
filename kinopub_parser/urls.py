@@ -20,6 +20,9 @@ else:
 urlpatterns = proxy_patterns + [
     path('robots.txt', views.robots_txt, name='robots_txt'),
     path('', public_site.home, name='index'),
+    path('about/', public_site.about, name='public_about'),
+    path('offer/', public_site.legal_page, {'document': 'offer'}, name='public_offer'),
+    path('privacy/', public_site.legal_page, {'document': 'privacy'}, name='public_privacy'),
     path('catalog/', public_site.catalog, name='public_catalog'),
     path('preview/wishlist/', public_site.wishlist_demo, name='public_wishlist_demo'),
     path('catalog/<int:show_id>/', public_site.show_detail, name='public_show'),

@@ -8,7 +8,7 @@ from threading import Thread
 import client
 from aiogram import Dispatcher, F, Router
 from aiogram.enums import ChatType
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from api_server import start_api_server
 from handlers import callbacks, commands, inline, member
 from middlewares import (
@@ -100,6 +100,7 @@ def register_router() -> Router:
     )
 
     # --- Content Search & View ---
+    router.message.register(commands.handle_privacy_command, Command('privacy'))
     router.message.register(commands.handle_explicit_search, F.text.startswith('/search'))
     router.message.register(commands.handle_stats_command, F.text.startswith('/stats'))
     router.message.register(commands.handle_imdb_lookup, F.text.regexp(r'(?i)^imdb:\s*\d+$'))

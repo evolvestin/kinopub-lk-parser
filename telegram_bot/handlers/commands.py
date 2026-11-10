@@ -257,13 +257,22 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                     InlineKeyboardButton(
                         text='📱 Открыть веб-приложение', web_app=WebAppInfo(url=web_app_url)
                     )
-                ]
+                ],
+                [InlineKeyboardButton(text='Политика конфиденциальности', url=f'{base_url.rstrip("/")}/privacy/')],
             ]
         )
     else:
         text = f'⚠️ {bold("Ошибка регистрации.")}\nПопробуйте позже.'
 
     await sender.send_message(chat_id=user.id, text=text, keyboard=keyboard)
+
+
+async def handle_privacy_command(message: Message, bot: Bot):
+    base_url = os.getenv('WEBAPP_PUBLIC_URL') or os.getenv('BACKEND_URL') or 'http://localhost:8000'
+    await MessageSender(bot).send_message(
+        chat_id=message.chat.id,
+        text=f'Политика конфиденциальности: {html_secure(base_url.rstrip("/") + "/privacy/")}',
+    )
 
 
 async def handle_history_command(message: Message, bot: Bot):

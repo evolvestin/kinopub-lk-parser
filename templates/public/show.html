@@ -20,7 +20,7 @@
         <div class="show-tags">
           {% if show.year %}<span class="show-tag">{{ show.year }}</span>{% endif %}
           {% if show.type %}<span class="show-tag show-tag-accent">{{ show.public_type_label }}</span>{% endif %}
-          {% if show.status %}<span class="show-tag">{{ show.public_status_label }}</span>{% endif %}
+          {% if show.public_status_label %}<span class="show-tag">{{ show.public_status_label }}</span>{% endif %}
           {% for country in show.public_countries %}<span class="show-tag">{{ country }}</span>{% endfor %}
         </div>
         <div class="show-ratings">
@@ -30,7 +30,7 @@
         {% if show.plot %}<p class="show-detail-plot">{{ show.plot }}</p>{% endif %}
         {% if show.public_genres %}<div class="show-genres" aria-label="Жанры">{% for genre in show.public_genres %}<span>{{ genre }}</span>{% endfor %}</div>{% endif %}
         <a class="button show-detail-cta" href="{{ bot_url }}?start=site_show_{{ show.id }}">Открыть карточку в Telegram {% include 'public/arrow.html' with external=True %}</a>
-        <p class="show-detail-hint">В боте можно добавить тайтл в избранное и следить за новыми сериями.</p>
+        <p class="show-detail-hint">В боте можно добавить тайтл в избранное{% if show.public_is_series %} и следить за новыми сериями{% endif %}.</p>
       </div>
     </div>
   </article>

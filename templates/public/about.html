@@ -1,0 +1,15 @@
+{% extends 'public/base.html' %}
+{% block title %}О сервисе — KinoPub Observer{% endblock %}
+{% block description %}О KinoPub Observer: списки фильмов и сериалов, статистика просмотров и независимость проекта.{% endblock %}
+{% block content %}
+<article class="wrap article section">
+  <div class="eyebrow">KINOPUB OBSERVER</div>
+  <h1 class="page-title">О сервисе</h1>
+  <p class="lead">KinoPub Observer — Telegram-бот для избранного, статистики просмотров фильмов и сериалов и уведомлений о новых эпизодах.</p>
+  <h2>Независимость проекта</h2>
+  <p>KinoPub Observer — самостоятельный проект. Мы не связаны с KinoPub, сайтами kino.pub, kino.watch, их зеркалами и операторами и не представляем их.</p>
+  <h2>Контакты</h2>
+  <p>Создатель проекта — <a href="https://t.me/evolvestin">@evolvestin</a>. Инструкции по работе с ботом доступны в <a href="{% url 'public_guides' %}">разделе инструкций</a>.</p>
+  <a class="button" href="{{ site_bot_url }}">Открыть бота {% include 'public/arrow.html' with external=True %}</a>
+</article>
+{% endblock %}

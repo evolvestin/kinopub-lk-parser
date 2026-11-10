@@ -54,3 +54,15 @@ body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,He
 .guide-step.reveal{transform:translateY(26px) scale(.985);transition:opacity .7s ease,transform .8s cubic-bezier(.2,.75,.25,1)}.guide-step.reveal.is-visible{transform:translateY(0) scale(1)}
 @media(max-width:760px){.guide-step{grid-template-columns:1fr;gap:20px;margin:54px 0;padding-top:28px}.guide-step .editorial-figure{border-radius:19px}.guide-step .editorial-figure img{max-height:none}.guide-step-copy>p{font-size:15px}}
 @media(prefers-reduced-motion:reduce){.guide-step.reveal,.guide-step.reveal.is-visible{transform:none;transition:none}}
+
+/* Calm motion and a stable app preview. */
+.reveal{transform:translateY(12px);transition:opacity 1s ease,transform 1.1s cubic-bezier(.22,1,.36,1)}
+.app-demo-frame iframe{height:560px}
+@media(max-width:760px){.app-demo-frame iframe{height:540px}}
+@media(prefers-reduced-motion:reduce){.reveal{transform:none;transition:none}}
+
+@media(min-width:761px){.advantages{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}}
+@media (min-width:761px) and (max-width:1150px){.nav{display:flex;justify-content:space-between}.nav .desktop-nav{display:none}.mobile-menu{display:block}}
+@media (prefers-reduced-motion:no-preference){.hero>div:first-child,.hero .app-demo-frame{animation-duration:1.05s;animation-timing-function:cubic-bezier(.22,1,.36,1)}}
+.editorial-index-title h1{font-size:clamp(36px,4.3vw,60px);line-height:1.12;letter-spacing:-.035em;overflow-wrap:normal}
+@media(max-width:760px){.editorial-index-title h1{font-size:clamp(32px,8vw,46px)}}

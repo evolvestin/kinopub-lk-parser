@@ -1,5 +1,5 @@
 <template>
-  <div class="view active-view" id="view-stats" style="display: flex; flex-direction: column; overflow-y: auto; position: relative;">
+  <div class="view active-view" :class="{ 'editorial-demo': demoMode }" id="view-stats" style="display: flex; flex-direction: column; overflow-y: auto; position: relative;">
     <div v-if="isFakeMode" class="onboarding-overlay-fixed">
       <div class="onboarding-card">
         <div class="onboarding-icon">📊</div>
@@ -44,7 +44,7 @@
           <div style="font-size: 11px; color: var(--accent); font-weight: 800;">ПРОГРЕСС {{ totalViewsAllTime }} / 10</div>
         </div>
 
-        <div class="tabs" v-if="statsStore.hasGroup">
+        <div class="tabs" v-if="!demoMode && statsStore.hasGroup">
           <button class="tab" :class="{ on: !isGroupTab }" @click="selectTab('personal')">
             <div class="icon" v-html="icons.user"></div> Личная
           </button>
@@ -54,13 +54,13 @@
         </div>
 
         <!-- Keep the selector in its original position below the header/tabs. -->
-        <div class="years" v-if="statsStore.availableYears.length > 1">
+        <div class="years" v-if="demoMode || statsStore.availableYears.length > 1">
           <button
-            v-for="year in statsStore.availableYears"
+            v-for="year in (demoMode ? demoYears : statsStore.availableYears)"
             :key="year"
             class="yr clickable"
-            :class="{ on: String(statsStore.currentYear) === String(year) }"
-            @click="statsStore.setYear(year)"
+            :class="{ on: String(demoMode ? demoYear : statsStore.currentYear) === String(year) }"
+            @click="demoMode ? demoYear = year : statsStore.setYear(year)"
           >{{ year === 'all' ? 'Всё время' : year }}</button>
         </div>
 
@@ -211,7 +211,7 @@
                   <span v-if="item.emoji" style="font-size: clamp(18px, 5vw, 22px); margin-right: 6px; line-height: 1;">{{ item.emoji }}</span>
                   <div class="li-name">{{ item.name }}</div>
                 </div>
-                <span class="li-r" style="color: var(--info)">{{ item.count }} {{ plural(item.count, ['просмотр', 'просмотра', 'просмотров']) }}</span>
+                <span class="li-r" style="color: var(--info)">{{ item.count }} {{ plural(item.count, ['тайтл', 'тайтла', 'тайтлов']) }}</span>
               </div>
             </div>
           </div>
@@ -346,6 +346,8 @@ import { useTelegram } from '../composables/useTelegram'
 
 const BaseChart = defineAsyncComponent(() => import('../components/shared/BaseChart.vue'))
 
+const props = defineProps({ demoMode: { type: Boolean, default: false } })
+const examplePeople = props.demoMode ? JSON.parse(document.getElementById('stats-example-people')?.textContent || '{}') : {}
 const statsStore = useStatsStore()
 const uiStore = useUIStore()
 const userStore = useUserStore()
@@ -355,7 +357,7 @@ const { showConfirm } = useTelegram()
 // Keep the visible tab local so a click updates the section immediately even
 // while the hash-router finishes its navigation in the background.
 const activeTab = ref(route.query.tab || 'personal')
-const isGroupTab = computed(() => activeTab.value === 'group' || route.query.tab === 'group')
+const isGroupTab = computed(() => !props.demoMode && (activeTab.value === 'group' || route.query.tab === 'group'))
 
 const selectTab = (tab) => {
   activeTab.value = tab
@@ -407,8 +409,114 @@ const FAKE_STATS = {
   binges: []
 };
 
+// Fixed editorial data: the real statistics components render a separate
+// profile without reading or modifying any user's history.
+const demoYears = ['all', 2026, 2025, 2024, 2023, 2022]
+const demoYear = ref('all')
+const demoYearData = [
+  { year: 2022, views: 110, episodes: 77, hours: 145, seriesHours: 103, ratings: 51, added: 29, watched: 16 },
+  { year: 2023, views: 145, episodes: 105, hours: 200, seriesHours: 141, ratings: 68, added: 34, watched: 22 },
+  { year: 2024, views: 170, episodes: 124, hours: 240, seriesHours: 171, ratings: 79, added: 42, watched: 25 },
+  { year: 2025, views: 190, episodes: 137, hours: 270, seriesHours: 193, ratings: 88, added: 40, watched: 26 },
+  { year: 2026, views: 169, episodes: 121, hours: 241, seriesHours: 172, ratings: 76, added: 39, watched: 23 },
+]
+const spreadTotal = (total, weights) => {
+  const sum = weights.reduce((a, b) => a + b, 0)
+  const values = weights.map(weight => Math.floor(total * weight / sum))
+  for (let left = total - values.reduce((a, b) => a + b, 0), i = 0; left > 0; left--, i++) values[i % values.length]++
+  return values
+}
+const hoursText = hours => `${Math.floor(hours / 24)}д ${hours % 24}ч`
+const makeExampleHistory = item => {
+  let seed = item.year * 139 + 7429
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+    return seed / 4294967296
+  }
+  const daysInYear = item.year === 2024 ? 366 : 365
+  const availableDays = item.year === 2026 ? 314 : daysInYear
+  const days = Array.from({length: daysInYear}, () => ({views: 0, minutes: 0}))
+  const monthWeights = Array.from({length: 12}, () => .15 + random() * .85)
+  // Long breaks and bursts vary independently by year; events remain stable
+  // between renders and never come from the user's real account.
+  const gapStart = Math.floor(random() * (availableDays - 35))
+  const gapLength = 10 + Math.floor(random() * 24)
+  const episodeMinutes = spreadTotal(item.seriesHours * 60, Array.from({length: item.episodes}, () => 30 + random() * 30))
+  const movieMinutes = spreadTotal((item.hours - item.seriesHours) * 60, Array.from({length: item.views - item.episodes}, () => 80 + random() * 60))
+  let previousDay = -1
+  for (const [index, minutes] of [...episodeMinutes, ...movieMinutes].entries()) {
+    let day
+    if (item.year === 2025 && index < 7) {
+      day = 45 // Seven episodes on 15 February match the marathon card.
+    } else if (index < item.episodes && previousDay >= 0 && !(item.year === 2025 && previousDay === 45) && random() < .22) {
+      day = previousDay
+    } else {
+      do {
+        day = Math.floor(random() * availableDays)
+        if (item.year === 2025 && day === 45) continue
+        const date = new Date(Date.UTC(item.year, 0, 1 + day))
+        const weekend = date.getUTCDay() === 0 || date.getUTCDay() === 6
+        const gap = day >= gapStart && day < gapStart + gapLength
+        if (random() < monthWeights[date.getUTCMonth()] * (weekend ? 1 : .55) * (gap ? .08 : 1)) break
+      } while (true)
+    }
+    days[day].views++
+    days[day].minutes += minutes
+    previousDay = day
+  }
+  return {...item, days, availableDays}
+}
+const exampleHistory = demoYearData.map(makeExampleHistory)
+const demoStats = computed(() => {
+  const selected = demoYear.value === 'all' ? exampleHistory : exampleHistory.filter(item => item.year === Number(demoYear.value))
+  const sum = key => selected.reduce((total, item) => total + item[key], 0)
+  const views = sum('views'), episodes = sum('episodes'), hours = sum('hours'), seriesHours = sum('seriesHours')
+  const chart = { labels: [], views: [], hours: [] }
+  const weekdays = Array(7).fill(0)
+  const monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек']
+  for (const item of selected) {
+    const months = item.year === 2026 ? 11 : 12
+    const monthViews = Array(months).fill(0), monthMinutes = Array(months).fill(0)
+    item.days.slice(0, item.availableDays).forEach((day, index) => {
+      const date = new Date(Date.UTC(item.year, 0, 1 + index))
+      monthViews[date.getUTCMonth()] += day.views
+      monthMinutes[date.getUTCMonth()] += day.minutes
+      weekdays[(date.getUTCDay() + 6) % 7] += day.views
+    })
+    chart.labels.push(...monthNames.slice(0, months).map(name => demoYear.value === 'all' ? `${name} ${String(item.year).slice(-2)}` : name))
+    chart.views.push(...monthViews)
+    chart.hours.push(...monthMinutes.map(minutes => Math.round(minutes / 6) / 10))
+  }
+  const ratingDistribution = spreadTotal(sum('ratings'), [1, 2, 3, 5, 13, 32, 65, 104, 93, 44])
+  const ratingAverage = ratingDistribution.reduce((total, value, i) => total + value * (i + 1), 0) / sum('ratings')
+  const genreMinutes = spreadTotal(hours * 60, [32, 24, 19, 14, 11])
+  const people = (names, factor) => ({series: names.map((name, i) => ({name, ...examplePeople[name], count: Math.max(1, Math.round(views * (factor - i * 0.012)))})), others: []})
+  const heatmap = selected.slice().reverse().map(item => ({year: item.year, data: item.days.map(day => day.minutes === 0 ? 0 : day.minutes < 45 ? 1 : day.minutes < 90 ? 2 : day.minutes < 180 ? 3 : 4)}))
+  const periodDays = selected.reduce((total, item) => total + item.availableDays, 0)
+  const activeDays = heatmap.reduce((total, item) => total + item.data.filter(Boolean).length, 0)
+  return {
+    meta: {name: 'Олег', years: demoYears},
+    summary: {duration_display: hoursText(hours), total_minutes_watched: hours * 60, total_views: views,
+      activity_percent: Math.round(activeDays / periodDays * 1000) / 10, daily_average_min: Math.round(hours * 60 / periodDays),
+      total_episodes: episodes, unique_series: selected.length === 1 ? 14 : 52,
+      series_duration: hoursText(seriesHours), total_movies: views - episodes,
+      movies_duration: hoursText(hours - seriesHours), wishlist_added: sum('added'),
+      wishlist_watched: sum('watched'), period_label: demoYear.value === 'all' ? 'Всё время' : String(demoYear.value)},
+    ratings: {total: sum('ratings'), avg: ratingAverage, distribution: ratingDistribution},
+    monthly_chart: chart,
+    weekday_chart: {data: weekdays},
+    heatmap,
+    genres: ['Драма','Фантастика','Комедия','Детектив','Приключения'].map((name, i) => ({name, minutes: genreMinutes[i]})),
+    actors: people(['Педро Паскаль','Брайан Крэнстон','Киллиан Мёрфи'], 0.10),
+    directors: people(['Мишель Макларен','Дэвид Наттер','Винс Гиллиган'], 0.05),
+    writers: people(['Винс Гиллиган','Крейг Мэйзин'], 0.04),
+    countries: [{name:'США', emoji:'🇺🇸', count: Math.round((selected.length === 1 ? 14 + (views - episodes) * .8 : 228) * .55)}, {name:'Великобритания', emoji:'🇬🇧', count: Math.round((selected.length === 1 ? 14 + (views - episodes) * .8 : 228) * .18)}],
+    binges: selected.some(item => item.year === 2025) ? [{show_id: 8739, show_title:'Во все тяжкие', date:'15.02.2025', count: 7, poster_url:'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg'}] : [],
+  }
+})
+
 const isFakeMode = computed(() => {
-  return statsStore.currentStats && statsStore.currentStats.summary?.total_views === 0;
+  return !props.demoMode && statsStore.currentStats && statsStore.currentStats.summary?.total_views === 0;
 });
 
 const totalViewsAllTime = computed(() => {
@@ -421,16 +529,16 @@ const totalViewsAllTime = computed(() => {
 
 const isGamificationMode = computed(() => {
   const views = totalViewsAllTime.value;
-  return views > 0 && views < 10 && !statsStore.isShared;
+  return !props.demoMode && views > 0 && views < 10 && !statsStore.isShared;
 });
 
 const currentStats = computed(() => {
-  return isFakeMode.value ? FAKE_STATS : statsStore.currentStats;
+  return props.demoMode ? demoStats.value : (isFakeMode.value ? FAKE_STATS : statsStore.currentStats);
 });
 
 const summary = computed(() => currentStats.value?.summary || {})
-const userName = computed(() => currentStats.value?.meta?.name || userStore.firstName || '...')
-const userPhoto = computed(() => currentStats.value?.meta?.photo_url || userStore.userData?.photo_url)
+const userName = computed(() => props.demoMode ? 'Олег' : (currentStats.value?.meta?.name || userStore.firstName || '...'))
+const userPhoto = computed(() => props.demoMode ? '/static/oleg-example-avatar.png' : (currentStats.value?.meta?.photo_url || userStore.userData?.photo_url))
 const firstLetter = computed(() => userName.value.charAt(0).toUpperCase())
 const periodLabel = computed(() => summary.value.period_label || '')
 const themeIcon = computed(() => uiStore.theme === 'dark' ? icons.moon : icons.sun)
@@ -756,10 +864,10 @@ const openGroupMemberHistory = (index, name) => {
 
 const handleHeatmapClick = ({ date, value }) => value > 0 && openHistory('day', { date: date, title: date })
 
-onMounted(() => { if (!statsStore.currentStats) statsStore.fetchStats(statsStore.currentYear, true) })
+onMounted(() => { if (!props.demoMode && !statsStore.currentStats) statsStore.fetchStats(statsStore.currentYear, true) })
 
 watch(activeTab, (newTab) => {
-  if (newTab === 'group' && statsStore.currentStats?.meta?.has_group && !statsStore.currentStats.group) {
+  if (!props.demoMode && newTab === 'group' && statsStore.currentStats?.meta?.has_group && !statsStore.currentStats.group) {
     statsStore.fetchStats(statsStore.currentYear, true, true, true)
   }
 }, { immediate: true })
@@ -772,6 +880,7 @@ watch(() => route.query.tab, (newTab) => {
 </script>
 
 <style scoped>
+.editorial-demo .header-name { font-size: 16px; white-space: nowrap; overflow-wrap: normal; }
 .centered-stat-btn::after {
     top: 50% !important;
     transform: translateY(-50%) rotate(45deg) !important;

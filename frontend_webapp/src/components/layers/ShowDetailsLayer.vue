@@ -416,7 +416,7 @@ const showStatusRu = computed(() => {
 
 const shouldShowStatus = computed(() => {
   if (!show.value || !show.value.status) return false
-  if (!isSeries.value && ['Finished', 'Ongoing'].includes(show.value.status)) return false
+  if (!isSeries.value) return false
   return true
 })
 

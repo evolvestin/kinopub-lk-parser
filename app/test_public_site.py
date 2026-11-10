@@ -11,13 +11,14 @@ from django.urls import reverse
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
-from app.models import Person, PublicArticle, PublicVisit, Show, ShowCrew, ShowDuration
+from app.models import Person, PublicArticle, PublicVisit, Show, ShowCrew, ShowDuration, UserRating, ViewHistory, ViewUser, WishlistFolder, WishlistItem
 
 
 class PublicSiteTests(TestCase):
     def setUp(self):
         cache.delete(f'public_sitemap_ranges:{settings.DATABASES["default"]["NAME"]}')
         cache.delete(f'public_catalog_type_counts:{settings.DATABASES["default"]["NAME"]}')
+        cache.delete('public_usage_counts_v3')
         self.show = Show.objects.create(title='Тестовый сериал', original_title='Test Series', year=2024)
 
     def test_catalog_and_show_link_to_bot(self):
@@ -26,6 +27,16 @@ class PublicSiteTests(TestCase):
         self.assertContains(response, reverse('public_show', args=[self.show.pk]))
         response = self.client.get(reverse('public_show', args=[self.show.pk]))
         self.assertContains(response, f'https://t.me/kinopub_observer_bot?start=site_show_{self.show.pk}')
+
+    def test_status_and_episode_hint_only_for_series(self):
+        movie = Show.objects.create(title='Фильм', type='Movie', status='Finished')
+        series = Show.objects.create(title='Сериал', type='Series', status='Finished')
+        movie_page = self.client.get(reverse('public_show', args=[movie.pk]))
+        series_page = self.client.get(reverse('public_show', args=[series.pk]))
+        self.assertNotContains(movie_page, 'show-tag">Завершен')
+        self.assertNotContains(movie_page, 'и следить за новыми сериями')
+        self.assertContains(series_page, 'show-tag">Завершен')
+        self.assertContains(series_page, 'и следить за новыми сериями')
 
     def test_show_detail_renders_seasons_and_crew(self):
         person = Person.objects.create(name='Тестовый актёр')
@@ -50,6 +61,32 @@ class PublicSiteTests(TestCase):
     def test_public_ctas_mark_site_traffic(self):
         for path in ['/', '/catalog/', '/guide/']:
             self.assertContains(self.client.get(path), 'https://t.me/kinopub_observer_bot?start=site')
+
+    def test_home_explains_statistics_and_links_to_guide(self):
+        page = self.client.get('/')
+        self.assertContains(page, 'href="/guide/how-statistics-works/"')
+        self.assertContains(page, 'Откуда берётся статистика просмотров?')
+        self.assertContains(page, 'Почему просмотр не появился на карте активности?')
+
+    @override_settings(PUBLIC_OFFER_URL='https://example.org/offer')
+    def test_offer_link_in_public_navigation(self):
+        response = self.client.get('/guide/')
+        self.assertContains(response, 'href="https://example.org/offer"', count=3)
+
+    def test_legal_pages_and_default_navigation(self):
+        page = self.client.get('/guide/')
+        self.assertContains(page, 'href="/offer/"')
+        self.assertContains(page, 'href="/privacy/"')
+        self.assertContains(self.client.get('/offer/'), '@evolvestin')
+        self.assertContains(self.client.get('/privacy/'), 'sessionStorage')
+
+    def test_about_page_is_linked_and_indexable(self):
+        self.assertContains(self.client.get('/guide/'), 'href="/about/"')
+        self.assertNotContains(self.client.get('/'), 'id="about"')
+        response = self.client.get('/about/')
+        self.assertContains(response, 'kino.pub')
+        self.assertContains(response, 'kino.watch')
+        self.assertContains(self.client.get('/sitemap-shows-0.xml'), '/about/')
 
     def test_robots_and_sitemap(self):
         response = self.client.get('/robots.txt')
@@ -89,12 +126,22 @@ class PublicSiteTests(TestCase):
         self.assertRedirects(response, '/guide/new-episode-notifications/', status_code=301, fetch_redirect_response=False)
 
     @patch('app.public_site.cache.get_or_set')
-    def test_home_shows_rounded_real_catalog_counts(self, cached_counts):
-        cached_counts.return_value = {'total': 1514860, 'movies': 1316939, 'series': 186263}
+    def test_home_shows_rounded_catalog_and_adjusted_usage_counts(self, cached_counts):
+        cached_counts.side_effect = lambda key, fallback, timeout: ({'total': 1514860, 'movies': 1316939, 'series': 186263} if key.startswith('public_catalog') else fallback())
+        user = ViewUser.objects.create(telegram_id=12345)
+        ViewUser.objects.create(telegram_id=None)
+        ViewHistory.objects.create(show=self.show, is_checked=True)
+        folder = WishlistFolder.objects.create(user=user, name='Избранное')
+        WishlistItem.objects.create(user=user, folder=folder, show=self.show, is_active=True)
+        UserRating.objects.create(user=user, show=self.show, rating=8)
         response = self.client.get('/')
         self.assertContains(response, '1,5')
-        self.assertContains(response, '1,3')
-        self.assertContains(response, '186')
+        self.assertContains(response, 'пользователей')
+        self.assertEqual(response.context['users_count'], 431)
+        self.assertEqual(response.context['recorded_views'], 8001)
+        self.assertEqual(response.context['favorites_count'], 1946)
+        self.assertEqual(response.context['ratings_count'], 5435)
+        self.assertNotContains(response, 'фильмов в каталоге')
         self.assertContains(response, 'data-decimals="1"')
 
     def test_demo_uses_vue_entry_and_blocks_indexing(self):
@@ -102,6 +149,14 @@ class PublicSiteTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'public-wishlist-demo')
         self.assertIn('noindex', response['X-Robots-Tag'])
+
+    def test_statistics_example_includes_catalog_person_photo(self):
+        Person.objects.create(id=68732, name='Педро Паскаль', tmdb_photo_url='https://image.tmdb.org/t/p/w185/example.jpg')
+        response = self.client.get('/preview/wishlist/', {'stats-example': '1'})
+        self.assertContains(response, 'stats-example-people')
+        self.assertContains(response, '/api/image_proxy/?url=')
+        self.assertIn('Педро Паскаль', response.context['stats_example_people'])
+        self.assertNotContains(self.client.get('/preview/wishlist/'), 'stats-example-people')
 
     def test_public_pages_do_not_link_metrics(self):
         for path in ['/', '/catalog/', '/guide/']:

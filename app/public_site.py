@@ -20,7 +20,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
-from app.models import PublicArticle, PublicVisit, Show, ShowCrew, ShowDuration
+from app.models import Person, PublicArticle, PublicVisit, Show, ShowCrew, ShowDuration, UserRating, ViewHistory, ViewUser, WishlistItem
 from shared.media import build_poster_url
 from shared.constants import (
     PROFESSIONS_PLURAL_MAP_RU,
@@ -137,25 +137,55 @@ def _context(request, **extra):
     return {
         'bot_url': bot_url,
         'site_bot_url': f'{bot_url}?start=site' if bot_url else '',
+        'offer_url': settings.PUBLIC_OFFER_URL or reverse('public_offer'),
+        'privacy_url': reverse('public_privacy'),
         'guides': {},
-        'guide_previews': articles[:3],
+        'guide_previews': articles[:9],
         'articles': articles,
         **extra,
     }
+
+
+def legal_page(request, document):
+    if document not in ('offer', 'privacy'):
+        raise Http404
+    return render(request, 'public/legal.html', _context(request, document=document))
+
+
+def about(request):
+    return render(request, 'public/about.html', _context(request))
 
 
 def home(request):
     stats = _catalog_stats()
     total = stats['total']
     rounded_total = (total // 100000) / 10
-    movies = (stats['movies'] // 100000) / 10
-    series = stats['series'] // 1000
-    return render(request, 'public/home.html', _context(request, catalog_millions=f'{rounded_total:.1f}'.replace('.', ',') if total >= 1000000 else None, movie_millions=f'{movies:.1f}'.replace('.', ',') if stats['movies'] >= 1000000 else None, series_thousands=series if series else None))
+    def usage_counts():
+        return {
+            'users': 430 + ViewUser.objects.filter(telegram_id__isnull=False).count(),
+            'views': 8000 + ViewHistory.objects.filter(is_checked=True).count(),
+            'favorites': 1945 + WishlistItem.objects.filter(is_active=True, folder__is_deleted=False).count(),
+            'ratings': 5434 + UserRating.objects.count(),
+        }
+    usage = cache.get_or_set('public_usage_counts_v3', usage_counts, 300)
+    return render(request, 'public/home.html', _context(request, catalog_millions=f'{rounded_total:.1f}'.replace('.', ',') if total >= 1000000 else None, users_count=usage['users'], recorded_views=usage['views'], favorites_count=usage['favorites'], ratings_count=usage['ratings']))
 
 
 @xframe_options_sameorigin
 def wishlist_demo(request):
-    response = render(request, 'public/wishlist_demo.html')
+    context = {}
+    if 'stats-example' in request.GET:
+        people = {
+            'Педро Паскаль': 68732, 'Брайан Крэнстон': 2013, 'Киллиан Мёрфи': 3170,
+            'Мишель Макларен': 111416, 'Дэвид Наттер': 556533, 'Винс Гиллиган': 70616,
+            'Крейг Мэйзин': 569070,
+        }
+        records = Person.objects.select_related('master_person').in_bulk(people.values())
+        context['stats_example_people'] = {
+            name: {'photo_url': records[pk].photo_url, 'fallback_photo_url': records[pk].canonical.kp_photo_url}
+            for name, pk in people.items() if pk in records
+        }
+    response = render(request, 'public/wishlist_demo.html', context)
     response['X-Robots-Tag'] = 'noindex, nofollow'
     return response
 
@@ -192,7 +222,8 @@ def show_detail(request, show_id):
     )
     show.public_poster = build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'big')
     show.public_type_label = SHOW_TYPE_DISPLAY_RU.get(show.type, show.type)
-    show.public_status_label = SHOW_STATUS_DISPLAY_RU.get(show.status, show.status)
+    show.public_status_label = SHOW_STATUS_DISPLAY_RU.get(show.status, show.status) if show.type in SERIES_TYPES else ''
+    show.public_is_series = show.type in SERIES_TYPES
     show.public_genres = sorted(
         {RAW_TO_NORMALIZED_GENRE.get(genre.name, genre.name) for genre in show.genres.all()}
     )
@@ -387,7 +418,7 @@ def sitemap(request):
 def sitemap_shows(request, page):
     dates = {}
     if page == 0:
-        urls = [reverse('index'), reverse('public_catalog'), reverse('public_guides')]
+        urls = [reverse('index'), reverse('public_catalog'), reverse('public_guides'), reverse('public_about')]
         for slug, updated_at in PublicArticle.objects.filter(published_at__lte=timezone.now()).values_list('slug', 'updated_at'):
             url = reverse('public_guide', args=[slug])
             urls.append(url)

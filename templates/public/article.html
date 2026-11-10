@@ -22,7 +22,7 @@
           {% elif block.type == 'quote' %}<blockquote>{{ block.text }}</blockquote>{% endif %}
         {% endfor %}
       {% else %}<div class="editorial-content">{{ article.body|linebreaks }}</div>{% endif %}
-      <section class="editorial-end"><span>ВАШИ СЕРИАЛЫ — ПОД РУКОЙ</span><h2>Продолжите в Telegram</h2><p>Сохраните подборки, настройте уведомления и возвращайтесь к просмотру в удобное время.</p><a class="button" href="{{ site_bot_url }}">Открыть KinoPub Observer {% include 'public/arrow.html' with external=True %}</a></section>
+      <section class="editorial-end"><span>KINOPUB OBSERVER</span><h2>Продолжите в Telegram</h2><p>Откройте бота, чтобы использовать функции из инструкции.</p><a class="button" href="{{ site_bot_url }}">Открыть KinoPub Observer {% include 'public/arrow.html' with external=True %}</a></section>
       <p class="editorial-updated">Опубликовано {{ article.published_at|date:'d.m.Y' }} · Обновлено {{ article.updated_at|date:'d.m.Y' }}</p>
       {% if related %}<nav class="editorial-related" aria-label="Другие инструкции"><h2>Продолжить чтение</h2><div>{% for item in related %}<a href="{% url 'public_guide' item.slug %}"><span>{{ item.published_at|date:'d.m.Y' }}</span><strong>{{ item.title }}</strong><i>↗</i></a>{% endfor %}</div></nav>{% endif %}
     </div>
