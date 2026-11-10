@@ -64,13 +64,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import FolderCard from '../components/wishlist/FolderCard.vue'
 import ShowCard from '../components/shared/ShowCard.vue'
 import BottomNav from '../components/layout/BottomNav.vue'
 import SearchView from './SearchView.vue'
 import PublicStatsPreview from './PublicStatsPreview.vue'
-import StatsView from './StatsView.vue'
 import ShowDetailsLayer from '../components/layers/ShowDetailsLayer.vue'
 import WlFolderModal from '../components/modals/WlFolderModal.vue'
 import AddViewModal from '../components/modals/AddViewModal.vue'
@@ -80,6 +79,7 @@ import PrivacyModal from '../components/modals/PrivacyModal.vue'
 import { icons } from '../utils/icons'
 import { useUIStore } from '../stores/uiStore'
 
+const StatsView = defineAsyncComponent(() => import('./StatsView.vue'))
 const demoRatings = JSON.parse(document.getElementById('public-demo-ratings')?.textContent || '{}')
 const folders = ref([
   { id: 1, name: 'Буду смотреть', icon: 'bookmark', color: '#388bfd', items: [

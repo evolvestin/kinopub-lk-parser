@@ -1,17 +1,18 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
-import App from './App.vue'
 
 import '../../kinopub_parser/static/css/webapp.css'
 
 const pinia = createPinia()
 
 if (document.getElementById('app')) {
-  const app = createApp(App)
-  app.use(pinia)
-  app.use(router)
-  app.mount('#app')
+  import('./App.vue').then(({ default: App }) => {
+    const app = createApp(App)
+    app.use(pinia)
+    app.use(router)
+    app.mount('#app')
+  })
 }
 
 if (document.getElementById('admin-app')) {
