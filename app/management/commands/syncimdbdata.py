@@ -35,7 +35,7 @@ SUPPORTED_TITLE_TYPES = {
 class Command(LoggableBaseCommand):
     help = (
         'Downloads the official daily IMDb datasets, updates IMDb ratings, '
-        'and optionally adds rated movies/series missing from the local catalog.'
+        'and optionally adds movies/series missing from the local catalog.'
     )
 
     def add_arguments(self, parser):
@@ -78,11 +78,6 @@ class Command(LoggableBaseCommand):
                     time.monotonic() - phase_started,
                 )
 
-            rated_ids = None
-            if options['add_missing']:
-                rated_ids = self._collect_rated_ids(paths['ratings'])
-                logger.info('IMDb ratings contain %s rated titles.', len(rated_ids))
-
             phase_started = time.monotonic()
             existing_ids = set(
                 Show.objects.exclude(imdb_id__isnull=True)
@@ -99,7 +94,6 @@ class Command(LoggableBaseCommand):
                 paths['basics'],
                 title_types,
                 existing_ids,
-                rated_ids,
                 options['add_missing'],
                 batch_size,
             )
@@ -183,30 +177,6 @@ class Command(LoggableBaseCommand):
         with gzip.open(path, 'rt', encoding='utf-8', newline='') as handle:
             yield from csv.DictReader(handle, delimiter='\t')
 
-    def _collect_rated_ids(self, path):
-        started = time.monotonic()
-        rated_ids = set()
-        rows_seen = 0
-        for row in self._rows(path):
-            imdb_id = row.get('tconst')
-            if imdb_id:
-                rated_ids.add(imdb_id)
-            rows_seen += 1
-            if rows_seen % 500000 == 0:
-                logger.info(
-                    'IMDb rated-ID preload: %s rows scanned, %s IDs collected (%.1f seconds).',
-                    rows_seen,
-                    len(rated_ids),
-                    time.monotonic() - started,
-                )
-        logger.info(
-            'IMDb rated-ID preload completed: %s rows scanned, %s IDs collected in %.1f seconds.',
-            rows_seen,
-            len(rated_ids),
-            time.monotonic() - started,
-        )
-        return rated_ids
-
     @staticmethod
     def _extract_imdb_id(value):
         match = IMDB_ID_PATTERN.search(value or '')
@@ -241,7 +211,6 @@ class Command(LoggableBaseCommand):
         path,
         title_types,
         existing_ids,
-        rated_ids,
         add_missing,
         batch_size,
     ):
@@ -275,7 +244,7 @@ class Command(LoggableBaseCommand):
                     to_fill_year.clear()
                 continue
 
-            if not add_missing or imdb_id not in rated_ids:
+            if not add_missing:
                 continue
 
             primary_title = self._clean_text(row.get('primaryTitle')) or imdb_id

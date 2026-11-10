@@ -1,5 +1,8 @@
 <template>
-  <StatsView v-if="statsExample" :demo-mode="true" />
+  <template v-if="statsExample">
+    <StatsView :demo-mode="true" />
+    <PrivacyModal v-if="ui.modals.privacy.isOpen" :demo="true" />
+  </template>
   <div v-else class="public-demo-root" aria-label="Интерактивный пример избранного">
     <template v-if="ui.activeView === 'wishlist'">
     <div class="header public-demo-header">
@@ -11,7 +14,7 @@
           <button class="vt-btn" :class="{ active: viewMode === 'grid' }" aria-label="Сетка" @click="viewMode = 'grid'" v-html="icons.grid"></button>
           <button class="vt-btn" :class="{ active: viewMode === 'list' }" aria-label="Список" @click="viewMode = 'list'" v-html="icons.list"></button>
         </div>
-        <button class="theme-btn" aria-label="Тема" v-html="icons.moon"></button>
+        <button class="theme-btn" aria-label="Тема" @click="ui.toggleTheme" v-html="ui.theme === 'dark' ? icons.moon : icons.sun"></button>
         <button class="share-btn" aria-label="Добавить папку" @click="folderDialogOpen = true"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
       </div>
     </div>
@@ -45,15 +48,7 @@
       </section>
     </div>
 
-    <div v-if="rouletteOpen" class="public-demo-overlay" @click.self="rouletteOpen = false">
-      <section class="public-demo-dialog public-demo-roulette" role="dialog" aria-modal="true">
-        <button class="public-demo-close" aria-label="Закрыть" @click="rouletteOpen = false">×</button>
-        <div class="modal-title">🎰 Рулетка</div>
-        <p>Выберите случайный фильм или сериал из ваших списков.</p>
-        <div class="public-demo-pick">{{ roulettePick || 'Готовы выбрать?' }}</div>
-        <button class="btn-primary" @click="pickTitle">Выбрать тайтл</button>
-      </section>
-    </div>
+    <CasinoModal v-if="rouletteOpen" :demo-folders="folders" @close="rouletteOpen = false" />
     </template>
     <SearchView v-else-if="ui.activeView === 'search'" :demo-mode="true" />
     <PublicStatsPreview v-else />
@@ -69,7 +64,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import FolderCard from '../components/wishlist/FolderCard.vue'
 import ShowCard from '../components/shared/ShowCard.vue'
 import BottomNav from '../components/layout/BottomNav.vue'
@@ -80,13 +75,16 @@ import ShowDetailsLayer from '../components/layers/ShowDetailsLayer.vue'
 import WlFolderModal from '../components/modals/WlFolderModal.vue'
 import AddViewModal from '../components/modals/AddViewModal.vue'
 import RatingModal from '../components/modals/RatingModal.vue'
+import CasinoModal from '../components/modals/CasinoModal.vue'
+import PrivacyModal from '../components/modals/PrivacyModal.vue'
 import { icons } from '../utils/icons'
 import { useUIStore } from '../stores/uiStore'
 
+const demoRatings = JSON.parse(document.getElementById('public-demo-ratings')?.textContent || '{}')
 const folders = ref([
   { id: 1, name: 'Буду смотреть', icon: 'bookmark', color: '#388bfd', items: [
-    { id: 10001, show_id: 74959, title: 'Дюна', year: 2021, poster_url: 'https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg' },
-    { id: 10002, show_id: 8739, title: 'Во все тяжкие', year: 2008, poster_url: 'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg' }
+    { id: 10001, show_id: 74959, title: 'Дюна', year: 2021, type: 'Movie', user_rating: demoRatings[74959], poster_url: 'https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV94XAgMIckC.jpg' },
+    { id: 10002, show_id: 8739, title: 'Во все тяжкие', year: 2008, type: 'Series', user_rating: demoRatings[8739], poster_url: 'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg' }
   ] },
   { id: 2, name: 'Семья', icon: 'heart', color: '#e74c3c', items: [
     { id: 10003, show_id: 8613, title: 'Интерстеллар', year: 2014, poster_url: 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg' }
@@ -100,7 +98,6 @@ const sortMenuOpen = ref(false)
 const folderDialogOpen = ref(false)
 const rouletteOpen = ref(false)
 const folderName = ref('')
-const roulettePick = ref('')
 const sortOptions = [
   { key: 'default', label: 'Порядок' },
   { key: 'added_desc', label: 'Сначала добавленные' },
@@ -110,6 +107,7 @@ const sortOptions = [
 const activeFolder = computed(() => folders.value.find(folder => folder.id === activeFolderId.value) || folders.value[0])
 const sortLabel = computed(() => sortOptions.find(option => option.key === sortMode.value)?.label || 'Порядок')
 const ui = useUIStore()
+watch(() => ui.theme, theme => document.body.classList.toggle('light', theme === 'light'), { immediate: true })
 const statsExample = new URLSearchParams(window.location.search).has('stats-example')
 onMounted(() => { ui.activeView = 'wishlist' })
 
@@ -135,10 +133,6 @@ function createFolder() {
   folders.value.push({ id, name, icon: 'folder', color: '#2ecc71', items: [] })
   activeFolderId.value = id
   closeFolderDialog()
-}
-function pickTitle() {
-  const items = folders.value.flatMap(folder => folder.items)
-  roulettePick.value = items[Math.floor(Math.random() * items.length)]?.title || 'Добавьте тайтлы в избранное'
 }
 </script>
 

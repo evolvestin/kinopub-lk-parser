@@ -49,6 +49,16 @@
     {
       "type": "callout",
       "text": "Публичная страница каталога описывает конкретный тайтл; переход к личным спискам выполняется через кнопку Telegram."
+    },
+    {
+      "type": "guide_link",
+      "slug": "search-by-person",
+      "text": "Как найти фильмы по актёру или режиссёру"
+    },
+    {
+      "type": "guide_link",
+      "slug": "add-show-to-favorites",
+      "text": "Как добавить фильм или сериал в избранное KinoPub Observer"
     }
   ]
 }

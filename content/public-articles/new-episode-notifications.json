@@ -49,6 +49,16 @@
     {
       "type": "callout",
       "text": "Пример на скриншоте локальный и не меняет настройки Telegram. В самом боте переключатель применяется к выбранному сериалу."
+    },
+    {
+      "type": "guide_link",
+      "slug": "add-show-to-favorites",
+      "text": "Как добавить фильм или сериал в избранное KinoPub Observer"
+    },
+    {
+      "type": "guide_link",
+      "slug": "mute-series-notifications",
+      "text": "Как отключить уведомления о новых сериях у одного сериала"
     }
   ]
 }

@@ -28,6 +28,29 @@ class PublicSiteTests(TestCase):
         response = self.client.get(reverse('public_show', args=[self.show.pk]))
         self.assertContains(response, f'https://t.me/kinopub_observer_bot?start=site_show_{self.show.pk}')
 
+    def test_catalog_and_detail_show_webapp_local_rating(self):
+        user = ViewUser.objects.create(telegram_id=12345)
+        UserRating.objects.create(user=user, show=self.show, rating=8)
+        self.assertContains(self.client.get(reverse('public_catalog'), {'q': 'Тестовый'}), '★ 8.0')
+        self.assertContains(self.client.get(reverse('public_show', args=[self.show.pk])), '<b>LR</b> 8.0', html=True)
+
+    def test_home_preview_uses_actual_local_ratings(self):
+        cache.delete('public_demo_ratings_v1')
+        featured = Show.objects.create(pk=74959, title='Дюна')
+        user = ViewUser.objects.create(telegram_id=23456)
+        UserRating.objects.create(user=user, show=featured, rating=9)
+        response = self.client.get('/preview/wishlist/')
+        self.assertEqual(response.context['demo_ratings'], {74959: 9.0})
+
+    def test_guide_link_is_rendered_as_a_crawlable_relative_link(self):
+        article = PublicArticle.objects.create(
+            slug='first-guide', title='Руководство', description='Описание',
+            content_blocks=[{'type': 'guide_link', 'slug': 'add-show-to-favorites', 'text': 'Добавить в избранное'}],
+            published_at=timezone.now(),
+        )
+        self.assertContains(self.client.get(reverse('public_guide', args=[article.slug])),
+                            'href="/guide/add-show-to-favorites/"')
+
     def test_status_and_episode_hint_only_for_series(self):
         movie = Show.objects.create(title='Фильм', type='Movie', status='Finished')
         series = Show.objects.create(title='Сериал', type='Series', status='Finished')

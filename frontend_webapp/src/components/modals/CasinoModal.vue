@@ -145,6 +145,8 @@ import { icons } from '../../utils/icons'
 import PosterImage from '../shared/PosterImage.vue'
 import { getRatingClass, getResizedPosterUrl } from '../../utils/helpers'
 
+const props = defineProps({ demoFolders: { type: Array, default: null } })
+const emit = defineEmits(['close'])
 const uiStore = useUIStore()
 const wishlistStore = useWishlistStore()
 const statsStore = useStatsStore()
@@ -172,10 +174,11 @@ const now = ref(Date.now())
 let timerInterval = null
 
 const isDebug = computed(() => window.IS_DEBUG)
-const validFolders = computed(() => wishlistStore.folders.filter(f => f.items && f.items.length > 0))
+const folders = computed(() => props.demoFolders ?? wishlistStore.folders)
+const validFolders = computed(() => folders.value.filter(f => f.items && f.items.length > 0))
 
 const totalItemsCount = computed(() => {
-  return wishlistStore.folders.reduce((sum, f) => sum + (f.items?.length || 0), 0)
+  return folders.value.reduce((sum, f) => sum + (f.items?.length || 0), 0)
 })
 
 const isExpired = computed(() => countdownLeft.value <= 0)
@@ -373,6 +376,7 @@ const startCountdown = (expiresMs) => {
 }
 
 const checkStatus = async () => {
+  if (props.demoFolders) { state.value = 'menu'; return }
   state.value = 'loading'
   try {
     await wishlistStore.fetchCasinoStatus()
@@ -397,15 +401,17 @@ const selectFolder = async (folderId) => {
   let pool = []
   if (folderId === 'all') {
     let map = new Map()
-    wishlistStore.folders.forEach(f => f.items.forEach(i => map.set(i.show_id, i)))
+    folders.value.forEach(f => f.items.forEach(i => map.set(i.show_id, i)))
     pool = Array.from(map.values())
   } else {
-    const f = wishlistStore.folders.find(x => x.id === folderId)
+    const f = folders.value.find(x => x.id === folderId)
     if (f) pool = f.items
   }
 
   try {
-    const data = await api.post('casino/', { action: 'spin', folder_id: folderId })
+    const data = props.demoFolders
+      ? { show: pool[Math.floor(Math.random() * pool.length)], expires: Date.now() + 24 * 3600000 }
+      : await api.post('casino/', { action: 'spin', folder_id: folderId })
     if (data.error) {
       uiStore.showToast('Ошибка: ' + data.error)
       state.value = 'menu'
@@ -508,6 +514,7 @@ const runReveal = (expiresMs) => {
 }
 
 const loadHistory = async () => {
+  if (props.demoFolders) return
   uiStore.setLoading(true)
   try {
     const data = await api.post('casino/', { action: 'history' })
@@ -542,6 +549,7 @@ const resetToMenu = () => {
 }
 
 const close = () => {
+  if (props.demoFolders) { emit('close'); return }
   uiStore.closeModal('casino')
 }
 

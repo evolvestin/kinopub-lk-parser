@@ -9,6 +9,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import connection
 from django.db.models import BigIntegerField, Case, Count, ExpressionWrapper, F, IntegerField, Q, Value, When
 from django.http import FileResponse, Http404, HttpResponse, HttpResponsePermanentRedirect, JsonResponse
 from django.core.paginator import Paginator
@@ -174,6 +175,19 @@ def home(request):
 @xframe_options_sameorigin
 def wishlist_demo(request):
     context = {}
+    def demo_ratings():
+        ratings = UserRating.objects.filter(show_id__in=[74959, 8739]).select_related('user')
+        grouped = {}
+        for rating in ratings:
+            grouped.setdefault(rating.show_id, []).append(rating)
+        result = {}
+        for show in Show.objects.filter(id__in=grouped):
+            show._prefetched_objects_cache = {'ratings': grouped[show.id]}
+            value, _ = show.get_internal_rating_data()
+            if value is not None:
+                result[show.id] = round(value, 1)
+        return result
+    context['demo_ratings'] = cache.get_or_set('public_demo_ratings_v1', demo_ratings, 300)
     if 'stats-example' in request.GET:
         people = {
             'Педро Паскаль': 68732, 'Брайан Крэнстон': 2013, 'Киллиан Мёрфи': 3170,
@@ -205,7 +219,13 @@ def catalog(request):
         48,
         cached_count=None if query else _catalog_stats()['total'],
     ).get_page(request.GET.get('page'))
-    for show in [*featured, *page.object_list]:
+    visible_shows = [*featured, *page.object_list]
+    ratings_by_show = {}
+    for rating in UserRating.objects.filter(show_id__in=[show.pk for show in visible_shows]).select_related('user'):
+        ratings_by_show.setdefault(rating.show_id, []).append(rating)
+    for show in visible_shows:
+        show._prefetched_objects_cache = {'ratings': ratings_by_show.get(show.pk, [])}
+        show.public_internal_rating, _ = show.get_internal_rating_data()
         show.public_poster = build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'medium')
     count_display = f'{page.paginator.count:,}'.replace(',', '\u00a0')
     return render(request, 'public/catalog.html', _context(request, page=page, query=query, featured=featured, count_display=count_display))
@@ -221,6 +241,7 @@ def show_detail(request, show_id):
         pk=show_id,
     )
     show.public_poster = build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'big')
+    show.public_internal_rating, _ = show.get_internal_rating_data()
     show.public_type_label = SHOW_TYPE_DISPLAY_RU.get(show.type, show.type)
     show.public_status_label = SHOW_STATUS_DISPLAY_RU.get(show.status, show.status) if show.type in SERIES_TYPES else ''
     show.public_is_series = show.type in SERIES_TYPES
@@ -401,12 +422,27 @@ def article_asset(request, slug, filename):
     return response
 
 
-def sitemap(request):
+def _sitemap_ranges():
+    if connection.vendor == 'postgresql':
+        table = connection.ops.quote_name(Show._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.execute(f'''
+                SELECT bucket FROM generate_series(
+                    1::bigint, (SELECT (COALESCE(MAX(id), 0) + 9999) / 10000 FROM {table})
+                ) AS bucket
+                WHERE EXISTS (SELECT 1 FROM {table} WHERE id > (bucket - 1) * 10000 AND id <= bucket * 10000)
+                ORDER BY bucket
+            ''')
+            return [row[0] for row in cursor.fetchall()]
     bucket = ExpressionWrapper((F('id') - Value(1)) / Value(10000) + Value(1), output_field=BigIntegerField())
+    return list(Show.objects.order_by().annotate(bucket=bucket).values_list('bucket', flat=True).distinct().order_by('bucket'))
+
+
+def sitemap(request):
     db_name = settings.DATABASES['default']['NAME']
     pages = cache.get_or_set(
         f'public_sitemap_ranges:{db_name}',
-        lambda: list(Show.objects.order_by().annotate(bucket=bucket).values_list('bucket', flat=True).distinct().order_by('bucket')),
+        _sitemap_ranges,
         300,
     )
     urls = [reverse('public_sitemap_shows', args=[page]) for page in pages]
@@ -449,10 +485,16 @@ def article_api(request, slug):
         body = data.get('body', '')
         if not title or len(title) > 255 or not description or len(description) > 300 or not isinstance(blocks, list) or len(blocks) > 100 or (not body and not blocks):
             raise ValueError('Invalid article fields')
-        valid_types = {'lead', 'paragraph', 'heading', 'image', 'step', 'steps', 'list', 'callout', 'quote'}
+        valid_types = {'lead', 'paragraph', 'heading', 'image', 'step', 'steps', 'list', 'callout', 'quote', 'guide_link'}
         for block in blocks:
             if not isinstance(block, dict) or block.get('type') not in valid_types:
                 raise ValueError('Invalid content block')
+            if block['type'] == 'guide_link':
+                slug_value, label = block.get('slug'), block.get('text')
+                if not isinstance(slug_value, str) or not slug_value or len(slug_value) > 100 or any(c not in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in slug_value):
+                    raise ValueError('Guide link requires a valid slug')
+                if not isinstance(label, str) or not label.strip() or len(label) > 200:
+                    raise ValueError('Guide link requires a concise label')
             if block['type'] == 'image':
                 src, alt, caption = block.get('src'), block.get('alt'), block.get('caption')
                 if not isinstance(src, str) or not src.startswith('/articles/assets/') or '..' in src:

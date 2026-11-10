@@ -59,6 +59,21 @@
     {
       "type": "callout",
       "text": "Чтобы получать сообщения о новых эпизодах сериала, оставьте уведомления включёнными в его карточке и не блокируйте бота в Telegram."
+    },
+    {
+      "type": "guide_link",
+      "slug": "find-movie-in-catalog",
+      "text": "Как найти фильм в каталоге и открыть его карточку"
+    },
+    {
+      "type": "guide_link",
+      "slug": "organize-favorite-folders",
+      "text": "Как создать папку избранного для текущих сериалов"
+    },
+    {
+      "type": "guide_link",
+      "slug": "new-episode-notifications",
+      "text": "Как включить уведомления о новых сериях в Telegram"
     }
   ]
 }

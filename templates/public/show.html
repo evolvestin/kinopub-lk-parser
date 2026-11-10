@@ -26,6 +26,7 @@
         <div class="show-ratings">
           {% if show.ext_rating.kp %}<span class="rating-chip rating-kp"><b>КП</b> {{ show.ext_rating.kp|floatformat:1 }}</span>{% endif %}
           {% if show.imdb_rating %}<span class="rating-chip rating-imdb"><b>IMDb</b> {{ show.imdb_rating|floatformat:1 }}</span>{% endif %}
+          {% if show.public_internal_rating != None %}<span class="rating-chip"><b>LR</b> {{ show.public_internal_rating|floatformat:1 }}</span>{% endif %}
         </div>
         {% if show.plot %}<p class="show-detail-plot">{{ show.plot }}</p>{% endif %}
         {% if show.public_genres %}<div class="show-genres" aria-label="Жанры">{% for genre in show.public_genres %}<span>{{ genre }}</span>{% endfor %}</div>{% endif %}
