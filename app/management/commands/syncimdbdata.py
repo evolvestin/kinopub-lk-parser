@@ -89,6 +89,17 @@ class Command(LoggableBaseCommand):
                 len(existing_ids),
                 time.monotonic() - phase_started,
             )
+            # Older rows may only contain an IMDb URL. Treat those IDs as
+            # existing before creating missing records, not just during the
+            # later ratings pass, to avoid duplicate catalogue entries.
+            phase_started = time.monotonic()
+            imdb_url_map = self._build_imdb_url_map()
+            existing_ids.update(imdb_url_map)
+            logger.info(
+                'Built IMDb URL fallback map with %s IDs in %.1f seconds.',
+                len(imdb_url_map),
+                time.monotonic() - phase_started,
+            )
             phase_started = time.monotonic()
             basics_stats = self._process_basics(
                 paths['basics'],
@@ -101,13 +112,6 @@ class Command(LoggableBaseCommand):
                 'IMDb basics completed: processed=%s, created=%s in %.1f seconds.',
                 basics_stats['processed'],
                 basics_stats['created'],
-                time.monotonic() - phase_started,
-            )
-            phase_started = time.monotonic()
-            imdb_url_map = self._build_imdb_url_map()
-            logger.info(
-                'Built IMDb URL fallback map with %s IDs in %.1f seconds.',
-                len(imdb_url_map),
                 time.monotonic() - phase_started,
             )
             phase_started = time.monotonic()
