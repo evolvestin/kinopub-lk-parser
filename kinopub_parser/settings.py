@@ -1,11 +1,13 @@
 import logging
 import os
+import re
 import socket
 import sys
 from pathlib import Path
 
 from celery.schedules import crontab
 from django.core.exceptions import ImproperlyConfigured
+from django.contrib.staticfiles.storage import StaticFilesStorage
 from dotenv import load_dotenv
 from whitenoise.storage import CompressedManifestStaticFilesStorage
 
@@ -154,6 +156,13 @@ DJANGO_VITE = {
 
 
 class SafeCompressedManifestStaticFilesStorage(CompressedManifestStaticFilesStorage):
+    def url(self, name, force=False):
+        # Vite already fingerprints its bundle names. Rehashing the entry URL
+        # breaks module identity: dynamic chunks import the original filename.
+        if re.fullmatch(r'assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8}\.(?:js|css)', name):
+            return StaticFilesStorage.url(self, name)
+        return super().url(name, force=force)
+
     def stored_name(self, name):
         try:
             return super().stored_name(name)

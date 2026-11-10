@@ -12,6 +12,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from app.models import Person, PublicArticle, PublicVisit, Show, ShowCrew, ShowDuration, UserRating, ViewHistory, ViewUser, WishlistFolder, WishlistItem
+from kinopub_parser.settings import SafeCompressedManifestStaticFilesStorage
 
 
 class PublicSiteTests(TestCase):
@@ -36,6 +37,12 @@ class PublicSiteTests(TestCase):
         self.assertNotIn('noindex', response.get('X-Robots-Tag', ''))
         self.assertEqual(self.client.get('/metrics/', HTTP_HOST='157.173.101.93:8012').status_code, 200)
         self.assertEqual(self.client.get('/', HTTP_HOST='localhost:8022').status_code, 200)
+
+    @override_settings(STATIC_URL='/static/')
+    def test_vite_fingerprinted_assets_keep_original_urls(self):
+        storage = SafeCompressedManifestStaticFilesStorage()
+        self.assertEqual(storage.url('assets/main-CerCkXVE.js'), '/static/assets/main-CerCkXVE.js')
+        self.assertEqual(storage.url('assets/main-CMqabRWI.css'), '/static/assets/main-CMqabRWI.css')
 
     def test_missing_metadata_does_not_claim_seasons_or_cast(self):
         movie = Show.objects.create(title='Новый фильм', type='Movie', imdb_id='tt13918446')
