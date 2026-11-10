@@ -1,5 +1,9 @@
 # Agent operational notes
 
+## Public articles
+
+For publishing and updating public site articles, follow `docs/public-articles-api.md`. Use the configured dedicated token without printing or committing it. Verify the content against the actual product behavior before publication.
+
 ## Testing environment
 
 Run project checks, migrations, and tests inside the Docker Compose services.

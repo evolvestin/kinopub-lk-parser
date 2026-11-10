@@ -33,5 +33,11 @@ class NoIndexMiddleware:
 
     def __call__(self, request):
         response = self.get_response(request)
-        response['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+        public_routes = {'index', 'public_catalog', 'public_show', 'public_guides', 'public_guide', 'public_sitemap', 'public_sitemap_shows'}
+        route = getattr(request.resolver_match, 'url_name', None)
+        searchable = route in public_routes and response.status_code == 200
+        if route == 'public_catalog' and request.GET.get('q', '').strip():
+            searchable = False
+        if not searchable:
+            response.setdefault('X-Robots-Tag', 'noindex, nofollow, noarchive')
         return response

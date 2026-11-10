@@ -42,6 +42,10 @@
       </div>
     </div>
 
+    <div v-if="publicVisitStats" class="card" style="margin: 20px 16px; padding: 20px;">
+      <h2>Посещаемость сайта за 24 часа</h2>
+      <p>Сессии: {{ publicVisitStats.sessions }} · Просмотры: {{ publicVisitStats.pageviews }} · Среднее активное время: {{ publicVisitStats.duration }} сек.</p>
+    </div>
     <template v-for="(group, groupIdx) in metricGroups" :key="groupIdx">
       <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
         <div class="icon" :style="{ color: group.color }" v-html="icons[group.icon]"></div>
@@ -273,6 +277,7 @@ import { icons } from '../utils/icons'
 import ChartDataLabels from 'chartjs-plugin-datalabels'
 
 const allMetrics = window.ALL_METRICS || {}
+const publicVisitStats = window.PUBLIC_VISIT_STATS
 const adminApps = window.ADMIN_APP_LIST || []
 const ctx = window.ADMIN_CONTEXT || {}
 

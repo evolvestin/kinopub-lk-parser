@@ -856,6 +856,22 @@ class ExternalRating(BaseModel):
         return f'External Ratings for {self.show.id}'
 
 
+class PublicArticle(BaseModel):
+    slug = models.SlugField(max_length=150, unique=True)
+    title = models.CharField(max_length=255)
+    description = models.CharField(max_length=300)
+    body = models.TextField()
+    published_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+
+class PublicVisit(models.Model):
+    session_id = models.UUIDField(unique=True)
+    started_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    last_seen_at = models.DateTimeField(auto_now_add=True)
+    active_seconds = models.PositiveIntegerField(default=0)
+    pageviews = models.PositiveIntegerField(default=1)
+
+
 class SiteMetric(BaseModel):
     key = models.CharField(max_length=100, db_index=True)
     data = JSONField()

@@ -168,13 +168,24 @@ def metrics(request):
         'bot_users_total': bot_users_total,
         'metrics_json': json.dumps(metrics_history),
     }
+    if request.user.is_staff:
+        from django.db.models import Avg, Count, Sum
+        from app.models import PublicVisit
+        stats = PublicVisit.objects.filter(started_at__gte=timezone.now() - timedelta(days=1)).aggregate(sessions=Count('id'), pageviews=Sum('pageviews'), duration=Avg('active_seconds'))
+        context['public_visit_stats'] = json.dumps({'sessions': stats['sessions'], 'pageviews': stats['pageviews'] or 0, 'duration': round(stats['duration'] or 0)})
     return render(request, 'index.html', context)
 
 
 def robots_txt(request):
     lines = [
         'User-agent: *',
-        'Disallow: /',
+        'Disallow: /admin/',
+        'Disallow: /api/',
+        'Disallow: /metrics/',
+        'Disallow: /webapp/',
+        'Disallow: /webapp-preview/',
+        'Disallow: /webapp-preview-app/',
+        f'Sitemap: {request.build_absolute_uri("/sitemap.xml")}',
     ]
     return HttpResponse('\n'.join(lines), content_type='text/plain')
 

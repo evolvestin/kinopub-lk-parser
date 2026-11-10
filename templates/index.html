@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="{% static 'css/kp_theme.css' %}?v={{ APP_VERSION }}">
     <link rel="stylesheet" href="{% static 'css/webapp.css' %}?v={{ APP_VERSION }}">
     <script>
+        window.PUBLIC_VISIT_STATS = {{ public_visit_stats|default:'null'|safe }};
         window.IS_AUTHENTICATED = {{ user.is_authenticated|yesno:"true,false" }};
         window.ALL_METRICS = {{ metrics_json|safe }};
         window.LAST_ACTIONS = {

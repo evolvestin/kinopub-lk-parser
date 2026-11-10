@@ -14,6 +14,7 @@ from app.management.base import LoggableBaseCommand
 from app.models import (
     LogEntry,
     Person,
+    PublicVisit,
     Show,
     ShowDuration,
     TelegramLog,
@@ -347,6 +348,13 @@ class Command(LoggableBaseCommand):
         else:
             report_parts.append('✨ Все показатели в норме')
 
+        try:
+            from django.db.models import Avg, Count, Sum
+            visits = PublicVisit.objects.filter(started_at__gte=now - timedelta(days=1)).aggregate(sessions=Count('id'), pageviews=Sum('pageviews'), duration=Avg('active_seconds'))
+            report_parts.append(f'🌐 Сайт за 24 ч: <b>{visits["sessions"]}</b> сессий, <b>{visits["pageviews"] or 0}</b> просмотров, среднее активное время <b>{round(visits["duration"] or 0)} сек.</b>')
+        except Exception:
+            logger.exception('Could not collect public site visits')
+            report_parts.append('⚠️ Посещаемость сайта: недоступна')
         report_parts.extend(components_lines)
         message_text = '\n'.join(report_parts)
 

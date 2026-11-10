@@ -39,6 +39,15 @@ if (document.getElementById('admin-wishlist-preview')) {
   })
 }
 
+if (document.getElementById('public-wishlist-demo')) {
+  import('./views/PublicWishlistDemo.vue').then(({ default: PublicWishlistDemo }) => {
+    const demo = createApp(PublicWishlistDemo)
+    demo.use(pinia)
+    demo.use(router)
+    demo.mount('#public-wishlist-demo')
+  })
+}
+
 let touchStartX = 0
 let touchStartY = 0
 let touchStartTime = 0

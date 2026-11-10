@@ -4,6 +4,7 @@ from django.urls import path, re_path
 from django.views.generic.base import RedirectView
 
 from app import views
+from app import public_site
 from app.admin_site import admin_site
 from app.views import vite_proxy_view
 
@@ -18,7 +19,16 @@ else:
 
 urlpatterns = proxy_patterns + [
     path('robots.txt', views.robots_txt, name='robots_txt'),
-    path('', views.redirect_index, name='index'),
+    path('', public_site.home, name='index'),
+    path('catalog/', public_site.catalog, name='public_catalog'),
+    path('preview/wishlist/', public_site.wishlist_demo, name='public_wishlist_demo'),
+    path('catalog/<int:show_id>/', public_site.show_detail, name='public_show'),
+    path('guide/', public_site.guide_index, name='public_guides'),
+    path('guide/<slug:slug>/', public_site.guide_detail, name='public_guide'),
+    path('sitemap.xml', public_site.sitemap, name='public_sitemap'),
+    path('sitemap-shows-<int:page>.xml', public_site.sitemap_shows, name='public_sitemap_shows'),
+    path('api/internal/articles/<slug:slug>/', public_site.article_api),
+    path('api/public/visit/', public_site.visit_event),
     path('metrics/', views.metrics, name='metrics'),
     path('admin/', admin_site.urls),
     path(

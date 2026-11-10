@@ -194,9 +194,9 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
                 await sender.send_message(chat_id=user.id, text='❌ Некорректная ссылка на оценку.')
             return
 
-        if args.startswith('show_'):
+        if args.startswith(('show_', 'site_show_')):
             try:
-                show_id = int(args.split('_')[1])
+                show_id = int(args.removeprefix('site_show_').removeprefix('show_'))
                 show_data = await client.get_show_details(show_id, telegram_id=user.id)
 
                 if show_data:
