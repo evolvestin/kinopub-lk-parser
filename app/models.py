@@ -279,6 +279,13 @@ class ShowCrew(BaseModel):
 
 class ViewUser(BaseModel):
     telegram_id = models.BigIntegerField(unique=True, null=True, blank=True)
+    registration_source = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name='Источник регистрации',
+        help_text='Источник перехода из Telegram deep link, например site.',
+    )
     username = models.CharField(max_length=255, null=True, blank=True)
     name = models.CharField(max_length=255, default='')
     language = models.CharField(max_length=10, default='en')

@@ -42,7 +42,11 @@ async def bot_command_start_private(message: Message, bot: Bot, command: Command
     user = message.from_user
 
     success = await client.register_user(
-        user.id, user.username, user.first_name, user.language_code or 'ru'
+        user.id,
+        user.username,
+        user.first_name,
+        user.language_code or 'ru',
+        start_payload=command.args if command else None,
     )
 
     args = command.args if command else None

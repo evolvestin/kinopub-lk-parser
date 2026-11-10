@@ -94,6 +94,12 @@ class TelegramSender:
         self._request('delete_message', payload)
 
     def _get_role_message_text(self, view_user):
+        source_line = ''
+        if view_user.registration_source:
+            source_label = (
+                'website' if view_user.registration_source == 'site' else view_user.registration_source
+            )
+            source_line = f'\n{bold("Source:")} {html_secure(source_label)}'
         return (
             f'👤 {bold("User Registration / Role Management")}\n\n'
             f'{bold("Name:")} {html_secure(view_user.name or "N/A")}\n'
@@ -101,6 +107,7 @@ class TelegramSender:
             f'{bold("ID:")} {code(view_user.telegram_id)}\n'
             f'{bold("Language:")} {view_user.language}\n'
             f'{bold("Registered:")} {view_user.created_at.strftime("%Y-%m-%d %H:%M")}'
+            f'{source_line}'
         )
 
     def send_user_role_message(self, view_user):

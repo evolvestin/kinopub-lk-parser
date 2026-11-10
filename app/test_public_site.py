@@ -10,7 +10,7 @@ from django.db import connection
 from django.urls import reverse
 from django.test.utils import CaptureQueriesContext
 
-from app.models import PublicVisit, Show
+from app.models import Person, PublicVisit, Show, ShowCrew, ShowDuration
 
 
 class PublicSiteTests(TestCase):
@@ -25,6 +25,26 @@ class PublicSiteTests(TestCase):
         self.assertContains(response, reverse('public_show', args=[self.show.pk]))
         response = self.client.get(reverse('public_show', args=[self.show.pk]))
         self.assertContains(response, f'https://t.me/kinopub_observer_bot?start=site_show_{self.show.pk}')
+
+    def test_show_detail_renders_seasons_and_crew(self):
+        person = Person.objects.create(name='Тестовый актёр')
+        ShowCrew.objects.create(show=self.show, person=person, profession='Актер')
+        ShowDuration.objects.create(
+            show=self.show,
+            season_number=1,
+            episode_number=1,
+            duration_seconds=1800,
+        )
+
+        response = self.client.get(reverse('public_show', args=[self.show.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Сезоны и эпизоды')
+        self.assertContains(response, 'Сезон 1')
+        self.assertContains(response, 'E01')
+        self.assertContains(response, 'Актёр')
+        self.assertContains(response, 'Тестовый актёр')
+        self.assertContains(response, '"@type": "TVSeries"')
 
     def test_public_ctas_mark_site_traffic(self):
         for path in ['/', '/catalog/', '/guide/', '/guide/notifications/']:

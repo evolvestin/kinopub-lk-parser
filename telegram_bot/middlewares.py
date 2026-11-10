@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -20,11 +21,18 @@ class UserSyncMiddleware(BaseMiddleware):
 
         if user:
             try:
+                start_payload = None
+                message_text = getattr(event, 'text', None)
+                if message_text:
+                    match = re.match(r'^/start(?:@\w+)?\s+(\S+)', message_text.strip())
+                    if match:
+                        start_payload = match.group(1)
                 await client.register_user(
                     telegram_id=user.id,
                     username=user.username,
                     first_name=user.first_name,
                     language_code=user.language_code or 'en',
+                    start_payload=start_payload,
                 )
             except Exception as e:
                 logging.error(f'Middleware user sync error: {e}')

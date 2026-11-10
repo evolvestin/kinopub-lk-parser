@@ -49,7 +49,11 @@ async def _execute_request(
 
 
 async def register_user(
-    telegram_id: int, username: str, first_name: str, language_code: str
+    telegram_id: int,
+    username: str,
+    first_name: str,
+    language_code: str,
+    start_payload: str = None,
 ) -> bool:
     payload = {
         'telegram_id': telegram_id,
@@ -57,6 +61,8 @@ async def register_user(
         'first_name': first_name,
         'language_code': language_code,
     }
+    if start_payload:
+        payload['start_payload'] = start_payload
     data = await _execute_request('register/', method='POST', payload=payload)
     return bool(data)
 

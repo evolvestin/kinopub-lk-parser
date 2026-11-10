@@ -18,8 +18,17 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
-from app.models import PublicArticle, PublicVisit, Show
+from app.models import PublicArticle, PublicVisit, Show, ShowCrew, ShowDuration
 from shared.media import build_poster_url
+from shared.constants import (
+    PROFESSIONS_PLURAL_MAP_RU,
+    RAW_TO_NORMALIZED_COUNTRY,
+    RAW_TO_NORMALIZED_GENRE,
+    RAW_TO_NORMALIZED_RU,
+    SERIES_TYPES,
+    SHOW_STATUS_DISPLAY_RU,
+    SHOW_TYPE_DISPLAY_RU,
+)
 
 
 GUIDES = {
@@ -170,9 +179,110 @@ def catalog(request):
 
 
 def show_detail(request, show_id):
-    show = get_object_or_404(Show.objects.select_related('ext_rating').prefetch_related('genres', 'countries'), pk=show_id)
+    show = get_object_or_404(
+        Show.objects.select_related('ext_rating').prefetch_related(
+            'genres', 'countries',
+            # Load credits in one query and resolve aliases without N+1 reads.
+            'showcrew_set__person__master_person',
+        ),
+        pk=show_id,
+    )
     show.public_poster = build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'big')
-    return render(request, 'public/show.html', _context(request, show=show))
+    show.public_type_label = SHOW_TYPE_DISPLAY_RU.get(show.type, show.type)
+    show.public_status_label = SHOW_STATUS_DISPLAY_RU.get(show.status, show.status)
+    show.public_genres = sorted(
+        {RAW_TO_NORMALIZED_GENRE.get(genre.name, genre.name) for genre in show.genres.all()}
+    )
+    show.public_countries = sorted(
+        {RAW_TO_NORMALIZED_COUNTRY.get(country.name, country.name) for country in show.countries.all()}
+    )
+
+    grouped_crew = {}
+    seen_people = set()
+    for credit in show.showcrew_set.all():
+        person = credit.person.canonical
+        profession = credit.normalized_profession
+        if not profession or profession == '-':
+            profession = 'Другое'
+        identity = (profession, person.pk)
+        if identity in seen_people:
+            continue
+        seen_people.add(identity)
+        group = grouped_crew.setdefault(profession, [])
+        group.append({
+            'name': person.name,
+            'photo_url': person.photo_url,
+            'profession': profession,
+        })
+
+    preferred_professions = [
+        'Актёр', 'Актёр дубляжа', 'Режиссёр', 'Сценарист', 'Продюссер',
+        'Оператор', 'Композитор', 'Художник', 'Монтажёр',
+    ]
+    crew = []
+    added_professions = set()
+    for profession in [*preferred_professions, *grouped_crew.keys()]:
+        people = grouped_crew.get(profession)
+        if not people or profession in added_professions:
+            continue
+        added_professions.add(profession)
+        crew.append({
+            'title': PROFESSIONS_PLURAL_MAP_RU.get(profession, profession)
+            if len(people) > 1 else profession,
+            'people': people,
+        })
+
+    seasons_by_number = {}
+    if show.type in SERIES_TYPES:
+        episode_rows = ShowDuration.objects.filter(
+            show_id=show.pk,
+            season_number__isnull=False,
+            season_number__gt=0,
+            episode_number__isnull=False,
+            episode_number__gt=0,
+        ).values('season_number', 'episode_number').order_by('season_number', 'episode_number')
+        for episode in episode_rows:
+            season = seasons_by_number.setdefault(
+                episode['season_number'],
+                {'season_number': episode['season_number'], 'episodes': [], 'episode_count': 0},
+            )
+            season['episodes'].append(episode)
+            season['episode_count'] += 1
+    seasons = list(seasons_by_number.values())
+    total_episodes = sum(season['episode_count'] for season in seasons)
+
+    structured = {
+        '@context': 'https://schema.org',
+        '@type': 'Movie' if show.type == 'Movie' else 'TVSeries',
+        'name': show.title,
+        'alternateName': show.original_title if show.original_title != show.title else None,
+        'description': show.plot[:500] if show.plot else None,
+        'image': request.build_absolute_uri(show.public_poster) if show.public_poster else None,
+        'genre': show.public_genres,
+        'countryOfOrigin': show.public_countries,
+        'datePublished': str(show.year) if show.year else None,
+        'actor': [
+            {'@type': 'Person', 'name': person['name']}
+            for group in crew if group['title'].startswith('Акт')
+            for person in group['people']
+        ],
+    }
+    structured_json = json.dumps(
+        {key: value for key, value in structured.items() if value}, ensure_ascii=False
+    ).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+    return render(
+        request,
+        'public/show.html',
+        _context(
+            request,
+            show=show,
+            seasons=seasons,
+            total_episodes=total_episodes,
+            total_season_count=len(seasons),
+            crew=crew,
+            structured_json=structured_json,
+        ),
+    )
 
 
 def guide_index(request):

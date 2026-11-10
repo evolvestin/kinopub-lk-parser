@@ -1,1 +1,68 @@
-{% extends 'public/base.html' %}{% block title %}{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %} — KinoPub Observer{% endblock %}{% block description %}{% if show.plot %}{{ show.plot|truncatechars:155 }}{% else %}{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %}: сведения о фильме или сериале. Откройте карточку в KinoPub Observer и добавьте в избранное.{% endif %}{% endblock %}{% block content %}<section class="wrap section"><a class="back" href="/catalog/">Каталог</a><div class="detail"><div class="detail-poster poster">{% if show.public_poster %}<img class="public-poster" src="{{ show.public_poster }}" alt="Постер: {{ show.title }}">{% else %}<span>◈</span>{% endif %}</div><div><div class="eyebrow">ФИЛЬМЫ И СЕРИАЛЫ</div><h1 class="page-title">{{ show.title }}</h1><p class="lead">{{ show.original_title }}{% if show.year %} · {{ show.year }}{% endif %}</p>{% if show.plot %}<p class="detail-text">{{ show.plot }}</p>{% endif %}<dl class="show-facts">{% if show.year %}<div><dt>Год</dt><dd>{{ show.year }}</dd></div>{% endif %}{% if show.original_title and show.original_title != show.title %}<div><dt>Оригинальное название</dt><dd>{{ show.original_title }}</dd></div>{% endif %}{% if show.genres.all %}<div><dt>Жанры</dt><dd>{% for genre in show.genres.all %}{{ genre.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>{% endif %}{% if show.countries.all %}<div><dt>Страны</dt><dd>{% for country in show.countries.all %}{{ country.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>{% endif %}{% if show.ext_rating.kp %}<div><dt>Кинопоиск</dt><dd>{{ show.ext_rating.kp }}</dd></div>{% endif %}</dl><a class="button" href="{{ bot_url }}?start=site_show_{{ show.id }}">Открыть в Telegram {% include 'public/arrow.html' %}</a><p class="muted">Откройте карточку в боте, чтобы добавить её в избранное.</p></div></div></section>{% endblock %}
+{% extends 'public/base.html' %}
+{% block title %}{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %} — KinoPub Observer{% endblock %}
+{% block description %}{% if show.plot %}{{ show.plot|truncatechars:155 }}{% else %}{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %}: сведения о фильме или сериале. Сезоны, эпизоды и участники съёмочной группы.{% endif %}{% endblock %}
+{% block social_meta %}<meta property="og:title" content="{{ show.title }}{% if show.year %} ({{ show.year }}){% endif %}"><meta property="og:description" content="{% if show.plot %}{{ show.plot|truncatechars:155 }}{% else %}Карточка фильма или сериала «{{ show.title }}»{% endif %}"><meta property="og:type" content="{% if show.type == 'Movie' %}video.movie{% else %}video.tv_show{% endif %}">{% if show.public_poster %}<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ show.public_poster }}">{% endif %}{% endblock %}
+{% block structured_data %}<script type="application/ld+json">{{ structured_json|safe }}</script>{% endblock %}
+{% block content %}
+<section class="wrap section show-page">
+  <a class="back" href="/catalog/">← Каталог</a>
+  <article class="show-detail-card">
+    <div class="show-detail-backdrop"{% if show.public_poster %} style="background-image:url('{{ show.public_poster }}')"{% endif %} aria-hidden="true"></div>
+    <div class="show-detail-shade" aria-hidden="true"></div>
+    <div class="show-detail-layout">
+      <div class="show-detail-poster">
+        {% if show.public_poster %}<img src="{{ show.public_poster }}" alt="Постер фильма или сериала «{{ show.title }}»" width="500" height="750" fetchpriority="high" decoding="async">{% else %}<div class="poster-placeholder">▤</div>{% endif %}
+      </div>
+      <div class="show-detail-main">
+        <div class="eyebrow">КАТАЛОГ ФИЛЬМОВ И СЕРИАЛОВ</div>
+        <h1 class="show-detail-title">{{ show.title }}</h1>
+        {% if show.original_title and show.original_title != show.title %}<p class="show-original-title">{{ show.original_title }}</p>{% endif %}
+        <div class="show-tags">
+          {% if show.year %}<span class="show-tag">{{ show.year }}</span>{% endif %}
+          {% if show.type %}<span class="show-tag show-tag-accent">{{ show.public_type_label }}</span>{% endif %}
+          {% if show.status %}<span class="show-tag">{{ show.public_status_label }}</span>{% endif %}
+          {% for country in show.public_countries %}<span class="show-tag">{{ country }}</span>{% endfor %}
+        </div>
+        <div class="show-ratings">
+          {% if show.ext_rating.kp %}<span class="rating-chip rating-kp"><b>КП</b> {{ show.ext_rating.kp|floatformat:1 }}</span>{% endif %}
+          {% if show.imdb_rating %}<span class="rating-chip rating-imdb"><b>IMDb</b> {{ show.imdb_rating|floatformat:1 }}</span>{% endif %}
+        </div>
+        {% if show.plot %}<p class="show-detail-plot">{{ show.plot }}</p>{% endif %}
+        {% if show.public_genres %}<div class="show-genres" aria-label="Жанры">{% for genre in show.public_genres %}<span>{{ genre }}</span>{% endfor %}</div>{% endif %}
+        <a class="button show-detail-cta" href="{{ bot_url }}?start=site_show_{{ show.id }}">Открыть карточку в Telegram {% include 'public/arrow.html' with external=True %}</a>
+        <p class="show-detail-hint">В боте можно добавить тайтл в избранное и следить за новыми сериями.</p>
+      </div>
+    </div>
+  </article>
+
+  {% if seasons %}
+  <section class="show-section" aria-labelledby="seasons-title">
+    <div class="show-section-heading"><div><div class="eyebrow">СЕРИАЛ</div><h2 id="seasons-title">Сезоны и эпизоды</h2></div><span class="show-section-count">{{ total_season_count }} сез. · {{ total_episodes }} эп.</span></div>
+    <div class="season-grid">
+      {% for season in seasons %}
+      <article class="season-card">
+        <div class="season-card-heading"><h3>Сезон {{ season.season_number }}</h3><span>{{ season.episode_count }} эп.</span></div>
+        <div class="episode-chips" aria-label="Эпизоды сезона {{ season.season_number }}">
+          {% for episode in season.episodes|slice:":24" %}<span>E{{ episode.episode_number|stringformat:"02d" }}</span>{% endfor %}
+          {% if season.episode_count > 24 %}<span class="episode-more">+{{ season.episode_count|add:"-24" }}</span>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if crew %}
+  <section class="show-section" aria-labelledby="crew-title">
+    <div class="show-section-heading"><div><div class="eyebrow">УЧАСТНИКИ</div><h2 id="crew-title">Актёры и съёмочная группа</h2></div></div>
+    <div class="crew-grid">
+      {% for group in crew %}
+      <section class="crew-group"><h3>{{ group.title }}</h3><div class="crew-list">
+        {% for person in group.people %}<div class="crew-person">{% if person.photo_url %}<img src="{{ person.photo_url }}" alt="{{ person.name }}" width="48" height="48" loading="lazy" decoding="async">{% else %}<span class="crew-avatar" aria-hidden="true">{{ person.name|slice:":1" }}</span>{% endif %}<span>{{ person.name }}</span></div>{% endfor %}
+      </div></section>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</section>
+{% endblock %}

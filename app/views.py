@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import random
+import re
 import secrets
 import urllib.parse
 import uuid
@@ -440,6 +441,12 @@ def register_bot_user(request):
     telegram_id = data.get('telegram_id')
     username = data.get('username')
     first_name = data.get('first_name', '')
+    start_payload = str(data.get('start_payload') or '').strip()
+    registration_source = ''
+    if start_payload == 'site':
+        registration_source = 'site'
+    elif re.fullmatch(r'site_show_\d+', start_payload):
+        registration_source = start_payload
     login_username = username if username else str(telegram_id)
 
     host = 'localhost'
@@ -457,6 +464,7 @@ def register_bot_user(request):
             'language': data.get('language_code', 'ru'),
             'role': UserRole.GUEST,
             'is_bot_active': True,
+            'registration_source': registration_source,
         },
     )
 
