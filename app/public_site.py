@@ -315,7 +315,11 @@ def guide_detail(request, slug):
         'author': {'@type': 'Organization', 'name': 'KinoPub Observer'},
         'publisher': {'@type': 'Organization', 'name': 'KinoPub Observer'},
     }
-    images = [block.get('src') for block in article.content_blocks if block.get('type') == 'image' and block.get('src', '').startswith('/')]
+    images = []
+    for block in article.content_blocks:
+        image = block if block.get('type') == 'image' else block.get('image') if block.get('type') == 'step' else None
+        if isinstance(image, dict) and image.get('src', '').startswith('/'):
+            images.append(image['src'])
     article_images = [request.build_absolute_uri(src) for src in images[:3]]
     if images:
         structured['image'] = article_images
@@ -414,7 +418,7 @@ def article_api(request, slug):
         body = data.get('body', '')
         if not title or len(title) > 255 or not description or len(description) > 300 or not isinstance(blocks, list) or len(blocks) > 100 or (not body and not blocks):
             raise ValueError('Invalid article fields')
-        valid_types = {'lead', 'paragraph', 'heading', 'image', 'steps', 'list', 'callout', 'quote'}
+        valid_types = {'lead', 'paragraph', 'heading', 'image', 'step', 'steps', 'list', 'callout', 'quote'}
         for block in blocks:
             if not isinstance(block, dict) or block.get('type') not in valid_types:
                 raise ValueError('Invalid content block')
@@ -424,6 +428,23 @@ def article_api(request, slug):
                     raise ValueError('Images must use uploaded article assets')
                 if not isinstance(alt, str) or not alt.strip() or len(alt) > 300 or not isinstance(caption, str) or not caption.strip() or len(caption) > 500:
                     raise ValueError('Images require a concise alt text and caption')
+            if block['type'] == 'step':
+                if not isinstance(block.get('title'), str) or not block['title'].strip() or len(block['title']) > 160:
+                    raise ValueError('Step blocks require a short title')
+                if not isinstance(block.get('text'), str) or not block['text'].strip() or len(block['text']) > 1200:
+                    raise ValueError('Step blocks require clear action instructions')
+                image = block.get('image')
+                if image is not None:
+                    if not isinstance(image, dict):
+                        raise ValueError('Step images must be an object')
+                    src, alt, caption = image.get('src'), image.get('alt'), image.get('caption')
+                    if not isinstance(src, str) or not src.startswith('/articles/assets/') or '..' in src:
+                        raise ValueError('Step images must use uploaded article assets')
+                    if not isinstance(alt, str) or not alt.strip() or len(alt) > 300 or not isinstance(caption, str) or not caption.strip() or len(caption) > 500:
+                        raise ValueError('Step images require concise alt text and a caption')
+                result = block.get('result')
+                if result is not None and (not isinstance(result, str) or len(result) > 500):
+                    raise ValueError('Step results must be under 500 characters')
             if block['type'] in {'steps', 'list'} and (not isinstance(block.get('items'), list) or not block['items'] or len(block['items']) > 30 or not all(isinstance(item, str) and item.strip() and len(item) <= 1000 for item in block['items'])):
                 raise ValueError('List blocks require text items')
             if block['type'] in {'lead', 'paragraph', 'heading', 'callout', 'quote'} and (not isinstance(block.get('text'), str) or not block['text'].strip() or len(block['text']) > 10000):

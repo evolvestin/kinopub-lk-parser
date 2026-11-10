@@ -145,7 +145,7 @@ import { useUserStore } from '../../stores/userStore'
 import { icons } from '../../utils/icons'
 import { isSeriesType } from '../../utils/showTypes'
 
-const props = defineProps(['showId', 'title', 'initialValue', 'type'])
+const props = defineProps(['showId', 'title', 'initialValue', 'type', 'demoMode'])
 const emit = defineEmits(['close'])
 
 const api = useApi()
@@ -261,12 +261,14 @@ watch(() => router.currentRoute.value.query.modal_initialValue, (newVal) => {
 }, { immediate: true })
 
 const currentPersonalRating = computed(() => {
+  if (props.demoMode) return null
   if (!props.showId) return null
   const local = statsStore.userShowRatings[props.showId]
   return local !== undefined ? local : parseFloat(props.initialValue)
 })
 
 const hasExistingRating = computed(() => {
+  if (props.demoMode) return false
   const iv = props.initialValue
   if (iv === undefined || iv === null || iv === 'null' || iv === 'undefined' || iv === '') {
     return false
@@ -343,6 +345,7 @@ const showDeleteButton = computed(() => {
 })
 
 const showHint = computed(() => {
+  if (props.demoMode) return false
   return statsStore.currentStats?.ratings?.total === 0 && !uiStore.dismissedHints['rate_modal']
 })
 
@@ -415,7 +418,9 @@ onMounted(async () => {
     localVal.value = 5.0
   }
 
-  if (isSeries.value && !uiStore.episodesCache[props.showId]) {
+  if (props.demoMode) {
+    episodesData.value = []
+  } else if (isSeries.value && !uiStore.episodesCache[props.showId]) {
     await fetchEpisodes(true)
   } else if (isSeries.value) {
     episodesData.value = uiStore.episodesCache[props.showId]
@@ -513,6 +518,7 @@ const close = () => {
 }
 
 const saveRating = async () => {
+  if (props.demoMode) return close()
   isSaving.value = true
 
   if (!statsStore.isShared && !userStore.privacyChoiceMade) {

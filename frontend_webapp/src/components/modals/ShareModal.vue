@@ -8,7 +8,7 @@
       
       <div class="share-section-title" style="margin-top: 0;">Годы для экспорта</div>
       <div class="years-grid">
-        <label v-for="y in statsStore.availableYears" :key="y">
+        <label v-for="y in availableYears" :key="y">
             <input type="checkbox" v-model="selectedYears" :value="y" class="yr-chk-input">
             <div class="yr-chk-btn">{{ y === 'all' ? 'Всё время' : y }}</div>
         </label>
@@ -21,12 +21,12 @@
             <div class="chk-box"></div>
             <span class="chk-text">Скрыть мой профиль (Аноним)</span>
         </label>
-        <label class="chk-row" v-if="statsStore.hasGroup">
+        <label class="chk-row" v-if="!props.demo && statsStore.hasGroup">
             <input type="checkbox" v-model="config.include_group">
             <div class="chk-box"></div>
             <span class="chk-text">Включить вкладку "Группа"</span>
         </label>
-        <label class="chk-row" v-if="statsStore.hasGroup && config.include_group" style="padding-left:34px;">
+        <label class="chk-row" v-if="!props.demo && statsStore.hasGroup && config.include_group" style="padding-left:34px;">
             <input type="checkbox" v-model="config.anon_group">
             <div class="chk-box"></div>
             <span class="chk-text">Скрыть имена участников</span>
@@ -56,6 +56,8 @@ const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const api = useApi()
 const router = useRouter()
+const props = defineProps({ demo: { type: Boolean, default: false } })
+const availableYears = computed(() => props.demo ? ['all', 2025, 2024] : statsStore.availableYears)
 
 const isBaking = ref(false)
 
@@ -89,6 +91,7 @@ const close = () => {
 
 async function submit() {
   if (!selectedYears.value.length) return uiStore.showToast('Выберите период')
+  if (props.demo) return close()
   isBaking.value = true
   try {
     const res = await api.post('bake_stats/', {

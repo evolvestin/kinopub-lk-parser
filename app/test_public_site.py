@@ -148,6 +148,7 @@ class PublicSiteTests(TestCase):
         blocks = [
             {'type': 'lead', 'text': '<script>not markup</script>'},
             {'type': 'image', 'src': '/articles/assets/example/0123456789abcdef0123456789abcdef.jpg', 'alt': 'Фото карточки', 'caption': 'Подпись фото'},
+            {'type': 'step', 'title': 'Откройте избранное', 'text': 'Выберите раздел «Избранное».', 'result': 'Появятся сохранённые папки.', 'image': {'src': '/articles/assets/example/abcdef0123456789abcdef0123456789.jpg', 'alt': 'Открыт раздел избранного', 'caption': 'Шаг 1. Откройте избранное.'}},
             {'type': 'steps', 'items': ['Шаг первый', 'Шаг второй']},
         ]
         payload = json.dumps({'title': 'Статья с блоками', 'description': 'Ответ на вопрос', 'body': '', 'content_blocks': blocks, 'published_at': published})
@@ -157,6 +158,9 @@ class PublicSiteTests(TestCase):
         self.assertContains(page, '&lt;script&gt;not markup&lt;/script&gt;')
         self.assertContains(page, 'Фото карточки')
         self.assertContains(page, 'Подпись фото')
+        self.assertContains(page, 'Откройте избранное')
+        self.assertContains(page, 'Шаг 1. Откройте избранное.')
+        self.assertContains(page, 'Появятся сохранённые папки.')
         self.assertContains(page, 'Шаг первый')
 
     def test_visit_events_count_pageviews_and_time(self):

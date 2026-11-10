@@ -19,7 +19,7 @@
           {{ context.title }}
         </div>
 
-        <div v-if="statsStore.currentStats?.summary?.total_views === 0 && !uiStore.dismissedHints['add_view_modal']" class="modal-hint-box" style="position: relative;">
+        <div v-if="!context.demoMode && statsStore.currentStats?.summary?.total_views === 0 && !uiStore.dismissedHints['add_view_modal']" class="modal-hint-box" style="position: relative;">
           Выберите точную дату или месяц для построения графиков активности. Если точная дата неизвестна — используйте <b>"Не помню"</b>.
           <button @click="uiStore.dismissHint('add_view_modal')" style="position: absolute; right: 8px; top: 8px; background: none; border: none; color: var(--text-muted); cursor: pointer;">×</button>
         </div>
@@ -36,7 +36,7 @@
           </button>
         </div>
 
-        <div v-if="statsStore.hasGroup" style="margin-bottom: 20px; flex-shrink: 0;">
+        <div v-if="hasGroupContext" style="margin-bottom: 20px; flex-shrink: 0;">
           <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 8px; text-transform: uppercase;">Кто смотрел?</div>
           <div style="display: flex; gap: 20px; align-items: center;">
             <label class="chk-row" :style="targetGroup ? { opacity: 0.6, cursor: 'not-allowed' } : {}">
@@ -139,6 +139,7 @@ const router = useRouter()
 
 const context = computed(() => uiStore.modals.addView.context || {})
 const isSeries = computed(() => isSeriesType(context.value.type))
+const hasGroupContext = computed(() => !context.value.demoMode && statsStore.hasGroup)
 
 const episodesData = ref([])
 const loading = ref(false)
@@ -252,12 +253,13 @@ const isSeasonFullyWatched = (s) => {
 }
 
 const showHint = computed(() => {
+  if (context.value.demoMode) return false
   return statsStore.currentStats?.summary?.total_views === 0 && !uiStore.dismissedHints['add_view_modal']
 })
 
 const modalHeight = computed(() => {
   const hintHeight = showHint.value ? 100 : 0
-  const groupOffset = statsStore.hasGroup ? 60 : 0
+  const groupOffset = hasGroupContext.value ? 60 : 0
   
   if (!isSeries.value) {
     return `${420 + hintHeight + groupOffset}px`
@@ -287,6 +289,7 @@ const modalHeight = computed(() => {
 })
 
 const fetchEpisodes = async (silent = false) => {
+  if (context.value.demoMode) return
   if (!silent) loading.value = true
   try {
     if (uiStore.episodesCache[context.value.showId]) {
@@ -304,7 +307,7 @@ const fetchEpisodes = async (silent = false) => {
 }
 
 onMounted(async () => {
-  if (isSeries.value) {
+  if (isSeries.value && !context.value.demoMode) {
     if (uiStore.episodesCache[context.value.showId]) {
       episodesData.value = uiStore.episodesCache[context.value.showId]
     } else {
@@ -345,12 +348,13 @@ const close = () => {
 }
 
 const save = async () => {
+  if (context.value.demoMode) return close()
   if (isSeries.value && (!season.value || !episode.value)) {
     uiStore.showToast('Укажите сезон и эпизод')
     return
   }
 
-  if (statsStore.hasGroup && !targetMe.value && !targetGroup.value) {
+  if (hasGroupContext.value && !targetMe.value && !targetGroup.value) {
     uiStore.showToast('Выберите, кого добавить')
     return
   }
@@ -368,8 +372,8 @@ const save = async () => {
       episode: isSeries.value ? episode.value : 0,
       date_mode: dateMode.value,
       date_val: dateVal,
-      target_me: statsStore.hasGroup ? targetMe.value : true,
-      target_group: statsStore.hasGroup ? targetGroup.value : false
+      target_me: hasGroupContext.value ? targetMe.value : true,
+      target_group: hasGroupContext.value ? targetGroup.value : false
     })
     uiStore.showToast('Просмотр добавлен!')
     delete uiStore.showsCache[context.value.showId]

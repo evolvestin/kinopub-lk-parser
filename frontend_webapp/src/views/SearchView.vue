@@ -8,6 +8,8 @@ import EmptyState from '../components/shared/EmptyState.vue'
 import PersonPill from '../components/shared/PersonPill.vue'
 import ShowCard from '../components/shared/ShowCard.vue'
 
+const props = defineProps({ demoMode: { type: Boolean, default: false } })
+
 const dataStore = useDataStore()
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -120,7 +122,7 @@ onUnmounted(() => {
           <div v-if="dataStore.searchResults.shows?.length" style="padding-top: 10px;">
             <div class="label"><div class="icon" style="color:var(--info)" v-html="icons.film"></div>Контент</div>
             <div class="hist-grid" style="padding: 0 16px;">
-              <ShowCard v-for="s in dataStore.searchResults.shows" :key="s.id" :show="s" />
+              <ShowCard v-for="s in dataStore.searchResults.shows" :key="s.id" :show="s" :demo-mode="props.demoMode" />
             </div>
           </div>
         </div>

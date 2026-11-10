@@ -226,7 +226,7 @@ import { getRatingClass, isImageBroken, markImageAsBroken } from '../../utils/he
 import { isSeriesType, showTypeRu as formatShowTypeRu } from '../../utils/showTypes'
 import PersonPill from '../shared/PersonPill.vue'
 
-const props = defineProps(['showId'])
+const props = defineProps({ showId: [String, Number], demoMode: { type: Boolean, default: false } })
 const api = useApi()
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
@@ -239,6 +239,7 @@ const activePosterIndex = ref(0)
 const activeSeasonStr = ref(null)
 const isMuted = ref(false)
 const hasAnyMuted = ref(false)
+const demoSeasons = ref([])
 
 const isPosterBroken = ref(false)
 
@@ -309,6 +310,7 @@ const cacheKey = computed(() => {
 
 const seasonsData = computed(() => {
   if (!show.value) return []
+  if (props.demoMode) return demoSeasons.value
   return uiStore.episodesCache[cacheKey.value] || []
 })
 
@@ -342,12 +344,13 @@ const formatEpisodeDuration = (sec) => {
   return `${totalM}м`
 }
 
-const showWishlistGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.wishlist_added === 0 && !uiStore.dismissedHints['wishlist_guide'])
-const showViewGuide = computed(() => statsStore.currentStats && statsStore.currentStats.summary?.total_views === 0 && !uiStore.dismissedHints['view_guide'])
-const showRateGuide = computed(() => statsStore.currentStats && statsStore.currentStats.ratings?.total === 0 && !uiStore.dismissedHints['rate_guide'])
+const showWishlistGuide = computed(() => !props.demoMode && statsStore.currentStats && statsStore.currentStats.summary?.wishlist_added === 0 && !uiStore.dismissedHints['wishlist_guide'])
+const showViewGuide = computed(() => !props.demoMode && statsStore.currentStats && statsStore.currentStats.summary?.total_views === 0 && !uiStore.dismissedHints['view_guide'])
+const showRateGuide = computed(() => !props.demoMode && statsStore.currentStats && statsStore.currentStats.ratings?.total === 0 && !uiStore.dismissedHints['rate_guide'])
 const showMuteGuide = computed(() => !uiStore.dismissedHints['mute_guide'] && !hasAnyMuted.value)
 
 const currentPersonalRating = computed(() => {
+  if (props.demoMode) return null
   if (!show.value) return null
   if (statsStore.isShared) {
     return show.value.personal_rating
@@ -418,12 +421,13 @@ const shouldShowStatus = computed(() => {
 })
 
 const lastViewDisplay = computed(() => {
+  if (props.demoMode) return null
   if (!show.value) return null
   return show.value.last_view?.display || null
 })
 
 const loadShowData = async () => {
-  if (uiStore.showsCache[cacheKey.value]) {
+  if (!props.demoMode && uiStore.showsCache[cacheKey.value]) {
     const cachedData = uiStore.showsCache[cacheKey.value]
     show.value = cachedData
     isMuted.value = cachedData.is_muted
@@ -441,10 +445,16 @@ const loadShowData = async () => {
   try {
     const url = statsStore.isShared ? `show/${props.showId}/?shared_id=${statsStore.sharedId}` : `show/${props.showId}/`
     const data = await api.get(url)
-    show.value = data
-    isMuted.value = data.is_muted
-    hasAnyMuted.value = data.has_any_muted || false
-    uiStore.showsCache[cacheKey.value] = data
+    if (props.demoMode) {
+      show.value = { ...data, personal_rating: null, internal_rating: null, last_view: null, is_muted: false, has_any_muted: false }
+      isMuted.value = false
+      hasAnyMuted.value = false
+    } else {
+      show.value = data
+      isMuted.value = data.is_muted
+      hasAnyMuted.value = data.has_any_muted || false
+      uiStore.showsCache[cacheKey.value] = data
+    }
 
     if (data.title) {
       const query = { ...router.currentRoute.value.query }
@@ -455,7 +465,15 @@ const loadShowData = async () => {
     }
 
     if (isSeriesType(data.type)) {
-      if (!uiStore.episodesCache[cacheKey.value]) {
+      if (props.demoMode) {
+        const payload = { show_id: props.showId }
+        api.post('get_episodes/', payload).then(res => {
+          demoSeasons.value = (res.seasons || []).map(season => ({
+            ...season,
+            episodes: (season.episodes || []).map(episode => ({ ...episode, watched: false, rating: null }))
+          }))
+        }).catch(() => {})
+      } else if (!uiStore.episodesCache[cacheKey.value]) {
         const payload = { show_id: props.showId }
         if (statsStore.isShared) {
           payload.shared_id = statsStore.sharedId
@@ -492,6 +510,11 @@ const toggleMute = async () => {
   const localMessage = nextMuteValue ? 'Уведомления отключены' : 'Уведомления включены'
   uiStore.showToast(localMessage)
 
+  if (props.demoMode) {
+    isTogglingMute.value = false
+    return
+  }
+
   if (uiStore.showsCache[cacheKey.value]) {
     uiStore.showsCache[cacheKey.value].is_muted = nextMuteValue
   }
@@ -522,6 +545,7 @@ const toggleMute = async () => {
 onMounted(loadShowData)
 
 watch(() => uiStore.modals.rateShow.isOpen, async (newVal, oldVal) => {
+  if (props.demoMode) return
   if (oldVal === true && newVal === false) {
     await loadShowData()
     if (isSeries.value) {
@@ -536,6 +560,7 @@ watch(() => uiStore.modals.rateShow.isOpen, async (newVal, oldVal) => {
 })
 
 watch(() => uiStore.modals.addView.isOpen, async (newVal, oldVal) => {
+  if (props.demoMode) return
   if (oldVal === true && newVal === false) {
     await loadShowData()
     if (isSeries.value) {
@@ -579,6 +604,10 @@ const handleMovieBlockClick = () => {
 }
 
 const openWishlistModal = () => {
+  if (props.demoMode) {
+    uiStore.openModal('wlFolder', { showId: show.value.id, title: show.value.title, demoMode: true })
+    return
+  }
   uiStore.dismissHint('wishlist_guide')
   uiStore.openModal('wlFolder', { showId: show.value.id, title: show.value.title })
 }
@@ -588,8 +617,9 @@ const openRating = () => {
   uiStore.openModal('rateShow', {
     showId: show.value.id,
     title: show.value.title,
-    initialValue: statsStore.userShowRatings[show.value.id] !== undefined ? statsStore.userShowRatings[show.value.id] : show.value.personal_rating,
-    type: show.value.type
+    initialValue: props.demoMode ? null : (statsStore.userShowRatings[show.value.id] !== undefined ? statsStore.userShowRatings[show.value.id] : show.value.personal_rating),
+    type: show.value.type,
+    demoMode: props.demoMode
   })
 }
 
@@ -602,7 +632,8 @@ const openAddView = (seasonNum = null, episodeNum = null) => {
     title: show.value.title, 
     type: show.value.type,
     season: s,
-    episode: e
+    episode: e,
+    demoMode: props.demoMode
   })
 }
 

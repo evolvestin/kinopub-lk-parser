@@ -43,8 +43,9 @@ import { useApi } from '../../composables/useApi'
 const uiStore = useUIStore()
 const userStore = useUserStore()
 const api = useApi()
+const props = defineProps({ demo: { type: Boolean, default: false } })
 
-const localAnon = ref(userStore.isAnonymous)
+const localAnon = ref(props.demo ? true : userStore.isAnonymous)
 const isSaving = ref(false)
 
 const close = (success) => {
@@ -56,6 +57,7 @@ const close = (success) => {
 }
 
 const save = async () => {
+  if (props.demo) return close(false)
   isSaving.value = true
   try {
     await api.post('set_privacy/', { is_anonymous: localAnon.value })

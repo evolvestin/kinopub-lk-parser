@@ -65,13 +65,24 @@ def main():
     for path in files:
         article = json.loads(path.read_text(encoding="utf-8"))
         slug = path.stem
-        for block in article.get("content_blocks", []):
-            source = block.get("src", "")
+
+        def upload_asset(image):
+            if not isinstance(image, dict):
+                return
+            source = image.get("src", "")
             if source.startswith("asset:"):
                 local_image = assets / source.removeprefix("asset:")
-                block["src"] = multipart_image(
+                if not local_image.is_file():
+                    raise FileNotFoundError(f"Article image not found: {local_image}")
+                image["src"] = multipart_image(
                     f"{base}/api/internal/articles/assets/{slug}/", token, local_image
                 )
+
+        for block in article.get("content_blocks", []):
+            upload_asset(block)
+            # Procedure screenshots are nested on their matching step, so each
+            # action keeps its own evidence and the same protected asset flow.
+            upload_asset(block.get("image"))
         request(
             f"{base}/api/internal/articles/{slug}/",
             "PUT",

@@ -19,7 +19,7 @@
         Выберите папку
       </div>
       <div id="wl-modal-folders">
-        <div v-for="f in wishlistStore.folders" 
+        <div v-for="f in folders"
              :key="f.id" 
              class="wl-folder-card" 
              :style="hasShow(f) ? { borderColor: 'var(--accent)', background: 'var(--accent-dim)' } : {}"
@@ -53,8 +53,13 @@ import { plural } from '../../utils/helpers'
 const uiStore = useUIStore()
 const wishlistStore = useWishlistStore()
 const statsStore = useStatsStore()
+const props = defineProps({ demoMode: { type: Boolean, default: false } })
 
 const context = computed(() => uiStore.modals.wlFolder.context || {})
+const folders = computed(() => props.demoMode ? [
+  { id: 'demo-now', name: 'Буду смотреть', color: '#388bfd', icon: 'bookmark', items: [] },
+  { id: 'demo-family', name: 'Семья', color: '#e74c3c', icon: 'heart', items: [] }
+] : wishlistStore.folders)
 
 const hasShow = (folder) => {
   return folder.items && folder.items.some(item => item.show_id === context.value.showId)
@@ -65,6 +70,10 @@ const close = () => {
 }
 
 const addToFolder = async (folderId) => {
+  if (props.demoMode) {
+    uiStore.closeModal('wlFolder')
+    return
+  }
   await wishlistStore.addItemToFolder(folderId, context.value.showId)
   close()
 }

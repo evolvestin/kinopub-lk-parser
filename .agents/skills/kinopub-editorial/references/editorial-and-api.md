@@ -7,7 +7,10 @@ Treat GEO as clear, verifiable publishing, not a separate keyword trick. A guide
 - Put the exact task and its short answer near the top.
 - Use one descriptive H1 and task-oriented H2 headings. Cover one main question per URL; connect related pages with useful internal links.
 - Explain the actual controls and outcome in the current webapp. State prerequisites and exceptions instead of promising that every user will see a notification or result.
-- Add unique browser screenshots with concise, factual captions and alt text. The image must show the control or state being discussed; do not use stock images as UI evidence.
+- Write a procedure as one numbered action per step, in the order the reader performs it. Include where to act, what to do, and the confirmation or result that follows.
+- Pair every meaningful action with its own unique browser screenshot inside the same step block. A normal multi-action guide should show at least three different states (start, action, result) and use a separate shot for each meaningful stage. Never reuse a generic screenshot to fill out a procedure or reuse the same asset across unrelated articles.
+- Capture the complete relevant browser iframe screen at sharp native resolution; verify each image's dimensions, legibility, and crop. Reject clipped, tiny, blurry, empty, or wrong-state captures before publishing. Add concise, factual Russian captions and alt text that say what is visible. Do not use stock images as UI evidence.
+- Show the outcome immediately after the actions, then add a short check/troubleshooting note only when it solves a likely failure.
 - Show a real publication date and update date. Keep metadata and visible dates consistent; do not backdate or invent an author.
 - Use `Article` structured data with the organization as author/publisher, headline, description, canonical page, and relevant screenshot URLs. Structured data should match visible article content.
 - Keep pages crawlable: stable URL, self canonical, normal HTML text, public images, sitemap listing, and no `noindex` on public article URLs. Never add API tokens or private preview URLs to rendered metadata.
@@ -31,9 +34,10 @@ Primary references checked 2026-11-10:
   "published_at": "2026-11-10T12:00:00+03:00",
   "content_blocks": [
     {"type":"lead","text":"Короткий прямой ответ на запрос читателя."},
-    {"type":"image","src":"/articles/assets/slug/hashed-image.jpg","alt":"В избранном выбрана папка «Смотрю сейчас»","caption":"Выберите папку, куда сохранить сериал."},
     {"type":"heading","text":"Добавьте сериал в папку"},
-    {"type":"steps","items":["Откройте поиск…","Найдите нужный сериал…"]},
+    {"type":"step","title":"Откройте поиск","text":"В нижней панели приложения выберите «Поиск».","result":"Откроется экран поиска.","image":{"src":"/articles/assets/slug/step-01.jpg","alt":"Раздел поиска выбран в нижней панели","caption":"Шаг 1. Перейдите к поиску."}},
+    {"type":"step","title":"Найдите сериал","text":"Введите точное или оригинальное название и выберите подходящий результат.","image":{"src":"/articles/assets/slug/step-02.jpg","alt":"Введён запрос и показаны результаты поиска","caption":"Шаг 2. Сверьте название и год выпуска."}},
+    {"type":"step","title":"Выберите папку","text":"В карточке сериала добавьте его в избранное и укажите нужную папку.","result":"Сериал появится в выбранной папке.","image":{"src":"/articles/assets/slug/step-03.jpg","alt":"Сериал отображается в выбранной папке избранного","caption":"Шаг 3. Проверьте результат в избранном."}},
     {"type":"paragraph","text":"Пояснение, ограничение или ожидаемый результат."},
     {"type":"callout","text":"Важно: откройте чат с ботом и убедитесь, что он не заблокирован."},
     {"type":"list","items":["Что проверить, если…"]},
@@ -42,7 +46,7 @@ Primary references checked 2026-11-10:
 }
 ```
 
-Supported block types are `lead`, `paragraph`, `heading`, `image`, `steps`, `list`, `callout`, and `quote`. Text fields and list items are escaped by Django. Image `src` must be returned by the asset endpoint. The article API accepts up to 2 MB of JSON and 100 content blocks; image upload is limited to 12 MB and supports PNG, JPEG, and WebP.
+Supported block types are `lead`, `paragraph`, `heading`, `image`, `step`, `steps`, `list`, `callout`, and `quote`. A `step` stores title, action text, optional result, and its matching image object (`src`, `alt`, `caption`, optional dimensions). Text fields and list items are escaped by Django. Every image `src` must be returned by the asset endpoint. The article API accepts up to 2 MB of JSON; image upload is limited to 12 MB and supports PNG, JPEG, and WebP.
 
 ## Publish securely
 
