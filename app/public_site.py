@@ -7,9 +7,9 @@ from xml.sax.saxutils import escape
 
 from django.conf import settings
 from django.core.cache import cache
-from django.core.paginator import Paginator
 from django.db.models import BigIntegerField, Case, Count, ExpressionWrapper, F, IntegerField, Q, Value, When
 from django.http import Http404, HttpResponse, JsonResponse
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
@@ -91,6 +91,34 @@ FEATURED_IMDB_IDS = (
 )
 
 
+class PublicCatalogPaginator(Paginator):
+    def __init__(self, object_list, per_page, *, cached_count=None, **kwargs):
+        self.cached_count = cached_count
+        self._query_count = None
+        super().__init__(object_list, per_page, **kwargs)
+
+    @property
+    def count(self):
+        if self.cached_count is not None:
+            return self.cached_count
+        if self._query_count is None:
+            self._query_count = super().count
+        return self._query_count
+
+
+def _catalog_stats():
+    db_name = settings.DATABASES['default']['NAME']
+    return cache.get_or_set(
+        f'public_catalog_type_counts:{db_name}',
+        lambda: Show.objects.aggregate(
+            total=Count('id'),
+            movies=Count('id', filter=Q(type='Movie')),
+            series=Count('id', filter=Q(type='Series')),
+        ),
+        3600,
+    )
+
+
 def _context(request, **extra):
     username = os.getenv('PUBLIC_BOT_USERNAME', 'kinopub_observer_bot').strip().lstrip('@')
     articles = PublicArticle.objects.filter(published_at__lte=timezone.now()).order_by('-published_at')
@@ -105,8 +133,7 @@ def _context(request, **extra):
 
 
 def home(request):
-    db_name = settings.DATABASES['default']['NAME']
-    stats = cache.get_or_set(f'public_catalog_type_counts:{db_name}', lambda: Show.objects.aggregate(total=Count('id'), movies=Count('id', filter=Q(type='Movie')), series=Count('id', filter=Q(type='Series'))), 3600)
+    stats = _catalog_stats()
     total = stats['total']
     rounded_total = (total // 100000) / 10
     movies = (stats['movies'] // 100000) / 10
@@ -131,7 +158,11 @@ def catalog(request):
         if request.GET.get('page', '1') == '1':
             featured = list(Show.objects.filter(imdb_id__in=FEATURED_IMDB_IDS).order_by(ordering, 'id'))
         shows = Show.objects.exclude(title='').order_by('id')
-    page = Paginator(shows.only('id', 'title', 'original_title', 'year', 'type', 'kinopub_id', 'tmdb_poster_path'), 48).get_page(request.GET.get('page'))
+    page = PublicCatalogPaginator(
+        shows.only('id', 'title', 'original_title', 'year', 'type', 'kinopub_id', 'tmdb_poster_path'),
+        48,
+        cached_count=None if query else _catalog_stats()['total'],
+    ).get_page(request.GET.get('page'))
     for show in [*featured, *page.object_list]:
         show.public_poster = build_poster_url(show.kinopub_id, show.tmdb_poster_path, 'medium')
     count_display = f'{page.paginator.count:,}'.replace(',', '\u00a0')

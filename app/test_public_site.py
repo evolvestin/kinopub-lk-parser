@@ -6,7 +6,9 @@ from urllib.robotparser import RobotFileParser
 from django.test import TestCase, override_settings
 from django.conf import settings
 from django.core.cache import cache
+from django.db import connection
 from django.urls import reverse
+from django.test.utils import CaptureQueriesContext
 
 from app.models import PublicVisit, Show
 
@@ -14,6 +16,7 @@ from app.models import PublicVisit, Show
 class PublicSiteTests(TestCase):
     def setUp(self):
         cache.delete(f'public_sitemap_ranges:{settings.DATABASES["default"]["NAME"]}')
+        cache.delete(f'public_catalog_type_counts:{settings.DATABASES["default"]["NAME"]}')
         self.show = Show.objects.create(title='Тестовый сериал', original_title='Test Series', year=2024)
 
     def test_catalog_and_show_link_to_bot(self):
@@ -94,6 +97,13 @@ class PublicSiteTests(TestCase):
         self.assertContains(response, featured.title)
         self.assertContains(response, 'Неизвестная новинка')
         self.assertLess(response.content.find(featured.title.encode()), response.content.find('Неизвестная новинка'.encode()))
+
+    @patch('app.public_site.cache.get_or_set', return_value={'total': 100, 'movies': 90, 'series': 10})
+    def test_default_catalog_uses_cached_count(self, _cached_counts):
+        with CaptureQueriesContext(connection) as captured:
+            response = self.client.get('/catalog/')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(any('COUNT(' in query['sql'].upper() for query in captured.captured_queries))
 
     @override_settings(PUBLIC_ARTICLE_API_TOKEN='example-test-token')
     def test_article_api_requires_token_and_publishes(self):
