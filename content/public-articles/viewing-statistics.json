@@ -63,6 +63,11 @@
       "type": "guide_link",
       "slug": "rate-movie-or-series",
       "text": "Как поставить оценку фильму или сериалу"
+    },
+    {
+      "type": "guide_link",
+      "slug": "statistics-by-year",
+      "text": "Как посмотреть статистику за отдельный год"
     }
   ]
 }

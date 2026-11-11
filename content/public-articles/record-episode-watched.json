@@ -55,6 +55,11 @@
       "type": "guide_link",
       "slug": "how-statistics-works",
       "text": "Статистика просмотров фильмов и сериалов: что показывает бот"
+    },
+    {
+      "type": "guide_link",
+      "slug": "record-movie-watched",
+      "text": "Как отметить просмотр фильма"
     }
   ]
 }
