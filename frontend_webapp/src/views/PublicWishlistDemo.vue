@@ -15,7 +15,7 @@
           <button class="vt-btn" :class="{ active: viewMode === 'list' }" aria-label="Список" @click="viewMode = 'list'" v-html="icons.list"></button>
         </div>
         <button class="theme-btn" aria-label="Тема" @click="ui.toggleTheme" v-html="ui.theme === 'dark' ? icons.moon : icons.sun"></button>
-        <button class="share-btn" aria-label="Добавить папку" @click="folderDialogOpen = true"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <button class="share-btn" aria-label="Добавить папку" @click="openFolderEditor(false)"><svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
       </div>
     </div>
     <div class="wl-folders-grid">
@@ -24,29 +24,19 @@
     <div id="wl-active-folder-content">
       <div class="wl-active-header">
         <div id="wl-active-folder-title"><span :style="{color:activeFolder.color,display:'inline-flex'}" v-html="icons[activeFolder.icon] || icons.bookmark"></span><span class="wl-active-folder-name-text">{{ activeFolder.name }}</span></div>
-        <div class="public-demo-sort-wrap"><button class="sort-trigger-btn" @click="sortMenuOpen = !sortMenuOpen"><span v-html="icons.reorder"></span><span>{{ sortLabel }}</span><span v-html="icons.chevron_down"></span></button><div v-if="sortMenuOpen" class="public-demo-sort-menu"><button v-for="item in sortOptions" :key="item.key" @click="applySort(item.key)">{{ item.label }}<span v-if="sortMode === item.key">✓</span></button></div></div>
-        <button class="wl-edit-btn" aria-label="Настройки папки" @click="folderDialogOpen = true" v-html="icons.gear"></button>
+        <div class="sort-dropdown-container"><button type="button" class="sort-trigger-btn" @click="sortMenuOpen = !sortMenuOpen"><span class="sort-icon-main" :class="{ 'rotate-180': sortMode.endsWith('asc') }" v-html="sortMode === 'default' ? icons.reorder : icons.sort_arrow"></span><span class="sort-text-label">{{ sortLabel }}</span><span class="sort-chevron" v-html="icons.chevron_down"></span></button><div class="sort-dropdown-menu" :class="{ show: sortMenuOpen }"><div class="sort-item" :class="{ active: sortMode === 'default' }" @click="applySort('default')"><span class="icon-box" v-html="icons.reorder"></span><span>Порядок</span></div><div class="sort-item" :class="{ active: sortMode.startsWith('added') }" @click="applySort('added')"><span class="sort-arrow-icon" :class="{ 'rotate-180': sortMode === 'added_asc' }" v-html="icons.sort_arrow"></span><span>Добавлено</span></div><div class="sort-item" :class="{ active: sortMode.startsWith('year') }" @click="applySort('year')"><span class="sort-arrow-icon" :class="{ 'rotate-180': sortMode === 'year_asc' }" v-html="icons.sort_arrow"></span><span>Год</span></div></div></div>
+        <button class="wl-edit-btn" aria-label="Настройки папки" @click="openFolderEditor(true)" v-html="icons.gear"></button>
       </div>
       <div id="wl-items-container">
         <div class="hist-grid" :class="{'public-demo-list':viewMode==='list'}">
-          <ShowCard v-for="item in activeFolder.items" :key="item.id" :show="item" :view-mode="viewMode" context="wishlist" :demo-mode="true" />
+          <ShowCard v-for="item in sortedItems" :key="item.id" :show="item" :view-mode="viewMode" context="wishlist" :demo-mode="true" />
         </div>
         <div v-if="activeFolder.items.length === 0" class="public-demo-empty">Здесь появятся фильмы и сериалы, которые вы добавите в эту папку.</div>
       </div>
     </div>
     <BottomNav />
 
-    <div v-if="folderDialogOpen" class="public-demo-overlay" @click.self="closeFolderDialog">
-      <section class="public-demo-dialog" role="dialog" aria-modal="true" aria-labelledby="demo-folder-title">
-        <button class="public-demo-close" aria-label="Закрыть" @click="closeFolderDialog">×</button>
-        <div class="modal-title" id="demo-folder-title">Новая папка</div>
-        <p>Соберите фильмы и сериалы в отдельный список.</p>
-        <label for="demo-folder-name">Название папки</label>
-        <input id="demo-folder-name" v-model="folderName" maxlength="32" placeholder="Например, Текущие сериалы" @keydown.enter="createFolder" autofocus>
-        <div class="public-demo-color-label">Цвет и значок можно изменить позже в настройках.</div>
-        <button class="btn-primary" :disabled="!folderName.trim()" @click="createFolder">Создать папку</button>
-      </section>
-    </div>
+    <WlEditModal v-if="ui.modals.wlEdit.isOpen" :demo-folders="folders" @saved="saveDemoFolder" @deleted="deleteDemoFolder" />
 
     <CasinoModal v-if="rouletteOpen" :demo-folders="folders" @close="rouletteOpen = false" />
     </template>
@@ -80,6 +70,7 @@ import { icons } from '../utils/icons'
 import { useUIStore } from '../stores/uiStore'
 
 const StatsView = defineAsyncComponent(() => import('./StatsView.vue'))
+const WlEditModal = defineAsyncComponent(() => import('../components/modals/WlEditModal.vue'))
 const demoRatings = JSON.parse(document.getElementById('public-demo-ratings')?.textContent || '{}')
 const folders = ref([
   { id: 1, name: 'Буду смотреть', icon: 'bookmark', color: '#388bfd', items: [
@@ -95,17 +86,17 @@ const viewMode = ref('grid')
 const sortMode = ref('default')
 const reorderMode = ref(false)
 const sortMenuOpen = ref(false)
-const folderDialogOpen = ref(false)
 const rouletteOpen = ref(false)
-const folderName = ref('')
-const sortOptions = [
-  { key: 'default', label: 'Порядок' },
-  { key: 'added_desc', label: 'Сначала добавленные' },
-  { key: 'year_desc', label: 'Сначала новые' },
-  { key: 'year_asc', label: 'Сначала старые' }
-]
 const activeFolder = computed(() => folders.value.find(folder => folder.id === activeFolderId.value) || folders.value[0])
-const sortLabel = computed(() => sortOptions.find(option => option.key === sortMode.value)?.label || 'Порядок')
+const sortLabel = computed(() => sortMode.value.startsWith('added') ? 'Добавлено' : sortMode.value.startsWith('year') ? 'По году' : 'Порядок')
+const sortedItems = computed(() => {
+  const items = [...activeFolder.value.items]
+  if (sortMode.value === 'year_desc') return items.sort((a, b) => (b.year || 0) - (a.year || 0) || b.id - a.id)
+  if (sortMode.value === 'year_asc') return items.sort((a, b) => (a.year || 0) - (b.year || 0) || a.id - b.id)
+  if (sortMode.value === 'added_desc') return items.sort((a, b) => b.id - a.id)
+  if (sortMode.value === 'added_asc') return items.sort((a, b) => a.id - b.id)
+  return items
+})
 const ui = useUIStore()
 watch(() => ui.theme, theme => document.body.classList.toggle('light', theme === 'light'), { immediate: true })
 const statsExample = new URLSearchParams(window.location.search).has('stats-example')
@@ -115,24 +106,28 @@ function selectFolder(id) {
   if (!reorderMode.value) activeFolderId.value = id
 }
 function applySort(mode) {
-  sortMode.value = mode
-  const folder = activeFolder.value
-  if (mode === 'year_desc') folder.items.sort((a, b) => (b.year || 0) - (a.year || 0))
-  if (mode === 'year_asc') folder.items.sort((a, b) => (a.year || 0) - (b.year || 0))
-  if (mode === 'default') folder.items.reverse()
+  if (mode === 'year') sortMode.value = sortMode.value === 'year_desc' ? 'year_asc' : 'year_desc'
+  else if (mode === 'added') sortMode.value = sortMode.value === 'added_desc' ? 'added_asc' : 'added_desc'
+  else sortMode.value = 'default'
   sortMenuOpen.value = false
 }
-function closeFolderDialog() {
-  folderDialogOpen.value = false
-  folderName.value = ''
+function openFolderEditor(isEdit) {
+  ui.openModal('wlEdit', { isEdit, ...(isEdit ? { folderId: activeFolderId.value } : {}) })
 }
-function createFolder() {
-  const name = folderName.value.trim()
-  if (!name) return
-  const id = Math.max(...folders.value.map(folder => folder.id)) + 1
-  folders.value.push({ id, name, icon: 'folder', color: '#2ecc71', items: [] })
-  activeFolderId.value = id
-  closeFolderDialog()
+function saveDemoFolder({ id, name, icon, color }) {
+  if (id !== null) {
+    const folder = folders.value.find(item => item.id === id)
+    if (folder) Object.assign(folder, { name, icon, color })
+  } else {
+    const newId = Math.max(0, ...folders.value.map(folder => folder.id)) + 1
+    folders.value.push({ id: newId, name, icon, color, items: [] })
+    activeFolderId.value = newId
+  }
+}
+function deleteDemoFolder(id) {
+  folders.value = folders.value.filter(folder => folder.id !== id)
+  if (!folders.value.length) folders.value.push({ id: 1, name: 'Буду смотреть', icon: 'bookmark', color: '#388bfd', items: [] })
+  activeFolderId.value = folders.value[0].id
 }
 </script>
 

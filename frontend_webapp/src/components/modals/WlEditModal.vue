@@ -54,6 +54,8 @@ import { useUIStore } from '../../stores/uiStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { icons } from '../../utils/icons'
 
+const props = defineProps({ demoFolders: { type: Array, default: null } })
+const emit = defineEmits(['saved', 'deleted'])
 const uiStore = useUIStore()
 const wishlistStore = useWishlistStore()
 const router = useRouter()
@@ -64,7 +66,7 @@ const folderId = computed(() => context.value.folderId)
 
 const folder = computed(() => {
   if (!isEdit.value || !folderId.value) return null
-  return wishlistStore.folders.find(f => f.id === folderId.value) || null
+  return (props.demoFolders ?? wishlistStore.folders).find(f => f.id === folderId.value) || null
 })
 
 const updateQueryParams = (params) => {
@@ -112,6 +114,12 @@ const save = async () => {
     return
   }
 
+  if (props.demoFolders !== null) {
+    emit('saved', { id: isEdit.value ? folderId.value : null, name: trimmedName, icon: selectedIcon.value, color: selectedColor.value })
+    close()
+    return
+  }
+
   if (isEdit.value) {
     await wishlistStore.editFolder(folderId.value, trimmedName, selectedIcon.value, selectedColor.value)
   } else {
@@ -122,6 +130,11 @@ const save = async () => {
 
 const deleteFolder = async () => {
   if (confirm('Удалить папку и всё её содержимое?')) {
+    if (props.demoFolders !== null) {
+      emit('deleted', folderId.value)
+      close()
+      return
+    }
     await wishlistStore.deleteFolder(folderId.value)
     close()
   }
