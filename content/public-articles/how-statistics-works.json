@@ -117,6 +117,16 @@
       "type": "guide_link",
       "slug": "share-statistics-privately",
       "text": "Как поделиться статистикой просмотров анонимно"
+    },
+    {
+      "type": "guide_link",
+      "slug": "ratings-in-statistics",
+      "text": "Как читать статистику оценок"
+    },
+    {
+      "type": "guide_link",
+      "slug": "people-in-statistics",
+      "text": "Как посмотреть актёров и режиссёров в статистике"
     }
   ]
 }

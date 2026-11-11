@@ -56,6 +56,11 @@
       "type": "guide_link",
       "slug": "read-show-card",
       "text": "Как пользоваться карточкой фильма или сериала"
+    },
+    {
+      "type": "guide_link",
+      "slug": "ratings-in-statistics",
+      "text": "Как посмотреть статистику своих оценок"
     }
   ]
 }
