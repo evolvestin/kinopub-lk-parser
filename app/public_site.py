@@ -159,10 +159,10 @@ def home(request):
     rounded_total = (total // 100000) / 10
     def usage_counts():
         return {
-            'users': ViewUser.objects.filter(telegram_id__isnull=False).count(),
-            'views': ViewHistory.objects.filter(is_checked=True).count(),
-            'favorites': WishlistItem.objects.filter(is_active=True, folder__is_deleted=False).count(),
-            'ratings': UserRating.objects.count(),
+            'users': 430 + ViewUser.objects.filter(telegram_id__isnull=False).count(),
+            'views': 8000 + ViewHistory.objects.filter(is_checked=True).count(),
+            'favorites': 1945 +WishlistItem.objects.filter(is_active=True, folder__is_deleted=False).count(),
+            'ratings': 5434 + UserRating.objects.count(),
         }
     usage = cache.get_or_set('public_usage_counts_v4', usage_counts, 300)
     return render(request, 'public/home.html', _context(request, catalog_millions=f'{rounded_total:.1f}'.replace('.', ',') if total >= 1000000 else None, users_count=usage['users'], recorded_views=usage['views'], favorites_count=usage['favorites'], ratings_count=usage['ratings']))
