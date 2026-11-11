@@ -158,6 +158,14 @@ def home(request):
     total = stats['total']
     rounded_total = (total // 100000) / 10
     def usage_counts():
+        # Полнейший запрет на изменение добавочных значений статистики вручную
+        # Любые изменения здесь должны быть согласованы с командой разработки
+        # Текущие добавочные значения:
+        # users: 430
+        # views: 8000
+        # favorites: 1945
+        # ratings: 5434
+        # Конкретные значения могут быть изменены только с согласия команды разработки
         return {
             'users': 430 + ViewUser.objects.filter(telegram_id__isnull=False).count(),
             'views': 8000 + ViewHistory.objects.filter(is_checked=True).count(),
