@@ -874,10 +874,18 @@ class PublicArticle(BaseModel):
 
 class PublicVisit(models.Model):
     session_id = models.UUIDField(unique=True)
+    visitor_fingerprint = models.CharField(max_length=64, blank=True, db_index=True)
     started_at = models.DateTimeField(auto_now_add=True, db_index=True)
     last_seen_at = models.DateTimeField(auto_now_add=True)
     active_seconds = models.PositiveIntegerField(default=0)
     pageviews = models.PositiveIntegerField(default=1)
+    pages = JSONField(default=list, blank=True)
+    referrer_host = models.CharField(max_length=255, blank=True)
+    user_agent = models.CharField(max_length=512, blank=True)
+    accept_language = models.CharField(max_length=150, blank=True)
+    browser = models.CharField(max_length=100, blank=True)
+    operating_system = models.CharField(max_length=100, blank=True)
+    device_type = models.CharField(max_length=24, blank=True)
 
 
 class SiteMetric(BaseModel):

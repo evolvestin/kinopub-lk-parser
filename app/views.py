@@ -172,8 +172,21 @@ def metrics(request):
     if request.user.is_staff:
         from django.db.models import Avg, Count, Sum
         from app.models import PublicVisit
-        stats = PublicVisit.objects.filter(started_at__gte=timezone.now() - timedelta(days=1)).aggregate(sessions=Count('id'), pageviews=Sum('pageviews'), duration=Avg('active_seconds'))
-        context['public_visit_stats'] = json.dumps({'sessions': stats['sessions'], 'pageviews': stats['pageviews'] or 0, 'duration': round(stats['duration'] or 0)})
+        recent_visits = PublicVisit.objects.filter(started_at__gte=timezone.now() - timedelta(days=1))
+        stats = recent_visits.aggregate(sessions=Count('id'), pageviews=Sum('pageviews'), duration=Avg('active_seconds'))
+        visits = list(recent_visits.order_by('-last_seen_at').values(
+            'visitor_fingerprint', 'started_at', 'last_seen_at', 'active_seconds', 'pageviews',
+            'pages', 'referrer_host', 'browser', 'operating_system', 'device_type',
+        )[:50])
+        for visit in visits:
+            visit['started_at'] = visit['started_at'].isoformat()
+            visit['last_seen_at'] = visit['last_seen_at'].isoformat()
+        context['public_visit_stats'] = json.dumps({
+            'sessions': stats['sessions'], 'pageviews': stats['pageviews'] or 0,
+            'duration': round(stats['duration'] or 0),
+            'unique_networks': recent_visits.exclude(visitor_fingerprint='').values('visitor_fingerprint').distinct().count(),
+            'visits': visits,
+        })
     return render(request, 'index.html', context)
 
 

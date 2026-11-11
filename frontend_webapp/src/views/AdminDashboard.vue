@@ -44,7 +44,22 @@
 
     <div v-if="publicVisitStats" class="card" style="margin: 20px 16px; padding: 20px;">
       <h2>Посещаемость сайта за 24 часа</h2>
-      <p>Сессии: {{ publicVisitStats.sessions }} · Просмотры: {{ publicVisitStats.pageviews }} · Среднее активное время: {{ publicVisitStats.duration }} сек.</p>
+      <p>Сессии вкладок: {{ publicVisitStats.sessions }} · IP-отпечатки: {{ publicVisitStats.unique_networks }} · Просмотры: {{ publicVisitStats.pageviews }} · Среднее активное время: {{ publicVisitStats.duration }} сек.</p>
+      <div style="overflow-x:auto; margin-top:16px;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+          <thead><tr><th>Сеть (HMAC)</th><th>Время</th><th>Активность</th><th>Страницы</th><th>Источник</th><th>Устройство / браузер</th></tr></thead>
+          <tbody>
+            <tr v-for="(visit, i) in publicVisitStats.visits" :key="i" style="border-top:1px solid var(--border-color, rgba(255,255,255,.12));">
+              <td :title="visit.visitor_fingerprint">{{ visit.visitor_fingerprint ? visit.visitor_fingerprint.slice(0, 12) : '—' }}</td>
+              <td>{{ formatVisitTime(visit.started_at) }}<br><span style="opacity:.65">до {{ formatVisitTime(visit.last_seen_at) }}</span></td>
+              <td>{{ visit.pageviews }} стр. · {{ visit.active_seconds }} сек.</td>
+              <td>{{ (visit.pages || []).join(' → ') || '—' }}</td>
+              <td>{{ visit.referrer_host || 'прямой / неизвестен' }}</td>
+              <td>{{ [visit.device_type, visit.browser, visit.operating_system].filter(Boolean).join(' · ') || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
     <template v-for="(group, groupIdx) in metricGroups" :key="groupIdx">
       <div style="padding-left: 35px; margin-top: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 800; font-size: 18px; text-transform: uppercase;">
@@ -278,6 +293,7 @@ import ChartDataLabels from 'chartjs-plugin-datalabels'
 
 const allMetrics = window.ALL_METRICS || {}
 const publicVisitStats = window.PUBLIC_VISIT_STATS
+const formatVisitTime = value => value ? new Date(value).toLocaleString() : '—'
 const adminApps = window.ADMIN_APP_LIST || []
 const ctx = window.ADMIN_CONTEXT || {}
 

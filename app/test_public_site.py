@@ -287,7 +287,20 @@ class PublicSiteTests(TestCase):
     def test_visit_events_count_pageviews_and_time(self):
         session = str(uuid.uuid4())
         for event, seconds in [('pageview', 0), ('tick', 15), ('pageview', 0)]:
-            response = self.client.post('/api/public/visit/', json.dumps({'session_id': session, 'event': event, 'seconds': seconds}), content_type='application/json')
+            response = self.client.post(
+                '/api/public/visit/',
+                json.dumps({'session_id': session, 'event': event, 'seconds': seconds, 'page': '/catalog/example/', 'referrer': 'https://search.example/query?private=value'}),
+                content_type='application/json',
+                HTTP_X_REAL_IP='198.51.100.7',
+                HTTP_USER_AGENT='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36',
+                HTTP_ACCEPT_LANGUAGE='ru-RU,ru;q=0.9',
+            )
             self.assertEqual(response.status_code, 204)
         visit = PublicVisit.objects.get(session_id=session)
         self.assertEqual((visit.pageviews, visit.active_seconds), (2, 15))
+        self.assertEqual(visit.pages, ['/catalog/example/', '/catalog/example/'])
+        self.assertEqual(visit.referrer_host, 'search.example')
+        self.assertEqual((visit.browser, visit.operating_system, visit.device_type), ('Chrome', 'Windows', 'desktop'))
+        self.assertEqual(visit.accept_language, 'ru-RU')
+        self.assertTrue(visit.visitor_fingerprint)
+        self.assertNotIn('198.51.100.7', visit.visitor_fingerprint)

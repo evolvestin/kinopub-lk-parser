@@ -3,7 +3,10 @@ import os
 import json
 import secrets
 import uuid
+import hashlib
+import hmac
 import mimetypes
+from urllib.parse import urlsplit
 from xml.sax.saxutils import escape
 from pathlib import Path
 
@@ -541,7 +544,7 @@ def article_api(request, slug):
 @require_http_methods(['POST'])
 def visit_event(request):
     try:
-        if len(request.body) > 1024:
+        if len(request.body) > 4096:
             raise ValueError
         data = json.loads(request.body)
         session_id = uuid.UUID(data['session_id'])
@@ -549,8 +552,56 @@ def visit_event(request):
         if event not in ('pageview', 'tick'):
             raise ValueError
         seconds = max(0, min(int(data.get('seconds', 0)), 30))
+        page = data.get('page', '')
+        if not isinstance(page, str) or len(page) > 1024 or (page and (not page.startswith('/') or page.startswith('//'))):
+            raise ValueError
+        referrer = data.get('referrer', '')
+        if not isinstance(referrer, str) or len(referrer) > 2048:
+            raise ValueError
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         return JsonResponse({'error': 'Invalid event'}, status=400)
+
+    # Trust the real-IP header set by the configured reverse proxy. Never store
+    # the address itself; the keyed fingerprint allows repeat-visit analysis.
+    ip_address = request.META.get('HTTP_X_REAL_IP') or request.META.get('REMOTE_ADDR', '')
+    try:
+        ip_address = ip_address.strip().split(',')[-1].strip()
+        if ip_address.startswith('[') and ']' in ip_address:
+            ip_address = ip_address[1:ip_address.index(']')]
+        elif ip_address.count(':') == 1:
+            ip_address = ip_address.rsplit(':', 1)[0]
+        if ip_address:
+            import ipaddress
+            ip_address = str(ipaddress.ip_address(ip_address))
+    except ValueError:
+        ip_address = ''
+    fingerprint = hmac.new(settings.SECRET_KEY.encode(), ip_address.encode(), hashlib.sha256).hexdigest() if ip_address else ''
+
+    path = urlsplit(page).path[:512] if page else ''
+    try:
+        referrer_host = (urlsplit(referrer).hostname or '')[:255]
+    except ValueError:
+        referrer_host = ''
+    user_agent = request.META.get('HTTP_USER_AGENT', '')[:512]
+    accept_language = request.META.get('HTTP_ACCEPT_LANGUAGE', '').split(',', 1)[0][:150]
+    ua = user_agent.lower()
+    browser = next((name for token, name in (('edg/', 'Edge'), ('opr/', 'Opera'), ('chrome/', 'Chrome'), ('firefox/', 'Firefox'), ('safari/', 'Safari')) if token in ua), 'Other')
+    operating_system = next((name for token, name in (('windows', 'Windows'), ('android', 'Android'), ('iphone', 'iOS'), ('ipad', 'iPadOS'), ('mac os', 'macOS'), ('macintosh', 'macOS'), ('linux', 'Linux')) if token in ua), 'Other')
+    device_type = 'tablet' if any(token in ua for token in ('ipad', 'tablet')) else ('mobile' if any(token in ua for token in ('mobile', 'iphone', 'android')) else 'desktop')
+
     visit, created = PublicVisit.objects.get_or_create(session_id=session_id)
-    PublicVisit.objects.filter(pk=visit.pk).update(last_seen_at=timezone.now(), active_seconds=F('active_seconds') + seconds, pageviews=F('pageviews') + (1 if event == 'pageview' and not created else 0))
+    updates = {
+        'last_seen_at': timezone.now(),
+        'active_seconds': F('active_seconds') + seconds,
+        'pageviews': F('pageviews') + (1 if event == 'pageview' and not created else 0),
+    }
+    if created or not visit.visitor_fingerprint:
+        updates.update(visitor_fingerprint=fingerprint, referrer_host=referrer_host, user_agent=user_agent,
+                       accept_language=accept_language, browser=browser, operating_system=operating_system,
+                       device_type=device_type)
+    if event == 'pageview' and path:
+        pages = list(visit.pages or [])
+        pages.append(path)
+        updates['pages'] = pages[-100:]
+    PublicVisit.objects.filter(pk=visit.pk).update(**updates)
     return HttpResponse(status=204)
