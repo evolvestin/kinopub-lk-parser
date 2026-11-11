@@ -60,6 +60,11 @@
       "type": "guide_link",
       "slug": "new-episode-notifications",
       "text": "Как включить уведомления о новых сериях в Telegram"
+    },
+    {
+      "type": "guide_link",
+      "slug": "rate-movie-or-series",
+      "text": "Как поставить оценку фильму или сериалу"
     }
   ]
 }

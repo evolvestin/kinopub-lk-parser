@@ -58,6 +58,11 @@
       "type": "guide_link",
       "slug": "share-statistics-privately",
       "text": "Как поделиться статистикой просмотров анонимно"
+    },
+    {
+      "type": "guide_link",
+      "slug": "rate-movie-or-series",
+      "text": "Как поставить оценку фильму или сериалу"
     }
   ]
 }
