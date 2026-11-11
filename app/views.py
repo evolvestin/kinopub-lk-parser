@@ -175,7 +175,7 @@ def metrics(request):
         recent_visits = PublicVisit.objects.filter(started_at__gte=timezone.now() - timedelta(days=1))
         stats = recent_visits.aggregate(sessions=Count('id'), pageviews=Sum('pageviews'), duration=Avg('active_seconds'))
         visits = list(recent_visits.order_by('-last_seen_at').values(
-            'visitor_fingerprint', 'started_at', 'last_seen_at', 'active_seconds', 'pageviews',
+            'ip_address', 'visitor_fingerprint', 'started_at', 'last_seen_at', 'active_seconds', 'pageviews',
             'pages', 'referrer_host', 'browser', 'operating_system', 'device_type',
         )[:50])
         for visit in visits:
@@ -184,7 +184,7 @@ def metrics(request):
         context['public_visit_stats'] = json.dumps({
             'sessions': stats['sessions'], 'pageviews': stats['pageviews'] or 0,
             'duration': round(stats['duration'] or 0),
-            'unique_networks': recent_visits.exclude(visitor_fingerprint='').values('visitor_fingerprint').distinct().count(),
+            'unique_ips': recent_visits.filter(ip_address__isnull=False).exclude(ip_address='').values('ip_address').distinct().count(),
             'visits': visits,
         })
     return render(request, 'index.html', context)

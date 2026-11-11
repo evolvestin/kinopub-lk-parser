@@ -561,8 +561,9 @@ def visit_event(request):
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         return JsonResponse({'error': 'Invalid event'}, status=400)
 
-    # Trust the real-IP header set by the configured reverse proxy. Never store
-    # the address itself; the keyed fingerprint allows repeat-visit analysis.
+    # The public reverse proxy overwrites X-Real-IP with the connecting client
+    # address. Keep the normalized address for staff analytics and use a keyed
+    # fingerprint for indexed correlation.
     ip_address = request.META.get('HTTP_X_REAL_IP') or request.META.get('REMOTE_ADDR', '')
     try:
         ip_address = ip_address.strip().split(',')[-1].strip()
@@ -596,9 +597,11 @@ def visit_event(request):
         'pageviews': F('pageviews') + (1 if event == 'pageview' and not created else 0),
     }
     if created or not visit.visitor_fingerprint:
-        updates.update(visitor_fingerprint=fingerprint, referrer_host=referrer_host, user_agent=user_agent,
+        updates.update(ip_address=ip_address, visitor_fingerprint=fingerprint, referrer_host=referrer_host, user_agent=user_agent,
                        accept_language=accept_language, browser=browser, operating_system=operating_system,
                        device_type=device_type)
+    elif not visit.ip_address and ip_address:
+        updates['ip_address'] = ip_address
     if event == 'pageview' and path:
         pages = list(visit.pages or [])
         pages.append(path)

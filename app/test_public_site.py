@@ -302,5 +302,6 @@ class PublicSiteTests(TestCase):
         self.assertEqual(visit.referrer_host, 'search.example')
         self.assertEqual((visit.browser, visit.operating_system, visit.device_type), ('Chrome', 'Windows', 'desktop'))
         self.assertEqual(visit.accept_language, 'ru-RU')
+        self.assertEqual(visit.ip_address, '198.51.100.7')
         self.assertTrue(visit.visitor_fingerprint)
         self.assertNotIn('198.51.100.7', visit.visitor_fingerprint)

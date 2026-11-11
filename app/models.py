@@ -874,6 +874,7 @@ class PublicArticle(BaseModel):
 
 class PublicVisit(models.Model):
     session_id = models.UUIDField(unique=True)
+    ip_address = models.GenericIPAddressField(blank=True, db_index=True, null=True, unpack_ipv4=True)
     visitor_fingerprint = models.CharField(max_length=64, blank=True, db_index=True)
     started_at = models.DateTimeField(auto_now_add=True, db_index=True)
     last_seen_at = models.DateTimeField(auto_now_add=True)
