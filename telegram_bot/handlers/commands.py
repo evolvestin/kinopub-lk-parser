@@ -9,6 +9,7 @@ from aiogram.filters import CommandObject
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 from sender import MessageSender
 from services.bot_instance import BotInstance
+from services.widget_cards import send_show_widget
 
 from shared.card_formatter import get_ratings_report_blocks, get_show_card_text
 from shared.constants import SERIES_TYPES, UserRole
@@ -430,11 +431,39 @@ async def handle_show_command(message: Message, bot: Bot):
     show_id = int(match.group(1))
     sender = MessageSender(bot)
 
+    if message.chat.type == 'private' and message.from_user and await send_show_widget(
+        bot, message.chat.id, message.from_user.id, show_id
+    ):
+        return
+
     show_data = await client.get_show_details(show_id, telegram_id=message.from_user.id)
     if show_data:
         await _send_show_card(sender, message.chat.id, show_data)
     else:
         await sender.send_message(message.chat.id, '❌ Контент не найден или был удален.')
+
+
+async def handle_widget_command(message: Message, bot: Bot):
+    """Explicitly send the new interactive poster-free card in the private chat."""
+    match = re.match(r'/widget_(\d+)', message.text or '')
+    if not match:
+        return
+    if message.chat.type != 'private' or not message.from_user:
+        await MessageSender(bot).send_message(
+            message.chat.id,
+            'Интерактивная карточка доступна в личном чате с ботом. Откройте @kinopub_observer_bot.',
+        )
+        return
+    show_id = int(match.group(1))
+    if await send_show_widget(bot, message.chat.id, message.from_user.id, show_id):
+        return
+    show_data = await client.get_show_details(show_id, telegram_id=message.from_user.id)
+    if show_data:
+        await _send_show_card(MessageSender(bot), message.chat.id, show_data)
+    else:
+        await MessageSender(bot).send_message(
+            message.chat.id, '❌ Контент не найден или карточка временно недоступна.'
+        )
 
 
 async def _process_search(bot: Bot, chat_id: int, query: str):

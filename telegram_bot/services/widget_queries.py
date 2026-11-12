@@ -51,7 +51,7 @@ class WidgetQueryMiddleware(BaseMiddleware):
             if not isinstance(result, dict):
                 result = {'error': 'Данные временно недоступны'}
         operation = command.split(':', 1)[0] if isinstance(command, str) else ''
-        if operation not in {'s', 'e', 'p', 'r', 'c', 'v', 'w', 'i', 'd'}:
+        if operation not in {'s', 'e', 'p', 'r', 'c', 'v', 'w', 'd'}:
             operation = 'other'
         logging.info('Widget query: operation=%s error=%s', operation, bool(result.get('error')))
         if operation == 'e' and result.get('error'):

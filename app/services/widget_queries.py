@@ -3,6 +3,7 @@
 import json
 import re
 from datetime import datetime
+from urllib.parse import urlsplit
 
 from django.core.cache import cache
 from django.db import transaction
@@ -169,6 +170,13 @@ def _view_label(view_date, precision):
     return view_date.strftime({'month': '%m.%Y', 'year': '%Y'}.get(precision, '%d.%m.%Y'))
 
 
+def _safe_external_url(value):
+    if not value:
+        return None
+    parsed = urlsplit(value)
+    return value if parsed.scheme in {'http', 'https'} and parsed.netloc else None
+
+
 def widget_query(telegram_id, command):
     """Handle catalog reads and explicit per-viewer actions from the widget.
 
@@ -183,15 +191,14 @@ def widget_query(telegram_id, command):
     if command == 't':
         return {'theme': viewer.webapp_theme}
     parts = command.split(':')
-    if parts[0] == 'i' and len(parts) in (2, 3) and parts[1].isdigit():
-        from app.services.widget_poster import widget_poster
-
-        level = int(parts[2]) if len(parts) == 3 and parts[2].isdigit() else 10
-        poster = widget_poster(int(parts[1]), level)
-        return {'poster': poster} if poster else {'error': 'Постер недоступен'}
     if parts[0] in {'v', 'w'}:
         return _episode_action(viewer, parts)
-    if len(parts) == 3 and parts[0] == 's' and parts[1].isdigit() and parts[2] == 'show':
+    if (
+        len(parts) == 3
+        and parts[0] == 's'
+        and parts[1].isdigit()
+        and parts[2] in {'show', 'full'}
+    ):
         show = (
             Show.objects.select_related('ext_rating')
             .prefetch_related('genres', 'countries')
@@ -207,12 +214,17 @@ def widget_query(telegram_id, command):
             RAW_TO_NORMALIZED_COUNTRY.get(country.name, country.name)
             for country in source_countries
         }
-        normalized_ids = dict(
-            Country.objects.filter(name__in=normalized_names).values_list('name', 'id')
-        )
+        normalized_countries = {
+            name: (pk, emoji)
+            for name, pk, emoji in Country.objects.filter(name__in=normalized_names)
+            .values_list('name', 'id', 'emoji_flag')
+        }
         for country in source_countries:
             name = RAW_TO_NORMALIZED_COUNTRY.get(country.name, country.name)
-            countries.setdefault(name, normalized_ids.get(name, country.id))
+            country_id, emoji = normalized_countries.get(
+                name, (country.id, country.emoji_flag)
+            )
+            countries.setdefault(name, {'id': country_id, 'emoji': emoji or country.emoji_flag})
         genres = {}
         for genre in show.genres.all():
             name = RAW_TO_NORMALIZED_GENRE.get(genre.name, genre.name)
@@ -225,16 +237,24 @@ def widget_query(telegram_id, command):
             'type': normalize_show_type(show.type)[0],
             'status': show.status,
             'status_label': SHOW_STATUS_DISPLAY_RU.get(show.status, show.status),
-            'plot': (show.plot or '')[:160],
+            'plot': show.plot or '',
+            'plot_truncated': False,
             'duration': duration,
             'kp': getattr(getattr(show, 'ext_rating', None), 'kp', None),
             'imdb': show.imdb_rating,
             'local': round(local, 1) if local is not None else None,
             'genres': [{'id': pk, 'name': name} for name, pk in list(genres.items())[:5]],
-            'countries': [{'id': pk, 'name': name} for name, pk in list(countries.items())[:5]],
+            'countries': [
+                {'id': item['id'], 'name': name, **({'emoji': item['emoji']} if item['emoji'] else {})}
+                for name, item in list(countries.items())[:5]
+            ],
+            'imdb_url': _safe_external_url(show.imdb_url),
+            'kinopoisk_url': _safe_external_url(show.kinopoisk_url),
         }
-        while len(_serialize(result).encode('utf-8')) > MAX_ANSWER_BYTES and result['plot']:
+        max_show_bytes = 2048 if parts[2] == 'full' else MAX_ANSWER_BYTES
+        while len(_serialize(result).encode('utf-8')) > max_show_bytes and result['plot']:
             result['plot'] = result['plot'][:-20]
+            result['plot_truncated'] = True
         return result
     if len(parts) == 3 and parts[0] == 's' and parts[1].isdigit() and parts[2] == 'crew':
         show = Show.objects.get(pk=int(parts[1]))
@@ -374,10 +394,6 @@ def widget_query(telegram_id, command):
                 kp_details.append(f'Ожидание: {external.await_rating:g}%')
             if external and external.tmdb is not None:
                 kp_details.append(f'TMDb: {external.tmdb:g} / 10')
-            voters = [
-                f'{item["label"][:25]}: {item["rating"]:.1f}'
-                for item in local_users[:6]
-            ]
             personal = UserRating.objects.filter(
                 user=viewer, show=show, season_number__isnull=True, episode_number__isnull=True
             ).values_list('rating', flat=True).first()
@@ -394,9 +410,16 @@ def widget_query(telegram_id, command):
             return {
                 'title': 'Рейтинги',
                 'ratings': [
-                    ['Кинопоиск', getattr(external, 'kp', None), show.kinopoisk_votes or 0, ' · '.join(kp_details)],
-                    ['IMDb', show.imdb_rating, show.imdb_votes or 0, ''],
-                    ['Локальный', round(local_value, 1) if local_value is not None else None, len(local_users), ' · '.join(voters)],
+                    [
+                        'Кинопоиск', getattr(external, 'kp', None),
+                        show.kinopoisk_votes or 0, ' · '.join(kp_details),
+                        _safe_external_url(show.kinopoisk_url),
+                    ],
+                    [
+                        'IMDb', show.imdb_rating, show.imdb_votes or 0, '',
+                        _safe_external_url(show.imdb_url),
+                    ],
+                    ['Локальный', round(local_value, 1) if local_value is not None else None, len(local_users), ''],
                 ],
                 'personal': personal,
                 'view': movie_view,

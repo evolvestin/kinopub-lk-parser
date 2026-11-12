@@ -426,13 +426,17 @@ def bot_widget_query(request):
             .first()
             or 'dark'
         )
-        while len(json.dumps(result, ensure_ascii=False, separators=(',', ':')).encode()) > 1024:
+        max_response_bytes = 2048 if command.endswith(':full') else 1024
+        while len(
+            json.dumps(result, ensure_ascii=False, separators=(',', ':')).encode()
+        ) > max_response_bytes:
             if result.get('items'):
                 result['items'].pop()
                 result['more'] = True
                 result['next'] = result.get('offset', 0) + len(result['items'])
             elif result.get('plot'):
                 result['plot'] = result['plot'][:-20]
+                result['plot_truncated'] = True
             elif result.get('details'):
                 result['details'].pop()
             else:

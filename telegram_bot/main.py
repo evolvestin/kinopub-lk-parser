@@ -105,6 +105,7 @@ def register_router() -> Router:
     router.message.register(commands.handle_explicit_search, F.text.startswith('/search'))
     router.message.register(commands.handle_stats_command, F.text.startswith('/stats'))
     router.message.register(commands.handle_imdb_lookup, F.text.regexp(r'(?i)^imdb:\s*\d+$'))
+    router.message.register(commands.handle_widget_command, F.text.regexp(r'^/widget_\d+$'))
     router.message.register(commands.handle_show_command, F.text.regexp(r'^/show_\d+$'))
     router.message.register(commands.handle_ratings_command, F.text.regexp(r'^/ratings_\d+$'))
     router.message.register(commands.handle_history_command, F.text.regexp(r'^/history_\d+$'))

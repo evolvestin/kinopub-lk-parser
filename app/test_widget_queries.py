@@ -65,6 +65,7 @@ class WidgetQueryTests(TestCase):
     def test_rejects_invalid_command(self):
         self.assertIn('error', widget_query(12345, 'c:type:Movie:-1'))
         self.assertIn('error', widget_query(12345, 'x' * 65))
+        self.assertIn('error', widget_query(12345, f'i:{self.show.pk}:1'))
 
     def test_crew_person_and_episode_navigation(self):
         person = Person.objects.create(name='Актёр')

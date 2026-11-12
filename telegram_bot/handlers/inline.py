@@ -26,6 +26,10 @@ async def inline_share_handler(query: InlineQuery):
     if not stat_id:
         return
 
+    # Keep the legacy inline text card as a safe fallback: Bot API production
+    # currently supports HTML widgets only through sendWidget in private chats;
+    # widget results for inline mode are test-server-only. The previous card
+    # implementation is recoverable from commit c49ff7b.
     bot_username = await BotInstance().get_bot_username()
     env = os.getenv('ENVIRONMENT', 'DEV')
 
