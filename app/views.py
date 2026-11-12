@@ -408,6 +408,41 @@ def protected_bot_api(func):
 
 @csrf_exempt
 @protected_bot_api
+@require_http_methods(['POST'])
+def bot_widget_query(request):
+    from app.services.widget_queries import widget_query
+
+    try:
+        payload = json.loads(request.body)
+        telegram_id = int(payload['telegram_id'])
+        command = payload['command']
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+        return JsonResponse({'error': 'Некорректный запрос'}, status=400)
+    result = widget_query(telegram_id, command)
+    if 'error' not in result and command != 't':
+        result['theme'] = (
+            ViewUser.objects.filter(telegram_id=telegram_id)
+            .values_list('webapp_theme', flat=True)
+            .first()
+            or 'dark'
+        )
+        while len(json.dumps(result, ensure_ascii=False, separators=(',', ':')).encode()) > 1024:
+            if result.get('items'):
+                result['items'].pop()
+                result['more'] = True
+                result['next'] = result.get('offset', 0) + len(result['items'])
+            elif result.get('plot'):
+                result['plot'] = result['plot'][:-20]
+            elif result.get('details'):
+                result['details'].pop()
+            else:
+                result = {'error': 'Ответ слишком большой'}
+                break
+    return JsonResponse(result, json_dumps_params={'ensure_ascii': False, 'separators': (',', ':')})
+
+
+@csrf_exempt
+@protected_bot_api
 @require_http_methods(['GET'])
 def check_bot_user(request, telegram_id):
     try:
@@ -1283,6 +1318,22 @@ def get_webapp_user(request) -> ViewUser | None:
         return mock_user
 
     return None
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_save_theme(request):
+    user = get_webapp_user(request)
+    if not user:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    try:
+        theme = json.loads(request.body).get('theme')
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+    if theme not in ('dark', 'light'):
+        return JsonResponse({'error': 'Invalid theme'}, status=400)
+    ViewUser.objects.filter(pk=user.pk).exclude(webapp_theme=theme).update(webapp_theme=theme)
+    return JsonResponse({'theme': theme})
 
 
 @csrf_exempt

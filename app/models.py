@@ -306,6 +306,11 @@ class ViewUser(BaseModel):
     )
     is_anonymous = models.BooleanField(default=True, verbose_name='Анонимный')
     privacy_choice_made = models.BooleanField(default=False)
+    webapp_theme = models.CharField(
+        max_length=5,
+        choices=[('dark', 'Dark'), ('light', 'Light')],
+        default='dark',
+    )
 
     def update_personal_details(
         self,

@@ -17,6 +17,7 @@ from middlewares import (
 )
 from services.bot_instance import BotInstance
 from services.telegram_health import TelegramPollingIncidentHandler
+from services.widget_queries import WidgetQueryMiddleware
 
 
 class RemoteLogHandler(logging.Handler):
@@ -179,6 +180,9 @@ async def main():
 
     # Register handlers
     dispatcher = Dispatcher()
+    widgets_enabled = os.getenv('TELEGRAM_WIDGETS_ENABLED', '').lower() in ('1', 'true', 'yes')
+    if widgets_enabled:
+        dispatcher.update.outer_middleware(WidgetQueryMiddleware())
     dispatcher.update.outer_middleware(LoggingMiddleware())
     router = register_router()
     dispatcher.include_router(router)
@@ -200,6 +204,8 @@ async def main():
         'chat_member',
         'inline_query',
     ]
+    if widgets_enabled:
+        allowed_updates.append('widget_query')
 
     await dispatcher.start_polling(bot, allowed_updates=allowed_updates)
 

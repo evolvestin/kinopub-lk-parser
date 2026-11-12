@@ -61,6 +61,7 @@ urlpatterns = proxy_patterns + [
     ),
     # WebApp Endpoints
     path('webapp/', views.webapp_index, name='webapp_index'),
+    path('api/webapp/theme/', views.webapp_save_theme, name='webapp_save_theme'),
     path(
         'webapp-preview-app/<int:telegram_id>/',
         views.webapp_preview_app,
@@ -112,6 +113,7 @@ urlpatterns = proxy_patterns + [
     path('api/bot/set_role/', views.set_bot_user_role),
     path('api/bot/update_user/', views.update_bot_user),
     path('api/bot/search/', views.bot_search_shows),
+    path('api/bot/widget/', views.bot_widget_query),
     path('api/bot/show/<int:show_id>/', views.bot_get_show_details),
     path('api/bot/show/<int:show_id>/episodes/', views.bot_get_show_episodes),
     path('api/bot/show/<int:show_id>/ratings/', views.bot_get_show_ratings_details),

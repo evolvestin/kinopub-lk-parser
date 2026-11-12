@@ -5,6 +5,7 @@ import { useUIStore } from './stores/uiStore'
 import { useStatsStore } from './stores/useStatsStore'
 import { useWishlistStore } from './stores/wishlistStore'
 import { useTelegram } from './composables/useTelegram'
+import { useApi } from './composables/useApi'
 import { logger } from './utils/logger'
 import BottomNav from './components/layout/BottomNav.vue'
 import Loader from './components/layout/Loader.vue'
@@ -46,7 +47,9 @@ const StatsView = defineAsyncComponent({
 const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const wishlistStore = useWishlistStore()
-const { tg, showConfirm } = useTelegram()
+const { tg, initData, showConfirm } = useTelegram()
+const { post } = useApi()
+let themeSync = Promise.resolve()
 const router = useRouter()
 
 const bannerRef = ref(null)
@@ -176,7 +179,44 @@ onMounted(async () => {
   if (startParam && startParam !== processedStartParam) {
     sessionStorage.setItem('processed_start_param', startParam)
 
-    if (startParam.startsWith('stat_')) {
+    const rateMatch = startParam.match(/^rate_(\d+)_(Movie|Series)$/)
+    if (rateMatch) {
+      const [, showId, type] = rateMatch
+      targetPath = `/search/show/${showId}`
+      Object.keys(targetQuery).forEach(key => {
+        if (key === 'modal' || key.startsWith('modal_')) delete targetQuery[key]
+      })
+      Object.assign(targetQuery, { modal: 'rateShow', modal_showId: showId, modal_title: 'Оценка', modal_type: type })
+    }
+
+    const viewMatch = startParam.match(/^view_(\d+)_(Movie|Series)_(\d+)_(\d+)$/)
+    if (viewMatch) {
+      const [, showId, type, season, episode] = viewMatch
+      targetPath = `/search/show/${showId}`
+      Object.keys(targetQuery).forEach(key => {
+        if (key === 'modal' || key.startsWith('modal_')) delete targetQuery[key]
+      })
+      Object.assign(targetQuery, { modal: 'addView', modal_showId: showId, modal_title: 'Отметить просмотр', modal_type: type, modal_season: season, modal_episode: episode })
+    }
+
+    const watchMatch = startParam.match(/^watch_(\d+)_(\d+)_(\d+)$/)
+    if (rateMatch || viewMatch) {
+      // Rating context was applied above; retain the requested rating modal.
+    } else if (watchMatch) {
+      const [, showId, season, episode] = watchMatch
+      targetPath = `/search/show/${showId}`
+      Object.keys(targetQuery).forEach(key => {
+        if (key === 'modal' || key.startsWith('modal_')) delete targetQuery[key]
+      })
+      Object.assign(targetQuery, {
+        modal: 'addView',
+        modal_showId: showId,
+        modal_title: 'Просмотр серии',
+        modal_type: 'Series',
+        modal_season: season,
+        modal_episode: episode
+      })
+    } else if (startParam.startsWith('stat_')) {
       targetPath = '/stats'
       targetQuery.shared_id = startParam.replace('stat_', '')
     } else if (startParam.startsWith('show_')) {
@@ -231,6 +271,9 @@ watch(showBackButton, (val) => {
 
 watch(() => uiStore.theme, (val) => {
   document.body.classList.toggle('light', val === 'light')
+  if (!initData || window.IS_ADMIN_DASHBOARD) return
+  // Preserve toggle order when requests take longer than the user's clicks.
+  themeSync = themeSync.catch(() => {}).then(() => post('theme/', { theme: val })).catch(() => {})
 }, { immediate: true })
 </script>
 
