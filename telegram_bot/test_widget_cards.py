@@ -31,6 +31,7 @@ class WidgetCardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(method, SendWidget)
         self.assertEqual(method.__api_method__, 'sendWidget')
         self.assertEqual(method.height, 450)
+        self.assertIsNone(method.caption)
         self.assertNotIn('poster', method.html.lower())
         self.assertNotIn('__poster', method.html)
         self.assertLessEqual(len(method.html.encode()), 32768)

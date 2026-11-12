@@ -21,7 +21,6 @@ _MAX_STATE_BYTES = 1024
 _MAX_HTML_BYTES = 32768
 _MAX_COMPRESSED_HTML_BYTES = 4096
 _WIDGET_HEIGHT = 450
-_CAPTION = 'KinoPub Observer · карточка фильма'
 
 
 class SendWidget(TelegramMethod[Message]):
@@ -102,7 +101,6 @@ def build_widget_method(chat_id: int | str, show: dict) -> SendWidget:
             return SendWidget(
                 chat_id=chat_id,
                 html=_widget_html(),
-                caption=_CAPTION,
                 height=_WIDGET_HEIGHT,
                 public_data=public_data,
                 chat_data=chat_data,
