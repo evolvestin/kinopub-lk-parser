@@ -142,7 +142,7 @@ class QueryBudgetTests(TestCase):
 
         def run_search():
             request = request_factory.get(
-                '/api/bot/search',
+                '/api/bot/search/',
                 {'q': 'title', 'telegram_id': self.user.telegram_id},
                 HTTP_X_BOT_TOKEN='test-token',
             )
@@ -165,6 +165,30 @@ class QueryBudgetTests(TestCase):
             one_show_queries,
             three_show_queries,
             'bot search must batch prefetches instead of querying per matching show',
+        )
+
+    def test_bot_search_returns_absolute_proxy_url_for_telegram_thumbnails(self):
+        self.show.kinopub_id = 8613
+        self.show.save(update_fields=['kinopub_id'])
+        request = RequestFactory().get(
+            '/api/bot/search/',
+            {'q': 'A title'},
+            HTTP_X_BOT_TOKEN='test-token',
+        )
+
+        with (
+            patch('app.views.settings.BOT_TOKEN', 'test-token'),
+            patch('app.views.settings.POSTER_BASE_URL', 'https://m.pushbr.com/poster/item/'),
+            patch('app.views.settings.PUBLIC_SITE_URL', 'https://kinopub.webredirect.org'),
+        ):
+            response = bot_search_shows(request)
+
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)['results'][0]
+        self.assertEqual(
+            result['poster_url'],
+            'https://kinopub.webredirect.org/api/image_proxy/'
+            '?url=https%3A%2F%2Fm.pushbr.com%2Fposter%2Fitem%2Fsmall%2F8613.jpg',
         )
 
     def test_webapp_search_matches_imdb_id_without_title(self):

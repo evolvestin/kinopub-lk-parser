@@ -689,6 +689,7 @@ def bot_search_shows(request):
 
     shows = (
         Show.objects.filter(search_filter)
+        .select_related('ext_rating')
         .prefetch_related('countries', 'genres', 'ratings__user')
         .distinct()[:20]
     )
@@ -705,6 +706,20 @@ def bot_search_shows(request):
     results = []
     for show in shows:
         poster_url = build_poster_url(show.kinopub_id, show.tmdb_poster_path)
+        if poster_url:
+            parsed_poster_url = urllib.parse.urlsplit(poster_url)
+            if not parsed_poster_url.scheme:
+                public_base = (
+                    getattr(settings, 'PUBLIC_SITE_URL', '')
+                    or getattr(settings, 'WEBAPP_PUBLIC_URL', '')
+                ).rstrip('/')
+                poster_url = (
+                    urllib.parse.urljoin(f'{public_base}/', poster_url.lstrip('/'))
+                    if public_base
+                    else None
+                )
+            elif parsed_poster_url.scheme not in {'http', 'https'} or not parsed_poster_url.netloc:
+                poster_url = None
         internal_rating, user_ratings_list = show.get_internal_rating_data(current_user=user)
 
         results.append(
@@ -717,7 +732,7 @@ def bot_search_shows(request):
                 'status': show.status,
                 'poster_url': poster_url,
                 'imdb_rating': show.imdb_rating,
-                'kinopoisk_rating': show.kinopoisk_rating,
+                'kinopoisk_rating': getattr(getattr(show, 'ext_rating', None), 'kp', None),
                 'imdb_url': show.imdb_url,
                 'kinopoisk_url': show.kinopoisk_url,
                 'countries': _get_normalized_countries_strings(show.countries.all(), country_dict)[
