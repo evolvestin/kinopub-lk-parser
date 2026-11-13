@@ -49,7 +49,10 @@ class InlineCardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('<a href="https://www.kinopoisk.ru/film/258687/">KP: 8.7</a>', message)
         self.assertIn('<a href="https://www.imdb.com/title/tt0816692/">IMDB: 8.7</a>', message)
         self.assertEqual(article.description, '2014 | Фильм | Interstellar')
-        self.assertIsNone(article.reply_markup)
+        self.assertEqual(
+            article.reply_markup.inline_keyboard[0][0].url,
+            'https://t.me/kinopub_observer_bot/stats?startapp=show_8613',
+        )
 
 
 if __name__ == '__main__':

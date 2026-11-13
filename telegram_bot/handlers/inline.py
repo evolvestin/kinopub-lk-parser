@@ -154,7 +154,17 @@ async def inline_search_handler(query: InlineQuery):
             thumbnail_width=50,
             thumbnail_height=75,
             input_message_content=input_content,
-            reply_markup=None,
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[[
+                    InlineKeyboardButton(
+                        text='Открыть в приложении ↗',
+                        url=(
+                            f'https://t.me/{bot_username}/'
+                            f'{os.getenv("WEBAPP_SHORT_NAME", "stats")}?startapp=show_{show_id}'
+                        ),
+                    )
+                ]]
+            ),
         )
         articles.append(article)
 
