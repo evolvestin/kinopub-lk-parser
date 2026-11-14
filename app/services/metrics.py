@@ -924,17 +924,32 @@ def calculate_total_persons_by_show_type_metric():
             .order_by('-total')
         )
     else:
-        # canonical_person_id is already the resolved identity, so joining
-        # app_person is unnecessary.  The old COALESCE expression forced a
-        # hash join with the 3.5M-row Person table before sorting 15M+ crew
-        # rows for COUNT(DISTINCT).
-        stats = (
-            ShowCrew.objects.filter(show__type__isnull=False)
-            .exclude(show__type='')
-            .values('show__type')
-            .annotate(total=Count('canonical_person', distinct=True))
-            .order_by('-total')
-        )
+        # COUNT(DISTINCT) forced PostgreSQL to sort all 15M+ joined crew rows
+        # serially. Grouping unique (type, person) pairs first allows a
+        # parallel hash join/aggregate and avoids carrying duplicate credits
+        # through a large serial sort.
+        show_table = connection.ops.quote_name(Show._meta.db_table)
+        crew_table = connection.ops.quote_name(ShowCrew._meta.db_table)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f'''
+                SELECT unique_people.show_type, COUNT(*) AS total
+                FROM (
+                    SELECT show_row.type AS show_type, crew.canonical_person_id
+                    FROM {crew_table} AS crew
+                    INNER JOIN {show_table} AS show_row ON crew.show_id = show_row.id
+                    WHERE show_row.type IS NOT NULL AND show_row.type <> %s
+                    GROUP BY show_row.type, crew.canonical_person_id
+                ) AS unique_people
+                GROUP BY unique_people.show_type
+                ORDER BY total DESC
+                ''',
+                [''],
+            )
+            stats = [
+                {'show__type': show_type, 'total': total}
+                for show_type, total in cursor.fetchall()
+            ]
     return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
 
 

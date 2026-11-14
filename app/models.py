@@ -537,11 +537,6 @@ class Show(BaseModel):
         verbose_name_plural = 'Shows'
         indexes = [
             models.Index(fields=['type', 'year'], name='idx_show_type_year'),
-            models.Index(
-                fields=['type', 'id'],
-                name='idx_show_type_id_with_crew',
-                condition=Q(type__isnull=False) & ~Q(type=''),
-            ),
             models.Index(fields=['status', 'year'], name='idx_show_status_year'),
             models.Index(
                 fields=['type', 'id'],

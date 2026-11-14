@@ -341,9 +341,11 @@ class TotalPersonsMetricTests(TestCase):
         aggregate_sql = next(
             query['sql']
             for query in queries
-            if 'COUNT(DISTINCT' in query['sql'].upper()
+            if 'GROUP BY' in query['sql'].upper()
+            and 'CANONICAL_PERSON_ID' in query['sql'].upper()
         )
         self.assertNotIn('JOIN "app_person"', aggregate_sql.upper())
+        self.assertIn('COUNT(*)', aggregate_sql.upper())
 
     def test_total_person_details_use_correlated_exists_for_first_page(self):
         canonical = Person.objects.create(name='Canonical person')
