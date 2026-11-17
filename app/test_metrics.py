@@ -200,7 +200,7 @@ class ProfessionMetricTests(TestCase):
 
         self.assertIn({'name': 'Actor', 'value': 1}, stats)
 
-    def test_backfilled_profession_counts_share_one_distinct_scan_per_language(self):
+    def test_backfilled_profession_counts_deduplicate_person_role_pairs_per_language(self):
         actor = Person.objects.create(name='Known actor', en_name='Known actor')
         alias = Person.objects.create(name='Actor alias', master_person=actor)
         unknown = Person.objects.create(name='Unknown crew member')
@@ -238,6 +238,10 @@ class ProfessionMetricTests(TestCase):
             if 'GROUPING SETS' in query['sql'].upper()
         ]
         self.assertEqual(len(grouped_queries), 2)
+        self.assertTrue(
+            all('COUNT(DISTINCT' not in query.upper() for query in grouped_queries)
+        )
+        self.assertTrue(all('UNIQUE_ROLE_PEOPLE' in query.upper() for query in grouped_queries))
 
 
 class AvatarMetricTests(TestCase):

@@ -1180,11 +1180,18 @@ def _calculate_profession_stats_canonical():
                         WHERE {primary_column} = ANY(%s)
                            OR {fallback_column} = ANY(%s)
                     )
-                    SELECT normalized,
-                           COUNT(DISTINCT {canonical_column}) AS value,
-                           GROUPING(normalized) AS is_total
-                    FROM role_rows
-                    GROUP BY GROUPING SETS ((normalized), ())
+                    , unique_role_people AS (
+                        SELECT {canonical_column}, normalized,
+                               GROUPING(normalized) AS is_total
+                        FROM role_rows
+                        GROUP BY GROUPING SETS (
+                            (normalized, {canonical_column}),
+                            ({canonical_column})
+                        )
+                    )
+                    SELECT normalized, COUNT(*) AS value, is_total
+                    FROM unique_role_people
+                    GROUP BY normalized, is_total
                     ORDER BY is_total DESC, value DESC
                 """
                 params = [primary_values]
