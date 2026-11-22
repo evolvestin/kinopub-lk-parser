@@ -350,6 +350,13 @@ class TotalPersonsMetricTests(TestCase):
         )
         self.assertNotIn('JOIN "app_person"', aggregate_sql.upper())
         self.assertIn('COUNT(*)', aggregate_sql.upper())
+        if connection.vendor == 'postgresql':
+            work_mem_sql = next(
+                query['sql']
+                for query in queries
+                if 'SET_CONFIG' in query['sql'].upper()
+            )
+            self.assertIn('64MB', work_mem_sql.upper())
 
     def test_total_person_details_use_correlated_exists_for_first_page(self):
         canonical = Person.objects.create(name='Canonical person')

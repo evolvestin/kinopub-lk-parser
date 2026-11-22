@@ -6,7 +6,7 @@ from hashlib import sha1
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import (
     Case,
     CharField,
@@ -66,6 +66,7 @@ PERSON_DETAIL_WARM_KEYS = {
     'unused_persons',
 }
 SYSTEM_STATUS_SNAPSHOT_KEY = '_system_status'
+TOTAL_PERSONS_METRIC_WORK_MEM = '64MB'
 
 
 @contextmanager
@@ -930,26 +931,35 @@ def calculate_total_persons_by_show_type_metric():
         # through a large serial sort.
         show_table = connection.ops.quote_name(Show._meta.db_table)
         crew_table = connection.ops.quote_name(ShowCrew._meta.db_table)
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f'''
-                SELECT unique_people.show_type, COUNT(*) AS total
-                FROM (
-                    SELECT show_row.type AS show_type, crew.canonical_person_id
-                    FROM {crew_table} AS crew
-                    INNER JOIN {show_table} AS show_row ON crew.show_id = show_row.id
-                    WHERE show_row.type IS NOT NULL AND show_row.type <> %s
-                    GROUP BY show_row.type, crew.canonical_person_id
-                ) AS unique_people
-                GROUP BY unique_people.show_type
-                ORDER BY total DESC
-                ''',
-                [''],
-            )
-            stats = [
-                {'show__type': show_type, 'total': total}
-                for show_type, total in cursor.fetchall()
-            ]
+        # The 15M-row grouped aggregate spills heavily at PostgreSQL's 4MB
+        # default (32 planned hash partitions on PROD). Raise work_mem only
+        # inside this transaction and query; do not change the session/server
+        # setting used by unrelated requests.
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT set_config('work_mem', %s, true)",
+                    [TOTAL_PERSONS_METRIC_WORK_MEM],
+                )
+                cursor.execute(
+                    f'''
+                    SELECT unique_people.show_type, COUNT(*) AS total
+                    FROM (
+                        SELECT show_row.type AS show_type, crew.canonical_person_id
+                        FROM {crew_table} AS crew
+                        INNER JOIN {show_table} AS show_row ON crew.show_id = show_row.id
+                        WHERE show_row.type IS NOT NULL AND show_row.type <> %s
+                        GROUP BY show_row.type, crew.canonical_person_id
+                    ) AS unique_people
+                    GROUP BY unique_people.show_type
+                    ORDER BY total DESC
+                    ''',
+                    [''],
+                )
+                stats = [
+                    {'show__type': show_type, 'total': total}
+                    for show_type, total in cursor.fetchall()
+                ]
     return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
 
 
