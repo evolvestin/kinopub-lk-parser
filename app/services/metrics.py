@@ -66,7 +66,7 @@ PERSON_DETAIL_WARM_KEYS = {
     'unused_persons',
 }
 SYSTEM_STATUS_SNAPSHOT_KEY = '_system_status'
-TOTAL_PERSONS_METRIC_WORK_MEM = '64MB'
+HEAVY_METRIC_AGGREGATE_WORK_MEM = '64MB'
 
 
 @contextmanager
@@ -98,6 +98,21 @@ def metrics_statement_timeout():
                 # A timed-out statement can leave the connection unusable.
                 # Closing it makes Django open a clean connection next time.
                 connection.close()
+
+
+@contextmanager
+def _metric_query_work_mem(value):
+    """Temporarily raise PostgreSQL work_mem for one expensive metric query."""
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute('SHOW work_mem')
+            previous_work_mem = cursor.fetchone()[0]
+            cursor.execute("SELECT set_config('work_mem', %s, true)", [value])
+            yield cursor
+            cursor.execute(
+                "SELECT set_config('work_mem', %s, true)",
+                [previous_work_mem],
+            )
 
 
 def _format_type(t):
@@ -935,14 +950,9 @@ def calculate_total_persons_by_show_type_metric():
         # default (32 planned hash partitions on PROD). Raise work_mem only
         # inside this transaction and query; do not change the session/server
         # setting used by unrelated requests.
-        with transaction.atomic():
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT set_config('work_mem', %s, true)",
-                    [TOTAL_PERSONS_METRIC_WORK_MEM],
-                )
-                cursor.execute(
-                    f'''
+        with _metric_query_work_mem(HEAVY_METRIC_AGGREGATE_WORK_MEM) as cursor:
+            cursor.execute(
+                f'''
                     SELECT unique_people.show_type, COUNT(*) AS total
                     FROM (
                         SELECT show_row.type AS show_type, crew.canonical_person_id
@@ -954,12 +964,12 @@ def calculate_total_persons_by_show_type_metric():
                     GROUP BY unique_people.show_type
                     ORDER BY total DESC
                     ''',
-                    [''],
-                )
-                stats = [
-                    {'show__type': show_type, 'total': total}
-                    for show_type, total in cursor.fetchall()
-                ]
+                [''],
+            )
+            stats = [
+                {'show__type': show_type, 'total': total}
+                for show_type, total in cursor.fetchall()
+            ]
     return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
 
 
@@ -1218,7 +1228,10 @@ def _calculate_profession_stats_canonical():
                 )
                 params.extend((primary_values, fallback_values))
 
-                with connection.cursor() as cursor:
+                # This aggregate groups several million crew rows and spills
+                # at PostgreSQL's 4MB default during peak load. Scope the
+                # extra hash memory to this query only.
+                with _metric_query_work_mem(HEAVY_METRIC_AGGREGATE_WORK_MEM) as cursor:
                     cursor.execute(sql, params)
                     rows = cursor.fetchall()
 

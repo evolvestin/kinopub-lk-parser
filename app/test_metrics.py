@@ -242,6 +242,16 @@ class ProfessionMetricTests(TestCase):
             all('COUNT(DISTINCT' not in query.upper() for query in grouped_queries)
         )
         self.assertTrue(all('UNIQUE_ROLE_PEOPLE' in query.upper() for query in grouped_queries))
+        raised_work_mem_queries = [
+            query['sql']
+            for query in queries
+            if 'SET_CONFIG' in query['sql'].upper() and '64MB' in query['sql'].upper()
+        ]
+        self.assertEqual(len(raised_work_mem_queries), 2)
+        if connection.vendor == 'postgresql':
+            with connection.cursor() as cursor:
+                cursor.execute('SHOW work_mem')
+                self.assertNotEqual(cursor.fetchone()[0], '64MB')
 
 
 class AvatarMetricTests(TestCase):
@@ -357,6 +367,9 @@ class TotalPersonsMetricTests(TestCase):
                 if 'SET_CONFIG' in query['sql'].upper()
             )
             self.assertIn('64MB', work_mem_sql.upper())
+            with connection.cursor() as cursor:
+                cursor.execute('SHOW work_mem')
+                self.assertNotEqual(cursor.fetchone()[0], '64MB')
 
     def test_total_person_details_use_correlated_exists_for_first_page(self):
         canonical = Person.objects.create(name='Canonical person')
