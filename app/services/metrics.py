@@ -66,7 +66,7 @@ PERSON_DETAIL_WARM_KEYS = {
     'unused_persons',
 }
 SYSTEM_STATUS_SNAPSHOT_KEY = '_system_status'
-HEAVY_METRIC_AGGREGATE_WORK_MEM = '128MB'
+HEAVY_METRIC_AGGREGATE_WORK_MEM = '256MB'
 HEAVY_METRIC_AGGREGATE_TIMEOUT_MS = 600_000
 
 
@@ -958,8 +958,8 @@ def calculate_total_persons_by_show_type_metric():
         show_table = connection.ops.quote_name(Show._meta.db_table)
         crew_table = connection.ops.quote_name(ShowCrew._meta.db_table)
         # The 15M-row grouped aggregate sorts millions of rows per parallel
-        # worker. Keep enough memory for those sorts and allow the aggregate a
-        # longer bound, scoped to this transaction only.
+        # worker. Give the hash aggregate a larger budget to cut disk spills
+        # and allow it a longer bound, scoped to this transaction only.
         with _heavy_metric_query(HEAVY_METRIC_AGGREGATE_WORK_MEM) as cursor:
             cursor.execute(
                 f'''
