@@ -66,7 +66,8 @@ PERSON_DETAIL_WARM_KEYS = {
     'unused_persons',
 }
 SYSTEM_STATUS_SNAPSHOT_KEY = '_system_status'
-HEAVY_METRIC_AGGREGATE_WORK_MEM = '64MB'
+HEAVY_METRIC_AGGREGATE_WORK_MEM = '128MB'
+HEAVY_METRIC_AGGREGATE_TIMEOUT_MS = 600_000
 
 
 @contextmanager
@@ -101,17 +102,27 @@ def metrics_statement_timeout():
 
 
 @contextmanager
-def _metric_query_work_mem(value):
-    """Temporarily raise PostgreSQL work_mem for one expensive metric query."""
+def _heavy_metric_query(value):
+    """Give one large metric aggregate bounded memory and execution time."""
     with transaction.atomic():
         with connection.cursor() as cursor:
             cursor.execute('SHOW work_mem')
             previous_work_mem = cursor.fetchone()[0]
+            cursor.execute('SHOW statement_timeout')
+            previous_statement_timeout = cursor.fetchone()[0]
             cursor.execute("SELECT set_config('work_mem', %s, true)", [value])
+            cursor.execute(
+                "SELECT set_config('statement_timeout', %s, true)",
+                [str(HEAVY_METRIC_AGGREGATE_TIMEOUT_MS)],
+            )
             yield cursor
             cursor.execute(
                 "SELECT set_config('work_mem', %s, true)",
                 [previous_work_mem],
+            )
+            cursor.execute(
+                "SELECT set_config('statement_timeout', %s, true)",
+                [previous_statement_timeout],
             )
 
 
@@ -946,11 +957,10 @@ def calculate_total_persons_by_show_type_metric():
         # through a large serial sort.
         show_table = connection.ops.quote_name(Show._meta.db_table)
         crew_table = connection.ops.quote_name(ShowCrew._meta.db_table)
-        # The 15M-row grouped aggregate spills heavily at PostgreSQL's 4MB
-        # default (32 planned hash partitions on PROD). Raise work_mem only
-        # inside this transaction and query; do not change the session/server
-        # setting used by unrelated requests.
-        with _metric_query_work_mem(HEAVY_METRIC_AGGREGATE_WORK_MEM) as cursor:
+        # The 15M-row grouped aggregate sorts millions of rows per parallel
+        # worker. Keep enough memory for those sorts and allow the aggregate a
+        # longer bound, scoped to this transaction only.
+        with _heavy_metric_query(HEAVY_METRIC_AGGREGATE_WORK_MEM) as cursor:
             cursor.execute(
                 f'''
                     SELECT unique_people.show_type, COUNT(*) AS total
@@ -1228,10 +1238,9 @@ def _calculate_profession_stats_canonical():
                 )
                 params.extend((primary_values, fallback_values))
 
-                # This aggregate groups several million crew rows and spills
-                # at PostgreSQL's 4MB default during peak load. Scope the
-                # extra hash memory to this query only.
-                with _metric_query_work_mem(HEAVY_METRIC_AGGREGATE_WORK_MEM) as cursor:
+                # PostgreSQL plans a multi-million-row parallel sort here;
+                # scope the additional memory and timeout to this query.
+                with _heavy_metric_query(HEAVY_METRIC_AGGREGATE_WORK_MEM) as cursor:
                     cursor.execute(sql, params)
                     rows = cursor.fetchall()
 

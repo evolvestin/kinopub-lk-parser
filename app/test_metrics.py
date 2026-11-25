@@ -245,13 +245,21 @@ class ProfessionMetricTests(TestCase):
         raised_work_mem_queries = [
             query['sql']
             for query in queries
-            if 'SET_CONFIG' in query['sql'].upper() and '64MB' in query['sql'].upper()
+            if 'SET_CONFIG' in query['sql'].upper() and '128MB' in query['sql'].upper()
         ]
         self.assertEqual(len(raised_work_mem_queries), 2)
+        raised_timeout_queries = [
+            query['sql']
+            for query in queries
+            if 'STATEMENT_TIMEOUT' in query['sql'].upper() and '600000' in query['sql']
+        ]
+        self.assertEqual(len(raised_timeout_queries), 2)
         if connection.vendor == 'postgresql':
             with connection.cursor() as cursor:
                 cursor.execute('SHOW work_mem')
-                self.assertNotEqual(cursor.fetchone()[0], '64MB')
+                self.assertNotEqual(cursor.fetchone()[0], '128MB')
+                cursor.execute('SHOW statement_timeout')
+                self.assertNotEqual(cursor.fetchone()[0], '600000ms')
 
 
 class AvatarMetricTests(TestCase):
@@ -366,10 +374,10 @@ class TotalPersonsMetricTests(TestCase):
                 for query in queries
                 if 'SET_CONFIG' in query['sql'].upper()
             )
-            self.assertIn('64MB', work_mem_sql.upper())
+            self.assertIn('128MB', work_mem_sql.upper())
             with connection.cursor() as cursor:
                 cursor.execute('SHOW work_mem')
-                self.assertNotEqual(cursor.fetchone()[0], '64MB')
+                self.assertNotEqual(cursor.fetchone()[0], '128MB')
 
     def test_total_person_details_use_correlated_exists_for_first_page(self):
         canonical = Person.objects.create(name='Canonical person')
