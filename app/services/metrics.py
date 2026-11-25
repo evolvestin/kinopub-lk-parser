@@ -1773,10 +1773,17 @@ def get_tmdb_missing_durations_list(show_type: str):
 
 
 def calculate_unused_persons_metric():
-    canonical_id = _canonical_person_id_expression()
-    used_persons = ShowCrew.objects.annotate(canonical_id=canonical_id).filter(
-        canonical_id=OuterRef('pk')
-    )
+    if ShowCrew.objects.filter(canonical_person__isnull=True).exists():
+        # Keep compatibility with rows that have not been backfilled yet.
+        used_persons = ShowCrew.objects.annotate(
+            canonical_id=_canonical_person_id_expression()
+        ).filter(canonical_id=OuterRef('pk'))
+    else:
+        # The canonical-person index supports this correlated existence check.
+        # Avoid joining app_person for every crew row via COALESCE when the
+        # canonical IDs are already complete.
+        used_persons = ShowCrew.objects.filter(canonical_person_id=OuterRef('pk'))
+
     with metrics_statement_timeout():
         unused_count = (
             Person.objects.filter(master_person__isnull=True)

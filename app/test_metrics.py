@@ -333,6 +333,8 @@ class UnusedPersonMetricTests(TestCase):
         )
         self.assertIn('EXISTS', count_sql.upper())
         self.assertNotIn('IN (SELECT DISTINCT', count_sql.upper())
+        self.assertEqual(count_sql.upper().count('FROM "APP_PERSON"'), 1)
+        self.assertNotIn('LEFT OUTER JOIN "APP_PERSON"', count_sql.upper())
 
     def test_unused_person_details_use_correlated_exists(self):
         Person.objects.create(name='Unused person')
