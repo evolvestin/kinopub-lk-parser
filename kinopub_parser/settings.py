@@ -434,6 +434,11 @@ class MultiSchedule:
 CELERY_TASK_ROUTES = {
     'app.tasks.update_site_metrics_task': {'queue': 'metrics'},
     'app.tasks.fetch_person_photos_task': {'queue': 'metrics'},
+    # Cache warming scans the same large tables as snapshot generation. Keep
+    # it on the single metrics worker so it cannot compete with a snapshot.
+    'app.tasks.warm_metrics_caches_task': {'queue': 'metrics'},
+    'app.tasks.warm_duplicate_photo_urls_task': {'queue': 'metrics'},
+    'app.tasks.warm_person_metric_pages_task': {'queue': 'metrics'},
 }
 
 CELERY_BEAT_SCHEDULE = {

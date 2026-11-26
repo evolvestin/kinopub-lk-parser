@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from unittest.mock import Mock, patch
 
 from celery.exceptions import Retry, SoftTimeLimitExceeded
+from django.conf import settings
 from django.test import SimpleTestCase, TestCase
 
 from app import tasks
@@ -35,6 +36,17 @@ class FakeQueueRedis:
 
     def delete(self, retry_key):
         self.cleared_keys.append(retry_key)
+
+
+class MetricTaskRoutingTests(SimpleTestCase):
+    def test_cache_warmup_uses_single_metrics_queue(self):
+        for task_name in (
+            'app.tasks.warm_metrics_caches_task',
+            'app.tasks.warm_duplicate_photo_urls_task',
+            'app.tasks.warm_person_metric_pages_task',
+        ):
+            with self.subTest(task_name=task_name):
+                self.assertEqual(settings.CELERY_TASK_ROUTES[task_name], {'queue': 'metrics'})
 
 
 class QueueRetryTests(TestCase):
