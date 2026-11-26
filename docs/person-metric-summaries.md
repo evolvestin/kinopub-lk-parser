@@ -6,7 +6,8 @@ person metrics only need a small set of per-person facts.
 
 ## Stored data
 
-`PersonMetricSummary` has one row per canonical person:
+`PersonMetricSummary` has one row per canonical person and is the refreshable
+intermediate input:
 
 - distinct show types represented by that person's credits;
 - distinct normalized Russian and English professions;
@@ -19,9 +20,14 @@ people waiting for Kinopoisk data without reading all credits.
 
 `PersonMetricSummaryDirty` is a deduplicated work queue keyed by canonical
 person ID. Database triggers mark affected people dirty when credits change,
-show type or Kinopoisk URL changes, or an `ExternalRating` row is added,
-removed, or moved. `PersonMetricSummaryState` records whether the initial
-backfill completed. Snapshot jobs retry while the state is not ready.
+show type or Kinopoisk URL changes, an `ExternalRating` row is added, removed,
+or moved, or canonical person links change.
+
+The snapshot reads `PersonMetricAggregate`, a small grouped rollup of role and
+show-type counts, plus counters on `PersonMetricSummaryState`. Dirty person
+refreshes apply old/new deltas to those counters. The routine snapshot therefore
+does not unnest or count millions of intermediate person rows. The state row
+also tracks the canonical-person population from a database trigger.
 
 ## Refresh lifecycle
 
@@ -36,10 +42,10 @@ write locks. It rebuilds the summary in bounded batches of actual `ShowCrew`
 rows, finding each batch boundary through the table's primary-key index. A
 canonical person can have credits in several batches, so each batch merges
 distinct values into that person's summary row.
-It marks
-the state ready only after all ranges and queued changes are processed. It is
-the one-time full pass; routine snapshot generation refreshes only dirty
-people in small batches and aggregates the compact summary table.
+It marks the state ready only after all ranges and queued changes are processed
+and the small grouped rollups are built. It is the one-time full pass; routine
+snapshot generation refreshes only dirty people in small batches and reads the
+grouped rollups.
 
 If a rebuild fails, readiness remains false and snapshots defer. Resolve the
 failure and rerun the command; it is safe to rerun because it clears and

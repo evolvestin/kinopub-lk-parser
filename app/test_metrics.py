@@ -6,7 +6,9 @@ from django.utils import timezone
 from app.models import (
     ExternalRating,
     Person,
+    PersonMetricAggregate,
     PersonMetricSummaryDirty,
+    PersonMetricSummaryState,
     Show,
     ShowCrew,
     SiteMetric,
@@ -469,7 +471,18 @@ class PersonMetricSummaryTests(TestCase):
         )
 
         rebuild_person_metric_summaries(batch_size=1)
-        summary = get_person_metric_summary_data()
+        with CaptureQueriesContext(connection) as queries:
+            summary = get_person_metric_summary_data()
+        self.assertFalse(
+            any('FROM app_personmetricsummary ' in query['sql'].lower() for query in queries)
+        )
+        self.assertLessEqual(PersonMetricAggregate.objects.count(), 20)
+        state = PersonMetricSummaryState.objects.get(pk=1)
+        self.assertEqual(
+            state.root_person_count,
+            Person.objects.filter(master_person__isnull=True).count(),
+        )
+        self.assertEqual(state.used_person_count, 1)
         summary_professions = _profession_stats_from_summary(summary)
         live_professions = _calculate_profession_stats()
         self.assertEqual(
@@ -552,6 +565,10 @@ class PersonMetricSummaryTests(TestCase):
         )
 
         new_canonical = Person.objects.create(name='New canonical actor')
+        self.assertEqual(
+            PersonMetricSummaryState.objects.get(pk=1).root_person_count,
+            Person.objects.filter(master_person__isnull=True).count(),
+        )
         Person.objects.filter(pk=alias.pk).update(master_person=new_canonical)
         self.assertTrue(
             PersonMetricSummaryDirty.objects.filter(

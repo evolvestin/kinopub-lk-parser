@@ -944,6 +944,27 @@ class PersonMetricSummaryState(models.Model):
     id = models.PositiveSmallIntegerField(primary_key=True, default=1)
     ready = models.BooleanField(default=False)
     rebuilt_at = models.DateTimeField(null=True, blank=True)
+    root_person_count = models.BigIntegerField(default=0)
+    ru_known_person_count = models.BigIntegerField(default=0)
+    en_known_person_count = models.BigIntegerField(default=0)
+    used_person_count = models.BigIntegerField(default=0)
+
+
+class PersonMetricAggregate(models.Model):
+    """Small grouped rollups consumed by the global snapshot."""
+
+    kind = models.CharField(max_length=16)
+    language = models.CharField(max_length=2, blank=True, default='')
+    name = models.TextField()
+    value = models.BigIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['kind', 'language', 'name'],
+                name='uniq_person_metric_aggregate_dimension',
+            ),
+        ]
 
 
 class WishlistFolder(BaseModel):

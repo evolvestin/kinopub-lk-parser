@@ -4,7 +4,7 @@ from django.db import connection, transaction
 from django.utils import timezone
 
 from app.models import (
-    Person,
+    PersonMetricAggregate,
     PersonMetricSummary,
     PersonMetricSummaryDirty,
     PersonMetricSummaryState,
@@ -15,6 +15,7 @@ from shared.constants import RAW_TO_NORMALIZED_EN, RAW_TO_NORMALIZED_RU, PROFESS
 SUMMARY_TABLE = PersonMetricSummary._meta.db_table
 DIRTY_TABLE = PersonMetricSummaryDirty._meta.db_table
 STATE_TABLE = PersonMetricSummaryState._meta.db_table
+AGGREGATE_TABLE = PersonMetricAggregate._meta.db_table
 CREW_TABLE = ShowCrew._meta.db_table
 
 
@@ -172,14 +173,18 @@ def refresh_dirty_person_metric_summaries(batch_size=5000, force=False):
 
                 cursor.execute(
                     '''
+                    SELECT canonical_person_id
+                    FROM unnest(%s::bigint[]) AS dirty(canonical_person_id)
+                    UNION
                     SELECT DISTINCT COALESCE(master_person_id, id)
                     FROM app_person
                     WHERE id = ANY(%s)
                     ''',
-                    [dirty_ids],
+                    [dirty_ids, dirty_ids],
                 )
-                canonical_ids = [row[0] for row in cursor.fetchall()]
+                canonical_ids = list({row[0] for row in cursor.fetchall()})
                 if canonical_ids:
+                    _adjust_person_metric_rollups(canonical_ids, -1, cursor)
                     cursor.execute(
                         f'DELETE FROM {SUMMARY_TABLE} WHERE canonical_person_id = ANY(%s)',
                         [canonical_ids],
@@ -188,8 +193,69 @@ def refresh_dirty_person_metric_summaries(batch_size=5000, force=False):
                         'sc.canonical_person_id = ANY(%s)', upsert=True
                     )
                     cursor.execute(sql, [*params, canonical_ids])
+                    _adjust_person_metric_rollups(canonical_ids, 1, cursor)
                 processed += len(dirty_ids)
     return processed
+
+
+def _adjust_person_metric_rollups(canonical_ids, multiplier, cursor):
+    """Apply a changed person's old/new arrays to compact grouped counters."""
+    if not canonical_ids:
+        return
+
+    cursor.execute(
+        f'''
+        INSERT INTO {AGGREGATE_TABLE} (kind, language, name, value)
+        SELECT kind, language, name, SUM(value)::bigint
+        FROM (
+            SELECT 'ru_role'::varchar AS kind, 'ru'::varchar AS language,
+                   role AS name, (%s)::bigint AS value
+            FROM {SUMMARY_TABLE} s
+            CROSS JOIN LATERAL UNNEST(s.ru_roles) AS role
+            WHERE s.canonical_person_id = ANY(%s)
+            UNION ALL
+            SELECT 'en_role'::varchar, 'en'::varchar, role,
+                   (%s)::bigint
+            FROM {SUMMARY_TABLE} s
+            CROSS JOIN LATERAL UNNEST(s.en_roles) AS role
+            WHERE s.canonical_person_id = ANY(%s)
+            UNION ALL
+            SELECT 'show_type'::varchar, ''::varchar, show_type,
+                   (%s)::bigint
+            FROM {SUMMARY_TABLE} s
+            CROSS JOIN LATERAL UNNEST(s.show_types) AS show_type
+            WHERE s.canonical_person_id = ANY(%s)
+        ) deltas
+        GROUP BY kind, language, name
+        ON CONFLICT (kind, language, name) DO UPDATE
+        SET value = {AGGREGATE_TABLE}.value + EXCLUDED.value
+        ''',
+        [multiplier, canonical_ids, multiplier, canonical_ids, multiplier, canonical_ids],
+    )
+    cursor.execute(f'DELETE FROM {AGGREGATE_TABLE} WHERE value <= 0')
+
+    cursor.execute(
+        f'''
+        SELECT
+            COUNT(*),
+            COUNT(*) FILTER (WHERE cardinality(ru_roles) > 0),
+            COUNT(*) FILTER (WHERE cardinality(en_roles) > 0)
+        FROM {SUMMARY_TABLE}
+        WHERE canonical_person_id = ANY(%s)
+        ''',
+        [canonical_ids],
+    )
+    used_count, ru_known_count, en_known_count = cursor.fetchone()
+    cursor.execute(
+        f'''
+        UPDATE {STATE_TABLE}
+        SET used_person_count = GREATEST(0, used_person_count + %s),
+            ru_known_person_count = GREATEST(0, ru_known_person_count + %s),
+            en_known_person_count = GREATEST(0, en_known_person_count + %s)
+        WHERE id = 1
+        ''',
+        [multiplier * used_count, multiplier * ru_known_count, multiplier * en_known_count],
+    )
 
 
 def rebuild_person_metric_summaries(batch_size=50000, progress_callback=None):
@@ -201,7 +267,7 @@ def rebuild_person_metric_summaries(batch_size=50000, progress_callback=None):
 
     with connection.cursor() as cursor:
         cursor.execute(
-            f'TRUNCATE TABLE {SUMMARY_TABLE}, {DIRTY_TABLE}'
+            f'TRUNCATE TABLE {SUMMARY_TABLE}, {DIRTY_TABLE}, {AGGREGATE_TABLE}'
         )
         cursor.execute(f'SELECT MIN(id), MAX(id) FROM {CREW_TABLE}')
         min_id, max_id = cursor.fetchone()
@@ -247,10 +313,54 @@ def rebuild_person_metric_summaries(batch_size=50000, progress_callback=None):
             lower_id = upper_id
 
     refresh_dirty_person_metric_summaries(force=True)
+    _rebuild_person_metric_rollups()
     state.ready = True
     state.rebuilt_at = timezone.now()
     state.save(update_fields=['ready', 'rebuilt_at'])
     return processed_ranges
+
+
+def _rebuild_person_metric_rollups():
+    """Build the tiny snapshot-facing rollups once after the summary backfill."""
+    with connection.cursor() as cursor:
+        cursor.execute(f'TRUNCATE TABLE {AGGREGATE_TABLE}')
+        cursor.execute(
+            f'''
+            INSERT INTO {AGGREGATE_TABLE} (kind, language, name, value)
+            SELECT kind, language, name, COUNT(*)::bigint
+            FROM (
+                SELECT 'ru_role'::varchar AS kind, 'ru'::varchar AS language,
+                       role AS name, s.canonical_person_id
+                FROM {SUMMARY_TABLE} s
+                CROSS JOIN LATERAL UNNEST(s.ru_roles) AS role
+                UNION ALL
+                SELECT 'en_role'::varchar, 'en'::varchar, role, s.canonical_person_id
+                FROM {SUMMARY_TABLE} s
+                CROSS JOIN LATERAL UNNEST(s.en_roles) AS role
+                UNION ALL
+                SELECT 'show_type'::varchar, ''::varchar, show_type, s.canonical_person_id
+                FROM {SUMMARY_TABLE} s
+                CROSS JOIN LATERAL UNNEST(s.show_types) AS show_type
+            ) rows
+            GROUP BY kind, language, name
+            '''
+        )
+        cursor.execute(
+            f'''
+            UPDATE {STATE_TABLE} AS state
+            SET root_person_count = (
+                    SELECT COUNT(*) FROM app_person WHERE master_person_id IS NULL
+                ),
+                used_person_count = (SELECT COUNT(*) FROM {SUMMARY_TABLE}),
+                ru_known_person_count = (
+                    SELECT COUNT(*) FROM {SUMMARY_TABLE} WHERE cardinality(ru_roles) > 0
+                ),
+                en_known_person_count = (
+                    SELECT COUNT(*) FROM {SUMMARY_TABLE} WHERE cardinality(en_roles) > 0
+                )
+            WHERE state.id = 1
+            '''
+        )
 
 
 def get_person_metric_summary_data():
@@ -260,55 +370,27 @@ def get_person_metric_summary_data():
 
     refresh_dirty_person_metric_summaries()
 
-    with connection.cursor() as cursor:
-        cursor.execute(
-            f'''
-            WITH role_rows AS (
-                SELECT s.canonical_person_id, role.language, role.normalized_role
-                FROM {SUMMARY_TABLE} AS s
-                CROSS JOIN LATERAL (
-                    SELECT 'ru'::text AS language, UNNEST(s.ru_roles) AS normalized_role
-                    UNION ALL
-                    SELECT 'en'::text AS language, UNNEST(s.en_roles) AS normalized_role
-                ) AS role
-            ), role_stats AS (
-                SELECT language, normalized_role, COUNT(*) AS value
-                FROM role_rows
-                GROUP BY language, normalized_role
-            )
-            SELECT language, normalized_role, value
-            FROM role_stats
-            ORDER BY language, value DESC
-            '''
+    aggregates = list(
+        PersonMetricAggregate.objects.order_by('kind', 'language', '-value').values_list(
+            'kind', 'language', 'name', 'value'
         )
-        role_rows = cursor.fetchall()
-        cursor.execute(
-            f'''
-            SELECT
-                COUNT(*) FILTER (WHERE cardinality(ru_roles) > 0),
-                COUNT(*) FILTER (WHERE cardinality(en_roles) > 0),
-                COUNT(*)
-            FROM {SUMMARY_TABLE}
-            '''
-        )
-        ru_known_count, en_known_count, used_person_count = cursor.fetchone()
-        cursor.execute(
-            f'''
-            SELECT show_type, COUNT(*) AS value
-            FROM {SUMMARY_TABLE} AS s
-            CROSS JOIN LATERAL UNNEST(s.show_types) AS show_type
-            GROUP BY show_type
-            ORDER BY value DESC
-            '''
-        )
-        show_type_rows = cursor.fetchall()
-
-    root_person_count = Person.objects.filter(master_person__isnull=True).count()
+    )
+    state = PersonMetricSummaryState.objects.get(id=1)
+    role_rows = [
+        (language, name, value)
+        for kind, language, name, value in aggregates
+        if kind in ('ru_role', 'en_role')
+    ]
+    show_type_rows = [
+        (name, value)
+        for kind, _language, name, value in aggregates
+        if kind == 'show_type'
+    ]
     return {
         'role_rows': role_rows,
-        'ru_known_count': ru_known_count or 0,
-        'en_known_count': en_known_count or 0,
-        'used_person_count': used_person_count or 0,
-        'root_person_count': root_person_count,
+        'ru_known_count': state.ru_known_person_count,
+        'en_known_count': state.en_known_person_count,
+        'used_person_count': state.used_person_count,
+        'root_person_count': state.root_person_count,
         'show_type_rows': show_type_rows,
     }
