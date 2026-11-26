@@ -28,7 +28,7 @@ class Command(BaseCommand):
 
                     def report_progress(upper_id, max_id, ranges):
                         self.stdout.write(
-                            f'Processed canonical person IDs through {upper_id}/{max_id} '
+                            f'Processed ShowCrew IDs through {upper_id}/{max_id} '
                             f'({ranges} batches)'
                         )
 

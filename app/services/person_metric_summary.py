@@ -73,10 +73,28 @@ def _insert_summary_sql(where_clause, upsert=False):
     if upsert:
         conflict_sql = f'''
             ON CONFLICT (canonical_person_id) DO UPDATE SET
-                show_types = EXCLUDED.show_types,
-                ru_roles = EXCLUDED.ru_roles,
-                en_roles = EXCLUDED.en_roles,
-                kp_waiting_person_ids = EXCLUDED.kp_waiting_person_ids
+                show_types = ARRAY(
+                    SELECT DISTINCT value
+                    FROM UNNEST({SUMMARY_TABLE}.show_types || EXCLUDED.show_types) AS item(value)
+                    ORDER BY value
+                ),
+                ru_roles = ARRAY(
+                    SELECT DISTINCT value
+                    FROM UNNEST({SUMMARY_TABLE}.ru_roles || EXCLUDED.ru_roles) AS item(value)
+                    ORDER BY value
+                ),
+                en_roles = ARRAY(
+                    SELECT DISTINCT value
+                    FROM UNNEST({SUMMARY_TABLE}.en_roles || EXCLUDED.en_roles) AS item(value)
+                    ORDER BY value
+                ),
+                kp_waiting_person_ids = ARRAY(
+                    SELECT DISTINCT value
+                    FROM UNNEST(
+                        {SUMMARY_TABLE}.kp_waiting_person_ids || EXCLUDED.kp_waiting_person_ids
+                    ) AS item(value)
+                    ORDER BY value
+                )
         '''
     sql = f'''
         INSERT INTO {SUMMARY_TABLE}
@@ -185,9 +203,7 @@ def rebuild_person_metric_summaries(batch_size=50000, progress_callback=None):
         cursor.execute(
             f'TRUNCATE TABLE {SUMMARY_TABLE}, {DIRTY_TABLE}'
         )
-        cursor.execute(
-            'SELECT MIN(id), MAX(id) FROM app_person WHERE master_person_id IS NULL'
-        )
+        cursor.execute(f'SELECT MIN(id), MAX(id) FROM {CREW_TABLE}')
         min_id, max_id = cursor.fetchone()
         cursor.execute(
             'SELECT EXISTS (SELECT 1 FROM app_showcrew WHERE canonical_person_id IS NULL)'
@@ -209,7 +225,8 @@ def rebuild_person_metric_summaries(batch_size=50000, progress_callback=None):
                 with connection.cursor() as cursor:
                     cursor.execute("SET LOCAL statement_timeout = '10min'")
                     sql, params = _insert_summary_sql(
-                        'sc.canonical_person_id > %s AND sc.canonical_person_id <= %s'
+                        'sc.id > %s AND sc.id <= %s',
+                        upsert=True,
                     )
                     cursor.execute(sql, [*params, lower_id, upper_id])
             processed_ranges += 1

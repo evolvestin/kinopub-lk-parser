@@ -32,7 +32,10 @@ python manage.py rebuild_person_metric_summaries --batch-size 50000
 ```
 
 The command takes the metrics snapshot, catalog write, and external rating
-write locks. It rebuilds the summary in bounded canonical-ID ranges and marks
+write locks. It rebuilds the summary in bounded `ShowCrew.id` ranges using the
+table's primary-key index. A canonical person can have credits in several
+ranges, so each range merges distinct values into that person's summary row.
+It marks
 the state ready only after all ranges and queued changes are processed. It is
 the one-time full pass; routine snapshot generation refreshes only dirty
 people in small batches and aggregates the compact summary table.

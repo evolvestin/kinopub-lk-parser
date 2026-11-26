@@ -458,12 +458,23 @@ class PersonMetricSummaryTests(TestCase):
             profession='В ролях',
             en_profession='Actor',
         )
+        second_show = Show.objects.create(
+            title='Series', original_title='Series', type='TV Show',
+        )
+        ShowCrew.objects.create(
+            show=second_show,
+            person=canonical,
+            profession='Режиссёр',
+            en_profession='Director',
+        )
 
         rebuild_person_metric_summaries(batch_size=1)
         summary = get_person_metric_summary_data()
+        summary_professions = _profession_stats_from_summary(summary)
+        live_professions = _calculate_profession_stats()
         self.assertEqual(
-            _profession_stats_from_summary(summary),
-            _calculate_profession_stats(),
+            tuple(sorted(rows, key=lambda row: row['name']) for rows in summary_professions),
+            tuple(sorted(rows, key=lambda row: row['name']) for rows in live_professions),
         )
         self.assertEqual(
             _total_persons_by_show_type_from_summary(summary),
@@ -494,9 +505,11 @@ class PersonMetricSummaryTests(TestCase):
         self.assertGreater(refresh_dirty_person_metric_summaries(), 0)
 
         summary = get_person_metric_summary_data()
+        summary_professions = _profession_stats_from_summary(summary)
+        live_professions = _calculate_profession_stats()
         self.assertEqual(
-            _profession_stats_from_summary(summary),
-            _calculate_profession_stats(),
+            tuple(sorted(rows, key=lambda row: row['name']) for rows in summary_professions),
+            tuple(sorted(rows, key=lambda row: row['name']) for rows in live_professions),
         )
         self.assertEqual(
             _total_persons_by_show_type_from_summary(summary),
@@ -548,9 +561,11 @@ class PersonMetricSummaryTests(TestCase):
         )
         refresh_dirty_person_metric_summaries()
         summary = get_person_metric_summary_data()
+        summary_professions = _profession_stats_from_summary(summary)
+        live_professions = _calculate_profession_stats()
         self.assertEqual(
-            _profession_stats_from_summary(summary),
-            _calculate_profession_stats(),
+            tuple(sorted(rows, key=lambda row: row['name']) for rows in summary_professions),
+            tuple(sorted(rows, key=lambda row: row['name']) for rows in live_professions),
         )
 
         ShowCrew.objects.filter(pk=crew.pk).delete()
