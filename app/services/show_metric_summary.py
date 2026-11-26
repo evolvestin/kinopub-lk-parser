@@ -44,17 +44,17 @@ def _summary_select_sql(where_clause):
     no_status = "(s.status IS NULL OR s.status = '')"
     no_plot = "(s.plot IS NULL OR s.plot = '')"
     no_imdb_id = "(s.imdb_id IS NULL OR s.imdb_id = '')"
-    no_kp_rating = (
-        f'NOT EXISTS (SELECT 1 FROM {rating_table} er '
-        'WHERE er.show_id = s.id AND er.kp IS NOT NULL)'
-    )
+    # ExternalRating.show is one-to-one. Join it once so PostgreSQL does not
+    # repeat the same full table scan for each rating flag during backfill.
+    has_kp_rating = 'er.kp IS NOT NULL'
+    no_kp_rating = 'er.kp IS NULL'
     duration_exists = f'EXISTS (SELECT 1 FROM {duration_table} d WHERE d.show_id = s.id)'
     genre_exists = f'EXISTS (SELECT 1 FROM {genre_table} sg WHERE sg.show_id = s.id)'
     country_exists = f'EXISTS (SELECT 1 FROM {country_table} sc WHERE sc.show_id = s.id)'
     series_filter = 's.type = ANY(%s)'
     cases = [
         _metric_case('total_shows', 'TRUE'),
-        _metric_case('has_kp', f'EXISTS (SELECT 1 FROM {rating_table} er WHERE er.show_id = s.id AND er.kp IS NOT NULL)'),
+        _metric_case('has_kp', has_kp_rating),
         _metric_case('has_imdb', 's.imdb_rating IS NOT NULL'),
         _metric_case('missing_kp', f'{kp_url} AND s.kinopoisk_rating_available AND {no_kp_rating}'),
         _metric_case(
@@ -100,6 +100,7 @@ def _summary_select_sql(where_clause):
             COALESCE(s.status, ''),
             ARRAY_REMOVE(ARRAY[{', '.join(cases)}]::text[], NULL)
         FROM {show_table} s
+        LEFT JOIN {rating_table} er ON er.show_id = s.id
         WHERE {where_clause}
     '''
     return sql, [list(SERIES_TYPES), list(SERIES_TYPES)]
@@ -221,6 +222,7 @@ def rebuild_show_metric_summaries(batch_size=50000, progress_callback=None):
             with connection.cursor() as cursor:
                 cursor.execute("SET LOCAL statement_timeout = '10min'")
                 cursor.execute("SET LOCAL work_mem = '256MB'")
+                cursor.execute('SET LOCAL jit = off')
                 _insert_summary(cursor, 's.id > %s AND s.id <= %s', [lower_id, upper_id])
         batches += 1
         if progress_callback:
