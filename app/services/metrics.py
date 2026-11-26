@@ -41,6 +41,7 @@ from app.services.person_metric_summary import (
     get_person_metric_summary_data,
     person_metric_summary_ready,
 )
+from app.services.show_metric_summary import get_show_metric_aggregate_data
 from app.utils import get_proxied_image_url
 from kinopub_parser import celery_app
 from shared.constants import (
@@ -475,6 +476,7 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     person_summary = (
         get_person_metric_summary_data() if person_metric_summary_ready() else None
     )
+    show_metric_summary = get_show_metric_aggregate_data()
     if profession_stats is None:
         profession_stats = (
             _profession_stats_from_summary(person_summary)
@@ -489,25 +491,29 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     # must not pin the snapshot lock or any parser/browser resource.
     return {
         SYSTEM_STATUS_SNAPSHOT_KEY: calculate_system_status_snapshot(),
-        'missing_kp': calculate_missing_kp_metric(),
-        'kp_unrated': calculate_kp_unrated_metric(),
-        'missing_imdb': calculate_missing_imdb_metric(),
-        'imdb_unrated': calculate_imdb_unrated_metric(),
-        'missing_imdb_id': calculate_missing_imdb_id_metric(),
-        'tmdb_only_shows': calculate_tmdb_only_shows_metric(),
-        'missing_tmdb_id': calculate_missing_tmdb_id_metric(),
-        'tmdb_no_kp': calculate_tmdb_no_kp_metric(),
-        'has_kp': calculate_has_kp_metric(),
-        'has_imdb': calculate_has_imdb_metric(),
-        'total_shows': calculate_total_shows_metric(),
-        'missing_year': calculate_missing_year_metric(),
-        'missing_status': calculate_missing_status_metric(),
-        'missing_plot': calculate_missing_plot_metric(),
-        'missing_durations': calculate_missing_durations_metric(),
-        'no_genres': calculate_no_genres_metric(),
+        'missing_kp': _snapshot_show_metric(show_metric_summary, 'missing_kp', calculate_missing_kp_metric),
+        'kp_unrated': _snapshot_show_metric(show_metric_summary, 'kp_unrated', calculate_kp_unrated_metric),
+        'missing_imdb': _snapshot_show_metric(show_metric_summary, 'missing_imdb_candidate', calculate_missing_imdb_metric, exclude_unreleased=True),
+        'imdb_unrated': _snapshot_show_metric(show_metric_summary, 'imdb_unrated_candidate', calculate_imdb_unrated_metric, exclude_unreleased=True),
+        'missing_imdb_id': _snapshot_show_metric(show_metric_summary, 'missing_imdb_id', calculate_missing_imdb_id_metric),
+        'tmdb_only_shows': _snapshot_show_metric(show_metric_summary, 'tmdb_only_shows', calculate_tmdb_only_shows_metric),
+        'missing_tmdb_id': _snapshot_show_metric(show_metric_summary, 'missing_tmdb_id', calculate_missing_tmdb_id_metric),
+        'tmdb_no_kp': _snapshot_show_metric(show_metric_summary, 'tmdb_no_kp', calculate_tmdb_no_kp_metric),
+        'has_kp': _snapshot_show_metric(show_metric_summary, 'has_kp', calculate_has_kp_metric),
+        'has_imdb': _snapshot_show_metric(show_metric_summary, 'has_imdb', calculate_has_imdb_metric),
+        'total_shows': _snapshot_show_metric(show_metric_summary, 'total_shows', calculate_total_shows_metric),
+        'missing_year': _snapshot_show_metric(show_metric_summary, 'missing_year', calculate_missing_year_metric),
+        'missing_status': _snapshot_show_metric(show_metric_summary, 'missing_status', calculate_missing_status_metric),
+        'missing_plot': _snapshot_show_metric(show_metric_summary, 'missing_plot', calculate_missing_plot_metric),
+        'missing_durations': _snapshot_show_metric(show_metric_summary, 'missing_durations', calculate_missing_durations_metric),
+        'no_genres': _snapshot_show_metric(
+            show_metric_summary, 'no_genres', calculate_no_genres_metric
+        ),
         'total_genres': calculate_total_genres_metric(),
         'unmapped_genres': calculate_unmapped_genres_metric(),
-        'no_countries': calculate_no_countries_metric(),
+        'no_countries': _snapshot_show_metric(
+            show_metric_summary, 'no_countries', calculate_no_countries_metric
+        ),
         'missing_country_meta': calculate_missing_country_meta_metric(),
         'total_countries': calculate_total_countries_metric(),
         'total_persons_by_show_type': (
@@ -526,13 +532,38 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
             if person_summary is not None
             else calculate_unused_persons_metric()
         ),
-        'tmdb_missing_year': calculate_tmdb_missing_year_metric(),
-        'tmdb_missing_status': calculate_tmdb_missing_status_metric(),
-        'tmdb_missing_plot': calculate_tmdb_missing_plot_metric(),
-        'tmdb_missing_durations': calculate_tmdb_missing_durations_metric(),
-        'tmdb_no_genres': calculate_tmdb_no_genres_metric(),
-        'tmdb_no_countries': calculate_tmdb_no_countries_metric(),
+        'tmdb_missing_year': _snapshot_show_metric(show_metric_summary, 'tmdb_missing_year', calculate_tmdb_missing_year_metric),
+        'tmdb_missing_status': _snapshot_show_metric(show_metric_summary, 'tmdb_missing_status', calculate_tmdb_missing_status_metric),
+        'tmdb_missing_plot': _snapshot_show_metric(show_metric_summary, 'tmdb_missing_plot', calculate_tmdb_missing_plot_metric),
+        'tmdb_missing_durations': _snapshot_show_metric(show_metric_summary, 'tmdb_missing_durations', calculate_tmdb_missing_durations_metric),
+        'tmdb_no_genres': _snapshot_show_metric(show_metric_summary, 'tmdb_no_genres', calculate_tmdb_no_genres_metric),
+        'tmdb_no_countries': _snapshot_show_metric(show_metric_summary, 'tmdb_no_countries', calculate_tmdb_no_countries_metric),
     }
+
+
+def _snapshot_show_metric(summary_rows, metric_key, fallback, exclude_unreleased=False):
+    if summary_rows is None:
+        return fallback()
+
+    counts = defaultdict(int)
+    current_year = timezone.localdate().year
+    for key, show_type, show_year, status, value in summary_rows:
+        if key != metric_key:
+            continue
+        if exclude_unreleased and (
+            status in UNRELEASED_IMDB_STATUSES
+            or status.casefold() == 'announced'
+            or (show_year is not None and show_year > current_year)
+        ):
+            continue
+        counts[show_type] += value
+
+    return _aggregate_by_display_type(
+        [
+            {'type': show_type or None, 'total': count}
+            for show_type, count in counts.items()
+        ]
+    )
 
 
 def _profession_stats_from_summary(summary_data):

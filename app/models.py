@@ -967,6 +967,49 @@ class PersonMetricAggregate(models.Model):
         ]
 
 
+class ShowMetricSummary(models.Model):
+    """Per-show flags used to maintain compact global catalog aggregates."""
+
+    show_id = models.BigIntegerField(primary_key=True)
+    show_type = models.TextField(blank=True, default='')
+    show_year = models.IntegerField(null=True, blank=True)
+    status = models.TextField(blank=True, default='')
+    metrics = ArrayField(models.TextField(), default=list, blank=True)
+
+
+class ShowMetricSummaryDirty(models.Model):
+    """Shows whose global metric flags need to be recalculated."""
+
+    show_id = models.BigIntegerField(primary_key=True)
+
+
+class ShowMetricAggregate(models.Model):
+    """Pre-grouped global catalog counts, maintained from dirty shows."""
+
+    metric_key = models.CharField(max_length=48)
+    show_type = models.TextField(blank=True, default='')
+    show_year = models.IntegerField(null=True, blank=True)
+    status = models.TextField(blank=True, default='')
+    value = models.BigIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['metric_key', 'show_type', 'show_year', 'status'],
+                name='uniq_show_metric_aggregate_dimension',
+                nulls_distinct=False,
+            ),
+        ]
+
+
+class ShowMetricSummaryState(models.Model):
+    """Readiness marker for the one-time catalog summary backfill."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+    ready = models.BooleanField(default=False)
+    rebuilt_at = models.DateTimeField(null=True, blank=True)
+
+
 class WishlistFolder(BaseModel):
     user = models.ForeignKey(ViewUser, on_delete=models.CASCADE, related_name='wishlist_folders')
     name = models.CharField(max_length=100, blank=True)

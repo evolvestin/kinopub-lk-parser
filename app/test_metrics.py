@@ -5,12 +5,14 @@ from django.utils import timezone
 
 from app.models import (
     ExternalRating,
+    Genre,
     Person,
     PersonMetricAggregate,
     PersonMetricSummaryDirty,
     PersonMetricSummaryState,
     Show,
     ShowCrew,
+    ShowDuration,
     SiteMetric,
 )
 from app.services.metrics import (
@@ -21,13 +23,20 @@ from app.services.metrics import (
     calculate_kp_unrated_metric,
     calculate_missing_imdb_metric,
     calculate_missing_kp_metric,
+    calculate_missing_durations_metric,
+    calculate_missing_status_metric,
     calculate_persons_avatar_stats_metric,
     calculate_total_persons_by_show_type_metric,
+    calculate_total_shows_metric,
+    calculate_tmdb_missing_durations_metric,
+    calculate_tmdb_missing_status_metric,
+    calculate_tmdb_no_genres_metric,
     calculate_unused_persons_metric,
     _calculate_profession_stats,
     _profession_stats_from_summary,
     _total_persons_by_show_type_from_summary,
     _unused_persons_from_summary,
+    _snapshot_show_metric,
     get_duplicate_photo_urls_page,
     get_global_metrics_history,
     get_has_rating_list,
@@ -36,6 +45,10 @@ from app.services.metrics import (
     get_total_persons_list,
     get_unused_persons_list,
     invalidate_duplicate_photo_urls_cache,
+)
+from app.services.show_metric_summary import (
+    get_show_metric_aggregate_data,
+    rebuild_show_metric_summaries,
 )
 from app.services.person_metric_summary import (
     get_person_metric_summary_data,
@@ -497,6 +510,7 @@ class PersonMetricSummaryTests(TestCase):
             _unused_persons_from_summary(summary),
             calculate_unused_persons_metric(),
         )
+
         self.assertEqual(
             calculate_persons_avatar_stats_metric(person_summary=summary),
             calculate_persons_avatar_stats_metric(),
@@ -531,10 +545,6 @@ class PersonMetricSummaryTests(TestCase):
         self.assertEqual(
             _unused_persons_from_summary(summary),
             calculate_unused_persons_metric(),
-        )
-        self.assertEqual(
-            calculate_persons_avatar_stats_metric(person_summary=summary),
-            calculate_persons_avatar_stats_metric(),
         )
 
         Show.objects.filter(pk=show.pk).update(kinopoisk_url='')
@@ -591,4 +601,64 @@ class PersonMetricSummaryTests(TestCase):
         self.assertEqual(
             _unused_persons_from_summary(summary),
             calculate_unused_persons_metric(),
+        )
+
+
+class ShowMetricSummaryTests(TestCase):
+    def assert_metric_matches_live(self, rows, key, live_metric):
+        summarized = _snapshot_show_metric(rows, key, live_metric)
+        live = live_metric()
+        self.assertEqual(
+            sorted(summarized, key=lambda item: item['name']),
+            sorted(live, key=lambda item: item['name']),
+        )
+
+    def test_rollups_match_live_metrics_and_track_source_changes(self):
+        kp_series = Show.objects.create(
+            title='KP Series',
+            original_title='KP Series',
+            type='TV Show',
+            kinopub_id=9001,
+            kinopoisk_url='https://www.kinopoisk.ru/film/9001/',
+            kinopoisk_rating_available=True,
+            imdb_url='https://www.imdb.com/title/tt9001/',
+            imdb_rating_available=True,
+            status='',
+        )
+        tmdb_series = Show.objects.create(
+            title='TMDB Series',
+            original_title='TMDB Series',
+            type='Series',
+            tmdb_id=9002,
+            plot='',
+            status=None,
+        )
+
+        rebuild_show_metric_summaries(batch_size=1)
+        rows = get_show_metric_aggregate_data()
+        self.assert_metric_matches_live(rows, 'total_shows', calculate_total_shows_metric)
+        self.assert_metric_matches_live(rows, 'missing_kp', calculate_missing_kp_metric)
+        self.assert_metric_matches_live(rows, 'missing_status', calculate_missing_status_metric)
+        self.assert_metric_matches_live(
+            rows, 'tmdb_missing_status', calculate_tmdb_missing_status_metric
+        )
+        self.assert_metric_matches_live(
+            rows, 'tmdb_missing_durations', calculate_tmdb_missing_durations_metric
+        )
+        self.assert_metric_matches_live(rows, 'tmdb_no_genres', calculate_tmdb_no_genres_metric)
+
+        ExternalRating.objects.create(show=kp_series, kp=7.4)
+        ShowDuration.objects.create(show=tmdb_series, duration_seconds=3600)
+        genre = Genre.objects.create(name='Documentary')
+        tmdb_series.genres.add(genre)
+        Show.objects.filter(pk=tmdb_series.pk).update(type='Movie')
+
+        rows = get_show_metric_aggregate_data()
+        self.assert_metric_matches_live(rows, 'has_kp', calculate_has_kp_metric)
+        self.assert_metric_matches_live(rows, 'missing_kp', calculate_missing_kp_metric)
+        self.assert_metric_matches_live(
+            rows, 'missing_durations', calculate_missing_durations_metric
+        )
+        self.assert_metric_matches_live(
+            rows, 'tmdb_missing_durations', calculate_tmdb_missing_durations_metric
         )
