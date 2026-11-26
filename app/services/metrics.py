@@ -1778,21 +1778,16 @@ def calculate_unused_persons_metric():
         used_persons = ShowCrew.objects.annotate(
             canonical_id=_canonical_person_id_expression()
         ).filter(canonical_id=OuterRef('pk'))
-        with metrics_statement_timeout():
-            unused_count = (
-                Person.objects.filter(master_person__isnull=True)
-                .annotate(has_crew=Exists(used_persons))
-                .filter(has_crew=False)
-                .count()
-            )
     else:
-        # Probe-index-per-person turns this into hundreds of thousands of
-        # random reads. Count used canonical people once from the covering
-        # ShowCrew index, then subtract from the root-person count.
-        with metrics_statement_timeout():
-            total_roots = Person.objects.filter(master_person__isnull=True).count()
-            used_roots = (
-                ShowCrew.objects.values('canonical_person_id').distinct().count()
-            )
-        unused_count = max(0, total_roots - used_roots)
+        # The canonical-person index supports an indexed anti-join and avoids
+        # a full DISTINCT pass across all 15M+ ShowCrew rows.
+        used_persons = ShowCrew.objects.filter(canonical_person_id=OuterRef('pk'))
+
+    with metrics_statement_timeout():
+        unused_count = (
+            Person.objects.filter(master_person__isnull=True)
+            .annotate(has_crew=Exists(used_persons))
+            .filter(has_crew=False)
+            .count()
+        )
     return [{'name': 'Без ролей', 'value': unused_count}]

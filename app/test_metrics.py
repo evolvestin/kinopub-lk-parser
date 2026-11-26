@@ -322,20 +322,20 @@ class UnusedPersonMetricTests(TestCase):
         self.assertEqual(calculate_unused_persons_metric(), [{'name': 'Без ролей', 'value': 0}])
         self.assertFalse(get_unused_persons_list().filter(id=master.id).exists())
 
-    def test_unused_person_metric_subtracts_distinct_canonical_people(self):
+    def test_unused_person_metric_uses_indexed_correlated_exists(self):
         Person.objects.create(name='Unused person')
         with CaptureQueriesContext(connection) as queries:
             metric = calculate_unused_persons_metric()
 
         self.assertEqual(metric, [{'name': 'Без ролей', 'value': 1}])
-        used_count_sql = next(
+        count_sql = next(
             query['sql']
             for query in queries
-            if 'SELECT COUNT' in query['sql'].upper() and '"app_showcrew"' in query['sql']
+            if 'SELECT COUNT' in query['sql'].upper()
         )
-        self.assertIn('SELECT DISTINCT', used_count_sql.upper())
-        self.assertIn('"canonical_person_id"', used_count_sql)
-        self.assertNotIn('NOT EXISTS', used_count_sql.upper())
+        self.assertIn('EXISTS', count_sql.upper())
+        self.assertEqual(count_sql.upper().count('FROM "APP_PERSON"'), 1)
+        self.assertNotIn('LEFT OUTER JOIN "APP_PERSON"', count_sql.upper())
 
     def test_unused_person_metric_keeps_legacy_fallback_for_null_canonical_ids(self):
         used_person = Person.objects.create(name='Used person')
