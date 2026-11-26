@@ -220,7 +220,19 @@ def rebuild_person_metric_summaries(batch_size=50000, progress_callback=None):
     if min_id is not None and max_id is not None:
         lower_id = min_id - 1
         while lower_id < max_id:
-            upper_id = min(lower_id + batch_size, max_id)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f'''
+                    SELECT id
+                    FROM {CREW_TABLE}
+                    WHERE id > %s
+                    ORDER BY id
+                    LIMIT 1 OFFSET %s
+                    ''',
+                    [lower_id, batch_size - 1],
+                )
+                boundary = cursor.fetchone()
+            upper_id = boundary[0] if boundary else max_id
             with transaction.atomic():
                 with connection.cursor() as cursor:
                     cursor.execute("SET LOCAL statement_timeout = '10min'")
