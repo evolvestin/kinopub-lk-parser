@@ -37,6 +37,10 @@ from app.models import (
     ViewHistory,
     ViewUser,
 )
+from app.services.person_metric_summary import (
+    get_person_metric_summary_data,
+    person_metric_summary_ready,
+)
 from app.utils import get_proxied_image_url
 from kinopub_parser import celery_app
 from shared.constants import (
@@ -66,7 +70,7 @@ PERSON_DETAIL_WARM_KEYS = {
     'unused_persons',
 }
 SYSTEM_STATUS_SNAPSHOT_KEY = '_system_status'
-HEAVY_METRIC_AGGREGATE_WORK_MEM = '512MB'
+HEAVY_METRIC_AGGREGATE_WORK_MEM = '256MB'
 HEAVY_METRIC_AGGREGATE_TIMEOUT_MS = 600_000
 
 
@@ -468,8 +472,15 @@ def calculate_system_status_snapshot() -> dict:
 
 
 def generate_global_metrics_snapshot(profession_stats=None) -> dict:
+    person_summary = (
+        get_person_metric_summary_data() if person_metric_summary_ready() else None
+    )
     if profession_stats is None:
-        profession_stats = _calculate_profession_stats()
+        profession_stats = (
+            _profession_stats_from_summary(person_summary)
+            if person_summary is not None
+            else _calculate_profession_stats()
+        )
     professions_stats, en_professions_stats = profession_stats
     duplicate_photo_stats = calculate_duplicate_photo_urls_metric()
     # Cache warming is deliberately kept off the snapshot path.  This
@@ -499,12 +510,22 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
         'no_countries': calculate_no_countries_metric(),
         'missing_country_meta': calculate_missing_country_meta_metric(),
         'total_countries': calculate_total_countries_metric(),
-        'total_persons_by_show_type': calculate_total_persons_by_show_type_metric(),
-        'persons_avatar_stats': calculate_persons_avatar_stats_metric(),
+        'total_persons_by_show_type': (
+            _total_persons_by_show_type_from_summary(person_summary)
+            if person_summary is not None
+            else calculate_total_persons_by_show_type_metric()
+        ),
+        'persons_avatar_stats': calculate_persons_avatar_stats_metric(
+            person_summary=person_summary
+        ),
         'professions_stats': professions_stats,
         'en_professions_stats': en_professions_stats,
         'duplicate_photo_urls': duplicate_photo_stats,
-        'unused_persons': calculate_unused_persons_metric(),
+        'unused_persons': (
+            _unused_persons_from_summary(person_summary)
+            if person_summary is not None
+            else calculate_unused_persons_metric()
+        ),
         'tmdb_missing_year': calculate_tmdb_missing_year_metric(),
         'tmdb_missing_status': calculate_tmdb_missing_status_metric(),
         'tmdb_missing_plot': calculate_tmdb_missing_plot_metric(),
@@ -512,6 +533,39 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
         'tmdb_no_genres': calculate_tmdb_no_genres_metric(),
         'tmdb_no_countries': calculate_tmdb_no_countries_metric(),
     }
+
+
+def _profession_stats_from_summary(summary_data):
+    stats = {'ru': [], 'en': []}
+    known_counts = {
+        'ru': summary_data['ru_known_count'],
+        'en': summary_data['en_known_count'],
+    }
+    for language, role, value in summary_data['role_rows']:
+        stats[language].append({'name': role, 'value': value})
+
+    for language in ('ru', 'en'):
+        stats[language].sort(key=lambda item: item['value'], reverse=True)
+        unknown_count = max(0, summary_data['root_person_count'] - known_counts[language])
+        if unknown_count:
+            stats[language].append({'name': '\u041d\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043d\u043e', 'value': unknown_count})
+    return stats['ru'], stats['en']
+
+
+def _total_persons_by_show_type_from_summary(summary_data):
+    stats = [
+        {'show__type': show_type, 'total': value}
+        for show_type, value in summary_data['show_type_rows']
+    ]
+    return _aggregate_by_display_type(stats, type_field='show__type', count_field='total')
+
+
+def _unused_persons_from_summary(summary_data):
+    unused_count = max(
+        0,
+        summary_data['root_person_count'] - summary_data['used_person_count'],
+    )
+    return [{'name': '\u0411\u0435\u0437 \u0440\u043e\u043b\u0435\u0439', 'value': unused_count}]
 
 
 def get_global_metrics_history() -> dict:
@@ -989,23 +1043,10 @@ def _canonical_person_id_expression():
     return F('canonical_person_id')
 
 
-def calculate_persons_avatar_stats_metric():
+def calculate_persons_avatar_stats_metric(person_summary=None):
     has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
     has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
     tmdb_done = Q(is_photo_fetched=True)
-
-    # Keep this as a database subquery. Materializing all matching crew person
-    # IDs in Python is expensive on the 15M-row production table and can make
-    # the snapshot worker spend its time transferring a large intermediate set.
-    kp_waiting_person_ids = (
-        ShowCrew.objects.filter(
-            show__kinopoisk_url__isnull=False,
-            show__ext_rating__isnull=True,
-        )
-        .exclude(show__kinopoisk_url='')
-        .exclude(show__kinopoisk_url__endswith='/film/0')
-        .values_list('person_id', flat=True)
-    )
 
     person_stats = Person.objects.aggregate(
         has_tmdb=Count('id', filter=has_tmdb),
@@ -1016,11 +1057,46 @@ def calculate_persons_avatar_stats_metric():
         all_none=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
     )
 
-    waiting_stats = {'kp_wait': 0, 'all_none_wait': 0}
-    waiting_stats = Person.objects.filter(id__in=Subquery(kp_waiting_person_ids)).aggregate(
-        kp_wait=Count('id', filter=~has_kp),
-        all_none_wait=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
-    )
+    if person_summary is None:
+        # Keep direct callers (including health diagnostics) fresh and isolated.
+        kp_waiting_person_ids = (
+            ShowCrew.objects.filter(
+                show__kinopoisk_url__isnull=False,
+                show__ext_rating__isnull=True,
+            )
+            .exclude(show__kinopoisk_url='')
+            .exclude(show__kinopoisk_url__endswith='/film/0')
+            .values_list('person_id', flat=True)
+        )
+        waiting_stats = Person.objects.filter(
+            id__in=Subquery(kp_waiting_person_ids)
+        ).aggregate(
+            kp_wait=Count('id', filter=~has_kp),
+            all_none_wait=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
+        )
+    else:
+        # The summary keeps source person IDs (including aliases) so this
+        # preserves the exact waiting-person semantics without scanning crew.
+        with connection.cursor() as cursor:
+            cursor.execute(
+                '''
+                WITH waiting_person_ids AS (
+                    SELECT DISTINCT UNNEST(kp_waiting_person_ids) AS person_id
+                    FROM app_personmetricsummary
+                    WHERE cardinality(kp_waiting_person_ids) > 0
+                )
+                SELECT
+                    COUNT(p.id) FILTER (WHERE NOT (p.kp_photo_url IS NOT NULL AND p.kp_photo_url <> '')),
+                    COUNT(p.id) FILTER (
+                        WHERE p.is_photo_fetched
+                          AND NOT (p.tmdb_photo_url IS NOT NULL AND p.tmdb_photo_url <> '')
+                          AND NOT (p.kp_photo_url IS NOT NULL AND p.kp_photo_url <> '')
+                    )
+                FROM waiting_person_ids AS waiting
+                JOIN app_person AS p ON p.id = waiting.person_id
+                '''
+            )
+            waiting_stats = dict(zip(('kp_wait', 'all_none_wait'), cursor.fetchone()))
 
     data = [
         {'name': 'Есть фото (TMDB)', 'value': person_stats['has_tmdb']},

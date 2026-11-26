@@ -3,8 +3,8 @@ import time
 
 from app.management.base import LoggableBaseCommand
 from app.services.metrics import (
+    _calculate_profession_stats,
     calculate_duplicate_photo_urls_metric,
-    calculate_en_professions_stats_metric,
     calculate_has_imdb_metric,
     calculate_has_kp_metric,
     calculate_imdb_unrated_metric,
@@ -21,7 +21,6 @@ from app.services.metrics import (
     calculate_no_countries_metric,
     calculate_no_genres_metric,
     calculate_persons_avatar_stats_metric,
-    calculate_professions_stats_metric,
     calculate_tmdb_missing_durations_metric,
     calculate_tmdb_missing_plot_metric,
     calculate_tmdb_missing_status_metric,
@@ -77,8 +76,7 @@ class Command(LoggableBaseCommand):
             ('total_countries', calculate_total_countries_metric),
             ('total_persons_by_show_type', calculate_total_persons_by_show_type_metric),
             ('persons_avatar_stats', calculate_persons_avatar_stats_metric),
-            ('professions_stats', calculate_professions_stats_metric),
-            ('en_professions_stats', calculate_en_professions_stats_metric),
+            ('profession_stats_both_languages', _calculate_profession_stats),
             ('duplicate_photo_urls', calculate_duplicate_photo_urls_metric),
             ('unused_persons', calculate_unused_persons_metric),
             ('tmdb_missing_year', calculate_tmdb_missing_year_metric),
@@ -96,7 +94,13 @@ class Command(LoggableBaseCommand):
         with metrics_statement_timeout():
             for name, func in metric_funcs:
                 start_time = time.perf_counter()
-                measured_values[name] = func()
+                value = func()
+                if name == 'profession_stats_both_languages':
+                    measured_values['professions_stats'], measured_values[
+                        'en_professions_stats'
+                    ] = value
+                else:
+                    measured_values[name] = value
                 elapsed = (time.perf_counter() - start_time) * 1000
                 results.append((name, elapsed))
 

@@ -145,6 +145,7 @@ class MetricsSnapshotCoordinationTests(SimpleTestCase):
 
         with (
             patch('app.tasks._redis_lock', side_effect=acquired_lock),
+            patch('app.tasks.person_metric_summary_ready', return_value=True),
             patch('app.tasks.metrics_statement_timeout'),
             patch(
                 'app.tasks.generate_global_metrics_snapshot',
@@ -164,6 +165,7 @@ class MetricsSnapshotCoordinationTests(SimpleTestCase):
 
         with (
             patch('app.tasks._redis_lock', side_effect=acquired_lock),
+            patch('app.tasks.person_metric_summary_ready', return_value=True),
             patch('app.tasks.metrics_statement_timeout'),
             patch(
                 'app.tasks.generate_global_metrics_snapshot',
@@ -175,6 +177,23 @@ class MetricsSnapshotCoordinationTests(SimpleTestCase):
                 tasks.update_site_metrics_task.run(timeout_retries=2)
 
         retry.assert_not_called()
+
+    def test_snapshot_waits_for_person_metric_summary_backfill(self):
+        @contextmanager
+        def acquired_lock(_lock_name, _timeout=None, **_kwargs):
+            yield True
+
+        with (
+            patch('app.tasks._redis_lock', side_effect=acquired_lock),
+            patch('app.tasks.person_metric_summary_ready', return_value=False),
+            patch('app.tasks.generate_global_metrics_snapshot') as generate_snapshot,
+            patch.object(tasks.update_site_metrics_task, 'retry', side_effect=Retry()) as retry,
+        ):
+            with self.assertRaises(Retry):
+                tasks.update_site_metrics_task.run()
+
+        retry.assert_called_once_with(countdown=300)
+        generate_snapshot.assert_not_called()
 
 
 class RatingWriterLockRetryTests(SimpleTestCase):

@@ -3,7 +3,14 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
-from app.models import ExternalRating, Person, Show, ShowCrew, SiteMetric
+from app.models import (
+    ExternalRating,
+    Person,
+    PersonMetricSummaryDirty,
+    Show,
+    ShowCrew,
+    SiteMetric,
+)
 from app.services.metrics import (
     calculate_duplicate_photo_urls_metric,
     calculate_en_professions_stats_metric,
@@ -15,6 +22,10 @@ from app.services.metrics import (
     calculate_persons_avatar_stats_metric,
     calculate_total_persons_by_show_type_metric,
     calculate_unused_persons_metric,
+    _calculate_profession_stats,
+    _profession_stats_from_summary,
+    _total_persons_by_show_type_from_summary,
+    _unused_persons_from_summary,
     get_duplicate_photo_urls_page,
     get_global_metrics_history,
     get_has_rating_list,
@@ -23,6 +34,11 @@ from app.services.metrics import (
     get_total_persons_list,
     get_unused_persons_list,
     invalidate_duplicate_photo_urls_cache,
+)
+from app.services.person_metric_summary import (
+    get_person_metric_summary_data,
+    rebuild_person_metric_summaries,
+    refresh_dirty_person_metric_summaries,
 )
 
 
@@ -245,7 +261,7 @@ class ProfessionMetricTests(TestCase):
         raised_work_mem_queries = [
             query['sql']
             for query in queries
-            if 'SET_CONFIG' in query['sql'].upper() and '512MB' in query['sql'].upper()
+            if 'SET_CONFIG' in query['sql'].upper() and '256MB' in query['sql'].upper()
         ]
         self.assertEqual(len(raised_work_mem_queries), 2)
         raised_timeout_queries = [
@@ -257,7 +273,7 @@ class ProfessionMetricTests(TestCase):
         if connection.vendor == 'postgresql':
             with connection.cursor() as cursor:
                 cursor.execute('SHOW work_mem')
-                self.assertNotEqual(cursor.fetchone()[0], '512MB')
+                self.assertNotEqual(cursor.fetchone()[0], '256MB')
                 cursor.execute('SHOW statement_timeout')
                 self.assertNotEqual(cursor.fetchone()[0], '600000ms')
 
@@ -385,10 +401,10 @@ class TotalPersonsMetricTests(TestCase):
                 for query in queries
                 if 'SET_CONFIG' in query['sql'].upper()
             )
-            self.assertIn('512MB', work_mem_sql.upper())
+            self.assertIn('256MB', work_mem_sql.upper())
             with connection.cursor() as cursor:
                 cursor.execute('SHOW work_mem')
-                self.assertNotEqual(cursor.fetchone()[0], '512MB')
+                self.assertNotEqual(cursor.fetchone()[0], '256MB')
 
     def test_total_person_details_use_correlated_exists_for_first_page(self):
         canonical = Person.objects.create(name='Canonical person')
@@ -424,4 +440,123 @@ class TotalPersonsMetricTests(TestCase):
         self.assertEqual(
             [person['id'] for person in get_total_persons_list('TV Show')],
             [canonical.id],
+        )
+
+
+class PersonMetricSummaryTests(TestCase):
+    def test_backfill_and_dirty_refresh_match_live_metrics(self):
+        canonical = Person.objects.create(name='Canonical actor')
+        alias = Person.objects.create(name='Actor alias', master_person=canonical)
+        Person.objects.create(name='Unused person')
+        show = Show.objects.create(
+            title='Movie', original_title='Movie', type='Movie',
+            kinopoisk_url='https://www.kinopoisk.ru/film/12345/',
+        )
+        crew = ShowCrew.objects.create(
+            show=show,
+            person=alias,
+            profession='В ролях',
+            en_profession='Actor',
+        )
+
+        rebuild_person_metric_summaries(batch_size=1)
+        summary = get_person_metric_summary_data()
+        self.assertEqual(
+            _profession_stats_from_summary(summary),
+            _calculate_profession_stats(),
+        )
+        self.assertEqual(
+            _total_persons_by_show_type_from_summary(summary),
+            calculate_total_persons_by_show_type_metric(),
+        )
+        self.assertEqual(
+            _unused_persons_from_summary(summary),
+            calculate_unused_persons_metric(),
+        )
+        self.assertEqual(
+            calculate_persons_avatar_stats_metric(person_summary=summary),
+            calculate_persons_avatar_stats_metric(),
+        )
+        with CaptureQueriesContext(connection) as queries:
+            calculate_persons_avatar_stats_metric(person_summary=summary)
+        self.assertFalse(
+            any('app_showcrew' in query['sql'].lower() for query in queries)
+        )
+
+        ShowCrew.objects.filter(pk=crew.pk).update(
+            profession='Сценарист',
+            en_profession='Writer',
+        )
+        Show.objects.filter(pk=show.pk).update(type='TV Show')
+        self.assertTrue(
+            PersonMetricSummaryDirty.objects.filter(canonical_person_id=canonical.pk).exists()
+        )
+        self.assertGreater(refresh_dirty_person_metric_summaries(), 0)
+
+        summary = get_person_metric_summary_data()
+        self.assertEqual(
+            _profession_stats_from_summary(summary),
+            _calculate_profession_stats(),
+        )
+        self.assertEqual(
+            _total_persons_by_show_type_from_summary(summary),
+            calculate_total_persons_by_show_type_metric(),
+        )
+        self.assertEqual(
+            _unused_persons_from_summary(summary),
+            calculate_unused_persons_metric(),
+        )
+        self.assertEqual(
+            calculate_persons_avatar_stats_metric(person_summary=summary),
+            calculate_persons_avatar_stats_metric(),
+        )
+
+        Show.objects.filter(pk=show.pk).update(kinopoisk_url='')
+        self.assertTrue(
+            PersonMetricSummaryDirty.objects.filter(canonical_person_id=canonical.pk).exists()
+        )
+        refresh_dirty_person_metric_summaries()
+        summary = get_person_metric_summary_data()
+        self.assertEqual(
+            calculate_persons_avatar_stats_metric(person_summary=summary),
+            calculate_persons_avatar_stats_metric(),
+        )
+
+        Show.objects.filter(pk=show.pk).update(
+            kinopoisk_url='https://www.kinopoisk.ru/film/12345/'
+        )
+        refresh_dirty_person_metric_summaries()
+
+        ExternalRating.objects.create(show=show, kp=7.0)
+        self.assertTrue(
+            PersonMetricSummaryDirty.objects.filter(canonical_person_id=canonical.pk).exists()
+        )
+        refresh_dirty_person_metric_summaries()
+        summary = get_person_metric_summary_data()
+        self.assertEqual(
+            calculate_persons_avatar_stats_metric(person_summary=summary),
+            calculate_persons_avatar_stats_metric(),
+        )
+
+        new_canonical = Person.objects.create(name='New canonical actor')
+        Person.objects.filter(pk=alias.pk).update(master_person=new_canonical)
+        self.assertTrue(
+            PersonMetricSummaryDirty.objects.filter(
+                canonical_person_id__in=[canonical.pk, new_canonical.pk]
+            ).count()
+            >= 2
+        )
+        refresh_dirty_person_metric_summaries()
+        summary = get_person_metric_summary_data()
+        self.assertEqual(
+            _profession_stats_from_summary(summary),
+            _calculate_profession_stats(),
+        )
+
+        ShowCrew.objects.filter(pk=crew.pk).delete()
+        refresh_dirty_person_metric_summaries()
+        summary = get_person_metric_summary_data()
+        self.assertEqual(
+            _unused_persons_from_summary(summary),
+            calculate_unused_persons_metric(),
         )

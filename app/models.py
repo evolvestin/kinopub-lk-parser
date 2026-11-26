@@ -2,6 +2,7 @@ import statistics
 import uuid
 
 from django.contrib.auth.models import User
+from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
 from django.db.models import JSONField, Q
@@ -908,6 +909,41 @@ class SiteMetric(BaseModel):
 
     def __str__(self):
         return f'{self.key} at {self.created_at.strftime(DATETIME_FORMAT)}'
+
+
+class PersonMetricSummary(models.Model):
+    """Compact per-canonical-person inputs for the global metrics snapshot."""
+
+    canonical_person = models.OneToOneField(
+        Person,
+        on_delete=models.CASCADE,
+        primary_key=True,
+        related_name='metric_summary',
+    )
+    show_types = ArrayField(models.TextField(), default=list, blank=True)
+    ru_roles = ArrayField(models.TextField(), default=list, blank=True)
+    en_roles = ArrayField(models.TextField(), default=list, blank=True)
+    kp_waiting_person_ids = ArrayField(
+        models.BigIntegerField(), default=list, blank=True
+    )
+
+    class Meta:
+        verbose_name = 'Person metric summary'
+        verbose_name_plural = 'Person metric summaries'
+
+
+class PersonMetricSummaryDirty(models.Model):
+    """Canonical person IDs whose compact metric row needs recomputing."""
+
+    canonical_person_id = models.BigIntegerField(primary_key=True)
+
+
+class PersonMetricSummaryState(models.Model):
+    """Readiness marker for the one-time summary backfill."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+    ready = models.BooleanField(default=False)
+    rebuilt_at = models.DateTimeField(null=True, blank=True)
 
 
 class WishlistFolder(BaseModel):
