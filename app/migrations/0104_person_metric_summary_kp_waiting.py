@@ -19,9 +19,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS app_show_metric_summary_dirty ON app_show;
-CREATE TRIGGER app_show_metric_summary_dirty
-AFTER UPDATE OF type, kinopoisk_url ON app_show
+CREATE TRIGGER app_show_kp_url_metric_summary_dirty
+AFTER UPDATE OF kinopoisk_url ON app_show
 FOR EACH ROW EXECUTE FUNCTION app_mark_show_metric_summary_dirty();
 
 CREATE OR REPLACE FUNCTION app_mark_external_rating_summary_dirty()
@@ -54,6 +53,7 @@ FOR EACH ROW EXECUTE FUNCTION app_mark_external_rating_summary_dirty();
 
 
 DROP_DIRTY_TRIGGERS = """
+DROP TRIGGER IF EXISTS app_show_kp_url_metric_summary_dirty ON app_show;
 DROP TRIGGER IF EXISTS app_externalrating_metric_summary_dirty ON app_externalrating;
 DROP FUNCTION IF EXISTS app_mark_external_rating_summary_dirty();
 
@@ -72,10 +72,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS app_show_metric_summary_dirty ON app_show;
-CREATE TRIGGER app_show_metric_summary_dirty
-AFTER UPDATE OF type ON app_show
-FOR EACH ROW EXECUTE FUNCTION app_mark_show_metric_summary_dirty();
 """
 
 
