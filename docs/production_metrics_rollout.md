@@ -71,8 +71,8 @@
    Apply only reviewed candidates with `--apply`, then run
    `python manage.py backfillcanonicalperson --no-indexes`.
 
-8. The snapshot task queues `warm_metrics_caches_task` only after the snapshot is committed.
-   This warms the expensive person/duplicate detail pages off the request path. The cache is an
+8. The snapshot task does not warm person/duplicate detail pages. Those queries can read many
+   `Person` rows and should run only when a user opens the corresponding page. The cache is an
    optimization, not the source of truth: invalidation increments the duplicate-photo version
    after person/catalog writes, and non-person detail endpoints must remain backed by indexed
    database queries.

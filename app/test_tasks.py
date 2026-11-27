@@ -146,6 +146,8 @@ class MetricsSnapshotCoordinationTests(SimpleTestCase):
         with (
             patch('app.tasks._redis_lock', side_effect=acquired_lock),
             patch('app.tasks.person_metric_summary_ready', return_value=True),
+            patch('app.tasks.person_photo_metric_summary_ready', return_value=True),
+            patch('app.tasks.show_metric_summary_ready', return_value=True),
             patch('app.tasks.metrics_statement_timeout'),
             patch(
                 'app.tasks.generate_global_metrics_snapshot',
@@ -166,6 +168,8 @@ class MetricsSnapshotCoordinationTests(SimpleTestCase):
         with (
             patch('app.tasks._redis_lock', side_effect=acquired_lock),
             patch('app.tasks.person_metric_summary_ready', return_value=True),
+            patch('app.tasks.person_photo_metric_summary_ready', return_value=True),
+            patch('app.tasks.show_metric_summary_ready', return_value=True),
             patch('app.tasks.metrics_statement_timeout'),
             patch(
                 'app.tasks.generate_global_metrics_snapshot',
@@ -194,6 +198,30 @@ class MetricsSnapshotCoordinationTests(SimpleTestCase):
 
         retry.assert_called_once_with(countdown=300)
         generate_snapshot.assert_not_called()
+
+
+class MetricsSnapshotPersistenceTests(TestCase):
+    def test_snapshot_does_not_schedule_expensive_detail_cache_warmup(self):
+        @contextmanager
+        def acquired_lock(_lock_name, _timeout=None, **_kwargs):
+            yield True
+
+        with (
+            patch('app.tasks._redis_lock', side_effect=acquired_lock),
+            patch('app.tasks.person_metric_summary_ready', return_value=True),
+            patch('app.tasks.person_photo_metric_summary_ready', return_value=True),
+            patch('app.tasks.show_metric_summary_ready', return_value=True),
+            patch('app.tasks.metrics_statement_timeout'),
+            patch('app.tasks.generate_global_metrics_snapshot', return_value={'metric': 1}),
+            patch('app.tasks.warm_metrics_caches_task.delay') as warmup,
+        ):
+            tasks.update_site_metrics_task.run()
+
+        self.assertEqual(
+            tasks.SiteMetric.objects.get(key='global_snapshot').data,
+            {'metric': 1},
+        )
+        warmup.assert_not_called()
 
 
 class RatingWriterLockRetryTests(SimpleTestCase):

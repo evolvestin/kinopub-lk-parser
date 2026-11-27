@@ -974,9 +974,8 @@ def update_site_metrics_task(self, timeout_retries=0):
     cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
     cache.delete('lock:queuing_global_snapshot')
     logging.info('Global site metrics snapshot updated successfully.')
-    # Populate the expensive person/duplicate detail pages after the snapshot,
-    # so the first dashboard click does not pay the full grouping cost.
-    warm_metrics_caches_task.delay()
+    # Keep person/duplicate detail queries lazy: warming them after every
+    # snapshot can scan millions of Person rows even when nobody opens a page.
 
 
 def _warm_person_metric_pages():
