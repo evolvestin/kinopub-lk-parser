@@ -8,7 +8,9 @@
     </div>
 
     <div v-if="!show" class="show-data-loading" aria-busy="true">
-      <div class="show-data-loading-poster"></div>
+      <div class="show-data-loading-poster">
+        <img v-if="posterPreviewUrl" :src="posterPreviewUrl" alt="" decoding="async">
+      </div>
       <div class="show-data-loading-line show-data-loading-line-wide"></div>
       <div class="show-data-loading-line"></div>
       <div class="show-data-loading-card"></div>
@@ -22,8 +24,8 @@
       
       <div style="position: relative; z-index: 3; height: 95%; max-width: 85%; aspect-ratio: 2/3; display: flex; align-items: flex-end;">
         <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: flex-end;">
-          <div v-if="isPosterBroken" class="hero-poster is-placeholder" v-html="icons.film"></div>
-          <img v-else :src="activePoster" class="hero-poster" style="margin: 0;" alt="poster" @load="validatePoster" @error="handlePosterError">
+          <img v-if="activePoster && !isPosterBroken" :src="activePoster" class="hero-poster" :class="{ 'is-loading': isPosterLoading }" style="margin: 0;" alt="poster" @load="validatePoster" @error="handlePosterError">
+          <div v-else class="hero-poster is-blank" aria-hidden="true"></div>
           
           <div class="grid-badges" style="position: absolute; top: 12px; left: 12px; right: auto; align-items: flex-start; z-index: 10;">
             <span v-if="currentPersonalRating" class="rating-badge" :class="getRatingClass(currentPersonalRating)" style="font-size: 20px; padding: 4px 10px; border-radius: 10px; gap: 5px; display: inline-flex; align-items: center; font-weight: 800; text-shadow: none;">
@@ -216,7 +218,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useApi } from '../../composables/useApi'
 import { useUIStore } from '../../stores/uiStore'
@@ -242,6 +244,16 @@ const hasAnyMuted = ref(false)
 const demoSeasons = ref([])
 
 const isPosterBroken = ref(false)
+const isPosterLoading = ref(false)
+const lastGoodPoster = ref({ url: '', background: '', index: 0 })
+let requestedFullPosterUrl = ''
+let posterSelectionRequest = 0
+const posterLoads = new Map()
+
+const posterPreviewUrl = computed(() => {
+  if (props.demoMode) return ''
+  return uiStore.showPosterPreviews[String(props.showId)] || ''
+})
 
 watch(() => activePoster.value, (newUrl) => {
   if (newUrl) {
@@ -253,15 +265,76 @@ watch(() => activePoster.value, (newUrl) => {
 
 const validatePoster = (e) => {
   if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {
-    handlePosterError()
+    handlePosterError(e)
+    return
+  }
+  if (e.target.getAttribute('src') !== activePoster.value) return
+  isPosterLoading.value = false
+  if (activePoster.value !== posterPreviewUrl.value) activeBg.value = activePoster.value
+  lastGoodPoster.value = {
+    url: activePoster.value,
+    background: activeBg.value,
+    index: activePosterIndex.value
   }
 }
 
-const handlePosterError = () => {
-  if (activePoster.value) {
-    markImageAsBroken(activePoster.value)
-  }
-  isPosterBroken.value = true
+const restoreLastGoodPoster = () => {
+  const previous = lastGoodPoster.value
+  activePosterIndex.value = previous.index
+  activePoster.value = previous.url && !isImageBroken(previous.url) ? previous.url : ''
+  activeBg.value = previous.background
+  isPosterLoading.value = false
+  isPosterBroken.value = false
+}
+
+const handlePosterError = (event) => {
+  const failedUrl = event?.target?.getAttribute('src') || activePoster.value
+  if (failedUrl !== activePoster.value) return
+  const isMissingPoster = event?.target?.naturalWidth === 208 && event?.target?.naturalHeight === 304
+  if (isMissingPoster) markImageAsBroken(failedUrl)
+  else posterLoads.delete(failedUrl)
+  restoreLastGoodPoster()
+}
+
+const loadPoster = (url) => {
+  if (!url || isImageBroken(url)) return Promise.resolve(false)
+  if (posterLoads.has(url)) return posterLoads.get(url)
+
+  const request = (async () => {
+    const retryDelays = [300, 900]
+    for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, retryDelays[attempt - 1]))
+      }
+
+      const result = await new Promise(resolve => {
+        const img = new Image()
+        img.onload = () => {
+          if (img.naturalWidth === 208 && img.naturalHeight === 304) {
+            resolve('missing')
+            return
+          }
+          resolve('loaded')
+        }
+        img.onerror = () => resolve('network-error')
+        img.src = url
+      })
+
+      if (result === 'loaded') return true
+      if (result === 'missing') {
+        markImageAsBroken(url)
+        return false
+      }
+    }
+
+    // Network failures are retryable if the user selects this option again.
+    // Only the in-flight promise is cached; failures are not treated as a
+    // permanently broken URL for the rest of the page session.
+    posterLoads.delete(url)
+    return false
+  })()
+  posterLoads.set(url, request)
+  return request
 }
 
 const posterOptions = computed(() => {
@@ -280,28 +353,62 @@ const posterLabel = (poster) => {
 
 const selectPoster = (index) => {
   const poster = posterOptions.value[index]
-  if (!poster?.url) return
+  if (!poster?.url || (index === activePosterIndex.value && poster.url === activePoster.value) || isImageBroken(poster.url)) return
+
+  const selectionRequest = ++posterSelectionRequest
   activePosterIndex.value = index
-  activePoster.value = poster.url
-  activeBg.value = poster.url
-  isPosterBroken.value = isImageBroken(poster.url)
+  activePoster.value = ''
+  activeBg.value = ''
+  isPosterLoading.value = true
+  isPosterBroken.value = false
+  loadPoster(poster.url).then(loaded => {
+    if (selectionRequest !== posterSelectionRequest) return
+    if (!loaded) {
+      restoreLastGoodPoster()
+      return
+    }
+    activePoster.value = poster.url
+  })
 }
 
 const setInitialPoster = (data) => {
-  activePosterIndex.value = 0
-  activePoster.value = data.poster_medium || posterOptions.value[0]?.url || ''
-  activeBg.value = activePoster.value
+  const primaryIndex = Math.max(0, posterOptions.value.findIndex(poster => poster.is_primary))
+  activePosterIndex.value = primaryIndex
+  // Do not start a second medium-poster request from the detail payload.
+  // The card preview was already fetched before the user opened this layer.
+  activePoster.value = posterPreviewUrl.value
+  isPosterLoading.value = false
+  // Keep the blurred hero background empty until the full poster succeeds;
+  // reusing the preview as CSS background would create another image load.
+  activeBg.value = ''
   isPosterBroken.value = isImageBroken(activePoster.value)
-  if (data.poster_large && posterOptions.value.length) {
-    const img = new Image()
-    img.src = data.poster_large
-    img.onload = () => {
-      if (activePosterIndex.value === 0) {
-        activePoster.value = data.poster_large
-        activeBg.value = data.poster_large
-      }
-    }
+  lastGoodPoster.value = {
+    url: activePoster.value,
+    background: '',
+    index: primaryIndex
   }
+
+  const fullPosterUrl = data.poster_large || posterOptions.value[primaryIndex]?.url || posterOptions.value[0]?.url || ''
+  if (props.demoMode || !fullPosterUrl || fullPosterUrl === requestedFullPosterUrl) return
+  requestedFullPosterUrl = fullPosterUrl
+  const fullPosterIndex = Math.max(0, posterOptions.value.findIndex(poster => poster.url === fullPosterUrl))
+
+  // Let Vue paint the show details first. The full image is then downloaded
+  // independently and only replaces the already-rendered preview on success.
+  nextTick().then(() => new Promise(resolve => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve))
+  })).then(() => {
+    loadPoster(fullPosterUrl).then(loaded => {
+      if (!loaded || requestedFullPosterUrl !== fullPosterUrl) return
+      if (activePosterIndex.value === primaryIndex) {
+        activePosterIndex.value = fullPosterIndex
+        activePoster.value = fullPosterUrl
+        activeBg.value = ''
+        isPosterLoading.value = true
+        isPosterBroken.value = false
+      }
+    })
+  })
 }
 
 const cacheKey = computed(() => {
@@ -714,7 +821,6 @@ const openRatingsDetails = (ratingType) => {
     padding: 20px 16px 40px;
 }
 
-.show-data-loading-poster,
 .show-data-loading-line,
 .show-data-loading-card {
     background: linear-gradient(100deg, var(--bg-input) 30%, var(--bg-card) 50%, var(--bg-input) 70%);
@@ -725,9 +831,30 @@ const openRatingsDetails = (ratingType) => {
 
 .show-data-loading-poster {
     width: min(58vw, 220px);
-    height: min(58vw, 300px);
+    aspect-ratio: 2 / 3;
     margin: 0 auto 20px;
     border-radius: 20px;
+    overflow: hidden;
+    background: var(--bg-input);
+    animation: none;
+}
+
+.show-data-loading-poster img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.hero-poster.is-blank {
+    background: var(--bg-input);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.hero-poster.is-loading {
+    background: var(--bg-input);
 }
 
 .show-data-loading-line {

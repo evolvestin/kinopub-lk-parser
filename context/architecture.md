@@ -236,7 +236,9 @@ row exists.
 
 ## Image Proxy Timeout Policy
 
-**RULE**: The maximum allowed HTTP request timeout for proxying external images (e.g., TMDB/Kinopoisk in `/api/image_proxy/`) MUST NOT exceed 3.5 seconds total (connect: 2.0s, read: 3.5s). If an image fails to load within this window, the proxy MUST fail fast immediately without holding worker threads.
+**RULE**: Show details must render independently of external poster requests. Opening a show from a listing reuses the small poster URL already loaded by its card; if no preview is available (including a direct link), render an empty poster box with the same fixed aspect ratio and dimensions. Do not request `poster_medium` while opening the detail layer. After show data has rendered and had a browser paint, request the primary full poster asynchronously and replace the preview only after a successful load. On network errors, make up to three attempts total with short backoff delays; a failed URL can be retried if the user selects it again. The known 208x304 missing-poster response is treated as permanent for the page session and is not retried. Keep the preview or empty box visible and do not block show details. When multiple poster options exist, load an alternative only after the user selects it and immediately show the selected option as loading (empty poster box), rather than leaving the previous option visible. Switch to the selected image after success; on failure, restore the last successfully displayed poster. Failure of one option must not prevent the other options from being selected.
+
+The image proxy (`/api/image_proxy/`) must also fail fast: external image requests use at most a 1 second connect timeout and a 2.5 second read timeout, with no automatic retries. This timeout is a fallback for the background image request, never a reason to delay rendering the show details.
 
 
 ## Celery Task Concurrency & Locking Policy

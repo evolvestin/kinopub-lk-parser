@@ -10,6 +10,7 @@ export const useUIStore = defineStore('ui', () => {
   const isHistoryEditMode = ref(false)
   const episodesCache = ref({})
   const showsCache = ref({})
+  const showPosterPreviews = ref({})
   const dismissedHints = ref(JSON.parse(localStorage.getItem('kp_hints') || '{}'))
 
   function dismissHint(key) {
@@ -335,7 +336,7 @@ export const useUIStore = defineStore('ui', () => {
 
   return {
     isLoading, isAppReady, theme, toast, layerStack, hasOpenLayers, activeView, modals,
-    isHistoryEditMode, episodesCache, showsCache, dismissedHints, isCasinoHistoryOpen,
+    isHistoryEditMode, episodesCache, showsCache, showPosterPreviews, dismissedHints, isCasinoHistoryOpen,
     openLayer, popLayer, switchBaseView, syncActiveView, showToast, toggleTheme, fitText, fitAll,
     openModal, closeModal, replaceQuery, updateModalQuery, dismissHint,
     setLoading: (v) => { isLoading.value = v },

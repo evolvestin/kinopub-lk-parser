@@ -165,7 +165,13 @@ const handleClick = () => {
   if (props.context === 'wishlist' && wishlistStoreActive.value?.isReorderItemsMode) return
   if (uiStore.isHistoryEditMode) return
   const id = props.show.show_id || props.show.id
-  if (id) uiStore.openLayer('show', id)
+  if (id) {
+    // Reuse the exact small poster URL that this card has already requested.
+    // The show detail layer can render it immediately while the full poster
+    // is fetched in the background after the show data is visible.
+    if (currentPosterUrl.value) uiStore.showPosterPreviews[String(id)] = currentPosterUrl.value
+    uiStore.openLayer('show', id)
+  }
 }
 
 const onDelete = (event) => {
