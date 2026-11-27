@@ -145,7 +145,7 @@ def _adjust_aggregate(show_ids, multiplier, cursor):
     cursor.execute(f'DELETE FROM {AGGREGATE_TABLE} WHERE value <= 0')
 
 
-def refresh_dirty_show_metric_summaries(batch_size=5000):
+def refresh_dirty_show_metric_summaries(batch_size=20000):
     if not show_metric_summary_ready():
         return 0
 

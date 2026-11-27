@@ -49,6 +49,10 @@ source and URL, and Person writes enqueue only affected old/new URLs. The
 snapshot refreshes those dirty people and URL groups before reading ten compact
 counters; it no longer scans all people or groups on every run.
 
+Dirty show facts are applied in bounded batches of 20,000 IDs. This keeps
+ordinary updates incremental while draining large batches of catalog changes
+with fewer repeated query/transaction cycles.
+
 After migration, build them once after the person credit summary is ready:
 
 ```sh
@@ -68,8 +72,8 @@ available to repair derived state.
 
 The status strip keeps fresh timestamps and a rolling 24-hour error count. Its
 large-table queries use partial B-tree indexes for the latest KP/IMDb sync,
-parser completion, and recent errors. These indexes are created concurrently
-so a release does not hold an exclusive table lock.
+photo fetch, parser completion, and recent errors. These indexes are created
+concurrently so a release does not hold an exclusive table lock.
 
 This does not apply to health reports: each health check must issue its own
 fresh query. It also does not apply to a film card or catalog detail: those
