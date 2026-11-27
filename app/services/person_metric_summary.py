@@ -8,6 +8,9 @@ from app.models import (
     PersonMetricSummary,
     PersonMetricSummaryDirty,
     PersonMetricSummaryState,
+    PersonKpWaitingSummary,
+    PersonPhotoMetricDirty,
+    PersonPhotoMetricState,
     ShowCrew,
 )
 from shared.constants import RAW_TO_NORMALIZED_EN, RAW_TO_NORMALIZED_RU, PROFESSION_TRANS_MAP
@@ -15,6 +18,9 @@ from shared.constants import RAW_TO_NORMALIZED_EN, RAW_TO_NORMALIZED_RU, PROFESS
 SUMMARY_TABLE = PersonMetricSummary._meta.db_table
 DIRTY_TABLE = PersonMetricSummaryDirty._meta.db_table
 STATE_TABLE = PersonMetricSummaryState._meta.db_table
+WAITING_TABLE = PersonKpWaitingSummary._meta.db_table
+PHOTO_DIRTY_TABLE = PersonPhotoMetricDirty._meta.db_table
+PHOTO_STATE_TABLE = PersonPhotoMetricState._meta.db_table
 AGGREGATE_TABLE = PersonMetricAggregate._meta.db_table
 CREW_TABLE = ShowCrew._meta.db_table
 
@@ -184,6 +190,29 @@ def refresh_dirty_person_metric_summaries(batch_size=5000, force=False):
                 )
                 canonical_ids = list({row[0] for row in cursor.fetchall()})
                 if canonical_ids:
+                    cursor.execute(
+                        f'''
+                        SELECT DISTINCT UNNEST(kp_waiting_person_ids)
+                        FROM {SUMMARY_TABLE}
+                        WHERE canonical_person_id = ANY(%s)
+                          AND cardinality(kp_waiting_person_ids) > 0
+                        ''',
+                        [canonical_ids],
+                    )
+                    old_waiting_ids = [row[0] for row in cursor.fetchall()]
+                    if old_waiting_ids:
+                        cursor.execute(
+                            f'DELETE FROM {WAITING_TABLE} WHERE person_id = ANY(%s)',
+                            [old_waiting_ids],
+                        )
+                        cursor.execute(
+                            f'''
+                            INSERT INTO {PHOTO_DIRTY_TABLE} (person_id)
+                            SELECT UNNEST(%s::bigint[])
+                            ON CONFLICT DO NOTHING
+                            ''',
+                            [old_waiting_ids],
+                        )
                     _adjust_person_metric_rollups(canonical_ids, -1, cursor)
                     cursor.execute(
                         f'DELETE FROM {SUMMARY_TABLE} WHERE canonical_person_id = ANY(%s)',
@@ -193,6 +222,33 @@ def refresh_dirty_person_metric_summaries(batch_size=5000, force=False):
                         'sc.canonical_person_id = ANY(%s)', upsert=True
                     )
                     cursor.execute(sql, [*params, canonical_ids])
+                    cursor.execute(
+                        f'''
+                        SELECT DISTINCT UNNEST(kp_waiting_person_ids)
+                        FROM {SUMMARY_TABLE}
+                        WHERE canonical_person_id = ANY(%s)
+                          AND cardinality(kp_waiting_person_ids) > 0
+                        ''',
+                        [canonical_ids],
+                    )
+                    new_waiting_ids = [row[0] for row in cursor.fetchall()]
+                    if new_waiting_ids:
+                        cursor.execute(
+                            f'''
+                            INSERT INTO {WAITING_TABLE} (person_id)
+                            SELECT UNNEST(%s::bigint[])
+                            ON CONFLICT DO NOTHING
+                            ''',
+                            [new_waiting_ids],
+                        )
+                        cursor.execute(
+                            f'''
+                            INSERT INTO {PHOTO_DIRTY_TABLE} (person_id)
+                            SELECT UNNEST(%s::bigint[])
+                            ON CONFLICT DO NOTHING
+                            ''',
+                            [new_waiting_ids],
+                        )
                     _adjust_person_metric_rollups(canonical_ids, 1, cursor)
                 processed += len(dirty_ids)
     return processed
@@ -264,6 +320,7 @@ def rebuild_person_metric_summaries(batch_size=50000, progress_callback=None):
     state.ready = False
     state.rebuilt_at = None
     state.save(update_fields=['ready', 'rebuilt_at'])
+    PersonPhotoMetricState.objects.filter(id=1).update(ready=False, rebuilt_at=None)
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -323,6 +380,16 @@ def rebuild_person_metric_summaries(batch_size=50000, progress_callback=None):
 def _rebuild_person_metric_rollups():
     """Build the tiny snapshot-facing rollups once after the summary backfill."""
     with connection.cursor() as cursor:
+        cursor.execute(f'TRUNCATE TABLE {WAITING_TABLE}')
+        cursor.execute(
+            f'''
+            INSERT INTO {WAITING_TABLE} (person_id)
+            SELECT DISTINCT UNNEST(kp_waiting_person_ids)
+            FROM {SUMMARY_TABLE}
+            WHERE cardinality(kp_waiting_person_ids) > 0
+            ON CONFLICT DO NOTHING
+            '''
+        )
         cursor.execute(f'TRUNCATE TABLE {AGGREGATE_TABLE}')
         cursor.execute(
             f'''

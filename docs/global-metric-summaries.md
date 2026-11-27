@@ -41,12 +41,35 @@ person links enqueue only affected canonical people for delta refresh.
 
 Its initial backfill is documented in [person-metric-summaries.md](person-metric-summaries.md).
 
+`PersonPhotoMetricSummary` and `PersonPhotoGroup` cover avatar counts and
+unresolved duplicate-photo groups. The per-person flag rows maintain eight
+avatar counters; `PersonKpWaitingSummary` indexes source person IDs whose
+credits currently wait for a Kinopoisk lookup. Photo groups store counts by
+source and URL, and Person writes enqueue only affected old/new URLs. The
+snapshot refreshes those dirty people and URL groups before reading ten compact
+counters; it no longer scans all people or groups on every run.
+
+After migration, build them once after the person credit summary is ready:
+
+```sh
+python manage.py rebuild_person_photo_metric_summaries
+```
+
+The command takes the snapshot and catalog/rating write locks. Rebuilding the
+person credit summary invalidates these dependent photo counters; run the
+photo summary rebuild afterward.
+
 ## Freshness and page behavior
 
 The summary tables are refreshed incrementally by database triggers and on the
-next metrics snapshot. Global metric charts can therefore avoid a live scan of
-the full catalog on every run. A periodic full rebuild remains available to
-repair derived state.
+next metrics snapshot. Global metric charts can therefore avoid full scans of
+the catalog and person tables on every run. A periodic full rebuild remains
+available to repair derived state.
+
+The status strip keeps fresh timestamps and a rolling 24-hour error count. Its
+large-table queries use partial B-tree indexes for the latest KP/IMDb sync,
+parser completion, and recent errors. These indexes are created concurrently
+so a release does not hold an exclusive table lock.
 
 This does not apply to health reports: each health check must issue its own
 fresh query. It also does not apply to a film card or catalog detail: those

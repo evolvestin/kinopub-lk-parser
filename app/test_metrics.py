@@ -55,6 +55,10 @@ from app.services.person_metric_summary import (
     rebuild_person_metric_summaries,
     refresh_dirty_person_metric_summaries,
 )
+from app.services.person_photo_metric_summary import (
+    get_person_photo_metric_summary_data,
+    rebuild_person_photo_metric_summaries,
+)
 
 
 class MetricsSnapshotPageTests(TestCase):
@@ -602,6 +606,77 @@ class PersonMetricSummaryTests(TestCase):
             _unused_persons_from_summary(summary),
             calculate_unused_persons_metric(),
         )
+
+
+class PersonPhotoMetricSummaryTests(TestCase):
+    def assert_photo_metrics_match_live(self, summary):
+        self.assertEqual(
+            sorted(
+                calculate_persons_avatar_stats_metric(photo_summary=summary),
+                key=lambda item: item['name'],
+            ),
+            sorted(calculate_persons_avatar_stats_metric(), key=lambda item: item['name']),
+        )
+        self.assertEqual(
+            sorted(
+                calculate_duplicate_photo_urls_metric(photo_summary=summary),
+                key=lambda item: item['name'],
+            ),
+            sorted(calculate_duplicate_photo_urls_metric(), key=lambda item: item['name']),
+        )
+
+    def test_avatar_and_duplicate_rollups_match_live_queries_and_refresh_dirty_people(self):
+        show = Show.objects.create(
+            title='Waiting for KP',
+            original_title='Waiting for KP',
+            type='Movie',
+            kinopoisk_url='https://www.kinopoisk.ru/film/71201/',
+        )
+        shared_kp_photo = 'https://images.example.test/shared-kp.jpg'
+        actor = Person.objects.create(
+            name='Root actor',
+            kp_photo_url=shared_kp_photo,
+            is_photo_fetched=True,
+        )
+        alias = Person.objects.create(
+            name='Alias actor',
+            kp_photo_url=shared_kp_photo,
+            is_photo_fetched=True,
+        )
+        waiting_actor = Person.objects.create(name='Actor without photo', is_photo_fetched=True)
+        ShowCrew.objects.create(show=show, person=actor, profession='В ролях')
+        ShowCrew.objects.create(show=show, person=alias, profession='В ролях')
+        ShowCrew.objects.create(show=show, person=waiting_actor, profession='В ролях')
+
+        rebuild_person_metric_summaries(batch_size=1)
+        rebuild_person_photo_metric_summaries()
+        summary = get_person_photo_metric_summary_data()
+        self.assert_photo_metrics_match_live(summary)
+
+        with CaptureQueriesContext(connection) as queries:
+            snapshot_summary = get_person_photo_metric_summary_data()
+            calculate_persons_avatar_stats_metric(photo_summary=snapshot_summary)
+            calculate_duplicate_photo_urls_metric(photo_summary=snapshot_summary)
+        sql = '\n'.join(query['sql'].lower() for query in queries)
+        self.assertNotIn('from app_person ', sql)
+        self.assertNotIn('from app_person p', sql)
+
+        Person.objects.filter(pk=actor.pk).update(
+            tmdb_photo_url='https://images.example.test/root-tmdb.jpg',
+            tmdb_id=71201,
+        )
+        summary = get_person_photo_metric_summary_data()
+        self.assert_photo_metrics_match_live(summary)
+
+        Person.objects.filter(pk=alias.pk).update(master_person=actor)
+        get_person_metric_summary_data()
+        summary = get_person_photo_metric_summary_data()
+        self.assert_photo_metrics_match_live(summary)
+
+        ExternalRating.objects.create(show=show, kp=7.2)
+        get_person_metric_summary_data()
+        summary = get_person_photo_metric_summary_data()
+        self.assert_photo_metrics_match_live(summary)
 
 
 class ShowMetricSummaryTests(TestCase):

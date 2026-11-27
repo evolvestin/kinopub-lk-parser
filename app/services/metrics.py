@@ -41,6 +41,10 @@ from app.services.person_metric_summary import (
     get_person_metric_summary_data,
     person_metric_summary_ready,
 )
+from app.services.person_photo_metric_summary import (
+    get_person_photo_metric_summary_data,
+    person_photo_metric_summary_ready,
+)
 from app.services.show_metric_summary import get_show_metric_aggregate_data
 from app.utils import get_proxied_image_url
 from kinopub_parser import celery_app
@@ -476,6 +480,11 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
     person_summary = (
         get_person_metric_summary_data() if person_metric_summary_ready() else None
     )
+    person_photo_summary = (
+        get_person_photo_metric_summary_data()
+        if person_photo_metric_summary_ready()
+        else None
+    )
     show_metric_summary = get_show_metric_aggregate_data()
     if profession_stats is None:
         profession_stats = (
@@ -484,7 +493,9 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
             else _calculate_profession_stats()
         )
     professions_stats, en_professions_stats = profession_stats
-    duplicate_photo_stats = calculate_duplicate_photo_urls_metric()
+    duplicate_photo_stats = calculate_duplicate_photo_urls_metric(
+        photo_summary=person_photo_summary
+    )
     # Cache warming is deliberately kept off the snapshot path.  This
     # Cache warming is deliberately kept off the snapshot path.  The
     # duplicate-photo query scans a large person table, so a slow cache fill
@@ -522,7 +533,8 @@ def generate_global_metrics_snapshot(profession_stats=None) -> dict:
             else calculate_total_persons_by_show_type_metric()
         ),
         'persons_avatar_stats': calculate_persons_avatar_stats_metric(
-            person_summary=person_summary
+            person_summary=person_summary,
+            photo_summary=person_photo_summary,
         ),
         'professions_stats': professions_stats,
         'en_professions_stats': en_professions_stats,
@@ -1074,60 +1086,76 @@ def _canonical_person_id_expression():
     return F('canonical_person_id')
 
 
-def calculate_persons_avatar_stats_metric(person_summary=None):
+def calculate_persons_avatar_stats_metric(person_summary=None, photo_summary=None):
     has_tmdb = Q(tmdb_photo_url__isnull=False) & ~Q(tmdb_photo_url='')
     has_kp = Q(kp_photo_url__isnull=False) & ~Q(kp_photo_url='')
     tmdb_done = Q(is_photo_fetched=True)
 
-    person_stats = Person.objects.aggregate(
-        has_tmdb=Count('id', filter=has_tmdb),
-        kp_only=Count('id', filter=has_kp & ~has_tmdb),
-        tmdb_none=Count('id', filter=tmdb_done & ~has_tmdb),
-        no_kp=Count('id', filter=~has_kp),
-        tmdb_wait=Count('id', filter=~(tmdb_done | has_tmdb)),
-        all_none=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
-    )
-
-    if person_summary is None:
-        # Keep direct callers (including health diagnostics) fresh and isolated.
-        kp_waiting_person_ids = (
-            ShowCrew.objects.filter(
-                show__kinopoisk_url__isnull=False,
-                show__ext_rating__isnull=True,
-            )
-            .exclude(show__kinopoisk_url='')
-            .exclude(show__kinopoisk_url__endswith='/film/0')
-            .values_list('person_id', flat=True)
-        )
-        waiting_stats = Person.objects.filter(
-            id__in=Subquery(kp_waiting_person_ids)
-        ).aggregate(
-            kp_wait=Count('id', filter=~has_kp),
-            all_none_wait=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
-        )
+    if photo_summary is not None:
+        person_stats = {
+            'has_tmdb': photo_summary['has_tmdb_photo'],
+            'kp_only': photo_summary['kp_only'],
+            'tmdb_none': photo_summary['tmdb_none'],
+            'no_kp': photo_summary['no_kp'],
+            'tmdb_wait': photo_summary['tmdb_wait'],
+            'all_none': photo_summary['all_none'],
+        }
+        waiting_stats = {
+            'kp_wait': photo_summary['kp_wait'],
+            'all_none_wait': photo_summary['all_none_wait'],
+        }
     else:
-        # The summary keeps source person IDs (including aliases) so this
-        # preserves the exact waiting-person semantics without scanning crew.
-        with connection.cursor() as cursor:
-            cursor.execute(
-                '''
-                WITH waiting_person_ids AS (
-                    SELECT DISTINCT UNNEST(kp_waiting_person_ids) AS person_id
-                    FROM app_personmetricsummary
-                    WHERE cardinality(kp_waiting_person_ids) > 0
+        person_stats = Person.objects.aggregate(
+            has_tmdb=Count('id', filter=has_tmdb),
+            kp_only=Count('id', filter=has_kp & ~has_tmdb),
+            tmdb_none=Count('id', filter=tmdb_done & ~has_tmdb),
+            no_kp=Count('id', filter=~has_kp),
+            tmdb_wait=Count('id', filter=~(tmdb_done | has_tmdb)),
+            all_none=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
+        )
+
+    if photo_summary is None:
+        if person_summary is None:
+            # Keep direct callers (including health diagnostics) fresh and isolated.
+            kp_waiting_person_ids = (
+                ShowCrew.objects.filter(
+                    show__kinopoisk_url__isnull=False,
+                    show__ext_rating__isnull=True,
                 )
-                SELECT
-                    COUNT(p.id) FILTER (WHERE NOT (p.kp_photo_url IS NOT NULL AND p.kp_photo_url <> '')),
-                    COUNT(p.id) FILTER (
-                        WHERE p.is_photo_fetched
-                          AND NOT (p.tmdb_photo_url IS NOT NULL AND p.tmdb_photo_url <> '')
-                          AND NOT (p.kp_photo_url IS NOT NULL AND p.kp_photo_url <> '')
-                    )
-                FROM waiting_person_ids AS waiting
-                JOIN app_person AS p ON p.id = waiting.person_id
-                '''
+                .exclude(show__kinopoisk_url='')
+                .exclude(show__kinopoisk_url__endswith='/film/0')
+                .values_list('person_id', flat=True)
             )
-            waiting_stats = dict(zip(('kp_wait', 'all_none_wait'), cursor.fetchone()))
+            waiting_stats = Person.objects.filter(
+                id__in=Subquery(kp_waiting_person_ids)
+            ).aggregate(
+                kp_wait=Count('id', filter=~has_kp),
+                all_none_wait=Count('id', filter=tmdb_done & ~has_tmdb & ~has_kp),
+            )
+        else:
+            # Keep direct callers fresh; only the global snapshot uses photo rollups.
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    '''
+                    WITH waiting_person_ids AS (
+                        SELECT DISTINCT UNNEST(kp_waiting_person_ids) AS person_id
+                        FROM app_personmetricsummary
+                        WHERE cardinality(kp_waiting_person_ids) > 0
+                    )
+                    SELECT
+                        COUNT(p.id) FILTER (
+                            WHERE NOT (p.kp_photo_url IS NOT NULL AND p.kp_photo_url <> '')
+                        ),
+                        COUNT(p.id) FILTER (
+                            WHERE p.is_photo_fetched
+                              AND NOT (p.tmdb_photo_url IS NOT NULL AND p.tmdb_photo_url <> '')
+                              AND NOT (p.kp_photo_url IS NOT NULL AND p.kp_photo_url <> '')
+                        )
+                    FROM waiting_person_ids AS waiting
+                    JOIN app_person AS p ON p.id = waiting.person_id
+                    '''
+                )
+                waiting_stats = dict(zip(('kp_wait', 'all_none_wait'), cursor.fetchone()))
 
     data = [
         {'name': 'Есть фото (TMDB)', 'value': person_stats['has_tmdb']},
@@ -1530,7 +1558,14 @@ def get_missing_status_list(show_type: str):
     )
 
 
-def calculate_duplicate_photo_urls_metric():
+def calculate_duplicate_photo_urls_metric(photo_summary=None):
+    if photo_summary is not None:
+        data = [
+            {'name': 'TMDB дубликаты', 'value': photo_summary['tmdb_duplicate_groups']},
+            {'name': 'KP дубликаты', 'value': photo_summary['kp_duplicate_groups']},
+        ]
+        return sorted(data, key=lambda x: x['value'], reverse=True)
+
     tmdb_dupes = _count_duplicate_photo_groups('tmdb_photo_url')
     kp_dupes = _count_duplicate_photo_groups('kp_photo_url')
 

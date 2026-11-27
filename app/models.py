@@ -537,6 +537,16 @@ class Show(BaseModel):
         verbose_name = 'Show'
         verbose_name_plural = 'Shows'
         indexes = [
+            models.Index(
+                fields=['-poiskkino_updated_at'],
+                name='idx_show_kp_rating_updated',
+                condition=Q(poiskkino_updated_at__isnull=False),
+            ),
+            models.Index(
+                fields=['-imdb_rating_updated_at'],
+                name='idx_show_imdb_rating_updated',
+                condition=Q(imdb_rating_updated_at__isnull=False),
+            ),
             models.Index(fields=['type', 'year'], name='idx_show_type_year'),
             models.Index(fields=['status', 'year'], name='idx_show_status_year'),
             models.Index(
@@ -759,6 +769,18 @@ class LogEntry(BaseModel):
         ordering = ['-created_at']
         verbose_name = 'Log entry'
         verbose_name_plural = 'Log entries'
+        indexes = [
+            models.Index(
+                fields=['-created_at'],
+                name='idx_log_parser_finished',
+                condition=Q(message__contains='Parser session finished'),
+            ),
+            models.Index(
+                fields=['-created_at'],
+                name='idx_log_error_created',
+                condition=Q(level__in=['ERROR', 'CRITICAL']),
+            ),
+        ]
 
 
 class UserRating(BaseModel):
@@ -965,6 +987,78 @@ class PersonMetricAggregate(models.Model):
                 name='uniq_person_metric_aggregate_dimension',
             ),
         ]
+
+
+class PersonKpWaitingSummary(models.Model):
+    """Source person IDs currently waiting for a KP rating lookup."""
+
+    person_id = models.BigIntegerField(primary_key=True)
+
+
+class PersonPhotoMetricSummary(models.Model):
+    """Small per-person flags used for avatar counters in global snapshots."""
+
+    person_id = models.BigIntegerField(primary_key=True)
+    has_tmdb_photo = models.BooleanField(default=False)
+    has_kp_photo = models.BooleanField(default=False)
+    photo_fetched = models.BooleanField(default=False)
+    kp_waiting = models.BooleanField(default=False)
+
+
+class PersonPhotoMetricDirty(models.Model):
+    """People whose photo metric flags need refreshing."""
+
+    person_id = models.BigIntegerField(primary_key=True)
+
+
+class PersonPhotoGroup(models.Model):
+    """Unresolved duplicate-photo groups among root people."""
+
+    source = models.CharField(max_length=4)
+    photo_url = models.TextField()
+    root_count = models.BigIntegerField(default=0)
+    unresolved_count = models.BigIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['source', 'photo_url'],
+                name='uniq_person_photo_group_source_url',
+            ),
+        ]
+
+
+class PersonPhotoGroupDirty(models.Model):
+    """Photo URLs whose duplicate-group counters need refreshing."""
+
+    source = models.CharField(max_length=4)
+    photo_url = models.TextField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['source', 'photo_url'],
+                name='uniq_person_photo_group_dirty_source_url',
+            ),
+        ]
+
+
+class PersonPhotoMetricState(models.Model):
+    """Compact counters and readiness for person-photo dashboard metrics."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+    ready = models.BooleanField(default=False)
+    rebuilt_at = models.DateTimeField(null=True, blank=True)
+    has_tmdb_photo = models.BigIntegerField(default=0)
+    kp_only = models.BigIntegerField(default=0)
+    tmdb_none = models.BigIntegerField(default=0)
+    no_kp = models.BigIntegerField(default=0)
+    tmdb_wait = models.BigIntegerField(default=0)
+    all_none = models.BigIntegerField(default=0)
+    kp_wait = models.BigIntegerField(default=0)
+    all_none_wait = models.BigIntegerField(default=0)
+    tmdb_duplicate_groups = models.BigIntegerField(default=0)
+    kp_duplicate_groups = models.BigIntegerField(default=0)
 
 
 class ShowMetricSummary(models.Model):

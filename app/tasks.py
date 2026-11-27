@@ -43,6 +43,7 @@ from app.services.metrics import (
     warm_duplicate_photo_urls_cache,
 )
 from app.services.person_metric_summary import person_metric_summary_ready
+from app.services.person_photo_metric_summary import person_photo_metric_summary_ready
 from app.services.show_metric_summary import show_metric_summary_ready
 from app.services.stats_calculator import (
     GLOBAL_STATS_REFRESH_COOLDOWN_KEY,
@@ -942,6 +943,11 @@ def update_site_metrics_task(self, timeout_retries=0):
                 if not person_metric_summary_ready():
                     logging.warning(
                         'Deferring metrics snapshot until person metric summaries are backfilled.'
+                    )
+                    raise self.retry(countdown=300)
+                if not person_photo_metric_summary_ready():
+                    logging.warning(
+                        'Deferring metrics snapshot until person photo metric summaries are backfilled.'
                     )
                     raise self.retry(countdown=300)
                 if not show_metric_summary_ready():
