@@ -1026,6 +1026,12 @@ class PersonPhotoGroup(models.Model):
                 name='uniq_person_photo_group_source_url',
             ),
         ]
+        indexes = [
+            models.Index(
+                fields=['source', '-root_count', 'photo_url'],
+                name='idx_personphotogroup_page',
+            ),
+        ]
 
 
 class PersonPhotoGroupDirty(models.Model):

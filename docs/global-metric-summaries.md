@@ -47,7 +47,9 @@ avatar counters; `PersonKpWaitingSummary` indexes source person IDs whose
 credits currently wait for a Kinopoisk lookup. Photo groups store counts by
 source and URL, and Person writes enqueue only affected old/new URLs. The
 snapshot refreshes those dirty people and URL groups before reading ten compact
-counters; it no longer scans all people or groups on every run.
+counters; it no longer scans all people or groups on every run. The duplicate
+photo detail page uses the indexed group rollup to choose its page of URLs,
+then reads the current matching Person rows for those URLs.
 
 Dirty show facts are applied in bounded batches of 20,000 IDs. This keeps
 ordinary updates incremental while draining large batches of catalog changes

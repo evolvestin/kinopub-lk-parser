@@ -29,6 +29,7 @@ from app.models import (
     Genre,
     LogEntry,
     Person,
+    PersonPhotoGroup,
     Show,
     ShowCrew,
     ShowDuration,
@@ -44,6 +45,7 @@ from app.services.person_metric_summary import (
 from app.services.person_photo_metric_summary import (
     get_person_photo_metric_summary_data,
     person_photo_metric_summary_ready,
+    refresh_dirty_person_photo_groups,
 )
 from app.services.show_metric_summary import get_show_metric_aggregate_data
 from app.utils import get_proxied_image_url
@@ -1614,6 +1616,21 @@ def _potential_duplicate_photo_groups(field: str):
     legitimately share an image, so they are not duplicate people. Only a
     group containing an unresolved row remains a review candidate.
     """
+    if person_photo_metric_summary_ready():
+        refresh_dirty_person_photo_groups()
+        source = 'tmdb' if field == 'tmdb_photo_url' else 'kp'
+        return (
+            PersonPhotoGroup.objects.filter(source=source)
+            .annotate(
+                **{
+                    field: F('photo_url'),
+                    'cnt': F('root_count'),
+                    'tmdb_id_count': F('root_count') - F('unresolved_count'),
+                }
+            )
+            .values(field, 'cnt', 'tmdb_id_count')
+        )
+
     return (
         Person.objects.filter(master_person__isnull=True, **{f'{field}__gt': ''})
         .values(field)

@@ -678,6 +678,38 @@ class PersonPhotoMetricSummaryTests(TestCase):
         summary = get_person_photo_metric_summary_data()
         self.assert_photo_metrics_match_live(summary)
 
+    def test_duplicate_photo_detail_uses_incremental_groups_and_refreshes_dirty_urls(self):
+        shared_photo = 'https://images.example.test/shared-kp.jpg'
+        first = Person.objects.create(name='First KP alias', kp_photo_url=shared_photo)
+        second = Person.objects.create(name='Second KP alias', kp_photo_url=shared_photo)
+        rebuild_person_photo_metric_summaries()
+        invalidate_duplicate_photo_urls_cache()
+
+        with CaptureQueriesContext(connection) as queries:
+            items, has_more = get_duplicate_photo_urls_page('KP', limit=10)
+
+        self.assertFalse(has_more)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(
+            {person['id'] for person in items[0]['persons']},
+            {first.id, second.id},
+        )
+        candidate_queries = [
+            query['sql'].lower()
+            for query in queries
+            if 'app_personphotogroup' in query['sql'].lower()
+        ]
+        self.assertTrue(candidate_queries)
+        self.assertNotIn('group by', candidate_queries[0])
+
+        Person.objects.filter(pk=second.pk).update(
+            kp_photo_url='https://images.example.test/reassigned-kp.jpg'
+        )
+        invalidate_duplicate_photo_urls_cache()
+        items, has_more = get_duplicate_photo_urls_page('KP', limit=10)
+        self.assertEqual(items, [])
+        self.assertFalse(has_more)
+
 
 class ShowMetricSummaryTests(TestCase):
     def assert_metric_matches_live(self, rows, key, live_metric):
