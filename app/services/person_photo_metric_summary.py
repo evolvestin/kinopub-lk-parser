@@ -1,5 +1,8 @@
 """Incremental avatar counters and duplicate-photo groups for global metrics."""
 
+import logging
+import time
+
 from django.db import connection, transaction
 from django.utils import timezone
 
@@ -75,6 +78,7 @@ def refresh_dirty_person_photo_metrics(batch_size=5000, force=False):
     if not force and not person_photo_metric_summary_ready():
         return 0
 
+    started_at = time.monotonic()
     processed = 0
     while True:
         with transaction.atomic():
@@ -124,6 +128,11 @@ def refresh_dirty_person_photo_metrics(batch_size=5000, force=False):
                 )
                 _adjust_avatar_totals(person_ids, 1, cursor)
                 processed += len(person_ids)
+    logging.info(
+        'Metrics dirty refresh kind=person_photo rows=%s seconds=%.3f.',
+        processed,
+        time.monotonic() - started_at,
+    )
     return processed
 
 
@@ -143,6 +152,7 @@ def refresh_dirty_person_photo_groups(batch_size=2000, force=False):
     if not force and not person_photo_metric_summary_ready():
         return 0
 
+    started_at = time.monotonic()
     processed = 0
     while True:
         with transaction.atomic():
@@ -215,6 +225,11 @@ def refresh_dirty_person_photo_groups(batch_size=2000, force=False):
                     cursor,
                 )
                 processed += len(dirty)
+    logging.info(
+        'Metrics dirty refresh kind=person_photo_group rows=%s seconds=%.3f.',
+        processed,
+        time.monotonic() - started_at,
+    )
     return processed
 
 

@@ -1,5 +1,8 @@
 """Incremental per-show facts and compact global catalog metric counts."""
 
+import logging
+import time
+
 from django.db import connection, transaction
 from django.utils import timezone
 
@@ -149,6 +152,7 @@ def refresh_dirty_show_metric_summaries(batch_size=20000):
     if not show_metric_summary_ready():
         return 0
 
+    started_at = time.monotonic()
     processed = 0
     while True:
         with transaction.atomic():
@@ -175,6 +179,11 @@ def refresh_dirty_show_metric_summaries(batch_size=20000):
                 _insert_summary(cursor, 's.id = ANY(%s)', [show_ids])
                 _adjust_aggregate(show_ids, 1, cursor)
                 processed += len(show_ids)
+    logging.info(
+        'Metrics dirty refresh kind=show rows=%s seconds=%.3f.',
+        processed,
+        time.monotonic() - started_at,
+    )
     return processed
 
 

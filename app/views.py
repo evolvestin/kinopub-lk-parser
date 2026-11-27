@@ -53,10 +53,12 @@ from app.models import (
     WishlistItem,
 )
 from app.services.metrics import (
+    DUPLICATE_PHOTO_MEMBER_PAGE_SIZE,
     PERSON_DETAIL_CACHE_TIMEOUT,
     SYSTEM_STATUS_SNAPSHOT_KEY,
     get_active_countries_list,
     get_duplicate_photo_urls_page,
+    get_duplicate_photo_url_group_members,
     get_global_metrics_history,
     get_has_rating_list,
     get_imdb_unrated_list,
@@ -95,6 +97,8 @@ from app.services.stats_calculator import (
     generate_global_stats,
     generate_group_stats,
     generate_user_stats,
+    mark_user_stats_aggregates_dirty,
+    load_user_stats_aggregate_periods,
 )
 from app.services.show_identity import normalize_show_type
 from app.services.telegram_auth import validate_telegram_init_data
@@ -1380,26 +1384,59 @@ def webapp_get_detailed_stats(request):
             screen_height=body.get('screen_height'),
         )
 
-        stats = generate_user_stats(view_user, year=year)
+        include_group = body.get('include_group', True)
+        allow_pending = body.get('allow_background_build', False)
+        stats = generate_user_stats(view_user, year=year, allow_pending=allow_pending)
+        if stats.get('pending'):
+            return JsonResponse({'pending': True}, status=202)
+
         # Group history is large and is only needed after the user switches to
         # the group tab. Keep the cheap capability flag in the small personal
         # response and avoid serialising/recomputing the group payload on the
         # common personal-stats path.
-        include_group = body.get('include_group', True)
-        if include_group:
-            group_stats = generate_group_stats(view_user, year=year)
+        has_group = stats.setdefault('meta', {}).get('has_group')
+        if has_group is None:
+            has_group = ViewUserGroup.objects.filter(users=view_user).exists()
+        if include_group and has_group:
+            group_stats = generate_group_stats(
+                view_user, year=year, allow_pending=allow_pending
+            )
+            if group_stats and group_stats.get('pending'):
+                return JsonResponse({'pending': True}, status=202)
             if group_stats:
                 stats['group'] = group_stats
-            stats.setdefault('meta', {})['has_group'] = bool(group_stats)
+            stats['meta']['has_group'] = bool(group_stats)
         else:
-            stats.setdefault('meta', {})['has_group'] = ViewUserGroup.objects.filter(
-                users=view_user
-            ).exists()
+            stats['meta']['has_group'] = bool(has_group)
 
         return JsonResponse(stats)
 
     except Exception as e:
         logger.error(f'WebApp Stats Error: {e}', exc_info=True)
+        return JsonResponse({'error': 'Server error'}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def webapp_get_stats_periods(request):
+    try:
+        user = get_webapp_user(request)
+        if not user:
+            return JsonResponse({'error': 'Unauthorized'}, status=403)
+        body = json.loads(request.body)
+        periods = body.get('periods') or []
+        if not isinstance(periods, list) or len(periods) > 50:
+            return JsonResponse({'error': 'Invalid periods'}, status=400)
+
+        result, pending = load_user_stats_aggregate_periods(user, periods)
+        if pending:
+            return JsonResponse(
+                {'pending': True, 'pending_periods': pending, 'periods': result},
+                status=202,
+            )
+        return JsonResponse({'periods': result})
+    except Exception as e:
+        logger.error('WebApp Stats Periods Error: %s', e, exc_info=True)
         return JsonResponse({'error': 'Server error'}, status=500)
 
 
@@ -2179,6 +2216,24 @@ def get_metric_details(request, key):
         limit = min(100, max(1, int(request.GET.get('limit', 50))))
     except (TypeError, ValueError):
         return JsonResponse({'error': 'Invalid pagination parameters'}, status=400)
+
+    group_url = request.GET.get('group_url')
+    if key == 'duplicate_photo_urls' and group_url:
+        try:
+            after_id = request.GET.get('after_id')
+            after_id = max(0, int(after_id)) if after_id not in (None, '') else None
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'Invalid group pagination parameters'}, status=400)
+        group_page = get_duplicate_photo_url_group_members(
+            show_type or 'KP',
+            group_url,
+            after_id=after_id,
+            limit=min(limit, DUPLICATE_PHOTO_MEMBER_PAGE_SIZE),
+        )
+        if group_page is None:
+            return JsonResponse({'error': 'Duplicate photo group not found'}, status=404)
+        return JsonResponse(group_page)
+
     is_person_metric = any(
         x in key for x in ['person', 'avatar', 'professions', 'duplicate_photo', 'unused_persons']
     )
@@ -2699,6 +2754,7 @@ def webapp_wishlist_data(request):
                 is_active=False
             )
             WishlistFolder.objects.filter(id=folder_id, user=view_user).update(is_deleted=True)
+            mark_user_stats_aggregates_dirty(view_user.id)
 
             if not WishlistFolder.objects.filter(user=view_user, is_deleted=False).exists():
                 WishlistFolder.objects.create(
@@ -2763,6 +2819,7 @@ def webapp_wishlist_data(request):
                     sort_order=max_order + 1,
                     include_in_stats=should_include,
                 )
+            mark_user_stats_aggregates_dirty(view_user.id)
             return JsonResponse({'status': 'ok'})
 
         elif action == 'remove_item':
@@ -2778,6 +2835,7 @@ def webapp_wishlist_data(request):
                 queryset.update(include_in_stats=False)
             else:
                 queryset.update(is_active=False, include_in_stats=keep_stats)
+            mark_user_stats_aggregates_dirty(view_user.id)
 
             return JsonResponse({'status': 'ok'})
 
@@ -2886,9 +2944,9 @@ def webapp_casino(request):
             winner_show = winner_item.show
 
             new_spin = CasinoSpin.objects.create(user=view_user, show=winner_show)
-            cache.delete(f'user_stats_v6:{view_user.id}:all')
+            mark_user_stats_aggregates_dirty(view_user.id)
             if new_spin.created_at:
-                cache.delete(f'user_stats_v6:{view_user.id}:{new_spin.created_at.year}')
+                mark_user_stats_aggregates_dirty(view_user.id, new_spin.created_at.year)
             expires_ms = int((new_spin.created_at + timedelta(hours=24)).timestamp() * 1000)
 
             user_rating = UserRating.objects.filter(
@@ -2940,9 +2998,11 @@ def webapp_casino(request):
 
         elif action == 'delete_spin':
             spin_id = body.get('spin_id')
+            spin = CasinoSpin.objects.filter(id=spin_id, user=view_user).first()
             CasinoSpin.objects.filter(id=spin_id, user=view_user).update(is_deleted=True)
-            cache.delete(f'user_stats_v6:{view_user.id}:all')
-            cache.delete(f'user_stats_v6:{view_user.id}:{timezone.now().year}')
+            mark_user_stats_aggregates_dirty(
+                view_user.id, spin.created_at.year if spin and spin.created_at else None
+            )
             return JsonResponse({'status': 'ok'})
 
         elif action == 'reset':
@@ -3257,9 +3317,9 @@ def webapp_rate_show(request):
             .values_list('view_date__year', flat=True)
         )
         years.add(timezone.now().year)
-        for y in list(years) + ['all']:
-            cache.delete(f'user_stats_v6:{view_user.id}:{y}')
-            cache.delete(f'group_stats_v6:{view_user.id}:{y}')
+        for y in years:
+            mark_user_stats_aggregates_dirty(view_user.id, y)
+        mark_user_stats_aggregates_dirty(view_user.id)
 
         return JsonResponse({'status': 'ok'})
 
@@ -3315,9 +3375,9 @@ def webapp_delete_rating(request):
             .values_list('view_date__year', flat=True)
         )
         years.add(timezone.now().year)
-        for y in list(years) + ['all']:
-            cache.delete(f'user_stats_v6:{view_user.id}:{y}')
-            cache.delete(f'group_stats_v6:{view_user.id}:{y}')
+        for y in years:
+            mark_user_stats_aggregates_dirty(view_user.id, y)
+        mark_user_stats_aggregates_dirty(view_user.id)
 
         return JsonResponse({'status': 'ok'})
 

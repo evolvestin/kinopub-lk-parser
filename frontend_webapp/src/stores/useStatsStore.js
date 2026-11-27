@@ -229,13 +229,24 @@ export const useStatsStore = defineStore('stats', () => {
 
     const promise = (async () => {
       try {
-        const data = await api.post('detailed_stats/', {
+        const requestPayload = {
           period_type: 'year',
           period_value: year === 'all' ? 0 : year,
           include_group: includeGroup,
+          allow_background_build: true,
           screen_width: window.innerWidth,
           screen_height: window.innerHeight
-        })
+        }
+        let data = await api.post('detailed_stats/', requestPayload)
+        let pendingPolls = 0
+        while (data?.pending && pendingPolls < 60) {
+          await new Promise(resolve => window.setTimeout(resolve, 5000))
+          data = await api.post('detailed_stats/', requestPayload)
+          pendingPolls += 1
+        }
+        if (data?.pending) {
+          throw new Error('Статистика ещё рассчитывается в фоне')
+        }
 
         if (data.meta) {
           updateAvailableYears(data.meta.years)
@@ -279,21 +290,7 @@ export const useStatsStore = defineStore('stats', () => {
   async function prefetchInitialStats() {
     const year = currentYear.value
     try {
-      const data = await fetchStats(year, true, false, activeTab.value === 'group')
-
-      // Warm the group tab after the personal response tells us that a group
-      // exists. It remains fully background work and replaces the same cache
-      // entry with the richer payload when complete.
-      if (data?.meta?.has_group && !data.group) {
-        await fetchStats(year, true, true, true)
-      }
-
-      // `meta.years` used to be treated as a list of tabs only. That made the
-      // first click on any year replace a complete page with an empty
-      // skeleton while a second, expensive calculation ran. Warm every year
-      // after the first response, in small batches, so switching periods is a
-      // cache hit for the common path. This is Redis-only data and does not
-      // add rows or columns to the database.
+      await fetchStats(year, true, false, activeTab.value === 'group')
       void prefetchAvailableStats()
     } catch (error) {
       console.warn('[StatsStore] Background stats prefetch failed:', error)
@@ -305,19 +302,33 @@ export const useStatsStore = defineStore('stats', () => {
     const queue = availableYears.value
       .map((year) => String(year))
       .filter((year) => year !== current && !statsCache.value[year] && !hasActiveRequest(year))
+    if (queue.length === 0) return
 
-    // Keep at most two heavy period calculations in flight. This makes the
-    // warm-up invisible to the user and avoids a request burst for accounts
-    // with a long history.
-    for (let i = 0; i < queue.length; i += 2) {
-      await Promise.all(
-        queue.slice(i, i + 2).map((year) =>
-          fetchStats(year, true, false, false).catch((error) => {
-            console.warn(`[StatsStore] Background year ${year} prefetch failed:`, error)
-            return null
-          })
-        )
-      )
+    try {
+      const requestPayload = { periods: queue }
+      let response = await api.post('detailed_stats_periods/', requestPayload)
+      const cacheReadyPeriods = (periods = {}) => {
+        Object.entries(periods).forEach(([year, stats]) => {
+          const previous = statsCache.value[year]
+          statsCache.value[year] = markRaw(
+            previous?.group ? { ...stats, group: previous.group } : stats
+          )
+        })
+      }
+      cacheReadyPeriods(response?.periods)
+      let pendingPolls = 0
+      while (response?.pending && pendingPolls < 60) {
+        await new Promise(resolve => window.setTimeout(resolve, 10000))
+        response = await api.post('detailed_stats_periods/', requestPayload)
+        cacheReadyPeriods(response?.periods)
+        pendingPolls += 1
+      }
+      if (response?.pending) {
+        throw new Error('Исторические периоды ещё рассчитываются в фоне')
+      }
+      cacheReadyPeriods(response?.periods)
+    } catch (error) {
+      console.warn('[StatsStore] Background periods prefetch failed:', error)
     }
   }
 

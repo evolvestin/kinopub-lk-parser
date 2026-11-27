@@ -176,15 +176,15 @@ class Person(BaseModel):
         verbose_name_plural = 'Persons'
         indexes = [
             models.Index(
-                fields=['tmdb_photo_url'],
-                name='idx_person_tmdb_dupe_source',
+                fields=['tmdb_photo_url', 'id'],
+                name='idx_person_tmdb_dupe_source_v2',
                 condition=Q(master_person__isnull=True)
                 & Q(tmdb_photo_url__isnull=False)
                 & ~Q(tmdb_photo_url=''),
             ),
             models.Index(
-                fields=['kp_photo_url'],
-                name='idx_person_kp_dupe_source',
+                fields=['kp_photo_url', 'id'],
+                name='idx_person_kp_dupe_source_v2',
                 condition=Q(master_person__isnull=True)
                 & Q(kp_photo_url__isnull=False)
                 & ~Q(kp_photo_url=''),
@@ -1108,6 +1108,36 @@ class ShowMetricSummaryState(models.Model):
     id = models.PositiveSmallIntegerField(primary_key=True, default=1)
     ready = models.BooleanField(default=False)
     rebuilt_at = models.DateTimeField(null=True, blank=True)
+
+
+class UserStatsAggregate(models.Model):
+    """Per-user, per-period materialized aggregates and detail projections."""
+
+    SCOPE_PERSONAL = 'personal'
+    SCOPE_GROUP = 'group'
+    SCOPE_CHOICES = (
+        (SCOPE_PERSONAL, 'Personal'),
+        (SCOPE_GROUP, 'Group'),
+    )
+
+    user = models.ForeignKey('ViewUser', on_delete=models.CASCADE, related_name='stats_aggregates')
+    scope = models.CharField(max_length=12, choices=SCOPE_CHOICES)
+    year = models.IntegerField(null=True, blank=True)
+    aggregates = models.JSONField(default=dict)
+    details = models.JSONField(default=dict)
+    generated_at = models.DateTimeField(auto_now=True)
+    ready = models.BooleanField(default=False)
+    dirty = models.BooleanField(default=False)
+    dirty_version = models.PositiveBigIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'scope', 'year'],
+                name='uniq_user_stats_aggregate_period',
+                nulls_distinct=False,
+            ),
+        ]
 
 
 class WishlistFolder(BaseModel):

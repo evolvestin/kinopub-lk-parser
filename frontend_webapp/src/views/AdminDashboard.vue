@@ -193,7 +193,13 @@
                     <span v-else-if="item.tmdb_status === 'partial'" style="font-size: 10px; font-weight: 800; color: #f1c40f; background: rgba(241, 196, 15, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Фото TMDB частично совпадают</span>
                     <span v-else-if="item.tmdb_status === 'missing'" style="font-size: 10px; font-weight: 800; color: #9ca3af; background: rgba(156, 163, 175, 0.15); padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">Нет фото TMDB</span>
                   </div>
-                  <button class="btn-merge-action" @click="executeMerge(item.persons[0].id, item.persons)">Объединить</button>
+                  <span style="font-size: 11px; color: var(--text-muted);">{{ item.persons.length }} / {{ item.persons_total }}</span>
+                  <button
+                    class="btn-merge-action"
+                    :disabled="item.persons_has_more || item.persons_loading"
+                    :title="item.persons_has_more ? 'Сначала загрузите всех участников группы' : ''"
+                    @click="executeMerge(item.persons[0].id, item.persons)"
+                  >{{ item.persons_has_more ? 'Загрузите всех' : 'Объединить' }}</button>
                 </div>
                 <div class="merge-content">
                   <div class="merge-poster-area">
@@ -232,6 +238,11 @@
                       </div>
                     </label>
                   </div>
+                </div>
+                <div v-if="item.persons_has_more || item.persons_loading" style="display:flex; justify-content:center; padding:0 14px 14px;">
+                  <button class="nav-btn" :disabled="item.persons_loading" @click="loadMoreDuplicateGroupMembers(item)">
+                    {{ item.persons_loading ? 'Загрузка…' : `Показать ещё участников (${item.persons.length} / ${item.persons_total})` }}
+                  </button>
                 </div>
               </template>
 
@@ -612,6 +623,31 @@ const mergeLoadedItems = (items) => {
       mergeSelections.value[item.persons[0].id] = defaultMasterId
     }
   })
+}
+
+const loadMoreDuplicateGroupMembers = async (item) => {
+  if (!item.persons_has_more || item.persons_loading) return
+  item.persons_loading = true
+  try {
+    const params = new URLSearchParams({
+      type: modalDataContext.value.request_type,
+      group_url: item.photo_url,
+      after_id: String(item.persons_after_id || 0),
+      limit: '50'
+    })
+    const response = await fetch(`/api/metrics/details/duplicate_photo_urls/?${params}`, {
+      credentials: 'same-origin'
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    item.persons.push(...(data.items || []))
+    item.persons_has_more = Boolean(data.has_more)
+    item.persons_after_id = data.next_after_id
+  } catch (error) {
+    console.error('[AdminDashboard] Duplicate group page failed:', error)
+  } finally {
+    item.persons_loading = false
+  }
 }
 
 const loadMoreDetails = async () => {

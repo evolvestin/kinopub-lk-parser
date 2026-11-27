@@ -66,6 +66,7 @@ from shared.constants import (
 
 DUPLICATE_PHOTO_CACHE_VERSION_KEY = 'metrics:duplicate_photo_urls:cache_version'
 DUPLICATE_PHOTO_CACHE_TIMEOUT = 86400
+DUPLICATE_PHOTO_MEMBER_PAGE_SIZE = 50
 PERSON_DETAIL_CACHE_VERSION_KEY = 'metrics:person_detail:cache_version'
 PERSON_DETAIL_CACHE_TIMEOUT = 86400
 UNRELEASED_IMDB_STATUSES = ('Filming', 'Post Production', 'Pre Production')
@@ -1655,9 +1656,8 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
     """Return one page of duplicate-photo groups without materializing all groups."""
     field = 'tmdb_photo_url' if 'TMDB' in source_type else 'kp_photo_url'
     version = cache.get(DUPLICATE_PHOTO_CACHE_VERSION_KEY, 1)
-    # v3 includes the source Kinopoisk person ID in each duplicate row.
-    # Keep this separate from older cached pages that do not have the field.
-    cache_key = f'metrics:duplicate_photo_urls:v3:{version}:{field}:{offset}:{limit}'
+    # v4 caps the initial member preview and lazily pages large groups.
+    cache_key = f'metrics:duplicate_photo_urls:v4:{version}:{field}:{offset}:{limit}'
     cached_page = cache.get(cache_key)
     if cached_page is not None:
         return cached_page
@@ -1674,41 +1674,24 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
 
     url_counts = {entry[field]: entry['cnt'] for entry in group_rows}
     urls = list(url_counts.keys())
-
-    persons_qs = (
-        Person.objects.filter(master_person__isnull=True)
-        .filter(**{f'{field}__in': urls})
-        .values(
-            'id',
-            'name',
-            'en_name',
-            'tmdb_photo_url',
-            'kp_photo_url',
-            'tmdb_id',
-            'kinopoisk_person_id',
-        )
-    )
-
     grouped_persons = defaultdict(list)
-    for p in persons_qs:
-        grouped_persons[p[field]].append(
-            {
-                'id': p['id'],
-                'name': p['name'],
-                'en_name': p['en_name'],
-                'tmdb_photo_url': get_proxied_image_url(p['tmdb_photo_url']),
-                'kp_photo_url': get_proxied_image_url(p['kp_photo_url']),
-                'tmdb_id': p['tmdb_id'],
-                'kinopoisk_person_id': p['kinopoisk_person_id'],
-            }
-        )
+    for row in _load_duplicate_photo_group_members(
+        field,
+        urls,
+        after_id=None,
+        limit=DUPLICATE_PHOTO_MEMBER_PAGE_SIZE + 1,
+    ):
+        grouped_persons[row['photo_url']].append(row['person'])
 
     results = []
     for url in urls:
-        persons_list = sorted(grouped_persons[url], key=lambda x: x['id'])
+        fetched_persons = grouped_persons[url]
+        persons_has_more = len(fetched_persons) > DUPLICATE_PHOTO_MEMBER_PAGE_SIZE
+        persons_list = fetched_persons[:DUPLICATE_PHOTO_MEMBER_PAGE_SIZE]
+        persons_complete = not persons_has_more
 
         kp_status = None
-        if field == 'tmdb_photo_url':
+        if persons_complete and field == 'tmdb_photo_url':
             kp_urls = {p['kp_photo_url'] for p in persons_list if p.get('kp_photo_url')}
             kp_urls.discard('')
             has_kp_count = sum(
@@ -1725,7 +1708,7 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
                 kp_status = 'different'
 
         tmdb_status = None
-        if field == 'kp_photo_url':
+        if persons_complete and field == 'kp_photo_url':
             tmdb_urls = {p['tmdb_photo_url'] for p in persons_list if p.get('tmdb_photo_url')}
             tmdb_urls.discard('')
             has_tmdb_count = sum(
@@ -1748,6 +1731,10 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
                 'id': 0,
                 'title': f'Группа дубликатов ({url_counts[url]})',
                 'persons': persons_list,
+                'photo_url': url,
+                'persons_total': url_counts[url],
+                'persons_has_more': persons_has_more,
+                'persons_after_id': persons_list[-1]['id'] if persons_has_more else None,
                 'tmdb_photo_url': proxied_main_url if field == 'tmdb_photo_url' else None,
                 'kp_photo_url': proxied_main_url if field == 'kp_photo_url' else None,
                 'kp_status': kp_status,
@@ -1758,6 +1745,103 @@ def get_duplicate_photo_urls_page(source_type: str, offset: int = 0, limit: int 
     result = (results, has_more)
     cache.set(cache_key, result, timeout=DUPLICATE_PHOTO_CACHE_TIMEOUT)
     return result
+
+
+def _load_duplicate_photo_group_members(field, urls, after_id, limit):
+    """Fetch a bounded, ID-ordered preview for each requested photo URL."""
+    if not urls or limit <= 0:
+        return []
+
+    person_table = connection.ops.quote_name(Person._meta.db_table)
+    photo_column = connection.ops.quote_name(field)
+    after_filter = 'AND person.id > %s' if after_id is not None else ''
+    params = [urls]
+    if after_id is not None:
+        params.append(after_id)
+    params.append(limit)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f'''
+            SELECT requested.photo_url,
+                   member.id,
+                   member.name,
+                   member.en_name,
+                   member.tmdb_photo_url,
+                   member.kp_photo_url,
+                   member.tmdb_id,
+                   member.kinopoisk_person_id
+            FROM UNNEST(%s::text[]) WITH ORDINALITY AS requested(photo_url, ordinal)
+            LEFT JOIN LATERAL (
+                SELECT person.id,
+                       person.name,
+                       person.en_name,
+                       person.tmdb_photo_url,
+                       person.kp_photo_url,
+                       person.tmdb_id,
+                       person.kinopoisk_person_id
+                FROM {person_table} AS person
+                WHERE person.master_person_id IS NULL
+                  AND person.{photo_column} = requested.photo_url
+                  {after_filter}
+                ORDER BY person.id
+                LIMIT %s
+            ) AS member ON TRUE
+            ORDER BY requested.ordinal, member.id
+            ''',
+            params,
+        )
+        rows = cursor.fetchall()
+
+    result = []
+    for photo_url, person_id, name, en_name, tmdb_url, kp_url, tmdb_id, kp_id in rows:
+        if person_id is None:
+            continue
+        result.append(
+            {
+                'photo_url': photo_url,
+                'person': {
+                    'id': person_id,
+                    'name': name,
+                    'en_name': en_name,
+                    'tmdb_photo_url': get_proxied_image_url(tmdb_url),
+                    'kp_photo_url': get_proxied_image_url(kp_url),
+                    'tmdb_id': tmdb_id,
+                    'kinopoisk_person_id': kp_id,
+                },
+            }
+        )
+    return result
+
+
+def get_duplicate_photo_url_group_members(source_type, photo_url, after_id=None, limit=50):
+    """Return one bounded page of members for a single duplicate-photo group."""
+    source = 'tmdb' if 'TMDB' in source_type else 'kp'
+    field = 'tmdb_photo_url' if source == 'tmdb' else 'kp_photo_url'
+    group = PersonPhotoGroup.objects.filter(
+        source=source,
+        photo_url=photo_url,
+        root_count__gt=1,
+        unresolved_count__gt=0,
+    ).values('root_count').first()
+    if not group:
+        return None
+
+    rows = _load_duplicate_photo_group_members(
+        field,
+        [photo_url],
+        after_id=after_id,
+        limit=limit + 1,
+    )
+    people = [row['person'] for row in rows]
+    has_more = len(people) > limit
+    people = people[:limit]
+    return {
+        'items': people,
+        'total': group['root_count'],
+        'has_more': has_more,
+        'next_after_id': people[-1]['id'] if has_more and people else None,
+    }
 
 
 def queue_duplicate_photo_urls_warmup():

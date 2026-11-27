@@ -48,6 +48,24 @@ class MetricTaskRoutingTests(SimpleTestCase):
             with self.subTest(task_name=task_name):
                 self.assertEqual(settings.CELERY_TASK_ROUTES[task_name], {'queue': 'metrics'})
 
+    def test_user_stats_refresh_uses_metrics_queue(self):
+        self.assertEqual(
+            settings.CELERY_TASK_ROUTES['app.tasks.refresh_user_stats_aggregate_task'],
+            {'queue': 'metrics'},
+        )
+
+
+class MetricsSnapshotRequestCoalescingTests(SimpleTestCase):
+    def test_only_the_first_snapshot_request_is_enqueued(self):
+        with (
+            patch('app.tasks.cache.add', side_effect=[True, False]),
+            patch.object(tasks.update_site_metrics_task, 'apply_async') as enqueue,
+        ):
+            self.assertTrue(tasks.queue_site_metrics_snapshot())
+            self.assertFalse(tasks.queue_site_metrics_snapshot())
+
+        enqueue.assert_called_once_with(queue='metrics', expires=600)
+
 
 class QueueRetryTests(TestCase):
     def test_missing_details_result_is_put_back_into_queue(self):

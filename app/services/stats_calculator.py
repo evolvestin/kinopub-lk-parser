@@ -5,6 +5,7 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import (
     Avg,
     Case,
@@ -36,6 +37,7 @@ from app.models import (
     ViewUser,
     ViewUserGroup,
     WishlistItem,
+    UserStatsAggregate,
 )
 from shared.constants import (
     ACTOR_ROLES,
@@ -52,6 +54,175 @@ from shared.formatters import format_duration, format_precision_date
 from shared.media import build_poster_url
 
 logger = logging.getLogger(__name__)
+
+
+def _stats_aggregate_identity(user, scope, year):
+    return {'user': user, 'scope': scope, 'year': year}
+
+
+def _split_user_stats_materialization(scope, payload):
+    """Keep computed aggregates separate from the detailed history projection."""
+    details = {}
+    aggregates = dict(payload)
+    for key in ('history_movies', 'history_episodes', 'wishlist_watched_items'):
+        if key in aggregates:
+            details[key] = aggregates.pop(key)
+    ratings = aggregates.get('ratings')
+    if ratings:
+        ratings = dict(ratings)
+        details['ratings_history'] = ratings.pop('history', [])
+        aggregates['ratings'] = ratings
+    if scope == UserStatsAggregate.SCOPE_GROUP:
+        for key in ('history_movies', 'history_episodes'):
+            if key in aggregates:
+                details[key] = aggregates.pop(key)
+    return aggregates, details
+
+
+def _join_user_stats_materialization(aggregates, details):
+    result = dict(aggregates)
+    result.update(details)
+    ratings_history = result.pop('ratings_history', [])
+    if 'ratings' in result:
+        result['ratings'] = dict(result['ratings'])
+        result['ratings']['history'] = ratings_history
+    return result
+
+
+def queue_user_stats_aggregate_refresh(user_id, scope, year):
+    refresh_key = f'user_stats_aggregate_refresh:{user_id}:{scope}:{year or "all"}'
+    if not cache.add(refresh_key, True, timeout=900):
+        return False
+    try:
+        from celery import current_app
+
+        current_app.send_task(
+            'app.tasks.refresh_user_stats_aggregate_task',
+            kwargs={'user_id': user_id, 'scope': scope, 'year': year},
+            queue='metrics',
+            expires=600,
+        )
+    except Exception:
+        cache.delete(refresh_key)
+        logger.exception('Could not queue user stats aggregate refresh for user %s', user_id)
+        return False
+    return True
+
+
+def load_user_stats_aggregate_periods(user, periods):
+    """Load requested ready periods in one indexed query, queue missing rows."""
+    normalized = []
+    for period in periods:
+        if period in (None, 'all', '0', 0):
+            value = None
+        else:
+            try:
+                value = int(str(period).split('-')[0])
+            except (TypeError, ValueError):
+                continue
+        if value not in normalized:
+            normalized.append(value)
+
+    query = UserStatsAggregate.objects.filter(
+        user=user, scope=UserStatsAggregate.SCOPE_PERSONAL
+    )
+    year_values = [value for value in normalized if value is not None]
+    period_filter = Q(year__in=year_values)
+    if None in normalized:
+        period_filter |= Q(year__isnull=True)
+    rows = list(
+        query.filter(period_filter).values('year', 'ready', 'dirty', 'aggregates', 'details')
+    )
+    rows_by_year = {row['year']: row for row in rows}
+    pending = []
+    result = {}
+    for year in normalized:
+        row = rows_by_year.get(year)
+        key = 'all' if year is None else str(year)
+        if row is None or not row['ready'] or row['dirty']:
+            queue_user_stats_aggregate_refresh(
+                user.id, UserStatsAggregate.SCOPE_PERSONAL, year
+            )
+            pending.append(key)
+            continue
+        result[key] = _join_user_stats_materialization(row['aggregates'], row['details'])
+    return result, pending
+
+
+def mark_user_stats_aggregates_dirty(user_id, year=None):
+    aggregates = UserStatsAggregate.objects.filter(user_id=user_id)
+    if year is not None:
+        aggregates = aggregates.filter(Q(year=year) | Q(year__isnull=True))
+    existing_periods = set(aggregates.values_list('scope', 'year'))
+    affected_years = {period_year for _, period_year in existing_periods}
+    if year is not None:
+        affected_years.update((year, None))
+    else:
+        affected_years.add(None)
+
+    scopes = {scope for scope, _ in existing_periods}
+    scopes.add(UserStatsAggregate.SCOPE_PERSONAL)
+    if ViewUserGroup.objects.filter(users__id=user_id).exists():
+        scopes.add(UserStatsAggregate.SCOPE_GROUP)
+
+    for scope in scopes:
+        for period_year in affected_years:
+            identity = {'user_id': user_id, 'scope': scope, 'year': period_year}
+            aggregate, created = UserStatsAggregate.objects.get_or_create(
+                **identity,
+                defaults={'ready': False, 'dirty': True, 'dirty_version': 1},
+            )
+            if not created:
+                UserStatsAggregate.objects.filter(pk=aggregate.pk).update(
+                    dirty=True, dirty_version=F('dirty_version') + 1
+                )
+            transaction.on_commit(
+                lambda user_id=user_id, scope=scope, period_year=period_year: (
+                    queue_user_stats_aggregate_refresh(user_id, scope, period_year)
+                )
+            )
+
+
+def _get_stats_aggregate_response(user, scope, year, force=False):
+    query = UserStatsAggregate.objects.filter(**_stats_aggregate_identity(user, scope, year))
+    if force:
+        query = query.only('id', 'ready', 'dirty', 'dirty_version')
+    snapshot = query.first()
+    if snapshot is None:
+        return None, 0, False
+    if not snapshot.ready:
+        if not force:
+            queue_user_stats_aggregate_refresh(user.id, scope, year)
+        return None, snapshot.dirty_version, False
+    if snapshot.dirty and not force:
+        queue_user_stats_aggregate_refresh(user.id, scope, year)
+    if force:
+        return None, snapshot.dirty_version, True
+    return (
+        _join_user_stats_materialization(snapshot.aggregates, snapshot.details),
+        snapshot.dirty_version,
+        True,
+    )
+
+
+def _save_stats_aggregate(user, scope, year, payload, dirty_version):
+    identity = _stats_aggregate_identity(user, scope, year)
+    aggregate_data, detail_data = _split_user_stats_materialization(scope, payload)
+    snapshot = UserStatsAggregate.objects.filter(**identity).first()
+    if snapshot is None:
+        UserStatsAggregate.objects.create(
+            **identity,
+            aggregates=aggregate_data,
+            details=detail_data,
+            ready=True,
+        )
+        return
+    snapshot.aggregates = aggregate_data
+    snapshot.details = detail_data
+    snapshot.generated_at = timezone.now()
+    snapshot.dirty = snapshot.dirty_version != dirty_version
+    snapshot.ready = True
+    snapshot.save(update_fields=['aggregates', 'details', 'generated_at', 'ready', 'dirty'])
 
 
 def _get_yearly_summary(base_qs, dur_qs, year=None):
@@ -569,12 +740,30 @@ def _get_weekday_chart(base_qs):
     return {'labels': ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], 'data': data}
 
 
-def generate_user_stats(user, year=None):
-    cache_key = f'user_stats_v6:{user.id}:{year or "all"}'
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
+def generate_user_stats(user, year=None, force=False, allow_pending=False):
+    snapshot_payload, snapshot_version, has_snapshot = _get_stats_aggregate_response(
+        user, UserStatsAggregate.SCOPE_PERSONAL, year, force=force
+    )
+    if snapshot_payload is not None:
+        return snapshot_payload
 
+    cache_key = f'user_stats_v7:{user.id}:{year or "all"}'
+    cached = cache.get(cache_key)
+    if cached and not force:
+        return cached
+    if not has_snapshot and not force:
+        legacy_payload = cache.get(f'user_stats_v6:{user.id}:{year or "all"}')
+        if legacy_payload is not None:
+            _save_stats_aggregate(
+                user, UserStatsAggregate.SCOPE_PERSONAL, year, legacy_payload, snapshot_version
+            )
+            cache.set(cache_key, legacy_payload, timeout=60 if settings.DEBUG else 3600)
+            return legacy_payload
+    if not has_snapshot and not force and allow_pending:
+        queue_user_stats_aggregate_refresh(
+            user.id, UserStatsAggregate.SCOPE_PERSONAL, year
+        )
+        return {'pending': True}
     current_yr = timezone.now().year
     is_guest = user.role == UserRole.GUEST
 
@@ -583,6 +772,9 @@ def generate_user_stats(user, year=None):
     if not is_guest:
         mate_ids = ViewUser.objects.filter(groups__users=user).values_list('id', flat=True)
         visible_user_ids.update(mate_ids)
+        has_group = bool(visible_user_ids - {user.id})
+    else:
+        has_group = ViewUserGroup.objects.filter(users=user).exists()
 
     history_years = (
         ViewHistory.objects.filter(users=user)
@@ -737,6 +929,7 @@ def generate_user_stats(user, year=None):
                 'years': all_years,
                 'role': user_role,
                 'photo_url': user.photo_url,
+                'has_group': has_group,
             },
             'summary': summary,
             'heatmap': [],
@@ -757,6 +950,9 @@ def generate_user_stats(user, year=None):
             },
         }
         cache.set(cache_key, result, timeout=cache_timeout)
+        _save_stats_aggregate(
+            user, UserStatsAggregate.SCOPE_PERSONAL, year, result, snapshot_version
+        )
         return result
 
     favs = _get_favorites(base_qs, dur_qs)
@@ -842,6 +1038,7 @@ def generate_user_stats(user, year=None):
             'photo_url': user.photo_url,
             'is_anonymous': user.is_anonymous,
             'privacy_choice_made': user.privacy_choice_made,
+            'has_group': has_group,
         },
         'summary': summary,
         'heatmap': _get_heatmap(dur_qs, year, all_years),
@@ -864,15 +1061,34 @@ def generate_user_stats(user, year=None):
         },
     }
     cache.set(cache_key, result, timeout=cache_timeout)
+    _save_stats_aggregate(
+        user, UserStatsAggregate.SCOPE_PERSONAL, year, result, snapshot_version
+    )
     return result
 
 
-def generate_group_stats(user, year=None):
-    cache_key = f'group_stats_v6:{user.id}:{year or "all"}'
-    cached = cache.get(cache_key)
-    if cached:
-        return cached
+def generate_group_stats(user, year=None, force=False, allow_pending=False):
+    snapshot_payload, snapshot_version, has_snapshot = _get_stats_aggregate_response(
+        user, UserStatsAggregate.SCOPE_GROUP, year, force=force
+    )
+    if snapshot_payload is not None:
+        return snapshot_payload
 
+    cache_key = f'group_stats_v7:{user.id}:{year or "all"}'
+    cached = cache.get(cache_key)
+    if cached and not force:
+        return cached
+    if not has_snapshot and not force:
+        legacy_payload = cache.get(f'group_stats_v6:{user.id}:{year or "all"}')
+        if legacy_payload is not None:
+            _save_stats_aggregate(
+                user, UserStatsAggregate.SCOPE_GROUP, year, legacy_payload, snapshot_version
+            )
+            cache.set(cache_key, legacy_payload, timeout=60 if settings.DEBUG else 3600)
+            return legacy_payload
+    if not has_snapshot and not force and allow_pending:
+        queue_user_stats_aggregate_refresh(user.id, UserStatsAggregate.SCOPE_GROUP, year)
+        return {'pending': True}
     groups = ViewUserGroup.objects.filter(users=user)
     if not groups.exists():
         return None
@@ -992,6 +1208,7 @@ def generate_group_stats(user, year=None):
 
     cache_timeout = 60 if settings.DEBUG else 3600
     cache.set(cache_key, result, timeout=cache_timeout)
+    _save_stats_aggregate(user, UserStatsAggregate.SCOPE_GROUP, year, result, snapshot_version)
     return result
 
 

@@ -1,5 +1,8 @@
 """Incrementally maintained, compact inputs for global person metrics."""
 
+import logging
+import time
+
 from django.db import connection, transaction
 from django.utils import timezone
 
@@ -156,6 +159,7 @@ def refresh_dirty_person_metric_summaries(batch_size=5000, force=False):
     if not force and not person_metric_summary_ready():
         return 0
 
+    started_at = time.monotonic()
     processed = 0
     while True:
         with transaction.atomic():
@@ -251,6 +255,11 @@ def refresh_dirty_person_metric_summaries(batch_size=5000, force=False):
                         )
                     _adjust_person_metric_rollups(canonical_ids, 1, cursor)
                 processed += len(dirty_ids)
+    logging.info(
+        'Metrics dirty refresh kind=person rows=%s seconds=%.3f.',
+        processed,
+        time.monotonic() - started_at,
+    )
     return processed
 
 

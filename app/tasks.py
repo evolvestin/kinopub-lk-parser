@@ -17,6 +17,7 @@ from celery.exceptions import Retry, SoftTimeLimitExceeded
 from django.conf import settings
 from django.core.cache import cache
 from django.core.management import call_command
+from django.db import connection
 from django.db.models import Q
 from django.utils import timezone
 from redis import Redis
@@ -33,6 +34,7 @@ from app.models import (
     SiteMetric,
     TaskRun,
     ViewUser,
+    UserStatsAggregate,
 )
 from app.services.error_aggregator import ErrorAggregator
 from app.services.metrics import (
@@ -77,6 +79,31 @@ if redis.call('get', KEYS[1]) == ARGV[1] then
 end
 return 0
 """
+
+METRICS_SNAPSHOT_REQUEST_LOCK = 'metrics:snapshot:request_lock'
+METRICS_SNAPSHOT_REQUEST_TTL = 120
+
+
+def queue_site_metrics_snapshot():
+    """Coalesce snapshot requests from closely spaced catalog writers."""
+    if not cache.add(
+        METRICS_SNAPSHOT_REQUEST_LOCK,
+        True,
+        timeout=METRICS_SNAPSHOT_REQUEST_TTL,
+    ):
+        return False
+
+    try:
+        update_site_metrics_task.apply_async(queue='metrics', expires=600)
+    except Exception:
+        cache.delete(METRICS_SNAPSHOT_REQUEST_LOCK)
+        raise
+    return True
+
+
+@shared_task(name='app.tasks.request_site_metrics_snapshot_task')
+def request_site_metrics_snapshot_task():
+    queue_site_metrics_snapshot()
 
 # Periodic tasks must not occupy a worker while waiting for a long-running
 # catalog writer. Celery Beat will enqueue them again on the next interval.
@@ -791,6 +818,58 @@ def precalculate_user_stats(user_id, year=None):
         pass
 
 
+@shared_task(name='app.tasks.refresh_user_stats_aggregate_task', time_limit=900, soft_time_limit=840)
+def refresh_user_stats_aggregate_task(user_id, scope, year=None):
+    refresh_key = f'user_stats_aggregate_refresh:{user_id}:{scope}:{year or "all"}'
+    started_at = time.monotonic()
+    query_timing = {'count': 0, 'seconds': 0.0, 'slowest_seconds': 0.0}
+
+    def time_query(execute, sql, params, many, context):
+        query_started_at = time.monotonic()
+        try:
+            return execute(sql, params, many, context)
+        finally:
+            elapsed = time.monotonic() - query_started_at
+            query_timing['count'] += 1
+            query_timing['seconds'] += elapsed
+            query_timing['slowest_seconds'] = max(query_timing['slowest_seconds'], elapsed)
+
+    refresh_succeeded = False
+    try:
+        user = ViewUser.objects.get(id=user_id)
+        with connection.execute_wrapper(time_query):
+            if scope == 'group':
+                from app.services.stats_calculator import generate_group_stats
+
+                result = generate_group_stats(user, year=year, force=True)
+            else:
+                result = generate_user_stats(user, year=year, force=True)
+        refresh_succeeded = result is not None
+        logging.info(
+            'User stats aggregate refreshed user=%s scope=%s year=%s in %.3fs; '
+            'SQL queries=%s, SQL time=%.3fs, slowest SQL=%.3fs.',
+            user_id,
+            scope,
+            year or 'all',
+            time.monotonic() - started_at,
+            query_timing['count'],
+            query_timing['seconds'],
+            query_timing['slowest_seconds'],
+        )
+    except ViewUser.DoesNotExist:
+        return
+    finally:
+        cache.delete(refresh_key)
+        if refresh_succeeded:
+            aggregate = UserStatsAggregate.objects.filter(
+                user_id=user_id, scope=scope, year=year, dirty=True
+            ).exists()
+            if aggregate:
+                from app.services.stats_calculator import queue_user_stats_aggregate_refresh
+
+                queue_user_stats_aggregate_refresh(user_id, scope, year)
+
+
 @shared_task
 @safe_execution
 def precalculate_all_stats():
@@ -847,7 +926,7 @@ def fetch_person_photos_task(limit=2000):
 
     if acquired:
         invalidate_duplicate_photo_urls_cache()
-        update_site_metrics_task.delay()
+        queue_site_metrics_snapshot()
 
 
 def get_kp_mapping():
@@ -883,7 +962,7 @@ def sync_poiskkino_ratings_task(self):
     # The catalog lock is released when both context managers above exit.
     # Queue the snapshot refresh only then, so the metrics worker does not
     # observe the writer lock and leave the dashboard on an old snapshot.
-    update_site_metrics_task.delay()
+    queue_site_metrics_snapshot()
 
 
 @shared_task(bind=True, max_retries=None)
@@ -918,6 +997,21 @@ def sync_imdb_data_task(self):
 @single_instance_task(lock_name=RedisLock.METRICS_SNAPSHOT, timeout=900)
 @safe_execution
 def update_site_metrics_task(self, timeout_retries=0):
+    snapshot_started_at = time.monotonic()
+    query_timing = {'count': 0, 'seconds': 0.0, 'slowest_seconds': 0.0}
+
+    def time_query(execute, sql, params, many, context):
+        started_at = time.monotonic()
+        try:
+            return execute(sql, params, many, context)
+        finally:
+            elapsed = time.monotonic() - started_at
+            query_timing['count'] += 1
+            query_timing['seconds'] += elapsed
+            query_timing['slowest_seconds'] = max(
+                query_timing['slowest_seconds'], elapsed
+            )
+
     # Do not run database-wide aggregates alongside catalog or external-rating
     # writes. IMDb sync uses EXTERNAL_RATING_WRITES without CATALOG_WRITES, so
     # both locks are required to keep the large scans off its write batches.
@@ -957,7 +1051,8 @@ def update_site_metrics_task(self, timeout_retries=0):
                     raise self.retry(countdown=300)
 
                 with metrics_statement_timeout():
-                    data = generate_global_metrics_snapshot()
+                    with connection.execute_wrapper(time_query):
+                        data = generate_global_metrics_snapshot()
     except SoftTimeLimitExceeded:
         if timeout_retries >= METRICS_TIMEOUT_RETRY_LIMIT:
             logging.error(
@@ -973,7 +1068,15 @@ def update_site_metrics_task(self, timeout_retries=0):
     SiteMetric.objects.create(key='global_snapshot', data=data)
     cache.set('metrics:person_detail:cache_version', int(time.time()), timeout=None)
     cache.delete('lock:queuing_global_snapshot')
-    logging.info('Global site metrics snapshot updated successfully.')
+    elapsed = time.monotonic() - snapshot_started_at
+    logging.info(
+        'Global site metrics snapshot updated successfully in %.3fs; '
+        'SQL queries=%s, SQL time=%.3fs, slowest SQL=%.3fs.',
+        elapsed,
+        query_timing['count'],
+        query_timing['seconds'],
+        query_timing['slowest_seconds'],
+    )
     # Keep person/duplicate detail queries lazy: warming them after every
     # snapshot can scan millions of Person rows even when nobody opens a page.
 
@@ -1154,4 +1257,4 @@ def enrich_tmdb_shows_task(limit: int = 5000):
 
     if catalog_acquired and rating_acquired:
         invalidate_duplicate_photo_urls_cache()
-        update_site_metrics_task.delay()
+        queue_site_metrics_snapshot()

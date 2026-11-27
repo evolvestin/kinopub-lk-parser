@@ -433,6 +433,8 @@ class MultiSchedule:
 
 CELERY_TASK_ROUTES = {
     'app.tasks.update_site_metrics_task': {'queue': 'metrics'},
+    'app.tasks.request_site_metrics_snapshot_task': {'queue': 'metrics'},
+    'app.tasks.refresh_user_stats_aggregate_task': {'queue': 'metrics'},
     'app.tasks.fetch_person_photos_task': {'queue': 'metrics'},
     # Cache warming scans the same large tables as snapshot generation. Keep
     # it on the single metrics worker so it cannot compete with a snapshot.
@@ -455,7 +457,7 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute='*/1'),  # Проверяем каждую минуту (отправка раз в 10 мин)
     },
     'update_site_metrics': {
-        'task': 'app.tasks.update_site_metrics_task',
+        'task': 'app.tasks.request_site_metrics_snapshot_task',
         # Keep the hourly frequency, but move the 12:00 run after the
         # 12:00 Poiskkino refresh (which normally finishes around :40).
         'schedule': MultiSchedule(

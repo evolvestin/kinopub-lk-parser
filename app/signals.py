@@ -8,12 +8,20 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import F
-from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete, pre_save
 from django.dispatch import Signal, receiver
 from django.utils import timezone
 
-from app.models import Person, TaskRun, UserRating, ViewHistory, ViewUser
+from app.models import (
+    Person,
+    TaskRun,
+    UserRating,
+    ViewHistory,
+    ViewUser,
+    ViewUserGroup,
+)
 from app.services.metrics import invalidate_duplicate_photo_urls_cache
+from app.services.stats_calculator import mark_user_stats_aggregates_dirty
 from app.telegram_bot import TelegramSender
 from shared.constants import DATETIME_FORMAT
 
@@ -170,51 +178,91 @@ def record_task_start(sender, **kwargs):
 @receiver(m2m_changed, sender=ViewHistory.users.through)
 def invalidate_stats_on_user_change(sender, instance, action, pk_set, **kwargs):
     try:
+        if action == 'pre_clear':
+            instance._stats_users_before_clear = set(
+                instance.users.values_list('id', flat=True)
+            )
+            return
         if action in ('post_add', 'post_remove', 'post_clear'):
             year = instance.view_date.year if instance.view_date else None
             user_ids = set(pk_set) if pk_set else set()
             user_ids.update(instance.users.values_list('id', flat=True))
+            user_ids.update(getattr(instance, '_stats_users_before_clear', set()))
 
             for uid in user_ids:
-                if year:
-                    cache.delete(f'user_stats:{uid}:{year}')
-                    cache.delete(f'user_stats_v6:{uid}:{year}')
-                    cache.delete(f'group_stats_v6:{uid}:{year}')
-                cache.delete(f'user_stats:{uid}:all')
-                cache.delete(f'user_stats_v6:{uid}:all')
-                cache.delete(f'group_stats_v6:{uid}:all')
+                mark_user_stats_aggregates_dirty(uid, year)
+            if action == 'post_clear':
+                instance._stats_users_before_clear = set()
     except Exception as e:
         logging.error(f'Error in invalidate_stats_on_user_change signal: {e}')
+
+
+@receiver(m2m_changed, sender=ViewUserGroup.users.through)
+def invalidate_stats_on_group_membership_change(sender, instance, action, pk_set, **kwargs):
+    if action == 'pre_clear':
+        instance._stats_members_before_clear = set(
+            instance.users.values_list('id', flat=True)
+        )
+        return
+    if action not in ('post_add', 'post_remove', 'post_clear'):
+        return
+    user_ids = set(pk_set or ())
+    user_ids.update(instance.users.values_list('id', flat=True))
+    user_ids.update(getattr(instance, '_stats_members_before_clear', set()))
+    for user_id in user_ids:
+        mark_user_stats_aggregates_dirty(user_id)
+    if action == 'post_clear':
+        instance._stats_members_before_clear = set()
+
+
+@receiver(post_save, sender=ViewUserGroup)
+def invalidate_stats_on_group_update(sender, instance, created, **kwargs):
+    if created:
+        return
+    for user_id in instance.users.values_list('id', flat=True):
+        mark_user_stats_aggregates_dirty(user_id)
+
+
+@receiver(pre_save, sender=ViewHistory)
+def capture_stats_before_history_change(sender, instance, **kwargs):
+    if not instance.pk:
+        instance._stats_previous_year = None
+        instance._stats_previous_user_ids = set()
+        return
+
+    previous = sender.objects.filter(pk=instance.pk).values('view_date').first()
+    if previous is None:
+        instance._stats_previous_year = None
+        instance._stats_previous_user_ids = set()
+        return
+
+    previous_date = previous['view_date']
+    instance._stats_previous_year = previous_date.year if previous_date else None
+    instance._stats_previous_user_ids = set(instance.users.values_list('id', flat=True))
 
 
 @receiver(post_save, sender=ViewHistory)
 def invalidate_stats_on_history_change(sender, instance, created, **kwargs):
     try:
-        year = instance.view_date.year if instance.view_date else None
-        for user in instance.users.all():
-            if year:
-                cache.delete(f'user_stats:{user.id}:{year}')
-                cache.delete(f'user_stats_v6:{user.id}:{year}')
-                cache.delete(f'group_stats_v6:{user.id}:{year}')
-            cache.delete(f'user_stats:{user.id}:all')
-            cache.delete(f'user_stats_v6:{user.id}:all')
-            cache.delete(f'group_stats_v6:{user.id}:all')
+        years = {instance.view_date.year if instance.view_date else None}
+        if not created:
+            years.add(getattr(instance, '_stats_previous_year', None))
+
+        user_ids = set(instance.users.values_list('id', flat=True))
+        user_ids.update(getattr(instance, '_stats_previous_user_ids', set()))
+        for user_id in user_ids:
+            for year in years:
+                mark_user_stats_aggregates_dirty(user_id, year)
     except Exception as e:
         logging.error(f'Error in invalidate_stats_on_history_change signal: {e}')
 
 
-@receiver(post_delete, sender=ViewHistory)
+@receiver(pre_delete, sender=ViewHistory)
 def invalidate_stats_on_history_delete(sender, instance, **kwargs):
     try:
         year = instance.view_date.year if instance.view_date else None
-        for user in instance.users.all():
-            if year:
-                cache.delete(f'user_stats:{user.id}:{year}')
-                cache.delete(f'user_stats_v6:{user.id}:{year}')
-                cache.delete(f'group_stats_v6:{user.id}:{year}')
-            cache.delete(f'user_stats:{user.id}:all')
-            cache.delete(f'user_stats_v6:{user.id}:all')
-            cache.delete(f'group_stats_v6:{user.id}:all')
+        for user_id in instance.users.values_list('id', flat=True):
+            mark_user_stats_aggregates_dirty(user_id, year)
     except Exception as e:
         logging.error(f'Error in invalidate_stats_on_history_delete signal: {e}')
 
@@ -244,10 +292,7 @@ def _invalidate_rating_cache(instance):
             years.add(instance.updated_at.year)
 
         for y in years:
-            cache.delete(f'user_stats_v6:{user_id}:{y}')
-            cache.delete(f'group_stats_v6:{user_id}:{y}')
-
-        cache.delete(f'user_stats_v6:{user_id}:all')
-        cache.delete(f'group_stats_v6:{user_id}:all')
+            mark_user_stats_aggregates_dirty(user_id, y)
+        mark_user_stats_aggregates_dirty(user_id)
     except Exception as e:
         logging.error(f'Error invalidating rating cache: {e}')

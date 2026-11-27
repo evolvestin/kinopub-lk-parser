@@ -79,6 +79,11 @@ urlpatterns = proxy_patterns + [
         views.webapp_get_detailed_stats,
         name='webapp_get_detailed_stats',
     ),
+    path(
+        'api/webapp/detailed_stats_periods/',
+        views.webapp_get_stats_periods,
+        name='webapp_get_stats_periods',
+    ),
     path('api/webapp/bake_stats/', views.webapp_bake_stats, name='webapp_bake_stats'),
     path(
         'api/webapp/shared_stats/<str:stat_id>/',

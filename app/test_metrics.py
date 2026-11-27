@@ -42,6 +42,7 @@ from app.services.metrics import (
     _unused_persons_from_summary,
     _snapshot_show_metric,
     get_duplicate_photo_urls_page,
+    get_duplicate_photo_url_group_members,
     get_global_metrics_history,
     get_has_rating_list,
     get_missing_status_list,
@@ -207,6 +208,33 @@ class ImdbMetricSplitTests(TestCase):
             [(person['id'], person['kinopoisk_person_id']) for person in items[0]['persons']],
             [(first.id, 101), (second.id, 202)],
         )
+
+    def test_large_duplicate_photo_group_members_are_loaded_in_bounded_pages(self):
+        shared_photo = 'https://image.example.test/large-shared-kp.jpg'
+        Person.objects.bulk_create(
+            [Person(name=f'KP Person {index}', kp_photo_url=shared_photo) for index in range(55)]
+        )
+        rebuild_person_photo_metric_summaries()
+        invalidate_duplicate_photo_urls_cache()
+
+        items, has_more = get_duplicate_photo_urls_page('KP', limit=10)
+
+        self.assertFalse(has_more)
+        self.assertEqual(len(items), 1)
+        group = items[0]
+        self.assertEqual(len(group['persons']), 50)
+        self.assertEqual(group['persons_total'], 55)
+        self.assertTrue(group['persons_has_more'])
+
+        next_page = get_duplicate_photo_url_group_members(
+            'KP',
+            shared_photo,
+            after_id=group['persons_after_id'],
+            limit=50,
+        )
+        self.assertEqual(next_page['total'], 55)
+        self.assertEqual(len(next_page['items']), 5)
+        self.assertFalse(next_page['has_more'])
 
 
 class ProfessionMetricTests(TestCase):

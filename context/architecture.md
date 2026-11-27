@@ -91,6 +91,28 @@ active diagnostics: every metric check still runs a fresh independent database q
 reuse the dashboard snapshot or a Redis result.
 
 
+## User Statistics Aggregates
+
+**RULE**: User-facing personal and group statistics are materialized per user and year in
+`UserStatsAggregate`; `year = NULL` represents all time. Do not restore a whole-response Redis
+snapshot as the primary storage or run the source-data aggregation on normal reads when a ready
+row exists.
+
+1. The unique `(user, scope, year)` constraint, including `NULLS NOT DISTINCT`, provides one
+   row per personal/group period and the index for period lookups.
+2. Source writes mark affected year(s) and all-time rows dirty, then queue a coalesced refresh on
+   transaction commit. A refresh aggregates that user's own data in the background; it must not
+   scan the catalog. Keep invalidation explicit for bulk writes that bypass model signals.
+3. A ready dirty row may be served stale while a refresh runs. `dirty_version` ensures a write
+   during a rebuild is not lost and causes another refresh to be queued.
+4. The WebApp reads the selected period first, then requests other years in one bulk indexed
+   query. Ready periods can be returned while missing/dirty periods are queued and polled in the
+   background. Group detail payloads are loaded only when the group view is requested.
+5. See `docs/user-stats-aggregates.md` for the full schema, invalidation sources, cold-build
+   behavior, polling intervals, code map, and verification limits. Do not state a 50 ms latency
+   target as measured until it has been benchmarked with representative database data.
+
+
 ## Display-Level Translation Policy
 
 **RULE**: All user-facing metadata fields, specifically `type` (e.g., "Series", "Movie", "3D Movie") and `status` (e.g., "Finished", "Ongoing"), MUST be translated to Russian at the display layer before rendering in the UI.
