@@ -196,11 +196,14 @@ def get_missing_country_meta_list():
 
 
 def calculate_total_countries_metric():
-    active_count = Country.objects.filter(show__isnull=False).distinct().count()
-    unused_count = Country.objects.filter(show__isnull=True).count()
+    show_country = Show.countries.through.objects.filter(country_id=OuterRef('pk'))
+    counts = Country.objects.annotate(has_show=Exists(show_country)).aggregate(
+        active=Count('id', filter=Q(has_show=True)),
+        unused=Count('id', filter=Q(has_show=False)),
+    )
     data = [
-        {'name': 'Активные', 'value': active_count},
-        {'name': 'Неиспользуемые', 'value': unused_count},
+        {'name': 'Активные', 'value': counts['active'] or 0},
+        {'name': 'Неиспользуемые', 'value': counts['unused'] or 0},
     ]
     return sorted(data, key=lambda x: x['value'], reverse=True)
 
@@ -425,27 +428,29 @@ def calculate_system_status_snapshot() -> dict:
     catalog tables.
     """
     cutoff_24h = timezone.now() - timedelta(days=1)
-    shows = Show.objects.aggregate(
-        latest=Max('created_at'),
-        ratings_kp=Max(
-            'poiskkino_updated_at',
-            filter=Q(poiskkino_updated_at__isnull=False),
-        ),
-        ratings_imdb=Max(
-            'imdb_rating_updated_at',
-            filter=Q(imdb_rating_updated_at__isnull=False),
-        ),
+    shows_latest = Show.objects.order_by('-created_at').values_list('created_at', flat=True).first()
+    ratings_kp_latest = (
+        Show.objects.filter(poiskkino_updated_at__isnull=False)
+        .order_by('-poiskkino_updated_at')
+        .values_list('poiskkino_updated_at', flat=True)
+        .first()
     )
-    logs = LogEntry.objects.aggregate(
-        parser_run=Max(
-            'created_at',
-            filter=Q(message__contains='Parser session finished'),
-        ),
-        errors_24h=Count(
-            'id',
-            filter=Q(created_at__gte=cutoff_24h, level__in=['ERROR', 'CRITICAL']),
-        ),
+    ratings_imdb_latest = (
+        Show.objects.filter(imdb_rating_updated_at__isnull=False)
+        .order_by('-imdb_rating_updated_at')
+        .values_list('imdb_rating_updated_at', flat=True)
+        .first()
     )
+    parser_run_latest = (
+        LogEntry.objects.filter(message__contains='Parser session finished')
+        .order_by('-created_at')
+        .values_list('created_at', flat=True)
+        .first()
+    )
+    errors_24h_count = LogEntry.objects.filter(
+        created_at__gte=cutoff_24h,
+        level__in=['ERROR', 'CRITICAL'],
+    ).count()
     users = ViewUser.objects.aggregate(
         total=Count('id'),
         active=Count('id', filter=Q(is_bot_active=True)),
@@ -454,25 +459,32 @@ def calculate_system_status_snapshot() -> dict:
     return {
         'last_actions': {
             'history': _format_snapshot_datetime(
-                ViewHistory.objects.aggregate(latest=Max('created_at'))['latest']
+                ViewHistory.objects.order_by('-created_at')
+                .values_list('created_at', flat=True)
+                .first()
             ),
-            'parser_run': _format_snapshot_datetime(logs['parser_run']),
-            'shows': _format_snapshot_datetime(shows['latest']),
-            'ratings_kp': _format_snapshot_datetime(shows['ratings_kp']),
-            'ratings_imdb': _format_snapshot_datetime(shows['ratings_imdb']),
+            'parser_run': _format_snapshot_datetime(parser_run_latest),
+            'shows': _format_snapshot_datetime(shows_latest),
+            'ratings_kp': _format_snapshot_datetime(ratings_kp_latest),
+            'ratings_imdb': _format_snapshot_datetime(ratings_imdb_latest),
             'durations': _format_snapshot_datetime(
-                ShowDuration.objects.aggregate(latest=Max('updated_at'))['latest']
+                ShowDuration.objects.order_by('-updated_at')
+                .values_list('updated_at', flat=True)
+                .first()
             ),
             'photos': _format_snapshot_datetime(
-                Person.objects.filter(is_photo_fetched=True).aggregate(
-                    latest=Max('updated_at')
-                )['latest']
+                Person.objects.filter(is_photo_fetched=True)
+                .order_by('-updated_at')
+                .values_list('updated_at', flat=True)
+                .first()
             ),
             'tg': _format_snapshot_datetime(
-                TelegramLog.objects.aggregate(latest=Max('created_at'))['latest']
+                TelegramLog.objects.order_by('-created_at')
+                .values_list('created_at', flat=True)
+                .first()
             ),
         },
-        'errors_24h_count': logs['errors_24h'] or 0,
+        'errors_24h_count': errors_24h_count,
         'bot_users_active': users['active'] or 0,
         'bot_users_total': users['total'] or 0,
     }

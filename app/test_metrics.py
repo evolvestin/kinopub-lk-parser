@@ -4,8 +4,10 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from app.models import (
+    Country,
     ExternalRating,
     Genre,
+    LogEntry,
     Person,
     PersonMetricAggregate,
     PersonMetricSummaryDirty,
@@ -16,6 +18,7 @@ from app.models import (
     SiteMetric,
 )
 from app.services.metrics import (
+    calculate_system_status_snapshot,
     calculate_duplicate_photo_urls_metric,
     calculate_en_professions_stats_metric,
     calculate_has_kp_metric,
@@ -27,6 +30,7 @@ from app.services.metrics import (
     calculate_missing_status_metric,
     calculate_persons_avatar_stats_metric,
     calculate_total_persons_by_show_type_metric,
+    calculate_total_countries_metric,
     calculate_total_shows_metric,
     calculate_tmdb_missing_durations_metric,
     calculate_tmdb_missing_status_metric,
@@ -709,6 +713,47 @@ class PersonPhotoMetricSummaryTests(TestCase):
         items, has_more = get_duplicate_photo_urls_page('KP', limit=10)
         self.assertEqual(items, [])
         self.assertFalse(has_more)
+
+
+class SystemStatusMetricTests(TestCase):
+    def test_latest_status_values_use_ordered_index_lookups(self):
+        Show.objects.create(title='Latest show', original_title='Latest show', type='Movie')
+        LogEntry.objects.create(
+            level='ERROR',
+            module='metrics-test',
+            message='Parser session finished with an error',
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            status = calculate_system_status_snapshot()
+
+        self.assertNotEqual(status['last_actions']['shows'], 'Никогда')
+        self.assertNotEqual(status['last_actions']['parser_run'], 'Никогда')
+        self.assertEqual(status['errors_24h_count'], 1)
+        sql = '\n'.join(query['sql'].lower() for query in queries)
+        self.assertNotIn('max(', sql)
+        self.assertIn('order by', sql)
+        self.assertIn('limit 1', sql)
+
+
+class CountryMetricTests(TestCase):
+    def test_active_countries_use_country_indexed_existence_checks(self):
+        active = Country.objects.create(name='Metric active country')
+        Country.objects.create(name='Metric unused country')
+        first = Show.objects.create(title='First country show', original_title='First', type='Movie')
+        second = Show.objects.create(title='Second country show', original_title='Second', type='Movie')
+        first.countries.add(active)
+        second.countries.add(active)
+
+        with CaptureQueriesContext(connection) as queries:
+            result = calculate_total_countries_metric()
+
+        self.assertEqual(
+            {entry['name']: entry['value'] for entry in result},
+            {'Активные': 1, 'Неиспользуемые': 1},
+        )
+        sql = '\n'.join(query['sql'].lower() for query in queries)
+        self.assertIn('exists', sql)
 
 
 class ShowMetricSummaryTests(TestCase):

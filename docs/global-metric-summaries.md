@@ -75,7 +75,10 @@ available to repair derived state.
 The status strip keeps fresh timestamps and a rolling 24-hour error count. Its
 large-table queries use partial B-tree indexes for the latest KP/IMDb sync,
 photo fetch, parser completion, and recent errors. These indexes are created
-concurrently so a release does not hold an exclusive table lock.
+concurrently so a release does not hold an exclusive table lock. Latest
+timestamps use ordered index lookups independently; country activity checks
+probe the small country dictionary against the relation index instead of
+grouping the full show-country table.
 
 This does not apply to health reports: each health check must issue its own
 fresh query. It also does not apply to a film card or catalog detail: those
