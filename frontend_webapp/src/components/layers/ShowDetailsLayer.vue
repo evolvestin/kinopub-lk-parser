@@ -758,6 +758,8 @@ const openRatingsDetails = (ratingType) => {
 
 <style scoped>
 .show-details-hero {
+    /* The shared hero zoom animation makes the poster visibly shrink after mount. */
+    animation: none;
     /* Keep the poster fade at the top, but do not fade controls placed below it. */
     mask-image: linear-gradient(to bottom, transparent, black 15%, black 100%);
     -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 100%);
@@ -766,9 +768,8 @@ const openRatingsDetails = (ratingType) => {
 .show-hero-controls {
     position: relative;
     z-index: 3;
-    height: 95%;
-    width: auto;
-    max-width: 85%;
+    width: min(calc(100vw - 80px), max(280px, 36vh));
+    max-width: 100%;
     aspect-ratio: 2 / 3;
     flex: 0 0 auto;
     display: flex;
@@ -776,13 +777,20 @@ const openRatingsDetails = (ratingType) => {
 }
 
 .show-poster-frame-inner {
-    position: relative;
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     min-width: 0;
-    flex: 0 0 auto;
-    display: flex;
-    align-items: flex-end;
+}
+
+.show-poster-frame-inner > .hero-poster {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    flex: none;
 }
 
 .detail-wishlist-btn:disabled,
