@@ -1,22 +1,11 @@
 <template>
-  <div class="layer-content">
+  <div class="layer-content" :aria-busy="!hasShowData">
     <div class="layer-header">
        <button class="tab clickable" @click="uiStore.popLayer">
          <span v-html="icons.chevron_left"></span> Назад
        </button>
-       <div class="layer-title-main">{{ show?.title || 'Загрузка' }}</div>
+       <div class="layer-title-main">{{ show.title || 'Загрузка' }}</div>
     </div>
-
-    <div v-if="!show" class="show-data-loading" aria-busy="true">
-      <div class="show-data-loading-poster">
-        <img v-if="posterPreviewUrl" :src="posterPreviewUrl" alt="" decoding="async">
-      </div>
-      <div class="show-data-loading-line show-data-loading-line-wide"></div>
-      <div class="show-data-loading-line"></div>
-      <div class="show-data-loading-card"></div>
-    </div>
-
-    <template v-if="show">
 
     <div class="hero-container show-details-hero">
       <div class="hero-bg" :style="{ backgroundImage: (activeBg && !isPosterBroken) ? `url(${activeBg})` : 'none' }"></div>
@@ -48,15 +37,15 @@
           ></button>
         </div>
 
-        <button class="detail-wishlist-btn anim-item" style="position: relative; animation-delay: 0s;" @click="openWishlistModal">
+        <button class="detail-wishlist-btn anim-item" :disabled="!hasShowData" style="position: relative; animation-delay: 0s;" @click="openWishlistModal">
           <span v-html="icons.bookmark_plus"></span>
           <div v-if="showWishlistGuide" class="guide-tooltip-left wishlist-guide">В избранное</div>
         </button>
-        <button class="detail-add-view-btn anim-item" style="position: relative; animation-delay: 0.1s;" @click="openAddView()">
+        <button class="detail-add-view-btn anim-item" :disabled="!hasShowData" style="position: relative; animation-delay: 0.1s;" @click="openAddView()">
           <span v-html="icons.eye"></span>
           <div v-if="showViewGuide" class="guide-tooltip-left view-guide">Отметить просмотр</div>
         </button>
-        <button class="detail-rate-btn anim-item" style="position: relative; animation-delay: 0.2s;" @click="openRating">
+        <button class="detail-rate-btn anim-item" :disabled="!hasShowData" style="position: relative; animation-delay: 0.2s;" @click="openRating">
           <span v-html="icons.star"></span>
           <div v-if="showRateGuide" class="guide-tooltip-left rate-guide">Поставить оценку</div>
         </button>
@@ -64,7 +53,7 @@
     </div>
 
     <div class="show-info">
-      <div class="show-title">{{ show.title }}</div>
+      <div class="show-title">{{ show.title || (hasShowData ? '' : 'Загрузка…') }}</div>
       <div class="show-orig" v-if="show.original_title !== show.title">{{ show.original_title }}</div>
       
       <div class="show-meta-tags">
@@ -96,7 +85,7 @@
 
     <div class="plot-box" v-if="show.plot" style="margin-top: 20px;">{{ show.plot }}</div>
 
-    <div v-if="!isSeries" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
+    <div v-if="hasShowData && !isSeries" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
       <div class="label" style="justify-content: space-between; align-items: center;">
         <div style="display:flex; align-items:center; gap:8px;">
           <div class="icon" style="color:var(--info)" v-html="icons.film"></div> Информация
@@ -213,7 +202,6 @@
         </div>
       </div>
     </template>
-    </template>
   </div>
 </template>
 
@@ -234,7 +222,12 @@ const uiStore = useUIStore()
 const statsStore = useStatsStore()
 const router = useRouter()
 
-const show = ref(null)
+const show = ref({
+  title: '', original_title: '', countries: [], year: null, type: '', is_3d: false,
+  status: '', kinopoisk_rating: null, imdb_rating: null, internal_rating: null,
+  plot: '', total_duration: null, genres: [], crew: []
+})
+const hasShowData = ref(false)
 const activePoster = ref('')
 const activeBg = ref('')
 const activePosterIndex = ref(0)
@@ -255,13 +248,17 @@ const posterPreviewUrl = computed(() => {
   return uiStore.showPosterPreviews[String(props.showId)] || ''
 })
 
+// Initialize the poster in setup so the first render uses the preview already
+// shown by the clicked card; the content tree itself never swaps to a skeleton.
+activePoster.value = posterPreviewUrl.value
+
 watch(() => activePoster.value, (newUrl) => {
   if (newUrl) {
     isPosterBroken.value = isImageBroken(newUrl)
   } else {
     isPosterBroken.value = false
   }
-})
+}, { immediate: true })
 
 const validatePoster = (e) => {
   if (e.target.naturalWidth === 208 && e.target.naturalHeight === 304) {
@@ -416,7 +413,7 @@ const cacheKey = computed(() => {
 })
 
 const seasonsData = computed(() => {
-  if (!show.value) return []
+  if (!hasShowData.value) return []
   if (props.demoMode) return demoSeasons.value
   return uiStore.episodesCache[cacheKey.value] || []
 })
@@ -458,7 +455,7 @@ const showMuteGuide = computed(() => !uiStore.dismissedHints['mute_guide'] && !h
 
 const currentPersonalRating = computed(() => {
   if (props.demoMode) return null
-  if (!show.value) return null
+  if (!hasShowData.value) return null
   if (statsStore.isShared) {
     return show.value.personal_rating
   }
@@ -471,7 +468,7 @@ const viewerRating = computed(() => {
 })
 
 const isSeries = computed(() => {
-  return show.value && isSeriesType(show.value.type)
+  return hasShowData.value && isSeriesType(show.value.type)
 })
 
 const isSeasonFullyWatched = (s) => {
@@ -492,7 +489,7 @@ const getSeasonButtonStyle = (s) => {
 }
 
 const isAllEpisodesWatched = computed(() => {
-  if (!show.value) return false
+  if (!hasShowData.value) return false
   if (!isSeries.value) return !!lastViewDisplay.value
   if (!seasonsData.value || seasonsData.value.length === 0) return false
   return seasonsData.value.every(s => s.episodes && s.episodes.length > 0 && s.episodes.every(e => e.watched))
@@ -505,12 +502,12 @@ const isActiveSeasonFullyWatched = computed(() => {
 })
 
 const showTypeRu = computed(() => {
-  if (!show.value) return ''
+  if (!hasShowData.value) return ''
   return formatShowTypeRu(show.value.type)
 })
 
 const showStatusRu = computed(() => {
-  if (!show.value) return ''
+  if (!hasShowData.value) return ''
   const mapping = {
     'Finished': 'Завершен',
     'Ongoing': 'В эфире',
@@ -522,14 +519,14 @@ const showStatusRu = computed(() => {
 })
 
 const shouldShowStatus = computed(() => {
-  if (!show.value || !show.value.status) return false
+  if (!hasShowData.value || !show.value.status) return false
   if (!isSeries.value) return false
   return true
 })
 
 const lastViewDisplay = computed(() => {
   if (props.demoMode) return null
-  if (!show.value) return null
+  if (!hasShowData.value) return null
   return show.value.last_view?.display || null
 })
 
@@ -537,6 +534,7 @@ const loadShowData = async () => {
   if (!props.demoMode && uiStore.showsCache[cacheKey.value]) {
     const cachedData = uiStore.showsCache[cacheKey.value]
     show.value = cachedData
+    hasShowData.value = true
     isMuted.value = cachedData.is_muted
     hasAnyMuted.value = cachedData.has_any_muted || false
     setInitialPoster(cachedData)
@@ -554,10 +552,12 @@ const loadShowData = async () => {
     const data = await api.get(url)
     if (props.demoMode) {
       show.value = { ...data, personal_rating: null, internal_rating: null, last_view: null, is_muted: false, has_any_muted: false }
+      hasShowData.value = true
       isMuted.value = false
       hasAnyMuted.value = false
     } else {
       show.value = data
+      hasShowData.value = true
       isMuted.value = data.is_muted
       hasAnyMuted.value = data.has_any_muted || false
       uiStore.showsCache[cacheKey.value] = data
@@ -593,7 +593,7 @@ const loadShowData = async () => {
 
     setInitialPoster(data)
   } catch (e) {
-    if (!show.value) {
+    if (!hasShowData.value) {
       console.error('[ShowDetailsLayer] Failed to load show:', e)
       uiStore.showToast('Ошибка загрузки')
       uiStore.popLayer()
@@ -817,35 +817,6 @@ const openRatingsDetails = (ratingType) => {
     }
 }
 
-.show-data-loading {
-    padding: 20px 16px 40px;
-}
-
-.show-data-loading-line,
-.show-data-loading-card {
-    background: linear-gradient(100deg, var(--bg-input) 30%, var(--bg-card) 50%, var(--bg-input) 70%);
-    background-size: 300% 100%;
-    animation: show-data-loading-shimmer 1.2s ease-in-out infinite;
-    border-radius: 16px;
-}
-
-.show-data-loading-poster {
-    width: min(58vw, 220px);
-    aspect-ratio: 2 / 3;
-    margin: 0 auto 20px;
-    border-radius: 20px;
-    overflow: hidden;
-    background: var(--bg-input);
-    animation: none;
-}
-
-.show-data-loading-poster img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
 .hero-poster.is-blank {
     background: var(--bg-input);
     border-radius: 12px;
@@ -855,26 +826,6 @@ const openRatingsDetails = (ratingType) => {
 
 .hero-poster.is-loading {
     background: var(--bg-input);
-}
-
-.show-data-loading-line {
-    width: 62%;
-    height: 18px;
-    margin: 0 auto 12px;
-}
-
-.show-data-loading-line-wide {
-    width: 82%;
-}
-
-.show-data-loading-card {
-    height: 110px;
-    margin-top: 24px;
-}
-
-@keyframes show-data-loading-shimmer {
-    0% { background-position: 100% 0; }
-    100% { background-position: -100% 0; }
 }
 
 .ep-badge {
