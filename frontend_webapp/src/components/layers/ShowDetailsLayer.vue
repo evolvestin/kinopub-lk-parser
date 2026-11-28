@@ -4,7 +4,7 @@
        <button class="tab clickable" @click="uiStore.popLayer">
          <span v-html="icons.chevron_left"></span> Назад
        </button>
-       <div class="layer-title-main">{{ show.title || 'Загрузка' }}</div>
+       <div class="layer-title-main" :class="{ 'is-loading': !hasShowData }">{{ show.title }}</div>
     </div>
 
     <div class="hero-container show-details-hero">
@@ -53,23 +53,23 @@
     </div>
 
     <div class="show-info">
-      <div class="show-title">{{ show.title || (hasShowData ? '' : 'Загрузка…') }}</div>
+      <div class="show-title" :class="{ 'is-loading': !hasShowData }">{{ show.title }}</div>
       <div class="show-orig" v-if="show.original_title !== show.title">{{ show.original_title }}</div>
       
-      <div class="show-meta-tags">
+      <div class="show-meta-tags loading-countries" :class="{ 'is-loading': !hasShowData }">
         <div v-for="c in show.countries" :key="c.id" class="sm-tag clickable" @click="uiStore.openLayer('country', c.id)">
           {{ c.emoji }} {{ c.name }}
         </div>
       </div>
 
-      <div class="show-meta-tags">
+      <div class="show-meta-tags loading-facts" :class="{ 'is-loading': !hasShowData }">
         <div v-if="show.year" class="sm-tag clickable" @click="uiStore.openLayer('year', show.year)">{{ show.year }}</div>
         <div v-if="show.type" class="sm-tag clickable" style="color:var(--info)" @click="uiStore.openLayer('show_type', show.type)">{{ showTypeRu }}</div>
         <div v-if="show.is_3d" class="sm-tag" style="color:var(--accent); border-color:var(--accent);">3D-копия</div>
         <div v-if="shouldShowStatus" class="sm-tag clickable" @click="uiStore.openLayer('status', show.status)">{{ showStatusRu }}</div>
       </div>
 
-      <div class="show-meta-tags">
+      <div class="show-meta-tags loading-ratings" :class="{ 'is-loading': !hasShowData }">
         <div v-if="show.kinopoisk_rating" class="sm-tag clickable" style="background:rgba(241, 90, 36, 0.15); color:#f15a24; border:none" @click="openRatingsDetails('kp')">KP {{ show.kinopoisk_rating }}</div>
         <div v-if="show.imdb_rating" class="sm-tag clickable" style="background:rgba(245, 197, 24, 0.15); color:#f5c518; border:none" @click="openRatingsDetails('imdb')">IMDb {{ show.imdb_rating }}</div>
         <div v-if="show.internal_rating" class="sm-tag clickable" style="background:var(--accent-dim); color:var(--accent); border:none" @click="openRatingsDetails('lr')">★ {{ show.internal_rating.toFixed(1) }}</div>
@@ -83,7 +83,10 @@
       </div>
     </div>
 
-    <div class="plot-box" v-if="show.plot" style="margin-top: 20px;">{{ show.plot }}</div>
+    <div class="plot-box" v-if="!hasShowData || show.plot" :class="{ 'is-loading': !hasShowData }" style="margin-top: 20px;">
+      <span v-if="!hasShowData" class="plot-skeleton-lines" aria-hidden="true"></span>
+      <template v-else>{{ show.plot }}</template>
+    </div>
 
     <div v-if="hasShowData && !isSeries" style="margin-bottom: 24px; animation: fadeInUp 0.5s ease-out 0.5s both;">
       <div class="label" style="justify-content: space-between; align-items: center;">
@@ -758,6 +761,72 @@ const openRatingsDetails = (ratingType) => {
     /* Keep the poster fade at the top, but do not fade controls placed below it. */
     mask-image: linear-gradient(to bottom, transparent, black 15%, black 100%);
     -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 100%);
+}
+
+.layer-title-main.is-loading,
+.show-title.is-loading {
+    color: transparent;
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+}
+
+.layer-title-main.is-loading::after,
+.show-title.is-loading::after,
+.show-meta-tags.is-loading::before,
+.plot-skeleton-lines {
+    content: "";
+    display: block;
+    border-radius: 8px;
+    background: linear-gradient(100deg, var(--bg-input) 30%, var(--bg-card) 50%, var(--bg-input) 70%);
+    background-size: 300% 100%;
+    animation: show-detail-shimmer 1.2s ease-in-out infinite;
+}
+
+.layer-title-main.is-loading::after {
+    position: absolute;
+    inset: 2px 0;
+    width: min(42vw, 170px);
+}
+
+.show-title.is-loading::after {
+    position: absolute;
+    inset: 2px 14%;
+    height: 0.9em;
+}
+
+.show-meta-tags.is-loading {
+    min-height: 28px;
+    align-items: center;
+}
+
+.show-meta-tags.is-loading::before {
+    width: 38%;
+    height: 24px;
+}
+
+.show-meta-tags.loading-facts.is-loading::before {
+    width: 52%;
+}
+
+.show-meta-tags.loading-ratings.is-loading::before {
+    width: 44%;
+}
+
+.plot-box.is-loading {
+    min-height: 92px;
+    background: transparent;
+    border: 0;
+}
+
+.plot-skeleton-lines {
+    height: 72px;
+    margin: 4px 0;
+}
+
+@keyframes show-detail-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
 }
 
 .poster-switcher {
