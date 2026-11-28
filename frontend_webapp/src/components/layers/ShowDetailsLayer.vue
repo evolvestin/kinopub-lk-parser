@@ -11,8 +11,8 @@
       <div class="hero-bg" :style="{ backgroundImage: (activeBg && !isPosterBroken) ? `url(${activeBg})` : 'none' }"></div>
       <div class="hero-gradient"></div>
       
-      <div style="position: relative; z-index: 3; height: 95%; max-width: 85%; aspect-ratio: 2/3; display: flex; align-items: flex-end;">
-        <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: flex-end;">
+      <div class="show-hero-controls">
+        <div class="show-poster-frame-inner">
           <img v-if="activePoster && !isPosterBroken" :src="activePoster" class="hero-poster" :class="{ 'is-loading': isPosterLoading }" style="margin: 0;" alt="poster" @load="validatePoster" @error="handlePosterError">
           <div v-else class="hero-poster is-blank" aria-hidden="true"></div>
           
@@ -761,6 +761,39 @@ const openRatingsDetails = (ratingType) => {
     /* Keep the poster fade at the top, but do not fade controls placed below it. */
     mask-image: linear-gradient(to bottom, transparent, black 15%, black 100%);
     -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 100%);
+}
+
+.show-hero-controls {
+    position: relative;
+    z-index: 3;
+    height: 95%;
+    width: auto;
+    max-width: 85%;
+    aspect-ratio: 2 / 3;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-end;
+}
+
+.show-poster-frame-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-end;
+}
+
+.detail-wishlist-btn:disabled,
+.detail-add-view-btn:disabled,
+.detail-rate-btn:disabled {
+    opacity: 0.42 !important;
+    filter: grayscale(0.65);
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
+    transition: none !important;
 }
 
 .layer-title-main.is-loading,
